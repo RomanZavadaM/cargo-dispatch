@@ -322,8 +322,8 @@ async fn main() -> Result<()> {
         trip_count = persisted.trips.len(),
         "starting control prototype"
     );
-    let driver_base_url = std::env::var("CARGO_DRIVER_BASE_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:8080/".into());
+    let driver_base_url =
+        std::env::var("CARGO_DRIVER_BASE_URL").unwrap_or_else(|_| "http://127.0.0.1:8080/".into());
     let driver_base_url = driver_base_url.trim_end_matches('/');
 
     for (index, trip) in persisted.trips.iter().enumerate() {
