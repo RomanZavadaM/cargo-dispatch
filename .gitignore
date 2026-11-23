@@ -31,3 +31,7 @@ Thumbs.db
 .env
 .env.*
 secrets/
+
+# Connectivity prototype runtime state
+/prototype-control-state.json
+/prototype-received/
