@@ -317,7 +317,6 @@ fn send_json(tx: &Tx, value: &SignalMessage) {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -362,17 +361,23 @@ mod tests {
 
         state.controls.write().await.insert(control_a, control_a_tx);
         state.controls.write().await.insert(control_b, control_b_tx);
-        state.browsers.write().await.insert(browser_a, browser_a_tx.clone());
+        state
+            .browsers
+            .write()
+            .await
+            .insert(browser_a, browser_a_tx.clone());
         state.browsers.write().await.insert(browser_b, browser_b_tx);
 
-        state.trips.write().await.insert(
-            trip_a,
-            registration(control_a, "token-a", Some(browser_a)),
-        );
-        state.trips.write().await.insert(
-            trip_b,
-            registration(control_b, "token-b", Some(browser_b)),
-        );
+        state
+            .trips
+            .write()
+            .await
+            .insert(trip_a, registration(control_a, "token-a", Some(browser_a)));
+        state
+            .trips
+            .write()
+            .await
+            .insert(trip_b, registration(control_b, "token-b", Some(browser_b)));
 
         let offer = SignalMessage::Offer {
             trip_session_id: trip_a,
@@ -382,15 +387,26 @@ mod tests {
 
         relay_to_peer(&state, trip_a, &browser_a_tx, offer.clone()).await;
 
-        let delivered = control_a_rx.try_recv().expect("trip A control receives offer");
+        let delivered = control_a_rx
+            .try_recv()
+            .expect("trip A control receives offer");
         let Message::Text(text) = delivered else {
             panic!("expected text signaling message");
         };
         let decoded: SignalMessage = serde_json::from_str(&text).expect("valid signaling JSON");
         assert_eq!(decoded, offer);
 
-        assert!(browser_a_rx.try_recv().is_err(), "sender must not receive its own offer");
-        assert!(control_b_rx.try_recv().is_err(), "trip B control must stay isolated");
-        assert!(browser_b_rx.try_recv().is_err(), "trip B browser must stay isolated");
+        assert!(
+            browser_a_rx.try_recv().is_err(),
+            "sender must not receive its own offer"
+        );
+        assert!(
+            control_b_rx.try_recv().is_err(),
+            "trip B control must stay isolated"
+        );
+        assert!(
+            browser_b_rx.try_recv().is_err(),
+            "trip B browser must stay isolated"
+        );
     }
 }
