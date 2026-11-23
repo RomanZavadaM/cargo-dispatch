@@ -1,9 +1,12 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use cargo_connectivity_protocol::{Endpoint, IceServerConfig, SignalMessage};
+use cargo_connectivity_protocol::{
+    Endpoint, FileTransferControl, IceServerConfig, SignalMessage,
+};
 use futures_util::{SinkExt, StreamExt};
+use sha2::{Digest, Sha256};
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -16,6 +19,19 @@ use webrtc::{
     },
     runtime::{Runtime, Sender, channel, default_runtime},
 };
+
+const MAX_PROTOTYPE_FILE_SIZE: u64 = 64 * 1024 * 1024;
+
+struct IncomingFile {
+    file_id: Uuid,
+    name: String,
+    mime_type: String,
+    expected_size: u64,
+    expected_sha256: String,
+    expected_chunks: u32,
+    received_chunks: u32,
+    data: Vec<u8>,
+}
 
 #[derive(Clone)]
 struct ControlHandler {
@@ -41,6 +57,7 @@ impl PeerConnectionEventHandler for ControlHandler {
         self.runtime.spawn(Box::pin(async move {
             let label = data_channel.label().await.unwrap_or_default();
             let id = data_channel.id();
+            let mut incoming_file: Option<IncomingFile> = None;
             info!(%label, %id, "data channel announced");
 
             while let Some(event) = data_channel.poll().await {
@@ -49,6 +66,121 @@ impl PeerConnectionEventHandler for ControlHandler {
                         info!(%label, %id, "data channel open");
                         if label == "control" {
                             let _ = data_channel.send_text("control-ready").await;
+                        }
+                    }
+                    DataChannelEvent::OnMessage(message) if label == "files" => {
+                        if message.is_string {
+                            let text = String::from_utf8_lossy(&message.data);
+                            match serde_json::from_str::<FileTransferControl>(&text) {
+                                Ok(FileTransferControl::FileStart {
+                                    file_id,
+                                    name,
+                                    mime_type,
+                                    size,
+                                    sha256,
+                                    chunk_count,
+                                    ..
+                                }) => {
+                                    if size > MAX_PROTOTYPE_FILE_SIZE {
+                                        send_file_ack(
+                                            &data_channel,
+                                            file_id,
+                                            0,
+                                            String::new(),
+                                            false,
+                                            format!(
+                                                "prototype limit exceeded: {size} > {MAX_PROTOTYPE_FILE_SIZE}"
+                                            ),
+                                        )
+                                        .await;
+                                        continue;
+                                    }
+
+                                    incoming_file = Some(IncomingFile {
+                                        file_id,
+                                        name,
+                                        mime_type,
+                                        expected_size: size,
+                                        expected_sha256: sha256,
+                                        expected_chunks: chunk_count,
+                                        received_chunks: 0,
+                                        data: Vec::new(),
+                                    });
+                                    info!(%file_id, size, "file transfer started");
+                                }
+                                Ok(FileTransferControl::FileEnd { file_id }) => {
+                                    let Some(file) = incoming_file.take() else {
+                                        send_file_ack(
+                                            &data_channel,
+                                            file_id,
+                                            0,
+                                            String::new(),
+                                            false,
+                                            "file_end without file_start".into(),
+                                        )
+                                        .await;
+                                        continue;
+                                    };
+
+                                    if file.file_id != file_id {
+                                        send_file_ack(
+                                            &data_channel,
+                                            file_id,
+                                            file.data.len() as u64,
+                                            String::new(),
+                                            false,
+                                            "file_id mismatch".into(),
+                                        )
+                                        .await;
+                                        continue;
+                                    }
+
+                                    let actual_sha256 =
+                                        format!("{:x}", Sha256::digest(&file.data));
+                                    let size_ok = file.data.len() as u64 == file.expected_size;
+                                    let hash_ok = actual_sha256 == file.expected_sha256;
+                                    let chunks_ok = file.received_chunks == file.expected_chunks;
+                                    let ok = size_ok && hash_ok && chunks_ok;
+
+                                    let message = if ok {
+                                        match save_received_file(&file) {
+                                            Ok(path) => format!("saved to {}", path.display()),
+                                            Err(error) => format!("verified but save failed: {error}"),
+                                        }
+                                    } else {
+                                        format!(
+                                            "verification failed: size={size_ok}, sha256={hash_ok}, chunks={chunks_ok}"
+                                        )
+                                    };
+
+                                    info!(
+                                        %file_id,
+                                        received_size = file.data.len(),
+                                        %actual_sha256,
+                                        ok,
+                                        "file transfer completed"
+                                    );
+
+                                    send_file_ack(
+                                        &data_channel,
+                                        file_id,
+                                        file.data.len() as u64,
+                                        actual_sha256,
+                                        ok,
+                                        message,
+                                    )
+                                    .await;
+                                }
+                                Ok(FileTransferControl::FileAck { .. }) => {}
+                                Err(error) => {
+                                    warn!(%error, message = %text, "invalid file control message");
+                                }
+                            }
+                        } else if let Some(file) = incoming_file.as_mut() {
+                            file.data.extend_from_slice(&message.data);
+                            file.received_chunks = file.received_chunks.saturating_add(1);
+                        } else {
+                            warn!("binary file chunk received without file_start");
                         }
                     }
                     DataChannelEvent::OnMessage(message) => {
@@ -217,6 +349,48 @@ fn to_rtc_ice_server(server: IceServerConfig) -> RTCIceServer {
         username: server.username,
         credential: server.credential,
     }
+}
+
+async fn send_file_ack(
+    data_channel: &Arc<dyn DataChannel>,
+    file_id: Uuid,
+    received_size: u64,
+    sha256: String,
+    ok: bool,
+    message: String,
+) {
+    let ack = FileTransferControl::FileAck {
+        file_id,
+        received_size,
+        sha256,
+        ok,
+        message,
+    };
+    if let Ok(text) = serde_json::to_string(&ack) {
+        let _ = data_channel.send_text(&text).await;
+    }
+}
+
+fn save_received_file(file: &IncomingFile) -> std::io::Result<PathBuf> {
+    let dir = PathBuf::from("prototype-received");
+    std::fs::create_dir_all(&dir)?;
+
+    let safe_name: String = file
+        .name
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect();
+
+    let path = dir.join(format!("{}-{}", file.file_id, safe_name));
+    std::fs::write(&path, &file.data)?;
+    info!(mime_type = %file.mime_type, path = %path.display(), "prototype file saved");
+    Ok(path)
 }
 
 async fn send_signal<S>(sink: &mut S, signal: &SignalMessage) -> Result<()>
