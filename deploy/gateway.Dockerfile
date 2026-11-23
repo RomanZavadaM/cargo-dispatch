@@ -2,9 +2,10 @@ FROM rust:1.91-bookworm AS build
 
 WORKDIR /src
 COPY Cargo.toml ./
+COPY Cargo.lock ./
 COPY crates ./crates
 COPY web ./web
-RUN cargo build --release -p cargo-connectivity-gateway
+RUN cargo build --locked --release -p cargo-connectivity-gateway
 
 FROM debian:bookworm-slim
 
