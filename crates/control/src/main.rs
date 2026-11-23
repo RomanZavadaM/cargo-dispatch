@@ -10,7 +10,8 @@ use uuid::Uuid;
 use webrtc::{
     data_channel::{DataChannel, DataChannelEvent},
     peer_connection::{
-        MediaEngine, PeerConnectionBuilder, PeerConnectionEventHandler, RTCConfigurationBuilder,
+        MediaEngine, PeerConnection, PeerConnectionBuilder, PeerConnectionEventHandler,
+        RTCConfigurationBuilder,
         RTCIceGatheringState, RTCIceServer, RTCPeerConnectionState, RTCSessionDescription,
         Registry, register_default_interceptors,
     },
