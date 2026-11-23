@@ -48,8 +48,10 @@ JavaScript у `web/` — лише браузерний тестовий harness 
 - Rust format/check/clippy/tests;
 - синтаксис браузерного harness;
 - збірка на Windows і macOS;
-- gateway Docker image та Compose validation;
+- Compose validation;
 - relay-only WebRTC data-channel через локально піднятий coturn з time-limited secret credentials.
+
+Gateway Docker image повторно перевіряється після уточнення фактичного MSRV WebRTC-стека до Rust 1.91; до зеленого server-package job не вважати Docker image підтвердженим.
 
 Ще не перевірено без реального публічного вузла й телефона:
 - direct WebRTC через реальні NAT/CGNAT;
@@ -58,4 +60,4 @@ JavaScript у `web/` — лише браузерний тестовий harness 
 - поведінка мобільного браузера при переході в навігатор.
 
 
-Технічний baseline прототипу: Rust 1.89+ (актуальна залежність uuid цього вимагає).
+Технічний baseline прототипу: Rust 1.91+. Причина — `webrtc-rs 0.21.1` / `rtc-mdns` використовує API `Ipv4Addr::from_octets`, стабільний від Rust 1.91.
