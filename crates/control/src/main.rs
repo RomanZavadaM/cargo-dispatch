@@ -411,8 +411,7 @@ async fn run_signaling_session(
                 servers,
                 expires_at,
             } if known_trips.contains(&trip_session_id) => {
-                let ice_servers: Vec<_> =
-                    servers.into_iter().map(to_rtc_ice_server).collect();
+                let ice_servers: Vec<_> = servers.into_iter().map(to_rtc_ice_server).collect();
                 info!(
                     %trip_session_id,
                     server_count = ice_servers.len(),
@@ -678,10 +677,7 @@ async fn send_file_ack(
     }
 }
 
-fn save_received_file(
-    file: &IncomingFile,
-    trip_session_id: Uuid,
-) -> std::io::Result<PathBuf> {
+fn save_received_file(file: &IncomingFile, trip_session_id: Uuid) -> std::io::Result<PathBuf> {
     let dir = PathBuf::from("prototype-received").join(trip_session_id.to_string());
     std::fs::create_dir_all(&dir)?;
 
