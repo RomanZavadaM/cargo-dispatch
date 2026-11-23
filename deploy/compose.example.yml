@@ -1,0 +1,33 @@
+services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: deploy/gateway.Dockerfile
+    restart: unless-stopped
+    environment:
+      CARGO_STUN_URL: "stun:${CARGO_PUBLIC_HOST}:3478"
+      CARGO_TURN_URLS: "turn:${CARGO_PUBLIC_HOST}:3478?transport=udp,turn:${CARGO_PUBLIC_HOST}:3478?transport=tcp"
+      CARGO_TURN_SECRET: "${CARGO_TURN_SECRET}"
+      CARGO_TURN_TTL_SECS: "3600"
+      RUST_LOG: "cargo_connectivity_gateway=info"
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  coturn:
+    image: coturn/coturn:4.19.2-r0
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      DETECT_EXTERNAL_IP: "yes"
+      DETECT_RELAY_IP: "yes"
+    command:
+      - "-n"
+      - "--log-file=stdout"
+      - "--fingerprint"
+      - "--use-auth-secret"
+      - "--static-auth-secret=${CARGO_TURN_SECRET}"
+      - "--realm=${CARGO_TURN_REALM}"
+      - "--no-multicast-peers"
+      - "--no-cli"
+      - "--min-port=49160"
+      - "--max-port=49200"
