@@ -86,3 +86,13 @@ jobs:
       - name: Show coturn log on failure
         if: failure()
         run: cat /tmp/coturn.log || true
+
+  server-package:
+    name: Server package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose
+        run: docker compose --env-file deploy/.env.example -f deploy/compose.example.yml config >/dev/null
+      - name: Build gateway image
+        run: docker build -f deploy/gateway.Dockerfile -t cargo-connectivity-gateway:test .
