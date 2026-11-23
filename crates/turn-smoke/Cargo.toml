@@ -1,0 +1,15 @@
+[package]
+name = "cargo-turn-smoke"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+base64.workspace = true
+hmac.workspace = true
+sha1.workspace = true
+tokio.workspace = true
+webrtc.workspace = true
