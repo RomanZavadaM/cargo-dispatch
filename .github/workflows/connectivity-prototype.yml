@@ -98,3 +98,14 @@ jobs:
         run: docker compose --env-file deploy/.env.example -f deploy/compose.example.yml config >/dev/null
       - name: Build gateway image
         run: docker build -f deploy/gateway.Dockerfile -t cargo-connectivity-gateway:test .
+
+  msrv:
+    name: MSRV 1.89
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.89"
+      - name: Check workspace on declared minimum Rust
+        run: cargo check --workspace --all-targets
