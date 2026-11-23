@@ -44,7 +44,10 @@ async fn main() {
 
     let state = AppState::default();
     let app = Router::new()
-        .route("/", get(|| async { Html(include_str!("../../../web/index.html")) }))
+        .route(
+            "/",
+            get(|| async { Html(include_str!("../../../web/index.html")) }),
+        )
         .route("/app.js", get(app_js))
         .route("/health", get(|| async { "ok" }))
         .route("/signal", get(signal_ws))
