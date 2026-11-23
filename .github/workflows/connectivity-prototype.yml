@@ -104,13 +104,13 @@ jobs:
           for i in $(seq 1 20); do
             if curl --fail --silent http://127.0.0.1:18080/health | grep -q '^ok
   msrv:
-    name: MSRV 1.89
+    name: MSRV 1.91
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.89"
+          toolchain: "1.91"
       - name: Check workspace on declared minimum Rust
         run: cargo check --workspace --all-targets
 ; then
