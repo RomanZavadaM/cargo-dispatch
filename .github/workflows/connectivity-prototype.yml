@@ -10,6 +10,7 @@ on:
       - "crates/**"
       - "web/**"
       - "prototype/**"
+      - "deploy/**"
       - ".github/workflows/connectivity-prototype.yml"
 
 permissions:
@@ -102,7 +103,15 @@ jobs:
         run: |
           docker run -d --rm --name cargo-gateway-smoke -p 127.0.0.1:18080:8080 cargo-connectivity-gateway:test
           for i in $(seq 1 20); do
-            if curl --fail --silent http://127.0.0.1:18080/health | grep -q '^ok
+            if [ "$(curl --fail --silent http://127.0.0.1:18080/health || true)" = "ok" ]; then
+              break
+            fi
+            sleep 1
+          done
+          test "$(curl --fail --silent http://127.0.0.1:18080/health)" = "ok"
+          curl --fail --silent http://127.0.0.1:18080/ | grep -q 'Тестове вікно водія'
+          docker stop cargo-gateway-smoke
+
   msrv:
     name: MSRV 1.91
     runs-on: ubuntu-latest
@@ -111,35 +120,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.91"
-      - name: Check workspace on declared minimum Rust
-        run: cargo check --workspace --all-targets
-; then
-              break
-            fi
-            sleep 1
-          done
-          curl --fail --silent http://127.0.0.1:18080/health | grep -q '^ok
-  msrv:
-    name: MSRV 1.89
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: "1.89"
-      - name: Check workspace on declared minimum Rust
-        run: cargo check --workspace --all-targets
-
-          curl --fail --silent http://127.0.0.1:18080/ | grep -q 'Тестове вікно водія'
-          docker stop cargo-gateway-smoke
-
-  msrv:
-    name: MSRV 1.89
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: "1.89"
       - name: Check workspace on declared minimum Rust
         run: cargo check --workspace --all-targets
