@@ -128,3 +128,16 @@ jobs:
           test "$(curl -fsS http://127.0.0.1:18080/health)" = "ok"
           curl -fsS http://127.0.0.1:18080/ | grep -Fq "Тестове вікно водія"
           docker stop cargo-gateway-smoke >/dev/null
+
+  lockfile-export:
+    name: One-time Cargo.lock export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91"
+      - name: Generate lockfile
+        run: cargo generate-lockfile
+      - name: Export lockfile for repository checkpoint
+        run: python3 -c 'import base64, pathlib; print("CARGO_LOCK_B64="+base64.b64encode(pathlib.Path("Cargo.lock").read_bytes()).decode())'
