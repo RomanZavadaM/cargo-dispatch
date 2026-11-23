@@ -6,7 +6,7 @@ use axum::{
         State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
-    response::IntoResponse,
+    response::{Html, IntoResponse},
     routing::get,
 };
 use cargo_connectivity_protocol::{
@@ -44,6 +44,8 @@ async fn main() {
 
     let state = AppState::default();
     let app = Router::new()
+        .route("/", get(|| async { Html(include_str!("../../../web/index.html")) }))
+        .route("/app.js", get(app_js))
         .route("/health", get(|| async { "ok" }))
         .route("/signal", get(signal_ws))
         .layer(CorsLayer::permissive())
@@ -56,6 +58,13 @@ async fn main() {
         .expect("bind gateway");
     info!(%addr, "gateway listening");
     axum::serve(listener, app).await.expect("serve gateway");
+}
+
+async fn app_js() -> impl IntoResponse {
+    (
+        [("content-type", "text/javascript; charset=utf-8")],
+        include_str!("../../../web/app.js"),
+    )
 }
 
 async fn signal_ws(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
