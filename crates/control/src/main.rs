@@ -573,7 +573,10 @@ fn to_rtc_ice_server(server: IceServerConfig) -> RTCIceServer {
     }
 }
 
-async fn send_synthetic_pdf(\n    data_channel: &Arc<dyn DataChannel>,\n    trip_session_id: Uuid,\n) -> Result<()> {
+async fn send_synthetic_pdf(
+    data_channel: &Arc<dyn DataChannel>,
+    trip_session_id: Uuid,
+) -> Result<()> {
     const CHUNK_SIZE: usize = 12 * 1024;
 
     let data = build_synthetic_pdf();
@@ -675,8 +678,11 @@ async fn send_file_ack(
     }
 }
 
-fn save_received_file(file: &IncomingFile) -> std::io::Result<PathBuf> {
-    let dir = PathBuf::from("prototype-received");
+fn save_received_file(
+    file: &IncomingFile,
+    trip_session_id: Uuid,
+) -> std::io::Result<PathBuf> {
+    let dir = PathBuf::from("prototype-received").join(trip_session_id.to_string());
     std::fs::create_dir_all(&dir)?;
 
     let safe_name: String = file
