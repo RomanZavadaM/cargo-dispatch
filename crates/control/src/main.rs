@@ -322,9 +322,19 @@ async fn main() -> Result<()> {
         trip_count = persisted.trips.len(),
         "starting control prototype"
     );
+    let driver_base_url = std::env::var("CARGO_DRIVER_BASE_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:8080/".into());
+    let driver_base_url = driver_base_url.trim_end_matches('/');
+
     for (index, trip) in persisted.trips.iter().enumerate() {
         println!("trip_{}_session_id={}", index + 1, trip.trip_session_id);
         println!("trip_{}_access_token={}", index + 1, trip.access_token);
+        println!(
+            "trip_{}_driver_url={driver_base_url}/?trip={}&token={}",
+            index + 1,
+            trip.trip_session_id,
+            trip.access_token
+        );
     }
 
     let runtime = default_runtime().context("webrtc runtime unavailable")?;
