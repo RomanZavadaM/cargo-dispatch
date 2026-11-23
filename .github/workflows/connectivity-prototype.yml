@@ -16,8 +16,8 @@ permissions:
   contents: read
 
 jobs:
-  rust:
-    name: Rust check
+  quality:
+    name: Rust quality + browser syntax
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,3 +32,20 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests
         run: cargo test --workspace --all-targets
+      - name: Browser harness syntax
+        run: node --check web/app.js
+
+  cross-platform:
+    name: Cross-platform check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check workspace
+        run: cargo check --workspace --all-targets
