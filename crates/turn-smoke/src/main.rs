@@ -9,7 +9,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use hmac::{Hmac, Mac};
 use sha1::Sha1;
 use webrtc::{
-    data_channel::{DataChannel, DataChannelEvent},
+    data_channel::{DataChannel, DataChannelEvent, RTCDataChannelState},
     peer_connection::{
         MediaEngine, PeerConnection, PeerConnectionBuilder, PeerConnectionEventHandler,
         RTCConfigurationBuilder, RTCIceGatheringState, RTCIceServer, RTCIceTransportPolicy,
@@ -121,7 +121,7 @@ async fn main() -> Result<()> {
     tokio::time::timeout(Duration::from_secs(20), async {
         loop {
             match data_channel.ready_state().await {
-                Ok(state) if state.to_string().eq_ignore_ascii_case("open") => break,
+                Ok(RTCDataChannelState::Open) => break,
                 _ => tokio::time::sleep(Duration::from_millis(100)).await,
             }
         }
