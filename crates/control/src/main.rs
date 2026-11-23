@@ -1,13 +1,20 @@
-use std::{\n    collections::HashSet,\n    path::{Path, PathBuf},\n    sync::Arc,\n};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use bytes::BytesMut;
-use cargo_connectivity_protocol::{\n    ControlChannelMessage, Endpoint, FileTransferControl, IceServerConfig, SignalMessage,\n};
+use cargo_connectivity_protocol::{
+    ControlChannelMessage, Endpoint, FileTransferControl, IceServerConfig, SignalMessage,
+};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tokio::sync::Mutex;\nuse tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
+use tokio::sync::Mutex;
+use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 use tracing::{info, warn};
 use uuid::Uuid;
 use webrtc::{
