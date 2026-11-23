@@ -85,6 +85,31 @@ pub struct TripPoint {
     pub longitude: f64,
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum FileTransferControl {
+    FileStart {
+        file_id: Uuid,
+        name: String,
+        mime_type: String,
+        size: u64,
+        sha256: String,
+        chunk_size: u32,
+        chunk_count: u32,
+    },
+    FileEnd {
+        file_id: Uuid,
+    },
+    FileAck {
+        file_id: Uuid,
+        received_size: u64,
+        sha256: String,
+        ok: bool,
+        message: String,
+    },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
