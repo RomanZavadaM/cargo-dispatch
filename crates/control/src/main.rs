@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -33,8 +33,27 @@ const MAX_PROTOTYPE_FILE_SIZE: u64 = 64 * 1024 * 1024;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PersistedControlState {
     control_instance_id: Uuid,
+    trips: Vec<PersistedTripState>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PersistedTripState {
     trip_session_id: Uuid,
     access_token: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct LegacyControlState {
+    control_instance_id: Uuid,
+    trip_session_id: Uuid,
+    access_token: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum ControlStateFile {
+    Current(PersistedControlState),
+    Legacy(LegacyControlState),
 }
 
 struct IncomingFile {
@@ -53,6 +72,7 @@ struct ControlHandler {
     runtime: Arc<dyn Runtime>,
     gather_complete_tx: Sender<()>,
     seen_event_ids: Arc<Mutex<HashSet<Uuid>>>,
+    trip_session_id: Uuid,
 }
 
 #[async_trait]
@@ -71,6 +91,7 @@ impl PeerConnectionEventHandler for ControlHandler {
     async fn on_data_channel(&self, data_channel: Arc<dyn DataChannel>) {
         let runtime = self.runtime.clone();
         let seen_event_ids = self.seen_event_ids.clone();
+        let trip_session_id = self.trip_session_id;
         self.runtime.spawn(Box::pin(async move {
             let label = data_channel.label().await.unwrap_or_default();
             let id = data_channel.id();
@@ -84,7 +105,8 @@ impl PeerConnectionEventHandler for ControlHandler {
                         if label == "control" {
                             let _ = data_channel.send_text("control-ready").await;
                         } else if label == "files"
-                            && let Err(error) = send_synthetic_pdf(&data_channel).await
+                            && let Err(error) =
+                                send_synthetic_pdf(&data_channel, trip_session_id).await
                         {
                             warn!(%error, "failed to send synthetic PDF");
                         }
@@ -164,7 +186,7 @@ impl PeerConnectionEventHandler for ControlHandler {
                                     let ok = size_ok && hash_ok && chunks_ok;
 
                                     let message = if ok {
-                                        match save_received_file(&file) {
+                                        match save_received_file(&file, trip_session_id) {
                                             Ok(path) => format!("saved to {}", path.display()),
                                             Err(error) => format!("verified but save failed: {error}"),
                                         }
