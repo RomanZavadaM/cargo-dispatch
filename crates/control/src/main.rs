@@ -429,7 +429,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-
 fn load_or_create_control_state(path: &Path) -> Result<PersistedControlState> {
     if path.exists() {
         let content = std::fs::read_to_string(path)
