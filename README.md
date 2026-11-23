@@ -1,0 +1,17 @@
+# cargo-dispatch
+
+**🇺🇦 Українська** · [🇬🇧 English](docs/readme/README.en.md) · [🇫🇷 Français](docs/readme/README.fr.md) · [🇩🇪 Deutsch](docs/readme/README.de.md) · [🇪🇸 Español](docs/readme/README.es.md) · [🇰🇷 한국어](docs/readme/README.ko.md) · [🇯🇵 日本語](docs/readme/README.ja.md) · [🇨🇳 简体中文](docs/readme/README.zh.md)
+
+> **Статус:** у розробці. Застосунку ще немає.
+
+## Про продукт
+
+**cargo-dispatch** добирає вантажі з ринку під малотонажний парк (повна маса до 7,5 т), будує рейси з підвантаженнями і дає диспетчеру контроль руху авто. Мова розробки: Rust.
+
+## Документація
+
+Робоча документація проєкту ведеться приватно.
+
+## Ліцензія
+
+Власницьке програмне забезпечення © 2026 Roman Zavada (Роман Завада). Публічність репозиторію не надає прав відкритої ліцензії. Див. [LICENSE.md](LICENSE.md) і [COPYRIGHT.md](COPYRIGHT.md).

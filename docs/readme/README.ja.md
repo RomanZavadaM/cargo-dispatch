@@ -1,0 +1,17 @@
+# cargo-dispatch
+
+[🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · **🇯🇵 日本語** · [🇨🇳 简体中文](README.zh.md)
+
+> **ステータス:** 開発中です。アプリケーションはまだありません。
+
+## 製品について
+
+**cargo-dispatch** は、小型トラック(車両総重量 7.5 t 以下)の車両群向けに市場から貨物を選び、途中の追加積載を含む運行を組み、配車担当者が車両の動きを管理できるようにします。開発言語:Rust。
+
+## ドキュメント
+
+プロジェクトの作業ドキュメントは非公開で管理されています。
+
+## ライセンス
+
+プロプライエタリソフトウェア © 2026 Roman Zavada。リポジトリが公開されていても、オープンソースの権利は付与されません。[LICENSE.md](../../LICENSE.md) と [COPYRIGHT.md](../../COPYRIGHT.md) を参照してください。
