@@ -155,23 +155,46 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     );
                     continue;
                 }
-                state.trips.write().await.insert(
-                    trip_session_id,
-                    TripRegistration {
-                        control_instance_id,
-                        access_token,
-                        browser_session_id: None,
-                    },
-                );
-                let (servers, expires_at) = state.ice_settings.for_trip(trip_session_id);
-                send_json(
-                    &tx,
-                    &SignalMessage::IceConfig {
+                let browser_session_id = {
+                    let mut trips = state.trips.write().await;
+                    let existing_browser = trips
+                        .get(&trip_session_id)
+                        .and_then(|registration| registration.browser_session_id);
+                    trips.insert(
                         trip_session_id,
-                        servers,
-                        expires_at,
-                    },
-                );
+                        TripRegistration {
+                            control_instance_id,
+                            access_token,
+                            browser_session_id: existing_browser,
+                        },
+                    );
+                    existing_browser
+                };
+
+                let (servers, expires_at) = state.ice_settings.for_trip(trip_session_id);
+                let ice_config = SignalMessage::IceConfig {
+                    trip_session_id,
+                    servers,
+                    expires_at,
+                };
+                send_json(&tx, &ice_config);
+
+                if let Some(browser_session_id) = browser_session_id
+                    && let Some(browser_tx) = state
+                        .browsers
+                        .read()
+                        .await
+                        .get(&browser_session_id)
+                        .cloned()
+                {
+                    send_json(&browser_tx, &ice_config);
+                    info!(
+                        %browser_session_id,
+                        %trip_session_id,
+                        "control re-registered; browser asked to renegotiate"
+                    );
+                }
+
                 info!(%control_instance_id, %trip_session_id, "trip registered");
             }
             SignalMessage::BrowserHello {
