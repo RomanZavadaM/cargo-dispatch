@@ -62,10 +62,12 @@ jobs:
           sudo apt-get install -y coturn
       - name: Start local coturn with time-limited secret auth
         run: |
+          sudo systemctl stop coturn || true
+          sudo pkill turnserver || true
           turnserver \
             --listening-ip=127.0.0.1 \
             --relay-ip=127.0.0.1 \
-            --listening-port=3478 \
+            --listening-port=3479 \
             --min-port=49160 \
             --max-port=49200 \
             --use-auth-secret \
@@ -80,7 +82,7 @@ jobs:
           sleep 2
       - name: TURN relay-only WebRTC data channel
         env:
-          CARGO_TURN_SMOKE_URL: turn:127.0.0.1:3478?transport=udp
+          CARGO_TURN_SMOKE_URL: turn:127.0.0.1:3479?transport=udp
           CARGO_TURN_SMOKE_SECRET: cargo-smoke-secret
         run: cargo run -p cargo-turn-smoke
       - name: Show coturn log on failure
