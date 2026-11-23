@@ -85,6 +85,25 @@ pub struct TripPoint {
     pub longitude: f64,
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ControlChannelMessage {
+    Hello {
+        source: String,
+    },
+    DriverEvent {
+        event_id: Uuid,
+        trip_session_id: TripSessionId,
+        event_type: String,
+        created_at: String,
+        payload: serde_json::Value,
+    },
+    EventAck {
+        event_id: Uuid,
+    },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum FileTransferControl {
