@@ -3,6 +3,7 @@ FROM rust:1.85-bookworm AS build
 WORKDIR /src
 COPY Cargo.toml ./
 COPY crates ./crates
+COPY web ./web
 RUN cargo build --release -p cargo-connectivity-gateway
 
 FROM debian:bookworm-slim
