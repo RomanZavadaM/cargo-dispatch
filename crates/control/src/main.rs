@@ -11,8 +11,8 @@ use webrtc::{
     data_channel::{DataChannel, DataChannelEvent},
     peer_connection::{
         MediaEngine, PeerConnectionBuilder, PeerConnectionEventHandler, RTCConfigurationBuilder,
-        RTCIceGatheringState, RTCIceServer, RTCPeerConnectionState, RTCSessionDescription, Registry,
-        register_default_interceptors,
+        RTCIceGatheringState, RTCIceServer, RTCPeerConnectionState, RTCSessionDescription,
+        Registry, register_default_interceptors,
     },
     runtime::{Runtime, Sender, channel, default_runtime},
 };
@@ -79,8 +79,8 @@ async fn main() -> Result<()> {
 
     let gateway_url =
         std::env::var("CARGO_GATEWAY_WS").unwrap_or_else(|_| "ws://127.0.0.1:8080/signal".into());
-    let stun_url = std::env::var("CARGO_STUN_URL")
-        .unwrap_or_else(|_| "stun:stun.l.google.com:19302".into());
+    let stun_url =
+        std::env::var("CARGO_STUN_URL").unwrap_or_else(|_| "stun:stun.l.google.com:19302".into());
 
     let control_instance_id = Uuid::new_v4();
     let trip_session_id = Uuid::new_v4();
