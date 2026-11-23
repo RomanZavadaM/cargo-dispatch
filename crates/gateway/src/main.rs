@@ -1,17 +1,19 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::{
+    Router,
     extract::{
         State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
     response::IntoResponse,
     routing::get,
-    Router,
 };
-use cargo_connectivity_protocol::{BrowserSessionId, ControlInstanceId, SignalMessage, TripSessionId};
+use cargo_connectivity_protocol::{
+    BrowserSessionId, ControlInstanceId, SignalMessage, TripSessionId,
+};
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{info, warn};
 
@@ -49,7 +51,9 @@ async fn main() {
         .with_state(state);
 
     let addr: SocketAddr = "0.0.0.0:8080".parse().expect("valid bind address");
-    let listener = tokio::net::TcpListener::bind(addr).await.expect("bind gateway");
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .expect("bind gateway");
     info!(%addr, "gateway listening");
     axum::serve(listener, app).await.expect("serve gateway");
 }
@@ -93,8 +97,14 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         };
 
         match parsed {
-            SignalMessage::RegisterControl { control_instance_id } => {
-                state.controls.write().await.insert(control_instance_id, tx.clone());
+            SignalMessage::RegisterControl {
+                control_instance_id,
+            } => {
+                state
+                    .controls
+                    .write()
+                    .await
+                    .insert(control_instance_id, tx.clone());
                 bound_control = Some(control_instance_id);
                 info!(%control_instance_id, "control registered");
             }
@@ -103,7 +113,12 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 trip_session_id,
                 access_token,
             } => {
-                if !state.controls.read().await.contains_key(&control_instance_id) {
+                if !state
+                    .controls
+                    .read()
+                    .await
+                    .contains_key(&control_instance_id)
+                {
                     send_json(
                         &tx,
                         &SignalMessage::Error {
@@ -150,13 +165,23 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     continue;
                 }
                 registration.browser_session_id = Some(browser_session_id);
-                state.browsers.write().await.insert(browser_session_id, tx.clone());
+                state
+                    .browsers
+                    .write()
+                    .await
+                    .insert(browser_session_id, tx.clone());
                 bound_browser = Some(browser_session_id);
                 info!(%browser_session_id, %trip_session_id, "browser joined trip");
             }
-            SignalMessage::Offer { trip_session_id, .. }
-            | SignalMessage::Answer { trip_session_id, .. }
-            | SignalMessage::IceCandidate { trip_session_id, .. } => {
+            SignalMessage::Offer {
+                trip_session_id, ..
+            }
+            | SignalMessage::Answer {
+                trip_session_id, ..
+            }
+            | SignalMessage::IceCandidate {
+                trip_session_id, ..
+            } => {
                 relay_to_peer(&state, trip_session_id, &tx, parsed).await;
             }
             SignalMessage::Heartbeat { .. } => {}
@@ -175,7 +200,12 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     writer.abort();
 }
 
-async fn relay_to_peer(state: &AppState, trip_session_id: TripSessionId, sender: &Tx, message: SignalMessage) {
+async fn relay_to_peer(
+    state: &AppState,
+    trip_session_id: TripSessionId,
+    sender: &Tx,
+    message: SignalMessage,
+) {
     let registration = state.trips.read().await.get(&trip_session_id).cloned();
     let Some(registration) = registration else {
         send_json(
@@ -188,7 +218,12 @@ async fn relay_to_peer(state: &AppState, trip_session_id: TripSessionId, sender:
         return;
     };
 
-    let control_tx = state.controls.read().await.get(&registration.control_instance_id).cloned();
+    let control_tx = state
+        .controls
+        .read()
+        .await
+        .get(&registration.control_instance_id)
+        .cloned();
     let browser_tx = match registration.browser_session_id {
         Some(id) => state.browsers.read().await.get(&id).cloned(),
         None => None,
