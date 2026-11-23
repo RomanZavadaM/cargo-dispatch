@@ -6,6 +6,15 @@ pub type TripSessionId = Uuid;
 pub type BrowserSessionId = Uuid;
 pub type MessageId = Uuid;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IceServerConfig {
+    pub urls: Vec<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub username: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub credential: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SignalMessage {
@@ -39,6 +48,11 @@ pub enum SignalMessage {
     },
     Heartbeat {
         trip_session_id: Option<TripSessionId>,
+    },
+    IceConfig {
+        trip_session_id: TripSessionId,
+        servers: Vec<IceServerConfig>,
+        expires_at: Option<u64>,
     },
     Error {
         code: String,
