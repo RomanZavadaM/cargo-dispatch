@@ -369,7 +369,6 @@ fn to_rtc_ice_server(server: IceServerConfig) -> RTCIceServer {
     }
 }
 
-
 async fn send_synthetic_pdf(data_channel: &Arc<dyn DataChannel>) -> Result<()> {
     const CHUNK_SIZE: usize = 12 * 1024;
 
