@@ -23,3 +23,5 @@
 - reconnect/offline queue.
 
 Усі дані прототипу синтетичні.
+
+CI status: workflow має запускатися на кожен push у цю прототипну гілку.
