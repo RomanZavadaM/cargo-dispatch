@@ -4,12 +4,19 @@ const state = document.querySelector("#connection");
 const FILE_CHUNK_SIZE = 12 * 1024;
 const FILE_BUFFER_HIGH_WATER = 512 * 1024;
 const FILE_BUFFER_LOW_WATER = 128 * 1024;
+const SESSION_KEY = "cargo-connectivity-session";
+const EVENT_QUEUE_PREFIX = "cargo-connectivity-events:";
 
 let ws;
 let peer;
 let controlChannel;
 let fileChannel;
-let activeTrip;\nlet incomingFile;
+let activeTrip;
+let activeToken;
+let incomingFile;
+let reconnectTimer;
+let shouldReconnect = false;
+let resettingPeer = false;
 
 function write(value) {
   log.textContent += `${typeof value === "string" ? value : JSON.stringify(value, null, 2)}\n`;
@@ -18,6 +25,95 @@ function write(value) {
 function setState(value) {
   state.textContent = value;
   write(value);
+}
+
+function saveSession() {
+  if (!activeTrip || !activeToken) return;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    trip: activeTrip,
+    token: activeToken
+  }));
+}
+
+function restoreSession() {
+  const params = new URLSearchParams(location.search);
+  const urlTrip = params.get("trip");
+  const urlToken = params.get("token");
+
+  if (urlTrip && urlToken) {
+    activeTrip = urlTrip;
+    activeToken = urlToken;
+    saveSession();
+  } else {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+      activeTrip = saved?.trip || "";
+      activeToken = saved?.token || "";
+    } catch {
+      activeTrip = "";
+      activeToken = "";
+    }
+  }
+
+  document.querySelector("#trip").value = activeTrip || "";
+  document.querySelector("#token").value = activeToken || "";
+}
+
+function eventQueueKey() {
+  return `${EVENT_QUEUE_PREFIX}${activeTrip || "none"}`;
+}
+
+function loadEventQueue() {
+  try {
+    const queue = JSON.parse(localStorage.getItem(eventQueueKey()) || "[]");
+    return Array.isArray(queue) ? queue : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveEventQueue(queue) {
+  localStorage.setItem(eventQueueKey(), JSON.stringify(queue));
+}
+
+function enqueueControlEvent(eventType, payload) {
+  if (!activeTrip) {
+    write("Немає активного рейсу");
+    return;
+  }
+
+  const event = {
+    type: "driver_event",
+    event_id: crypto.randomUUID(),
+    trip_session_id: activeTrip,
+    event_type: eventType,
+    created_at: new Date().toISOString(),
+    payload
+  };
+
+  const queue = loadEventQueue();
+  queue.push(event);
+  saveEventQueue(queue);
+  write({queued_event: event});
+  flushControlQueue();
+}
+
+function acknowledgeControlEvent(eventId) {
+  const queue = loadEventQueue();
+  const next = queue.filter(event => event.event_id !== eventId);
+  saveEventQueue(next);
+  write({event_acknowledged: eventId, pending: next.length});
+}
+
+function flushControlQueue() {
+  if (controlChannel?.readyState !== "open") return;
+  const queue = loadEventQueue();
+  for (const event of queue) {
+    controlChannel.send(JSON.stringify(event));
+  }
+  if (queue.length) {
+    write({queue_flushed: queue.length});
+  }
 }
 
 async function waitForIceGatheringComplete(pc) {
@@ -43,6 +139,7 @@ function setupChannel(channel) {
     write({channel: channel.label, state: "open"});
     if (channel.label === "control") {
       channel.send(JSON.stringify({type: "hello", source: "browser"}));
+      flushControlQueue();
     }
   });
 
@@ -54,7 +151,12 @@ function setupChannel(channel) {
 
     if (typeof event.data === "string") {
       try {
-        write({channel: channel.label, message: JSON.parse(event.data)});
+        const message = JSON.parse(event.data);
+        if (message.type === "event_ack") {
+          acknowledgeControlEvent(message.event_id);
+        } else {
+          write({channel: channel.label, message});
+        }
       } catch {
         write({channel: channel.label, message: event.data});
       }
@@ -67,7 +169,6 @@ function setupChannel(channel) {
     write({channel: channel.label, state: "closed"});
   });
 }
-
 
 async function handleIncomingFileMessage(event) {
   if (typeof event.data === "string") {
@@ -165,11 +266,21 @@ function addReceivedFile(name, blob) {
 }
 
 async function startPeer(trip, servers) {
-  if (peer) return;
+  resetPeer();
 
   peer = new RTCPeerConnection({iceServers: servers});
   peer.addEventListener("connectionstatechange", () => {
-    setState(`WebRTC: ${peer.connectionState}`);
+    setState(`WebRTC: ${peer?.connectionState || "closed"}`);
+
+    if (peer?.connectionState === "failed") {
+      forceSignalReconnect();
+    } else if (peer?.connectionState === "disconnected") {
+      setTimeout(() => {
+        if (peer?.connectionState === "disconnected") {
+          forceSignalReconnect();
+        }
+      }, 5000);
+    }
   });
 
   controlChannel = peer.createDataChannel("control");
@@ -188,6 +299,95 @@ async function startPeer(trip, servers) {
     sdp: JSON.stringify(peer.localDescription)
   }));
   write({type: "offer_sent", ice_servers: servers.length});
+}
+
+function resetPeer() {
+  if (resettingPeer) return;
+  resettingPeer = true;
+  try {
+    controlChannel?.close();
+    fileChannel?.close();
+    peer?.close();
+  } catch {
+    // Best-effort cleanup before reconnect.
+  }
+  controlChannel = null;
+  fileChannel = null;
+  peer = null;
+  incomingFile = null;
+  resettingPeer = false;
+}
+
+function scheduleReconnect() {
+  if (!shouldReconnect || reconnectTimer) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connectSignal();
+  }, 2000);
+}
+
+function forceSignalReconnect() {
+  if (!shouldReconnect) return;
+  resetPeer();
+
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+    ws.close();
+  } else {
+    scheduleReconnect();
+  }
+}
+
+function connectSignal() {
+  if (!activeTrip || !activeToken) return;
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+  const browserSession = crypto.randomUUID();
+  const wsScheme = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${wsScheme}://${location.host}/signal`);
+
+  ws.addEventListener("open", () => {
+    setState("Signaling підключено");
+    ws.send(JSON.stringify({
+      type: "browser_hello",
+      browser_session_id: browserSession,
+      trip_session_id: activeTrip,
+      access_token: activeToken
+    }));
+  });
+
+  ws.addEventListener("message", async event => {
+    const message = JSON.parse(event.data);
+    write(message);
+
+    if (
+      message.type === "ice_config" &&
+      message.trip_session_id === activeTrip
+    ) {
+      await startPeer(activeTrip, message.servers);
+      return;
+    }
+
+    if (
+      message.type === "answer" &&
+      message.trip_session_id === activeTrip &&
+      peer
+    ) {
+      const answer = JSON.parse(message.sdp);
+      await peer.setRemoteDescription(answer);
+      write("Answer застосовано");
+    }
+  });
+
+  ws.addEventListener("close", () => {
+    setState("Signaling відключено");
+    ws = null;
+    resetPeer();
+    scheduleReconnect();
+  });
+
+  ws.addEventListener("error", () => {
+    setState("Помилка signaling");
+  });
 }
 
 async function sha256Hex(buffer) {
@@ -254,53 +454,17 @@ async function sendFile(file) {
 }
 
 document.querySelector("#connect").addEventListener("click", () => {
-  const trip = document.querySelector("#trip").value.trim();
-  const token = document.querySelector("#token").value.trim();
-  if (!trip || !token) {
+  activeTrip = document.querySelector("#trip").value.trim();
+  activeToken = document.querySelector("#token").value.trim();
+
+  if (!activeTrip || !activeToken) {
     write("Вкажіть trip session і token");
     return;
   }
 
-  activeTrip = trip;
-  const browserSession = crypto.randomUUID();
-  const wsScheme = location.protocol === "https:" ? "wss" : "ws";
-  ws = new WebSocket(`${wsScheme}://${location.host}/signal`);
-
-  ws.addEventListener("open", () => {
-    setState("Signaling підключено");
-    ws.send(JSON.stringify({
-      type: "browser_hello",
-      browser_session_id: browserSession,
-      trip_session_id: trip,
-      access_token: token
-    }));
-  });
-
-  ws.addEventListener("message", async event => {
-    const message = JSON.parse(event.data);
-    write(message);
-
-    if (
-      message.type === "ice_config" &&
-      message.trip_session_id === activeTrip
-    ) {
-      await startPeer(activeTrip, message.servers);
-      return;
-    }
-
-    if (
-      message.type === "answer" &&
-      message.trip_session_id === activeTrip &&
-      peer
-    ) {
-      const answer = JSON.parse(message.sdp);
-      await peer.setRemoteDescription(answer);
-      write("Answer застосовано");
-    }
-  });
-
-  ws.addEventListener("close", () => setState("Signaling відключено"));
-  ws.addEventListener("error", () => setState("Помилка signaling"));
+  saveSession();
+  shouldReconnect = true;
+  connectSignal();
 });
 
 document.querySelector("#position").addEventListener("click", () => {
@@ -308,23 +472,22 @@ document.querySelector("#position").addEventListener("click", () => {
     write("Geolocation API недоступний");
     return;
   }
+
   navigator.geolocation.getCurrentPosition(
-    p => {
-      const payload = {
-        type: "position",
-        latitude: p.coords.latitude,
-        longitude: p.coords.longitude,
-        accuracy: p.coords.accuracy,
-        observed_at: new Date().toISOString()
-      };
-      write(payload);
-      if (controlChannel?.readyState === "open") {
-        controlChannel.send(JSON.stringify(payload));
-      }
+    position => {
+      enqueueControlEvent("position", {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy
+      });
     },
-    e => write({geolocation_error: e.message}),
+    error => write({geolocation_error: error.message}),
     {enableHighAccuracy: true, timeout: 15000}
   );
+});
+
+document.querySelector("#status-arrived").addEventListener("click", () => {
+  enqueueControlEvent("status_change", {status: "arrived"});
 });
 
 document.querySelector("#file").addEventListener("change", async event => {
@@ -337,3 +500,9 @@ document.querySelector("#file").addEventListener("change", async event => {
     write({file_error: error instanceof Error ? error.message : String(error)});
   }
 });
+
+restoreSession();
+if (activeTrip && activeToken) {
+  shouldReconnect = true;
+  connectSignal();
+}
