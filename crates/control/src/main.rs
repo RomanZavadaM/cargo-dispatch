@@ -532,7 +532,6 @@ fn load_or_create_control_state(path: &Path) -> Result<PersistedControlState> {
     Ok(state)
 }
 
-
 fn normalize_control_state(parsed: ControlStateFile) -> PersistedControlState {
     match parsed {
         ControlStateFile::Current(state) => state,
@@ -723,7 +722,6 @@ where
     sink.send(WsMessage::Text(text.into())).await?;
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
