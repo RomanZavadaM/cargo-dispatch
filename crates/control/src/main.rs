@@ -33,9 +33,17 @@ async fn main() {
         ],
     };
 
-    let register = SignalMessage::RegisterControl { control_instance_id };
+    let register = SignalMessage::RegisterControl {
+        control_instance_id,
+    };
 
     info!(%control_instance_id, %trip_session_id, "connectivity control prototype");
-    println!("{}", serde_json::to_string_pretty(&register).expect("serialize register"));
-    println!("{}", serde_json::to_string_pretty(&snapshot).expect("serialize snapshot"));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&register).expect("serialize register")
+    );
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&snapshot).expect("serialize snapshot")
+    );
 }
