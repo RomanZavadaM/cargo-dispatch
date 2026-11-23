@@ -25,3 +25,27 @@
 Усі дані прототипу синтетичні.
 
 CI status: workflow має запускатися на кожен push у цю прототипну гілку.
+
+## Поточний стан прототипу
+
+Працює в гілці `prototype/connectivity-r1`:
+- gateway реєструє control і кілька trip-сесій;
+- браузер отримує ICE config після автентифікації;
+- WebRTC offer/answer через signaling gateway;
+- окремі `control` і `files` data-channel;
+- STUN та підготовка TURN з короткоживучими credentials;
+- двосторонні файли з SHA-256 та ACK;
+- browser reconnect і черга легких подій;
+- control reconnect зі стабільними локальними ID;
+- два одночасні незалежні тестові рейси в одному control.
+
+JavaScript у `web/` — лише браузерний тестовий harness для перевірки WebRTC/Web APIs. Це не рішення щодо фінального UI продукту.
+
+Для ручної проби control друкує готові URL виду:
+`https://gateway.example/?trip=<trip_session_id>&token=<access_token>`.
+
+Не перевірено без реального публічного вузла:
+- direct WebRTC через реальні NAT/CGNAT;
+- TURN relay через coturn;
+- перемикання Wi-Fi ↔ mobile data на реальному телефоні;
+- поведінка мобільного браузера при переході в навігатор.
