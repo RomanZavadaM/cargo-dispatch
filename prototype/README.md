@@ -4,27 +4,24 @@
 
 Це не продуктовий код і не реалізація планувальника.
 
-Перший етап каркаса:
+Поточний технічний етап уже включає:
 - спільний JSON-протокол signaling;
 - gateway на Axum;
-- реєстрація control/trip сесій;
+- реєстрацію control/trip сесій;
 - WebSocket signaling;
-- синтетичний control;
-- браузерна оболонка;
-- GitHub CI.
-
-Наступний етап після зеленого CI:
-- реальний WebRTC PeerConnection у control;
-- browser RTCPeerConnection;
-- два data channels: службовий і файловий;
-- STUN/TURN;
-- direct/TURN сценарії;
-- chunked file transfer + SHA-256;
-- reconnect/offline queue.
+- WebRTC PeerConnection у control і браузері;
+- два data-channel: службовий і файловий;
+- STUN/TURN із короткоживучими credentials;
+- chunked file transfer + SHA-256 + ACK;
+- reconnect/offline queue;
+- два паралельні рейси;
+- Windows/macOS/Linux CI;
+- Docker/Compose server package;
+- relay-only TURN smoke.
 
 Усі дані прототипу синтетичні.
 
-CI status: workflow має запускатися на кожен push у цю прототипну гілку.
+**Наступний етап:** польова перевірка на реальному публічному вузлі та телефоні за `deploy/FIELD_TEST.md`. Вона має довести NAT/CGNAT, зовнішній TURN, Wi-Fi↔mobile-data і поведінку браузера при переході в навігатор.
 
 ## Поточний стан прототипу
 
