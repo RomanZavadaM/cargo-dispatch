@@ -46,12 +46,13 @@ JavaScript у `web/` — лише браузерний тестовий harness 
 
 Автоматично перевірено в GitHub Actions:
 - Rust format/check/clippy/tests;
+- окремий MSRV 1.91 job;
 - синтаксис браузерного harness;
 - збірка на Windows і macOS;
 - Compose validation;
 - relay-only WebRTC data-channel через локально піднятий coturn з time-limited secret credentials.
 
-Gateway Docker image повторно перевіряється після уточнення фактичного MSRV WebRTC-стека до Rust 1.91; до зеленого server-package job не вважати Docker image підтвердженим.
+Gateway Docker image і Compose перевірені; контейнер реально запускається в CI, `/health` відповідає `ok`, а стартова сторінка водія віддається з контейнера.
 
 Ще не перевірено без реального публічного вузла й телефона:
 - direct WebRTC через реальні NAT/CGNAT;
