@@ -2,9 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use cargo_connectivity_protocol::{
-    Endpoint, FileTransferControl, IceServerConfig, SignalMessage,
-};
+use cargo_connectivity_protocol::{Endpoint, FileTransferControl, IceServerConfig, SignalMessage};
 use futures_util::{SinkExt, StreamExt};
 use sha2::{Digest, Sha256};
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
