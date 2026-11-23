@@ -368,10 +368,6 @@ async fn main() -> Result<()> {
                 let registry = register_default_interceptors(Registry::new(), &mut media_engine)?;
                 let (gather_complete_tx, mut gather_complete_rx) = channel::<()>(1);
 
-                if let Some(old_pc) = peer_connection.take() {
-                    old_pc.close().await?;
-                }
-
                 let pc = PeerConnectionBuilder::new()
                     .with_configuration(
                         RTCConfigurationBuilder::new()
@@ -413,7 +409,9 @@ async fn main() -> Result<()> {
                 )
                 .await?;
 
-                peer_connection = Some(pc);
+                if let Some(old_pc) = peer_connection.replace(pc) {
+                    old_pc.close().await?;
+                }
                 info!(%trip_session_id, "answer sent");
             }
             SignalMessage::Error { code, message } => {
