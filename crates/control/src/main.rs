@@ -2,6 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use bytes::BytesMut;
 use cargo_connectivity_protocol::{Endpoint, FileTransferControl, IceServerConfig, SignalMessage};
 use futures_util::{SinkExt, StreamExt};
 use sha2::{Digest, Sha256};
@@ -64,6 +65,10 @@ impl PeerConnectionEventHandler for ControlHandler {
                         info!(%label, %id, "data channel open");
                         if label == "control" {
                             let _ = data_channel.send_text("control-ready").await;
+                        } else if label == "files"
+                            && let Err(error) = send_synthetic_pdf(&data_channel).await
+                        {
+                            warn!(%error, "failed to send synthetic PDF");
                         }
                     }
                     DataChannelEvent::OnMessage(message) if label == "files" => {
@@ -169,7 +174,22 @@ impl PeerConnectionEventHandler for ControlHandler {
                                     )
                                     .await;
                                 }
-                                Ok(FileTransferControl::FileAck { .. }) => {}
+                                Ok(FileTransferControl::FileAck {
+                                    file_id,
+                                    received_size,
+                                    sha256,
+                                    ok,
+                                    message,
+                                }) => {
+                                    info!(
+                                        %file_id,
+                                        received_size,
+                                        %sha256,
+                                        ok,
+                                        %message,
+                                        "browser acknowledged outbound file"
+                                    );
+                                }
                                 Err(error) => {
                                     warn!(%error, message = %text, "invalid file control message");
                                 }
@@ -347,6 +367,89 @@ fn to_rtc_ice_server(server: IceServerConfig) -> RTCIceServer {
         username: server.username,
         credential: server.credential,
     }
+}
+
+
+async fn send_synthetic_pdf(data_channel: &Arc<dyn DataChannel>) -> Result<()> {
+    const CHUNK_SIZE: usize = 12 * 1024;
+
+    let data = build_synthetic_pdf();
+    let file_id = Uuid::new_v4();
+    let sha256 = format!("{:x}", Sha256::digest(&data));
+    let chunk_count = data.len().div_ceil(CHUNK_SIZE) as u32;
+
+    let start = FileTransferControl::FileStart {
+        file_id,
+        name: "cargo-connectivity-test.pdf".into(),
+        mime_type: "application/pdf".into(),
+        size: data.len() as u64,
+        sha256: sha256.clone(),
+        chunk_size: CHUNK_SIZE as u32,
+        chunk_count,
+    };
+    data_channel
+        .send_text(&serde_json::to_string(&start)?)
+        .await?;
+
+    for chunk in data.chunks(CHUNK_SIZE) {
+        data_channel.send(BytesMut::from(chunk)).await?;
+    }
+
+    let end = FileTransferControl::FileEnd { file_id };
+    data_channel
+        .send_text(&serde_json::to_string(&end)?)
+        .await?;
+
+    info!(
+        %file_id,
+        size = data.len(),
+        %sha256,
+        chunk_count,
+        "synthetic PDF sent to browser"
+    );
+    Ok(())
+}
+
+fn build_synthetic_pdf() -> Vec<u8> {
+    let content = b"BT /F1 18 Tf 72 720 Td (CARGO connectivity test PDF) Tj ET";
+    let mut pdf = b"%PDF-1.4\n".to_vec();
+    let mut offsets = Vec::new();
+
+    let objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>".to_vec(),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec(),
+        {
+            let mut stream = format!("<< /Length {} >>\nstream\n", content.len()).into_bytes();
+            stream.extend_from_slice(content);
+            stream.extend_from_slice(b"\nendstream");
+            stream
+        },
+    ];
+
+    for (index, object) in objects.iter().enumerate() {
+        offsets.push(pdf.len());
+        pdf.extend_from_slice(format!("{} 0 obj\n", index + 1).as_bytes());
+        pdf.extend_from_slice(object);
+        pdf.extend_from_slice(b"\nendobj\n");
+    }
+
+    let xref_offset = pdf.len();
+    pdf.extend_from_slice(format!("xref\n0 {}\n", objects.len() + 1).as_bytes());
+    pdf.extend_from_slice(b"0000000000 65535 f \n");
+    for offset in offsets {
+        pdf.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());
+    }
+    pdf.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n",
+            objects.len() + 1
+        )
+        .as_bytes(),
+    );
+
+    pdf
 }
 
 async fn send_file_ack(
