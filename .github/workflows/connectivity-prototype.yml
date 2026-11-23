@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: connectivity-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     name: Rust quality + browser syntax
@@ -35,6 +39,17 @@ jobs:
         run: cargo test --workspace --all-targets
       - name: Browser harness syntax
         run: node --check web/app.js
+
+  msrv:
+    name: MSRV 1.91
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91"
+      - name: Check workspace on declared minimum Rust
+        run: cargo check --workspace --all-targets
 
   cross-platform:
     name: Cross-platform check (${{ matrix.os }})
@@ -61,7 +76,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y coturn
-      - name: Start local coturn with time-limited secret auth
+      - name: Start isolated coturn
         run: |
           sudo systemctl stop coturn || true
           sudo pkill turnserver || true
@@ -102,23 +117,14 @@ jobs:
       - name: Run gateway image smoke
         run: |
           docker run -d --rm --name cargo-gateway-smoke -p 127.0.0.1:18080:8080 cargo-connectivity-gateway:test
+          trap 'docker rm -f cargo-gateway-smoke >/dev/null 2>&1 || true' EXIT
           for i in $(seq 1 20); do
-            if [ "$(curl --fail --silent http://127.0.0.1:18080/health || true)" = "ok" ]; then
+            health="$(curl -fsS http://127.0.0.1:18080/health || true)"
+            if [ "$health" = "ok" ]; then
               break
             fi
             sleep 1
           done
-          test "$(curl --fail --silent http://127.0.0.1:18080/health)" = "ok"
-          curl --fail --silent http://127.0.0.1:18080/ | grep -q 'Тестове вікно водія'
-          docker stop cargo-gateway-smoke
-
-  msrv:
-    name: MSRV 1.91
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: "1.91"
-      - name: Check workspace on declared minimum Rust
-        run: cargo check --workspace --all-targets
+          test "$(curl -fsS http://127.0.0.1:18080/health)" = "ok"
+          curl -fsS http://127.0.0.1:18080/ | grep -Fq "Тестове вікно водія"
+          docker stop cargo-gateway-smoke >/dev/null
