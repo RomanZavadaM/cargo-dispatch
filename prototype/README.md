@@ -44,8 +44,18 @@ JavaScript у `web/` — лише браузерний тестовий harness 
 Для ручної проби control друкує готові URL виду:
 `https://gateway.example/?trip=<trip_session_id>&token=<access_token>`.
 
-Не перевірено без реального публічного вузла:
+Автоматично перевірено в GitHub Actions:
+- Rust format/check/clippy/tests;
+- синтаксис браузерного harness;
+- збірка на Windows і macOS;
+- gateway Docker image та Compose validation;
+- relay-only WebRTC data-channel через локально піднятий coturn з time-limited secret credentials.
+
+Ще не перевірено без реального публічного вузла й телефона:
 - direct WebRTC через реальні NAT/CGNAT;
-- TURN relay через coturn;
+- TURN relay через реальну зовнішню мережу;
 - перемикання Wi-Fi ↔ mobile data на реальному телефоні;
 - поведінка мобільного браузера при переході в навігатор.
+
+
+Технічний baseline прототипу: Rust 1.89+ (актуальна залежність uuid цього вимагає).
