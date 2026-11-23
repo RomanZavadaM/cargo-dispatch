@@ -1,3 +1,5 @@
+mod turn_auth;
+
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::{
@@ -16,14 +18,27 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::{RwLock, mpsc};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{info, warn};
+use turn_auth::IceSettings;
 
 type Tx = mpsc::UnboundedSender<Message>;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct AppState {
     controls: Arc<RwLock<HashMap<ControlInstanceId, Tx>>>,
     trips: Arc<RwLock<HashMap<TripSessionId, TripRegistration>>>,
     browsers: Arc<RwLock<HashMap<BrowserSessionId, Tx>>>,
+    ice_settings: IceSettings,
+}
+
+impl AppState {
+    fn new() -> Self {
+        Self {
+            controls: Arc::new(RwLock::new(HashMap::new())),
+            trips: Arc::new(RwLock::new(HashMap::new())),
+            browsers: Arc::new(RwLock::new(HashMap::new())),
+            ice_settings: IceSettings::from_env(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -42,7 +57,7 @@ async fn main() {
         )
         .init();
 
-    let state = AppState::default();
+    let state = AppState::new();
     let app = Router::new()
         .route(
             "/",
@@ -148,6 +163,15 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                         browser_session_id: None,
                     },
                 );
+                let (servers, expires_at) = state.ice_settings.for_trip(trip_session_id);
+                send_json(
+                    &tx,
+                    &SignalMessage::IceConfig {
+                        trip_session_id,
+                        servers,
+                        expires_at,
+                    },
+                );
                 info!(%control_instance_id, %trip_session_id, "trip registered");
             }
             SignalMessage::BrowserHello {
@@ -183,6 +207,15 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     .await
                     .insert(browser_session_id, tx.clone());
                 bound_browser = Some(browser_session_id);
+                let (servers, expires_at) = state.ice_settings.for_trip(trip_session_id);
+                send_json(
+                    &tx,
+                    &SignalMessage::IceConfig {
+                        trip_session_id,
+                        servers,
+                        expires_at,
+                    },
+                );
                 info!(%browser_session_id, %trip_session_id, "browser joined trip");
             }
             SignalMessage::Offer {
@@ -197,6 +230,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 relay_to_peer(&state, trip_session_id, &tx, parsed).await;
             }
             SignalMessage::Heartbeat { .. } => {}
+            SignalMessage::IceConfig { .. } => {}
             SignalMessage::Error { .. } => {}
         }
     }
