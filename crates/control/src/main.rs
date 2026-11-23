@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use cargo_connectivity_protocol::{Endpoint, SignalMessage};
+use cargo_connectivity_protocol::{Endpoint, IceServerConfig, SignalMessage};
 use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 use tracing::{info, warn};
@@ -79,8 +79,6 @@ async fn main() -> Result<()> {
 
     let gateway_url =
         std::env::var("CARGO_GATEWAY_WS").unwrap_or_else(|_| "ws://127.0.0.1:8080/signal".into());
-    let stun_url =
-        std::env::var("CARGO_STUN_URL").unwrap_or_else(|_| "stun:stun.l.google.com:19302".into());
 
     let control_instance_id = Uuid::new_v4();
     let trip_session_id = Uuid::new_v4();
@@ -118,30 +116,11 @@ async fn main() -> Result<()> {
     .await?;
 
     let runtime = default_runtime().context("webrtc runtime unavailable")?;
-    let mut media_engine = MediaEngine::default();
-    media_engine.register_default_codecs()?;
-    let registry = register_default_interceptors(Registry::new(), &mut media_engine)?;
-    let (gather_complete_tx, mut gather_complete_rx) = channel::<()>(1);
-
-    let peer_connection = PeerConnectionBuilder::new()
-        .with_configuration(
-            RTCConfigurationBuilder::new()
-                .with_ice_servers(vec![RTCIceServer {
-                    urls: vec![stun_url],
-                    ..Default::default()
-                }])
-                .build(),
-        )
-        .with_media_engine(media_engine)
-        .with_interceptor_registry(registry)
-        .with_handler(Arc::new(ControlHandler {
-            runtime: runtime.clone(),
-            gather_complete_tx,
-        }))
-        .with_runtime(runtime)
-        .with_udp_addrs(vec!["0.0.0.0:0".to_owned()])
-        .build()
-        .await?;
+    let mut ice_servers = vec![RTCIceServer {
+        urls: vec!["stun:stun.l.google.com:19302".to_owned()],
+        ..Default::default()
+    }];
+    let mut peer_connection = None;
 
     while let Some(message) = ws_read.next().await {
         let message = message?;
@@ -151,20 +130,56 @@ async fn main() -> Result<()> {
         let signal: SignalMessage = serde_json::from_str(&text)?;
 
         match signal {
+            SignalMessage::IceConfig {
+                trip_session_id: config_trip,
+                servers,
+                expires_at,
+            } if config_trip == trip_session_id => {
+                ice_servers = servers.into_iter().map(to_rtc_ice_server).collect();
+                info!(
+                    %trip_session_id,
+                    server_count = ice_servers.len(),
+                    ?expires_at,
+                    "ICE config received"
+                );
+            }
             SignalMessage::Offer {
                 trip_session_id: offer_trip,
                 from: Endpoint::Browser,
                 sdp,
             } if offer_trip == trip_session_id => {
                 info!(%offer_trip, "received browser offer");
-                let offer: RTCSessionDescription = serde_json::from_str(&sdp)?;
-                peer_connection.set_remote_description(offer).await?;
 
-                let answer = peer_connection.create_answer(None).await?;
-                peer_connection.set_local_description(answer).await?;
+                let mut media_engine = MediaEngine::default();
+                media_engine.register_default_codecs()?;
+                let registry = register_default_interceptors(Registry::new(), &mut media_engine)?;
+                let (gather_complete_tx, mut gather_complete_rx) = channel::<()>(1);
+
+                let pc = PeerConnectionBuilder::new()
+                    .with_configuration(
+                        RTCConfigurationBuilder::new()
+                            .with_ice_servers(ice_servers.clone())
+                            .build(),
+                    )
+                    .with_media_engine(media_engine)
+                    .with_interceptor_registry(registry)
+                    .with_handler(Arc::new(ControlHandler {
+                        runtime: runtime.clone(),
+                        gather_complete_tx,
+                    }))
+                    .with_runtime(runtime.clone())
+                    .with_udp_addrs(vec!["0.0.0.0:0".to_owned()])
+                    .build()
+                    .await?;
+
+                let offer: RTCSessionDescription = serde_json::from_str(&sdp)?;
+                pc.set_remote_description(offer).await?;
+
+                let answer = pc.create_answer(None).await?;
+                pc.set_local_description(answer).await?;
                 let _ = gather_complete_rx.recv().await;
 
-                let local = peer_connection
+                let local = pc
                     .local_description()
                     .await
                     .context("missing local description")?;
@@ -179,6 +194,8 @@ async fn main() -> Result<()> {
                     },
                 )
                 .await?;
+
+                peer_connection = Some(pc);
                 info!(%trip_session_id, "answer sent");
             }
             SignalMessage::Error { code, message } => {
@@ -188,8 +205,18 @@ async fn main() -> Result<()> {
         }
     }
 
-    peer_connection.close().await?;
+    if let Some(pc) = peer_connection {
+        pc.close().await?;
+    }
     Ok(())
+}
+
+fn to_rtc_ice_server(server: IceServerConfig) -> RTCIceServer {
+    RTCIceServer {
+        urls: server.urls,
+        username: server.username,
+        credential: server.credential,
+    }
 }
 
 async fn send_signal<S>(sink: &mut S, signal: &SignalMessage) -> Result<()>
