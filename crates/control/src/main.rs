@@ -1,12 +1,12 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{\n    collections::HashSet,\n    path::{Path, PathBuf},\n    sync::Arc,\n};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use bytes::BytesMut;
-use cargo_connectivity_protocol::{Endpoint, FileTransferControl, IceServerConfig, SignalMessage};
+use cargo_connectivity_protocol::{\n    ControlChannelMessage, Endpoint, FileTransferControl, IceServerConfig, SignalMessage,\n};
 use futures_util::{SinkExt, StreamExt};
 use sha2::{Digest, Sha256};
-use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
+use tokio::sync::Mutex;\nuse tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 use tracing::{info, warn};
 use uuid::Uuid;
 use webrtc::{
@@ -20,6 +20,14 @@ use webrtc::{
 };
 
 const MAX_PROTOTYPE_FILE_SIZE: u64 = 64 * 1024 * 1024;
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PersistedControlState {
+    control_instance_id: Uuid,
+    trip_session_id: Uuid,
+    access_token: String,
+}
 
 struct IncomingFile {
     file_id: Uuid,
@@ -36,6 +44,7 @@ struct IncomingFile {
 struct ControlHandler {
     runtime: Arc<dyn Runtime>,
     gather_complete_tx: Sender<()>,
+    seen_event_ids: Arc<Mutex<HashSet<Uuid>>>,
 }
 
 #[async_trait]
@@ -53,6 +62,7 @@ impl PeerConnectionEventHandler for ControlHandler {
 
     async fn on_data_channel(&self, data_channel: Arc<dyn DataChannel>) {
         let runtime = self.runtime.clone();
+        let seen_event_ids = self.seen_event_ids.clone();
         self.runtime.spawn(Box::pin(async move {
             let label = data_channel.label().await.unwrap_or_default();
             let id = data_channel.id();
@@ -201,6 +211,48 @@ impl PeerConnectionEventHandler for ControlHandler {
                             warn!("binary file chunk received without file_start");
                         }
                     }
+                    DataChannelEvent::OnMessage(message) if label == "control" => {
+                        if !message.is_string {
+                            warn!("binary message received on control channel");
+                            continue;
+                        }
+
+                        let text = String::from_utf8_lossy(&message.data);
+                        match serde_json::from_str::<ControlChannelMessage>(&text) {
+                            Ok(ControlChannelMessage::Hello { source }) => {
+                                info!(%source, "control channel hello");
+                            }
+                            Ok(ControlChannelMessage::DriverEvent {
+                                event_id,
+                                trip_session_id,
+                                event_type,
+                                created_at,
+                                payload,
+                            }) => {
+                                let is_new = seen_event_ids.lock().await.insert(event_id);
+                                info!(
+                                    %event_id,
+                                    %trip_session_id,
+                                    %event_type,
+                                    %created_at,
+                                    %payload,
+                                    is_new,
+                                    "driver event received"
+                                );
+
+                                let ack = ControlChannelMessage::EventAck { event_id };
+                                if let Ok(text) = serde_json::to_string(&ack) {
+                                    let _ = data_channel.send_text(&text).await;
+                                }
+                            }
+                            Ok(ControlChannelMessage::EventAck { event_id }) => {
+                                info!(%event_id, "unexpected event ack from browser");
+                            }
+                            Err(error) => {
+                                warn!(%error, message = %text, "invalid control message");
+                            }
+                        }
+                    }
                     DataChannelEvent::OnMessage(message) => {
                         let text = String::from_utf8_lossy(&message.data);
                         info!(%label, message = %text, "data channel message");
@@ -230,9 +282,12 @@ async fn main() -> Result<()> {
     let gateway_url =
         std::env::var("CARGO_GATEWAY_WS").unwrap_or_else(|_| "ws://127.0.0.1:8080/signal".into());
 
-    let control_instance_id = Uuid::new_v4();
-    let trip_session_id = Uuid::new_v4();
-    let access_token = Uuid::new_v4().simple().to_string();
+    let state_path = std::env::var("CARGO_CONTROL_STATE")
+        .unwrap_or_else(|_| "prototype-control-state.json".into());
+    let persisted = load_or_create_control_state(Path::new(&state_path))?;
+    let control_instance_id = persisted.control_instance_id;
+    let trip_session_id = persisted.trip_session_id;
+    let access_token = persisted.access_token;
 
     info!(
         %gateway_url,
@@ -266,6 +321,7 @@ async fn main() -> Result<()> {
     .await?;
 
     let runtime = default_runtime().context("webrtc runtime unavailable")?;
+    let seen_event_ids = Arc::new(Mutex::new(HashSet::new()));
     let mut ice_servers = vec![RTCIceServer {
         urls: vec!["stun:stun.l.google.com:19302".to_owned()],
         ..Default::default()
@@ -305,6 +361,10 @@ async fn main() -> Result<()> {
                 let registry = register_default_interceptors(Registry::new(), &mut media_engine)?;
                 let (gather_complete_tx, mut gather_complete_rx) = channel::<()>(1);
 
+                if let Some(old_pc) = peer_connection.take() {
+                    old_pc.close().await?;
+                }
+
                 let pc = PeerConnectionBuilder::new()
                     .with_configuration(
                         RTCConfigurationBuilder::new()
@@ -316,6 +376,7 @@ async fn main() -> Result<()> {
                     .with_handler(Arc::new(ControlHandler {
                         runtime: runtime.clone(),
                         gather_complete_tx,
+                        seen_event_ids: seen_event_ids.clone(),
                     }))
                     .with_runtime(runtime.clone())
                     .with_udp_addrs(vec!["0.0.0.0:0".to_owned()])
@@ -359,6 +420,34 @@ async fn main() -> Result<()> {
         pc.close().await?;
     }
     Ok(())
+}
+
+
+fn load_or_create_control_state(path: &Path) -> Result<PersistedControlState> {
+    if path.exists() {
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("read control state {}", path.display()))?;
+        return serde_json::from_str(&content)
+            .with_context(|| format!("parse control state {}", path.display()));
+    }
+
+    let state = PersistedControlState {
+        control_instance_id: Uuid::new_v4(),
+        trip_session_id: Uuid::new_v4(),
+        access_token: Uuid::new_v4().simple().to_string(),
+    };
+
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("create control state dir {}", parent.display()))?;
+    }
+
+    let content = serde_json::to_string_pretty(&state)?;
+    std::fs::write(path, content)
+        .with_context(|| format!("write control state {}", path.display()))?;
+    Ok(state)
 }
 
 fn to_rtc_ice_server(server: IceServerConfig) -> RTCIceServer {
