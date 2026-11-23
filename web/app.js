@@ -5,6 +5,7 @@ let ws;
 let peer;
 let controlChannel;
 let fileChannel;
+let activeTrip;
 
 function write(value) {
   log.textContent += `${typeof value === "string" ? value : JSON.stringify(value, null, 2)}\n`;
@@ -43,7 +44,33 @@ function setupChannel(channel) {
   });
 }
 
-document.querySelector("#connect").addEventListener("click", async () => {
+async function startPeer(trip, servers) {
+  if (peer) return;
+
+  peer = new RTCPeerConnection({iceServers: servers});
+  peer.addEventListener("connectionstatechange", () => {
+    setState(`WebRTC: ${peer.connectionState}`);
+  });
+
+  controlChannel = peer.createDataChannel("control");
+  fileChannel = peer.createDataChannel("files");
+  setupChannel(controlChannel);
+  setupChannel(fileChannel);
+
+  const offer = await peer.createOffer();
+  await peer.setLocalDescription(offer);
+  await waitForIceGatheringComplete(peer);
+
+  ws.send(JSON.stringify({
+    type: "offer",
+    trip_session_id: trip,
+    from: "browser",
+    sdp: JSON.stringify(peer.localDescription)
+  }));
+  write({type: "offer_sent", ice_servers: servers.length});
+}
+
+document.querySelector("#connect").addEventListener("click", () => {
   const trip = document.querySelector("#trip").value.trim();
   const token = document.querySelector("#token").value.trim();
   if (!trip || !token) {
@@ -51,11 +78,12 @@ document.querySelector("#connect").addEventListener("click", async () => {
     return;
   }
 
+  activeTrip = trip;
   const browserSession = crypto.randomUUID();
   const wsScheme = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${wsScheme}://${location.host}/signal`);
 
-  ws.addEventListener("open", async () => {
+  ws.addEventListener("open", () => {
     setState("Signaling підключено");
     ws.send(JSON.stringify({
       type: "browser_hello",
@@ -63,38 +91,25 @@ document.querySelector("#connect").addEventListener("click", async () => {
       trip_session_id: trip,
       access_token: token
     }));
-
-    peer = new RTCPeerConnection({
-      iceServers: [{urls: "stun:stun.l.google.com:19302"}]
-    });
-
-    peer.addEventListener("connectionstatechange", () => {
-      setState(`WebRTC: ${peer.connectionState}`);
-    });
-
-    controlChannel = peer.createDataChannel("control");
-    fileChannel = peer.createDataChannel("files");
-    setupChannel(controlChannel);
-    setupChannel(fileChannel);
-
-    const offer = await peer.createOffer();
-    await peer.setLocalDescription(offer);
-    await waitForIceGatheringComplete(peer);
-
-    ws.send(JSON.stringify({
-      type: "offer",
-      trip_session_id: trip,
-      from: "browser",
-      sdp: JSON.stringify(peer.localDescription)
-    }));
-    write("Offer відправлено");
   });
 
   ws.addEventListener("message", async event => {
     const message = JSON.parse(event.data);
     write(message);
 
-    if (message.type === "answer" && message.trip_session_id === trip && peer) {
+    if (
+      message.type === "ice_config" &&
+      message.trip_session_id === activeTrip
+    ) {
+      await startPeer(activeTrip, message.servers);
+      return;
+    }
+
+    if (
+      message.type === "answer" &&
+      message.trip_session_id === activeTrip &&
+      peer
+    ) {
       const answer = JSON.parse(message.sdp);
       await peer.setRemoteDescription(answer);
       write("Answer застосовано");
