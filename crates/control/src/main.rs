@@ -11,9 +11,8 @@ use webrtc::{
     data_channel::{DataChannel, DataChannelEvent},
     peer_connection::{
         MediaEngine, PeerConnection, PeerConnectionBuilder, PeerConnectionEventHandler,
-        RTCConfigurationBuilder,
-        RTCIceGatheringState, RTCIceServer, RTCPeerConnectionState, RTCSessionDescription,
-        Registry, register_default_interceptors,
+        RTCConfigurationBuilder, RTCIceGatheringState, RTCIceServer, RTCPeerConnectionState,
+        RTCSessionDescription, Registry, register_default_interceptors,
     },
     runtime::{Runtime, Sender, channel, default_runtime},
 };
