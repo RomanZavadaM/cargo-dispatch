@@ -32,11 +32,11 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
       - name: Check
-        run: cargo check --workspace --all-targets
+        run: cargo check --locked --workspace --all-targets
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Tests
-        run: cargo test --workspace --all-targets
+        run: cargo test --locked --workspace --all-targets
       - name: Browser harness syntax
         run: node --check web/app.js
 
@@ -49,7 +49,7 @@ jobs:
         with:
           toolchain: "1.91"
       - name: Check workspace on declared minimum Rust
-        run: cargo check --workspace --all-targets
+        run: cargo check --locked --workspace --all-targets
 
   cross-platform:
     name: Cross-platform check (${{ matrix.os }})
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Check workspace
-        run: cargo check --workspace --all-targets
+        run: cargo check --locked --workspace --all-targets
 
   turn-relay-smoke:
     name: TURN relay-only smoke
@@ -100,7 +100,7 @@ jobs:
         env:
           CARGO_TURN_SMOKE_URL: turn:127.0.0.1:3479?transport=udp
           CARGO_TURN_SMOKE_SECRET: cargo-smoke-secret
-        run: cargo run -p cargo-turn-smoke
+        run: cargo run --locked -p cargo-turn-smoke
       - name: Show coturn log on failure
         if: failure()
         run: cat /tmp/coturn.log || true
@@ -129,15 +129,3 @@ jobs:
           curl -fsS http://127.0.0.1:18080/ | grep -Fq "Тестове вікно водія"
           docker stop cargo-gateway-smoke >/dev/null
 
-  lockfile-export:
-    name: One-time Cargo.lock export
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: "1.91"
-      - name: Generate lockfile
-        run: cargo generate-lockfile
-      - name: Export lockfile for repository checkpoint
-        run: python3 -c 'import base64, pathlib; print("CARGO_LOCK_B64="+base64.b64encode(pathlib.Path("Cargo.lock").read_bytes()).decode())'
