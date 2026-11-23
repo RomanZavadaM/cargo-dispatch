@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CARGO connectivity prototype</title>
+</head>
+<body>
+  <main>
+    <h1>Тестове вікно водія</h1>
+    <p id="connection">Не підключено</p>
+    <section>
+      <label>Trip session <input id="trip"></label>
+      <label>Token <input id="token"></label>
+      <button id="connect">Підключити</button>
+    </section>
+    <section>
+      <button id="position">Передати тестову позицію</button>
+      <input id="file" type="file">
+    </section>
+    <pre id="log"></pre>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
