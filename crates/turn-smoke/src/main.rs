@@ -72,8 +72,8 @@ struct Peer {
 async fn main() -> Result<()> {
     let turn_url = std::env::var("CARGO_TURN_SMOKE_URL")
         .unwrap_or_else(|_| "turn:127.0.0.1:3478?transport=udp".into());
-    let secret = std::env::var("CARGO_TURN_SMOKE_SECRET")
-        .unwrap_or_else(|_| "cargo-smoke-secret".into());
+    let secret =
+        std::env::var("CARGO_TURN_SMOKE_SECRET").unwrap_or_else(|_| "cargo-smoke-secret".into());
     let runtime = default_runtime().context("webrtc runtime unavailable")?;
 
     let expires = SystemTime::now()
@@ -131,7 +131,10 @@ async fn main() -> Result<()> {
 
     data_channel.send_text("relay-only-ok").await?;
     let received = wait_value(&mut answerer.received_rx, "relay message").await?;
-    anyhow::ensure!(received == "relay-only-ok", "unexpected relay payload: {received}");
+    anyhow::ensure!(
+        received == "relay-only-ok",
+        "unexpected relay payload: {received}"
+    );
 
     println!("TURN relay-only WebRTC data channel: PASS");
 
