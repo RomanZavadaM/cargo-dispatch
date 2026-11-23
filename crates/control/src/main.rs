@@ -2,6 +2,7 @@ use std::{
     collections::HashSet,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 use anyhow::{Context, Result};
@@ -292,20 +293,46 @@ async fn main() -> Result<()> {
     let state_path = std::env::var("CARGO_CONTROL_STATE")
         .unwrap_or_else(|_| "prototype-control-state.json".into());
     let persisted = load_or_create_control_state(Path::new(&state_path))?;
-    let control_instance_id = persisted.control_instance_id;
-    let trip_session_id = persisted.trip_session_id;
-    let access_token = persisted.access_token;
 
     info!(
         %gateway_url,
-        %control_instance_id,
-        %trip_session_id,
-        "connecting control prototype"
+        control_instance_id = %persisted.control_instance_id,
+        trip_session_id = %persisted.trip_session_id,
+        "starting control prototype"
     );
-    println!("trip_session_id={trip_session_id}");
-    println!("access_token={access_token}");
+    println!("trip_session_id={}", persisted.trip_session_id);
+    println!("access_token={}", persisted.access_token);
 
-    let (socket, _) = connect_async(&gateway_url)
+    let runtime = default_runtime().context("webrtc runtime unavailable")?;
+    let seen_event_ids = Arc::new(Mutex::new(HashSet::new()));
+
+    loop {
+        match run_signaling_session(
+            &gateway_url,
+            &persisted,
+            runtime.clone(),
+            seen_event_ids.clone(),
+        )
+        .await
+        {
+            Ok(()) => warn!("gateway signaling disconnected; reconnecting"),
+            Err(error) => warn!(%error, "gateway signaling failed; reconnecting"),
+        }
+
+        runtime.sleep(Duration::from_secs(2)).await;
+    }
+}
+
+async fn run_signaling_session(
+    gateway_url: &str,
+    persisted: &PersistedControlState,
+    runtime: Arc<dyn Runtime>,
+    seen_event_ids: Arc<Mutex<HashSet<Uuid>>>,
+) -> Result<()> {
+    let control_instance_id = persisted.control_instance_id;
+    let trip_session_id = persisted.trip_session_id;
+
+    let (socket, _) = connect_async(gateway_url)
         .await
         .with_context(|| format!("connect signaling websocket {gateway_url}"))?;
     let (mut ws_write, mut ws_read) = socket.split();
@@ -322,13 +349,17 @@ async fn main() -> Result<()> {
         &SignalMessage::RegisterTrip {
             control_instance_id,
             trip_session_id,
-            access_token: access_token.clone(),
+            access_token: persisted.access_token.clone(),
         },
     )
     .await?;
 
-    let runtime = default_runtime().context("webrtc runtime unavailable")?;
-    let seen_event_ids = Arc::new(Mutex::new(HashSet::new()));
+    info!(
+        %control_instance_id,
+        %trip_session_id,
+        "control registered with gateway"
+    );
+
     let mut ice_servers = vec![RTCIceServer {
         urls: vec!["stun:stun.l.google.com:19302".to_owned()],
         ..Default::default()
