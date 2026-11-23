@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use cargo_connectivity_protocol::{\n    ControlChannelMessage, Endpoint, FileTransferControl, IceServerConfig, SignalMessage,\n};
 use futures_util::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;\nuse tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 use tracing::{info, warn};
@@ -20,7 +21,6 @@ use webrtc::{
 };
 
 const MAX_PROTOTYPE_FILE_SIZE: u64 = 64 * 1024 * 1024;
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PersistedControlState {
