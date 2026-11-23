@@ -514,16 +514,7 @@ fn load_or_create_control_state(path: &Path) -> Result<PersistedControlState> {
         let parsed: ControlStateFile = serde_json::from_str(&content)
             .with_context(|| format!("parse control state {}", path.display()))?;
 
-        let mut state = match parsed {
-            ControlStateFile::Current(state) => state,
-            ControlStateFile::Legacy(legacy) => PersistedControlState {
-                control_instance_id: legacy.control_instance_id,
-                trips: vec![PersistedTripState {
-                    trip_session_id: legacy.trip_session_id,
-                    access_token: legacy.access_token,
-                }],
-            },
-        };
+        let mut state = normalize_control_state(parsed);
 
         let changed = ensure_two_prototype_trips(&mut state);
         if changed {
@@ -539,6 +530,20 @@ fn load_or_create_control_state(path: &Path) -> Result<PersistedControlState> {
     ensure_two_prototype_trips(&mut state);
     persist_control_state(path, &state)?;
     Ok(state)
+}
+
+
+fn normalize_control_state(parsed: ControlStateFile) -> PersistedControlState {
+    match parsed {
+        ControlStateFile::Current(state) => state,
+        ControlStateFile::Legacy(legacy) => PersistedControlState {
+            control_instance_id: legacy.control_instance_id,
+            trips: vec![PersistedTripState {
+                trip_session_id: legacy.trip_session_id,
+                access_token: legacy.access_token,
+            }],
+        },
+    }
 }
 
 fn ensure_two_prototype_trips(state: &mut PersistedControlState) -> bool {
@@ -717,4 +722,61 @@ where
     let text = serde_json::to_string(signal)?;
     sink.send(WsMessage::Text(text.into())).await?;
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_state_keeps_existing_identity_during_migration() {
+        let control_instance_id = Uuid::new_v4();
+        let trip_session_id = Uuid::new_v4();
+        let access_token = "legacy-token".to_owned();
+
+        let legacy_json = serde_json::json!({
+            "control_instance_id": control_instance_id,
+            "trip_session_id": trip_session_id,
+            "access_token": access_token,
+        });
+
+        let parsed: ControlStateFile =
+            serde_json::from_value(legacy_json).expect("legacy state parses");
+        let mut state = normalize_control_state(parsed);
+
+        assert_eq!(state.control_instance_id, control_instance_id);
+        assert_eq!(state.trips.len(), 1);
+        assert_eq!(state.trips[0].trip_session_id, trip_session_id);
+        assert_eq!(state.trips[0].access_token, "legacy-token");
+
+        assert!(ensure_two_prototype_trips(&mut state));
+        assert_eq!(state.trips.len(), 2);
+        assert_eq!(state.trips[0].trip_session_id, trip_session_id);
+        assert_eq!(state.trips[0].access_token, "legacy-token");
+        assert_ne!(state.trips[1].trip_session_id, trip_session_id);
+    }
+
+    #[test]
+    fn current_two_trip_state_is_not_rewritten() {
+        let mut state = PersistedControlState {
+            control_instance_id: Uuid::new_v4(),
+            trips: vec![
+                PersistedTripState {
+                    trip_session_id: Uuid::new_v4(),
+                    access_token: "token-a".into(),
+                },
+                PersistedTripState {
+                    trip_session_id: Uuid::new_v4(),
+                    access_token: "token-b".into(),
+                },
+            ],
+        };
+
+        let original = state.trips.clone();
+        assert!(!ensure_two_prototype_trips(&mut state));
+        assert_eq!(state.trips.len(), 2);
+        assert_eq!(state.trips[0].trip_session_id, original[0].trip_session_id);
+        assert_eq!(state.trips[1].trip_session_id, original[1].trip_session_id);
+    }
 }
