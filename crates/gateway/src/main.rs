@@ -48,6 +48,12 @@ struct TripRegistration {
     browser_session_id: Option<BrowserSessionId>,
 }
 
+impl TripRegistration {
+    fn token_matches(&self, candidate: &str) -> bool {
+        self.access_token == candidate
+    }
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -213,7 +219,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     );
                     continue;
                 };
-                if registration.access_token != access_token {
+                if !registration.token_matches(&access_token) {
                     send_json(
                         &tx,
                         &SignalMessage::Error {
@@ -308,5 +314,83 @@ async fn relay_to_peer(
 fn send_json(tx: &Tx, value: &SignalMessage) {
     if let Ok(text) = serde_json::to_string(value) {
         let _ = tx.send(Message::Text(text.into()));
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cargo_connectivity_protocol::Endpoint;
+    use uuid::Uuid;
+
+    fn registration(
+        control_instance_id: ControlInstanceId,
+        access_token: &str,
+        browser_session_id: Option<BrowserSessionId>,
+    ) -> TripRegistration {
+        TripRegistration {
+            control_instance_id,
+            access_token: access_token.to_owned(),
+            browser_session_id,
+        }
+    }
+
+    #[test]
+    fn trip_token_rejects_wrong_value() {
+        let registration = registration(Uuid::new_v4(), "correct-token", None);
+        assert!(registration.token_matches("correct-token"));
+        assert!(!registration.token_matches("wrong-token"));
+        assert!(!registration.token_matches(""));
+    }
+
+    #[tokio::test]
+    async fn relay_keeps_two_trip_sessions_isolated() {
+        let state = AppState::new();
+
+        let control_a = Uuid::new_v4();
+        let control_b = Uuid::new_v4();
+        let browser_a = Uuid::new_v4();
+        let browser_b = Uuid::new_v4();
+        let trip_a = Uuid::new_v4();
+        let trip_b = Uuid::new_v4();
+
+        let (control_a_tx, mut control_a_rx) = mpsc::unbounded_channel();
+        let (control_b_tx, mut control_b_rx) = mpsc::unbounded_channel();
+        let (browser_a_tx, mut browser_a_rx) = mpsc::unbounded_channel();
+        let (browser_b_tx, mut browser_b_rx) = mpsc::unbounded_channel();
+
+        state.controls.write().await.insert(control_a, control_a_tx);
+        state.controls.write().await.insert(control_b, control_b_tx);
+        state.browsers.write().await.insert(browser_a, browser_a_tx.clone());
+        state.browsers.write().await.insert(browser_b, browser_b_tx);
+
+        state.trips.write().await.insert(
+            trip_a,
+            registration(control_a, "token-a", Some(browser_a)),
+        );
+        state.trips.write().await.insert(
+            trip_b,
+            registration(control_b, "token-b", Some(browser_b)),
+        );
+
+        let offer = SignalMessage::Offer {
+            trip_session_id: trip_a,
+            from: Endpoint::Browser,
+            sdp: "synthetic-offer".into(),
+        };
+
+        relay_to_peer(&state, trip_a, &browser_a_tx, offer.clone()).await;
+
+        let delivered = control_a_rx.try_recv().expect("trip A control receives offer");
+        let Message::Text(text) = delivered else {
+            panic!("expected text signaling message");
+        };
+        let decoded: SignalMessage = serde_json::from_str(&text).expect("valid signaling JSON");
+        assert_eq!(decoded, offer);
+
+        assert!(browser_a_rx.try_recv().is_err(), "sender must not receive its own offer");
+        assert!(control_b_rx.try_recv().is_err(), "trip B control must stay isolated");
+        assert!(browser_b_rx.try_recv().is_err(), "trip B browser must stay isolated");
     }
 }
