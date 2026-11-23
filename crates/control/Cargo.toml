@@ -19,3 +19,4 @@ tokio-tungstenite.workspace = true
 webrtc.workspace = true
 sha2.workspace = true
 bytes.workspace = true
+serde.workspace = true
