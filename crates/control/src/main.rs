@@ -319,11 +319,13 @@ async fn main() -> Result<()> {
     info!(
         %gateway_url,
         control_instance_id = %persisted.control_instance_id,
-        trip_session_id = %persisted.trip_session_id,
+        trip_count = persisted.trips.len(),
         "starting control prototype"
     );
-    println!("trip_session_id={}", persisted.trip_session_id);
-    println!("access_token={}", persisted.access_token);
+    for (index, trip) in persisted.trips.iter().enumerate() {
+        println!("trip_{}_session_id={}", index + 1, trip.trip_session_id);
+        println!("trip_{}_access_token={}", index + 1, trip.access_token);
+    }
 
     let runtime = default_runtime().context("webrtc runtime unavailable")?;
     let seen_event_ids = Arc::new(Mutex::new(HashSet::new()));
@@ -352,7 +354,6 @@ async fn run_signaling_session(
     seen_event_ids: Arc<Mutex<HashSet<Uuid>>>,
 ) -> Result<()> {
     let control_instance_id = persisted.control_instance_id;
-    let trip_session_id = persisted.trip_session_id;
 
     let (socket, _) = connect_async(gateway_url)
         .await
@@ -366,27 +367,36 @@ async fn run_signaling_session(
         },
     )
     .await?;
-    send_signal(
-        &mut ws_write,
-        &SignalMessage::RegisterTrip {
-            control_instance_id,
-            trip_session_id,
-            access_token: persisted.access_token.clone(),
-        },
-    )
-    .await?;
+
+    for trip in &persisted.trips {
+        send_signal(
+            &mut ws_write,
+            &SignalMessage::RegisterTrip {
+                control_instance_id,
+                trip_session_id: trip.trip_session_id,
+                access_token: trip.access_token.clone(),
+            },
+        )
+        .await?;
+    }
 
     info!(
         %control_instance_id,
-        %trip_session_id,
+        trip_count = persisted.trips.len(),
         "control registered with gateway"
     );
 
-    let mut ice_servers = vec![RTCIceServer {
-        urls: vec!["stun:stun.l.google.com:19302".to_owned()],
-        ..Default::default()
-    }];
-    let mut peer_connection = None;
+    let known_trips: HashSet<Uuid> = persisted
+        .trips
+        .iter()
+        .map(|trip| trip.trip_session_id)
+        .collect();
+    let mut ice_servers_by_trip: HashMap<Uuid, Vec<RTCIceServer>> = known_trips
+        .iter()
+        .copied()
+        .map(|trip_id| (trip_id, default_ice_servers()))
+        .collect();
+    let mut peer_connections = HashMap::new();
 
     while let Some(message) = ws_read.next().await {
         let message = message?;
@@ -397,34 +407,41 @@ async fn run_signaling_session(
 
         match signal {
             SignalMessage::IceConfig {
-                trip_session_id: config_trip,
+                trip_session_id,
                 servers,
                 expires_at,
-            } if config_trip == trip_session_id => {
-                ice_servers = servers.into_iter().map(to_rtc_ice_server).collect();
+            } if known_trips.contains(&trip_session_id) => {
+                let ice_servers: Vec<_> =
+                    servers.into_iter().map(to_rtc_ice_server).collect();
                 info!(
                     %trip_session_id,
                     server_count = ice_servers.len(),
                     ?expires_at,
                     "ICE config received"
                 );
+                ice_servers_by_trip.insert(trip_session_id, ice_servers);
             }
             SignalMessage::Offer {
-                trip_session_id: offer_trip,
+                trip_session_id,
                 from: Endpoint::Browser,
                 sdp,
-            } if offer_trip == trip_session_id => {
-                info!(%offer_trip, "received browser offer");
+            } if known_trips.contains(&trip_session_id) => {
+                info!(%trip_session_id, "received browser offer");
 
                 let mut media_engine = MediaEngine::default();
                 media_engine.register_default_codecs()?;
                 let registry = register_default_interceptors(Registry::new(), &mut media_engine)?;
                 let (gather_complete_tx, mut gather_complete_rx) = channel::<()>(1);
 
+                let ice_servers = ice_servers_by_trip
+                    .get(&trip_session_id)
+                    .cloned()
+                    .unwrap_or_else(default_ice_servers);
+
                 let pc = PeerConnectionBuilder::new()
                     .with_configuration(
                         RTCConfigurationBuilder::new()
-                            .with_ice_servers(ice_servers.clone())
+                            .with_ice_servers(ice_servers)
                             .build(),
                     )
                     .with_media_engine(media_engine)
@@ -433,6 +450,7 @@ async fn run_signaling_session(
                         runtime: runtime.clone(),
                         gather_complete_tx,
                         seen_event_ids: seen_event_ids.clone(),
+                        trip_session_id,
                     }))
                     .with_runtime(runtime.clone())
                     .with_udp_addrs(vec!["0.0.0.0:0".to_owned()])
@@ -462,7 +480,7 @@ async fn run_signaling_session(
                 )
                 .await?;
 
-                if let Some(old_pc) = peer_connection.replace(pc) {
+                if let Some(old_pc) = peer_connections.insert(trip_session_id, pc) {
                     old_pc.close().await?;
                 }
                 info!(%trip_session_id, "answer sent");
@@ -474,7 +492,7 @@ async fn run_signaling_session(
         }
     }
 
-    if let Some(pc) = peer_connection {
+    for (_, pc) in peer_connections {
         pc.close().await?;
     }
     Ok(())
@@ -484,16 +502,49 @@ fn load_or_create_control_state(path: &Path) -> Result<PersistedControlState> {
     if path.exists() {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("read control state {}", path.display()))?;
-        return serde_json::from_str(&content)
-            .with_context(|| format!("parse control state {}", path.display()));
+        let parsed: ControlStateFile = serde_json::from_str(&content)
+            .with_context(|| format!("parse control state {}", path.display()))?;
+
+        let mut state = match parsed {
+            ControlStateFile::Current(state) => state,
+            ControlStateFile::Legacy(legacy) => PersistedControlState {
+                control_instance_id: legacy.control_instance_id,
+                trips: vec![PersistedTripState {
+                    trip_session_id: legacy.trip_session_id,
+                    access_token: legacy.access_token,
+                }],
+            },
+        };
+
+        let changed = ensure_two_prototype_trips(&mut state);
+        if changed {
+            persist_control_state(path, &state)?;
+        }
+        return Ok(state);
     }
 
-    let state = PersistedControlState {
+    let mut state = PersistedControlState {
         control_instance_id: Uuid::new_v4(),
-        trip_session_id: Uuid::new_v4(),
-        access_token: Uuid::new_v4().simple().to_string(),
+        trips: Vec::new(),
     };
+    ensure_two_prototype_trips(&mut state);
+    persist_control_state(path, &state)?;
+    Ok(state)
+}
 
+fn ensure_two_prototype_trips(state: &mut PersistedControlState) -> bool {
+    let mut changed = false;
+    while state.trips.len() < 2 {
+        state.trips.push(PersistedTripState {
+            trip_session_id: Uuid::new_v4(),
+            access_token: Uuid::new_v4().simple().to_string(),
+        });
+        changed = true;
+    }
+    changed
+}
+
+fn persist_control_state(path: &Path, state: &PersistedControlState) -> Result<()> {
     if let Some(parent) = path.parent()
         && !parent.as_os_str().is_empty()
     {
@@ -501,10 +552,17 @@ fn load_or_create_control_state(path: &Path) -> Result<PersistedControlState> {
             .with_context(|| format!("create control state dir {}", parent.display()))?;
     }
 
-    let content = serde_json::to_string_pretty(&state)?;
+    let content = serde_json::to_string_pretty(state)?;
     std::fs::write(path, content)
         .with_context(|| format!("write control state {}", path.display()))?;
-    Ok(state)
+    Ok(())
+}
+
+fn default_ice_servers() -> Vec<RTCIceServer> {
+    vec![RTCIceServer {
+        urls: vec!["stun:stun.l.google.com:19302".to_owned()],
+        ..Default::default()
+    }]
 }
 
 fn to_rtc_ice_server(server: IceServerConfig) -> RTCIceServer {
@@ -515,7 +573,7 @@ fn to_rtc_ice_server(server: IceServerConfig) -> RTCIceServer {
     }
 }
 
-async fn send_synthetic_pdf(data_channel: &Arc<dyn DataChannel>) -> Result<()> {
+async fn send_synthetic_pdf(\n    data_channel: &Arc<dyn DataChannel>,\n    trip_session_id: Uuid,\n) -> Result<()> {
     const CHUNK_SIZE: usize = 12 * 1024;
 
     let data = build_synthetic_pdf();
@@ -525,7 +583,7 @@ async fn send_synthetic_pdf(data_channel: &Arc<dyn DataChannel>) -> Result<()> {
 
     let start = FileTransferControl::FileStart {
         file_id,
-        name: "cargo-connectivity-test.pdf".into(),
+        name: format!("cargo-connectivity-{trip_session_id}.pdf"),
         mime_type: "application/pdf".into(),
         size: data.len() as u64,
         sha256: sha256.clone(),
