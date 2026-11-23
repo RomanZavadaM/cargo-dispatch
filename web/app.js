@@ -9,7 +9,7 @@ let ws;
 let peer;
 let controlChannel;
 let fileChannel;
-let activeTrip;
+let activeTrip;\nlet incomingFile;
 
 function write(value) {
   log.textContent += `${typeof value === "string" ? value : JSON.stringify(value, null, 2)}\n`;
@@ -36,6 +36,7 @@ async function waitForIceGatheringComplete(pc) {
 function setupChannel(channel) {
   if (channel.label === "files") {
     channel.bufferedAmountLowThreshold = FILE_BUFFER_LOW_WATER;
+    channel.binaryType = "arraybuffer";
   }
 
   channel.addEventListener("open", () => {
@@ -45,7 +46,12 @@ function setupChannel(channel) {
     }
   });
 
-  channel.addEventListener("message", event => {
+  channel.addEventListener("message", async event => {
+    if (channel.label === "files") {
+      await handleIncomingFileMessage(event);
+      return;
+    }
+
     if (typeof event.data === "string") {
       try {
         write({channel: channel.label, message: JSON.parse(event.data)});
@@ -60,6 +66,102 @@ function setupChannel(channel) {
   channel.addEventListener("close", () => {
     write({channel: channel.label, state: "closed"});
   });
+}
+
+
+async function handleIncomingFileMessage(event) {
+  if (typeof event.data === "string") {
+    let message;
+    try {
+      message = JSON.parse(event.data);
+    } catch {
+      write({channel: "files", message: event.data});
+      return;
+    }
+
+    if (message.type === "file_start") {
+      incomingFile = {
+        fileId: message.file_id,
+        name: message.name,
+        mimeType: message.mime_type || "application/octet-stream",
+        expectedSize: message.size,
+        expectedSha256: message.sha256,
+        expectedChunks: message.chunk_count,
+        receivedChunks: 0,
+        receivedSize: 0,
+        chunks: []
+      };
+      write({type: "file_receive_started", name: message.name, size: message.size});
+      return;
+    }
+
+    if (message.type === "file_end") {
+      if (!incomingFile || incomingFile.fileId !== message.file_id) {
+        write({file_receive_error: "file_end without matching file_start"});
+        return;
+      }
+
+      const file = incomingFile;
+      incomingFile = null;
+      const blob = new Blob(file.chunks, {type: file.mimeType});
+      const buffer = await blob.arrayBuffer();
+      const actualSha256 = await sha256Hex(buffer);
+      const sizeOk = buffer.byteLength === file.expectedSize;
+      const hashOk = actualSha256 === file.expectedSha256;
+      const chunksOk = file.receivedChunks === file.expectedChunks;
+      const ok = sizeOk && hashOk && chunksOk;
+
+      if (ok) {
+        addReceivedFile(file.name, blob);
+      }
+
+      fileChannel.send(JSON.stringify({
+        type: "file_ack",
+        file_id: file.fileId,
+        received_size: buffer.byteLength,
+        sha256: actualSha256,
+        ok,
+        message: ok
+          ? "browser verified received file"
+          : `verification failed: size=${sizeOk}, sha256=${hashOk}, chunks=${chunksOk}`
+      }));
+
+      write({
+        type: "file_receive_complete",
+        file_id: file.fileId,
+        name: file.name,
+        size: buffer.byteLength,
+        sha256: actualSha256,
+        ok
+      });
+      return;
+    }
+
+    write({channel: "files", message});
+    return;
+  }
+
+  if (!incomingFile) {
+    write({file_receive_error: "binary chunk without file_start"});
+    return;
+  }
+
+  const chunk = event.data instanceof ArrayBuffer
+    ? event.data
+    : await event.data.arrayBuffer();
+  incomingFile.chunks.push(chunk);
+  incomingFile.receivedChunks += 1;
+  incomingFile.receivedSize += chunk.byteLength;
+}
+
+function addReceivedFile(name, blob) {
+  const downloads = document.querySelector("#downloads");
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = name;
+  link.textContent = `${name} (${blob.size} bytes)`;
+  link.style.display = "block";
+  downloads.appendChild(link);
 }
 
 async function startPeer(trip, servers) {
