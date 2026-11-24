@@ -310,12 +310,14 @@ mod tests {
                 sequence: 1,
                 kind: TripPointKind::Load,
                 title: "Load".to_owned(),
+                navigation: None,
             },
             TripRoutePoint {
                 point_id: point_id(second),
                 sequence: 2,
                 kind: TripPointKind::Unload,
                 title: "Unload".to_owned(),
+                navigation: None,
             },
         ]
     }
