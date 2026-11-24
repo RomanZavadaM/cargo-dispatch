@@ -27,9 +27,7 @@ fn App() -> impl IntoView {
     let show_unsaved_warning = RwSignal::new(false);
 
     let rows = Memo::new(move |_| {
-        service.with(|service| {
-            service.query(&filter.get(), sort.get(), ascending.get(), None)
-        })
+        service.with(|service| service.query(&filter.get(), sort.get(), ascending.get(), None))
     });
 
     let opened_row = Memo::new(move |_| {
