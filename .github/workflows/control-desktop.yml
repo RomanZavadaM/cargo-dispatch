@@ -50,10 +50,12 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Verify committed lockfile
-        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
+        run: cargo metadata --locked --format-version 1 --no-deps
 
       - name: Install pinned Trunk
-        run: cargo install trunk --locked --version "$TRUNK_VERSION"
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c
+        with:
+          tool: trunk@0.22.2
 
       - name: Build Control frontend
         working-directory: apps/control-ui
@@ -94,7 +96,7 @@ jobs:
             xdg-utils
 
       - name: Verify committed lockfile
-        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
+        run: cargo metadata --locked --format-version 1 --no-deps
 
       - name: Check desktop shell
         run: cargo check --locked -p cargo-dispatch-control-desktop --all-targets
