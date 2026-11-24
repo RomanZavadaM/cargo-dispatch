@@ -7,7 +7,7 @@ use cargo_dispatch_contracts::{
 use cargo_dispatch_control::{
     InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft, StoredTripPlan, TripImportCandidate,
 };
-use cargo_dispatch_domain::{PointId, TripId};
+use cargo_dispatch_domain::{DocumentId, PointId, TripId};
 use cargo_dispatch_planner::PlannerTripExportDraft;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -23,6 +23,77 @@ const LIMIT: u64 = 4 * 1024 * 1024;
 
 fn invalid(message: impl std::fmt::Debug) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, format!("{message:?}"))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DocumentDirection {
+    FromOperator,
+    FromDriver,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredDocument {
+    pub document_id: DocumentId,
+    pub direction: DocumentDirection,
+    pub original_name: String,
+    pub stored_name: String,
+    pub mime_type: String,
+    pub size: u64,
+    pub sha256: [u8; 32],
+    pub created_at_unix_ms: u64,
+    pub point_id: Option<PointId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DocumentEntry {
+    document_id: [u8; 16],
+    direction: DocumentDirection,
+    original_name: String,
+    stored_name: String,
+    mime_type: String,
+    size: u64,
+    sha256: [u8; 32],
+    created_at_unix_ms: u64,
+    point_id: Option<[u8; 16]>,
+}
+
+impl DocumentEntry {
+    fn record(&self) -> io::Result<StoredDocument> {
+        Ok(StoredDocument {
+            document_id: DocumentId::from_bytes(self.document_id).map_err(invalid)?,
+            direction: self.direction,
+            original_name: self.original_name.clone(),
+            stored_name: self.stored_name.clone(),
+            mime_type: self.mime_type.clone(),
+            size: self.size,
+            sha256: self.sha256,
+            created_at_unix_ms: self.created_at_unix_ms,
+            point_id: self.point_id.map(PointId::from_bytes).transpose().map_err(invalid)?,
+        })
+    }
+}
+
+fn id_hex(bytes: [u8; 16]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn safe_extension(original_name: &str) -> Option<String> {
+    let extension = Path::new(original_name).extension()?.to_str()?;
+    if extension.is_empty()
+        || extension.len() > 12
+        || !extension.chars().all(|ch| ch.is_ascii_alphanumeric())
+    {
+        return None;
+    }
+    Some(extension.to_ascii_lowercase())
+}
+
+fn document_subdir(direction: DocumentDirection) -> &'static str {
+    match direction {
+        DocumentDirection::FromOperator => "from_operator",
+        DocumentDirection::FromDriver => "from_driver",
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -199,9 +270,15 @@ enum Change {
     Complete([u8; 16]),
     OperatorEdit(Vec<Point>),
     DriverOrder(Vec<[u8; 16]>),
+    DocumentStored(DocumentEntry),
 }
 
-fn apply(reg: &mut InMemoryTripRegistry, trip: TripId, event: &Change) -> io::Result<()> {
+fn apply(
+    reg: &mut InMemoryTripRegistry,
+    documents: &mut std::collections::BTreeMap<DocumentId, StoredDocument>,
+    trip: TripId,
+    event: &Change,
+) -> io::Result<()> {
     match event {
         Change::Import(m) => {
             if m.trip != trip.as_bytes() {
@@ -244,6 +321,16 @@ fn apply(reg: &mut InMemoryTripRegistry, trip: TripId, event: &Change) -> io::Re
             }
             reg.edit_active_route(&current, proposed).map_err(invalid)?;
         }
+        Change::DocumentStored(entry) => {
+            let document = entry.record()?;
+            match documents.get(&document.document_id) {
+                Some(existing) if existing == &document => {}
+                Some(_) => return Err(invalid("document id metadata conflict")),
+                None => {
+                    documents.insert(document.document_id, document);
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -253,6 +340,7 @@ pub struct TripFolder {
     trip: TripId,
     cursor: u64,
     registry: InMemoryTripRegistry,
+    documents: std::collections::BTreeMap<DocumentId, StoredDocument>,
 }
 
 impl TripFolder {
@@ -270,13 +358,14 @@ impl TripFolder {
             trip,
             cursor: 0,
             registry: InMemoryTripRegistry::default(),
+            documents: std::collections::BTreeMap::new(),
         };
         for entry in entries {
             if entry != this.next_path()? {
                 return Err(invalid("incomplete trip history"));
             }
             let event: Change = serde_json::from_slice(&bounded(File::open(entry)?)?)?;
-            apply(&mut this.registry, trip, &event)?;
+            apply(&mut this.registry, &mut this.documents, trip, &event)?;
             this.cursor += 1;
         }
         Ok(this)
@@ -305,6 +394,16 @@ impl TripFolder {
             .expect("folder contains imported trip")
     }
 
+    #[must_use]
+    pub fn documents(&self) -> Vec<StoredDocument> {
+        self.documents.values().cloned().collect()
+    }
+
+    #[must_use]
+    pub fn document(&self, document_id: DocumentId) -> Option<StoredDocument> {
+        self.documents.get(&document_id).cloned()
+    }
+
     pub fn build_replan_request(
         &self,
         draft: ReplanRequestDraft,
@@ -326,8 +425,16 @@ impl TripFolder {
             return Err(invalid("trip changed; reopen folder"));
         }
         let mut updated = self.registry.clone();
-        apply(&mut updated, self.trip, &event)?;
-        if updated.get(self.trip) == self.registry.get(self.trip) {
+        let mut updated_documents = self.documents.clone();
+        apply(
+            &mut updated,
+            &mut updated_documents,
+            self.trip,
+            &event,
+        )?;
+        if updated.get(self.trip) == self.registry.get(self.trip)
+            && updated_documents == self.documents
+        {
             return Ok(());
         }
         let bytes = serde_json::to_vec(&event)?;
@@ -338,6 +445,7 @@ impl TripFolder {
         file.write_all(&bytes)?;
         publish(file, &path)?;
         self.registry = updated;
+        self.documents = updated_documents;
         self.cursor += 1;
         Ok(())
     }
@@ -363,6 +471,122 @@ impl TripFolder {
         self.record(Change::DriverOrder(
             order.iter().map(|p| p.as_bytes()).collect(),
         ))
+    }
+
+
+    pub fn store_document(
+        &mut self,
+        direction: DocumentDirection,
+        document_id: DocumentId,
+        original_name: &str,
+        mime_type: &str,
+        point_id: Option<PointId>,
+        created_at_unix_ms: u64,
+        source: &Path,
+    ) -> io::Result<StoredDocument> {
+        if original_name.trim().is_empty() {
+            return Err(invalid("document original name is required"));
+        }
+        if mime_type.trim().is_empty() {
+            return Err(invalid("document mime type is required"));
+        }
+        if let Some(point_id) = point_id
+            && !self
+                .state()
+                .route_points
+                .iter()
+                .any(|point| point.point_id == point_id)
+        {
+            return Err(invalid("document point does not belong to trip"));
+        }
+
+        let directory = self
+            .path
+            .join("documents")
+            .join(document_subdir(direction));
+        fs::create_dir_all(&directory)?;
+
+        let extension = safe_extension(original_name);
+        let stored_name = match extension {
+            Some(extension) => format!("{}.{}", id_hex(document_id.as_bytes()), extension),
+            None => id_hex(document_id.as_bytes()),
+        };
+        let destination = directory.join(&stored_name);
+
+        let mut source_file = File::open(source)?;
+        if !source_file.metadata()?.is_file() {
+            return Err(invalid("document source must be a regular file"));
+        }
+
+        let mut temporary = NamedTempFile::new_in(&directory)?;
+        let mut hasher = Sha256::new();
+        let mut size = 0_u64;
+        let mut buffer = [0_u8; 64 * 1024];
+        loop {
+            let read = source_file.read(&mut buffer)?;
+            if read == 0 {
+                break;
+            }
+            hasher.update(&buffer[..read]);
+            temporary.write_all(&buffer[..read])?;
+            size = size
+                .checked_add(u64::try_from(read).map_err(invalid)?)
+                .ok_or_else(|| invalid("document size overflow"))?;
+        }
+        temporary.as_file().sync_all()?;
+        let sha256: [u8; 32] = hasher.finalize().into();
+
+        let candidate = StoredDocument {
+            document_id,
+            direction,
+            original_name: original_name.to_owned(),
+            stored_name: stored_name.clone(),
+            mime_type: mime_type.to_owned(),
+            size,
+            sha256,
+            created_at_unix_ms,
+            point_id,
+        };
+
+        if let Some(existing) = self.documents.get(&document_id) {
+            if existing.direction == candidate.direction
+                && existing.original_name == candidate.original_name
+                && existing.mime_type == candidate.mime_type
+                && existing.size == candidate.size
+                && existing.sha256 == candidate.sha256
+                && existing.point_id == candidate.point_id
+            {
+                return Ok(existing.clone());
+            }
+            return Err(invalid("document id content or metadata conflict"));
+        }
+
+        if destination.try_exists()? {
+            let mut existing = File::open(&destination)?;
+            let mut existing_hasher = Sha256::new();
+            let existing_size = io::copy(&mut existing, &mut existing_hasher)?;
+            let existing_hash: [u8; 32] = existing_hasher.finalize().into();
+            if existing_size != size || existing_hash != sha256 {
+                return Err(invalid("unindexed document file conflicts with incoming content"));
+            }
+        } else {
+            publish(temporary, &destination)?;
+        }
+
+        self.record(Change::DocumentStored(DocumentEntry {
+            document_id: document_id.as_bytes(),
+            direction,
+            original_name: original_name.to_owned(),
+            stored_name,
+            mime_type: mime_type.to_owned(),
+            size,
+            sha256,
+            created_at_unix_ms,
+            point_id: point_id.map(PointId::as_bytes),
+        }))?;
+
+        self.document(document_id)
+            .ok_or_else(|| invalid("document record was not stored"))
     }
 }
 
