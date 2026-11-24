@@ -496,7 +496,19 @@ pub fn localized_field_label(language: UiLanguage, key: &str, english_fallback: 
 }
 
 pub fn localized_validation_issue(language: UiLanguage, issue: &ValidationIssue) -> String {
-    let label = localized_field_label(language, &issue.field_key, &issue.field_key);
+    let english_label = match issue.field_key.as_str() {
+        "origin" => "Origin",
+        "destination" => "Destination",
+        "cargo_description" => "Cargo description",
+        "customer_name" => "Customer",
+        "weight_kg" => "Weight",
+        "rate_eur" => "Rate",
+        "pickup_day" => "Pickup day",
+        "pallets" => "Pallets",
+        "contact_phone" => "Phone number",
+        _ => issue.field_key.as_str(),
+    };
+    let label = localized_field_label(language, &issue.field_key, english_label);
     if issue.message.contains("is required") {
         return format!("{label} — {}", ui_text(language, UiTextKey::FieldRequired));
     }
