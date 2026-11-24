@@ -324,14 +324,9 @@ mod tests {
             })
             .collect();
         let draft = PlannerTripExportDraft {
-            header: TripPackageHeader::new(
-                trip_id,
-                TripVersion::new(1).expect("version"),
-                None,
-            )
-            .expect("header"),
-            working_route_id: WorkingRouteId::from_bytes([trip_byte + 1; 16])
-                .expect("route id"),
+            header: TripPackageHeader::new(trip_id, TripVersion::new(1).expect("version"), None)
+                .expect("header"),
+            working_route_id: WorkingRouteId::from_bytes([trip_byte + 1; 16]).expect("route id"),
             working_route_revision: 1,
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).expect("operator"),
@@ -369,7 +364,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn loopback_browser_clients_share_control_truth_and_keep_trips_isolated() -> io::Result<()> {
+    async fn loopback_browser_clients_share_control_truth_and_keep_trips_isolated() -> io::Result<()>
+    {
         let tmp = tempfile::tempdir()?;
         let folder_a_path = tmp.path().join("trip-a");
         let folder_b_path = tmp.path().join("trip-b");
@@ -399,8 +395,7 @@ mod tests {
         let server = LoopbackControlServer::start(state.clone()).await?;
         assert_eq!(server.address().ip(), IpAddr::V4(Ipv4Addr::LOCALHOST));
 
-        let (status, _) =
-            http_request(server.address(), "GET", "/driver/wrong-token-0000").await?;
+        let (status, _) = http_request(server.address(), "GET", "/driver/wrong-token-0000").await?;
         assert_eq!(status, 404);
 
         let (status, page) =
@@ -453,14 +448,19 @@ mod tests {
         drop(state);
 
         let durable_a = TripFolder::open(&folder_a_path, trip_a)?;
-        assert!(durable_a
-            .state()
-            .completed_point_ids
-            .contains(&route_a[1].point_id));
+        assert!(
+            durable_a
+                .state()
+                .completed_point_ids
+                .contains(&route_a[1].point_id)
+        );
 
         let durable_b = TripFolder::open(&folder_b_path, trip_b)?;
         assert!(durable_b.state().completed_point_ids.is_empty());
-        assert_eq!(durable_b.state().route_points[0].point_id, route_b[0].point_id);
+        assert_eq!(
+            durable_b.state().route_points[0].point_id,
+            route_b[0].point_id
+        );
 
         fs::remove_file(tmp.path().join("trip-a.zip")).ok();
         Ok(())
