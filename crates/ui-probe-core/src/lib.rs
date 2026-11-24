@@ -205,6 +205,47 @@ pub struct MapProbeData {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DriverDocument {
+    pub id: String,
+    pub name: String,
+    pub required: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DriverTripView {
+    pub trip_id: String,
+    pub vehicle: String,
+    pub current_point: String,
+    pub task: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub documents: Vec<DriverDocument>,
+}
+
+pub fn synthetic_driver_trip() -> DriverTripView {
+    DriverTripView {
+        trip_id: "TRIP-A".to_owned(),
+        vehicle: "BC 1001 AA".to_owned(),
+        current_point: "Lviv · Warehouse 3".to_owned(),
+        task: "Arrive at gate 3 and confirm loading".to_owned(),
+        latitude: 49.8397,
+        longitude: 24.0297,
+        documents: vec![
+            DriverDocument {
+                id: "doc-ttn".to_owned(),
+                name: "TTN / delivery document".to_owned(),
+                required: true,
+            },
+            DriverDocument {
+                id: "doc-invoice".to_owned(),
+                name: "Invoice".to_owned(),
+                required: false,
+            },
+        ],
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProbeSummary {
     pub total_requests: usize,
     pub revision: u64,
@@ -1043,6 +1084,15 @@ fn status_rank(status: RequestStatus) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn driver_browser_snapshot_has_trip_task_and_documents() {
+        let trip = synthetic_driver_trip();
+        assert_eq!(trip.trip_id, "TRIP-A");
+        assert!(!trip.current_point.is_empty());
+        assert!(!trip.task.is_empty());
+        assert!(trip.documents.iter().any(|document| document.required));
+    }
 
     #[test]
     fn synthetic_dataset_is_deterministic_and_large() {
