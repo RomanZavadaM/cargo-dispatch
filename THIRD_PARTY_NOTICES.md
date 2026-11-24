@@ -12,6 +12,14 @@ cargo-dispatch може містити або розповсюджуватися
 - `tempfile 3.27.0` — MIT або Apache-2.0; уже використовувався файловим шаром, тепер також створює тимчасовий файл browser upload до атомарного приймання в trip folder.
 - Цей product slice не додає WebRTC/TURN/gateway runtime. Непрямі залежності цих crates фіксує `Cargo.lock` і перевіряє `cargo deny`.
 
+### Control desktop UI
+- `tauri 2.12.7` — MIT або Apache-2.0; accepted desktop shell для Windows/macOS/Linux.
+- `tauri-build 2.7.6` — MIT або Apache-2.0; build-time Tauri configuration.
+- `leptos 0.8.23` — MIT; accepted CSR UI layer.
+- `wasm-bindgen`, `wasm-bindgen-futures`, `js-sys`, `console_error_panic_hook` — permissive Rust/WASM bridge dependencies for the Leptos frontend; exact versions and transitive graph are fixed by `Cargo.lock` and checked by `cargo deny`.
+- `Trunk 0.22.2` — CI/build-only frontend bundler; installed at an exact version in the Control desktop workflow.
+- Tauri/Leptos versions are the exact starting versions already accepted by UI probe P01–P15; product code still receives its own CI and dependency/license gate.
+
 ## Дані
 - Дорожні дані OpenStreetMap, якщо будуть використані, поширюються за ліцензією ODbL; потрібна атрибуція «© OpenStreetMap contributors».
 - Реальні дані користувачів (авто, водії, заявки, координати) у репозиторії не зберігаються.
