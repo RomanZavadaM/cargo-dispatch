@@ -8,6 +8,7 @@ test("P02 request editor protects unsaved data and validates outside widgets", a
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   await page.goto("http://127.0.0.1:4173", { waitUntil: "domcontentloaded" });
+  await page.locator("#ui-language").selectOption("en");
   await expect(page.locator("#pool-count")).toHaveText("5000", { timeout: 30_000 });
   await expect(page.locator(".pool-row")).toHaveCount(5000, { timeout: 30_000 });
 
