@@ -1108,14 +1108,16 @@ mod tests {
         assert!(!trip.current_point.is_empty());
         assert!(!trip.task.is_empty());
         assert!(trip.documents.iter().any(|document| document.required));
-        assert!(trip
-            .documents
-            .iter()
-            .all(|document| document.direction == DocumentDirection::ControlToDriver));
-        assert!(trip
-            .documents
-            .iter()
-            .all(|document| !document.mime_type.is_empty() && document.size_bytes > 0));
+        assert!(
+            trip.documents
+                .iter()
+                .all(|document| document.direction == DocumentDirection::ControlToDriver)
+        );
+        assert!(
+            trip.documents
+                .iter()
+                .all(|document| !document.mime_type.is_empty() && document.size_bytes > 0)
+        );
     }
 
     #[test]
