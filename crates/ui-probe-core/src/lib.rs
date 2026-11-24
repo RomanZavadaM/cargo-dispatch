@@ -177,7 +177,6 @@ pub struct RoutePreview {
     pub excluded_cargo_ids: Vec<u64>,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct MapCoordinate {
     pub lng: f64,
@@ -537,7 +536,6 @@ impl ApplicationService {
         Ok(self.route.clone())
     }
 
-
     pub fn map_probe_data(&self) -> MapProbeData {
         synthetic_map_probe_data()
     }
@@ -817,7 +815,6 @@ fn build_editor_draft(row: &LoadRequest) -> RequestDraft {
         fields,
     }
 }
-
 
 fn synthetic_map_probe_data() -> MapProbeData {
     let routes = vec![
@@ -1218,15 +1215,7 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.routes.len(), 3);
         assert_eq!(a.points.len(), 200);
-        assert_eq!(
-            a.points.iter().filter(|point| point.manual).count(),
-            1
-        );
-        assert!(
-            a.routes
-                .iter()
-                .all(|route| route.coordinates.len() >= 4)
-        );
+        assert_eq!(a.points.iter().filter(|point| point.manual).count(), 1);
+        assert!(a.routes.iter().all(|route| route.coordinates.len() >= 4));
     }
-
 }
