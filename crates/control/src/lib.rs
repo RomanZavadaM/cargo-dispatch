@@ -12,7 +12,6 @@ pub struct TripImportCandidate {
     pub header: TripPackageHeader,
     pub content_fingerprint: PackageContentFingerprint,
     pub route_points: Vec<TripRoutePoint>,
-    pub completed_point_ids: BTreeSet<PointId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,6 +20,7 @@ pub struct StoredTripPlan {
     pub current_version: TripVersion,
     pub content_fingerprint: PackageContentFingerprint,
     pub route_points: Vec<TripRoutePoint>,
+    pub completed_point_ids: BTreeSet<PointId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,7 +157,11 @@ impl InMemoryTripRegistry {
             .get_mut(&trip_id)
             .ok_or(CompletionError::TripNotFound)?;
 
-        if !trip.route_points.iter().any(|point| point.point_id == point_id) {
+        if !trip
+            .route_points
+            .iter()
+            .any(|point| point.point_id == point_id)
+        {
             return Err(CompletionError::PointNotFound);
         }
 
