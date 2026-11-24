@@ -6,7 +6,7 @@
 
 ## Live public state
 
-- `main`: `ee137b853c72a62caca1e1c5fec5a45ff155e671`.
+- `main`: публічний вхід і короткий стан; точний head завжди звіряти live.
 - Активна product-робота: `product/foundation-r1`.
 - Поточний product head: `dafb03ec7d1c4d37950c784d103ba24d38eeef6d`.
 - Product CI run #87 / `45468910124`: SUCCESS на Linux, Windows і macOS.
