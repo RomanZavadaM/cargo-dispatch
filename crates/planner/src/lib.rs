@@ -312,6 +312,189 @@ pub fn evaluate_route_segments(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConfirmedTimeWindow {
+    pub earliest_unix_ms: u64,
+    pub latest_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RouteTimePoint {
+    pub window: Option<ConfirmedTimeWindow>,
+    pub handling_time_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RouteTimeSegment {
+    pub road_time_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeHardRejectReason {
+    SegmentCountMismatch {
+        point_count: usize,
+        segment_count: usize,
+    },
+    InvalidTimeWindow {
+        point_index: usize,
+        earliest_unix_ms: u64,
+        latest_unix_ms: u64,
+    },
+    WindowMissed {
+        point_index: usize,
+        earliest_possible_arrival_unix_ms: u64,
+        latest_unix_ms: u64,
+    },
+    TimeOverflow {
+        point_index: usize,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeNeedsCheckReason {
+    TimeWindowUnknown(usize),
+    HandlingTimeUnknown(usize),
+    RoadTimeUnknown(usize),
+    TightTimeWindow {
+        point_index: usize,
+        slack_ms: u64,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteTimeFeasibility {
+    pub level: FeasibilityLevel,
+    pub hard_reasons: Vec<TimeHardRejectReason>,
+    pub check_reasons: Vec<TimeNeedsCheckReason>,
+    pub earliest_arrivals_unix_ms: Vec<u64>,
+    pub earliest_departures_unix_ms: Vec<u64>,
+    pub minimum_known_slack_ms: Option<u64>,
+}
+
+#[must_use]
+pub fn evaluate_route_time_windows(
+    start_arrival_unix_ms: u64,
+    points: &[RouteTimePoint],
+    segments: &[RouteTimeSegment],
+    tight_slack_ms: u64,
+) -> RouteTimeFeasibility {
+    if segments.len() != points.len().saturating_sub(1) {
+        return RouteTimeFeasibility {
+            level: FeasibilityLevel::Impossible,
+            hard_reasons: vec![TimeHardRejectReason::SegmentCountMismatch {
+                point_count: points.len(),
+                segment_count: segments.len(),
+            }],
+            check_reasons: Vec::new(),
+            earliest_arrivals_unix_ms: Vec::new(),
+            earliest_departures_unix_ms: Vec::new(),
+            minimum_known_slack_ms: None,
+        };
+    }
+
+    let mut hard_reasons = Vec::new();
+    let mut check_reasons = Vec::new();
+    let mut earliest_arrivals_unix_ms = Vec::with_capacity(points.len());
+    let mut earliest_departures_unix_ms = Vec::with_capacity(points.len());
+    let mut minimum_known_slack_ms: Option<u64> = None;
+    let mut current_arrival = start_arrival_unix_ms;
+
+    for (point_index, point) in points.iter().enumerate() {
+        earliest_arrivals_unix_ms.push(current_arrival);
+
+        let service_start = match point.window {
+            Some(window) if window.earliest_unix_ms > window.latest_unix_ms => {
+                hard_reasons.push(TimeHardRejectReason::InvalidTimeWindow {
+                    point_index,
+                    earliest_unix_ms: window.earliest_unix_ms,
+                    latest_unix_ms: window.latest_unix_ms,
+                });
+                current_arrival
+            }
+            Some(window) => {
+                let service_start = current_arrival.max(window.earliest_unix_ms);
+                if service_start > window.latest_unix_ms {
+                    hard_reasons.push(TimeHardRejectReason::WindowMissed {
+                        point_index,
+                        earliest_possible_arrival_unix_ms: current_arrival,
+                        latest_unix_ms: window.latest_unix_ms,
+                    });
+                } else {
+                    let slack_ms = window.latest_unix_ms - service_start;
+                    minimum_known_slack_ms = Some(
+                        minimum_known_slack_ms
+                            .map_or(slack_ms, |minimum| minimum.min(slack_ms)),
+                    );
+                    if slack_ms <= tight_slack_ms {
+                        check_reasons.push(TimeNeedsCheckReason::TightTimeWindow {
+                            point_index,
+                            slack_ms,
+                        });
+                    }
+                }
+                service_start
+            }
+            None => {
+                check_reasons.push(TimeNeedsCheckReason::TimeWindowUnknown(point_index));
+                current_arrival
+            }
+        };
+
+        let handling_time_ms = match point.handling_time_ms {
+            Some(value) => value,
+            None => {
+                check_reasons.push(TimeNeedsCheckReason::HandlingTimeUnknown(point_index));
+                0
+            }
+        };
+
+        let departure = match service_start.checked_add(handling_time_ms) {
+            Some(value) => value,
+            None => {
+                hard_reasons.push(TimeHardRejectReason::TimeOverflow { point_index });
+                u64::MAX
+            }
+        };
+        earliest_departures_unix_ms.push(departure);
+
+        if let Some(segment) = segments.get(point_index) {
+            let road_time_ms = match segment.road_time_ms {
+                Some(value) => value,
+                None => {
+                    check_reasons.push(TimeNeedsCheckReason::RoadTimeUnknown(point_index));
+                    0
+                }
+            };
+            current_arrival = match departure.checked_add(road_time_ms) {
+                Some(value) => value,
+                None => {
+                    hard_reasons.push(TimeHardRejectReason::TimeOverflow { point_index });
+                    u64::MAX
+                }
+            };
+        }
+    }
+
+    let level = if hard_reasons.is_empty() {
+        if check_reasons.is_empty() {
+            FeasibilityLevel::Feasible
+        } else {
+            FeasibilityLevel::NeedsCheck
+        }
+    } else {
+        FeasibilityLevel::Impossible
+    };
+
+    RouteTimeFeasibility {
+        level,
+        hard_reasons,
+        check_reasons,
+        earliest_arrivals_unix_ms,
+        earliest_departures_unix_ms,
+        minimum_known_slack_ms,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     DuplicateRequest,
     RequestNotFound,
@@ -976,6 +1159,145 @@ mod tests {
                 .check_reasons
                 .contains(&RouteNeedsCheckReason::AvailablePalletsUnknown)
         );
+    }
+
+    #[test]
+    fn route_time_is_feasible_when_known_windows_have_slack() {
+        let base = 1_800_000_000_000_u64;
+        let result = evaluate_route_time_windows(
+            base,
+            &[
+                RouteTimePoint {
+                    window: Some(ConfirmedTimeWindow {
+                        earliest_unix_ms: base,
+                        latest_unix_ms: base + 60 * 60 * 1_000,
+                    }),
+                    handling_time_ms: Some(15 * 60 * 1_000),
+                },
+                RouteTimePoint {
+                    window: Some(ConfirmedTimeWindow {
+                        earliest_unix_ms: base + 90 * 60 * 1_000,
+                        latest_unix_ms: base + 150 * 60 * 1_000,
+                    }),
+                    handling_time_ms: Some(10 * 60 * 1_000),
+                },
+            ],
+            &[RouteTimeSegment {
+                road_time_ms: Some(60 * 60 * 1_000),
+            }],
+            10 * 60 * 1_000,
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Feasible);
+        assert!(result.hard_reasons.is_empty());
+        assert!(result.check_reasons.is_empty());
+        assert_eq!(result.earliest_arrivals_unix_ms[1], base + 75 * 60 * 1_000);
+        assert_eq!(result.earliest_departures_unix_ms[1], base + 100 * 60 * 1_000);
+        assert_eq!(result.minimum_known_slack_ms, Some(60 * 60 * 1_000));
+    }
+
+    #[test]
+    fn confirmed_window_missed_even_with_optimistic_timing_is_impossible() {
+        let base = 1_800_000_000_000_u64;
+        let result = evaluate_route_time_windows(
+            base,
+            &[
+                RouteTimePoint {
+                    window: None,
+                    handling_time_ms: None,
+                },
+                RouteTimePoint {
+                    window: Some(ConfirmedTimeWindow {
+                        earliest_unix_ms: base,
+                        latest_unix_ms: base + 50 * 60 * 1_000,
+                    }),
+                    handling_time_ms: Some(0),
+                },
+            ],
+            &[RouteTimeSegment {
+                road_time_ms: Some(60 * 60 * 1_000),
+            }],
+            10 * 60 * 1_000,
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Impossible);
+        assert!(result.hard_reasons.contains(&TimeHardRejectReason::WindowMissed {
+            point_index: 1,
+            earliest_possible_arrival_unix_ms: base + 60 * 60 * 1_000,
+            latest_unix_ms: base + 50 * 60 * 1_000,
+        }));
+    }
+
+    #[test]
+    fn unknown_road_or_handling_time_stays_needs_check() {
+        let base = 1_800_000_000_000_u64;
+        let result = evaluate_route_time_windows(
+            base,
+            &[
+                RouteTimePoint {
+                    window: Some(ConfirmedTimeWindow {
+                        earliest_unix_ms: base,
+                        latest_unix_ms: base + 30 * 60 * 1_000,
+                    }),
+                    handling_time_ms: None,
+                },
+                RouteTimePoint {
+                    window: Some(ConfirmedTimeWindow {
+                        earliest_unix_ms: base,
+                        latest_unix_ms: base + 120 * 60 * 1_000,
+                    }),
+                    handling_time_ms: Some(0),
+                },
+            ],
+            &[RouteTimeSegment { road_time_ms: None }],
+            10 * 60 * 1_000,
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
+        assert!(result.hard_reasons.is_empty());
+        assert!(result
+            .check_reasons
+            .contains(&TimeNeedsCheckReason::HandlingTimeUnknown(0)));
+        assert!(result
+            .check_reasons
+            .contains(&TimeNeedsCheckReason::RoadTimeUnknown(0)));
+    }
+
+    #[test]
+    fn tight_but_reachable_window_remains_candidate_with_warning() {
+        let base = 1_800_000_000_000_u64;
+        let result = evaluate_route_time_windows(
+            base,
+            &[
+                RouteTimePoint {
+                    window: Some(ConfirmedTimeWindow {
+                        earliest_unix_ms: base,
+                        latest_unix_ms: base + 60 * 60 * 1_000,
+                    }),
+                    handling_time_ms: Some(0),
+                },
+                RouteTimePoint {
+                    window: Some(ConfirmedTimeWindow {
+                        earliest_unix_ms: base,
+                        latest_unix_ms: base + 65 * 60 * 1_000,
+                    }),
+                    handling_time_ms: Some(0),
+                },
+            ],
+            &[RouteTimeSegment {
+                road_time_ms: Some(60 * 60 * 1_000),
+            }],
+            10 * 60 * 1_000,
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
+        assert!(result.hard_reasons.is_empty());
+        assert!(result
+            .check_reasons
+            .contains(&TimeNeedsCheckReason::TightTimeWindow {
+                point_index: 1,
+                slack_ms: 5 * 60 * 1_000,
+            }));
     }
 
     #[test]
