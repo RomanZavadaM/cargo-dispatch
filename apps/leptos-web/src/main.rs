@@ -476,7 +476,7 @@ fn App() -> impl IntoView {
                                     editor_draft.set(fresh);
                                     editor_issues.set(Vec::new());
                                     editor_message.set(Some(
-                                        ui_text(language.get_untracked(), UiTextKey::SavedState).to_owned(),
+                                        ui_text(language.get_untracked(), UiTextKey::Saved).to_owned(),
                                     ));
                                     show_unsaved_warning.set(false);
                                     opened.set(Some(draft.request_id));
