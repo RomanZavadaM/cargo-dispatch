@@ -1,0 +1,145 @@
+name: UI package measurements
+
+on:
+  push:
+    branches:
+      - "prototype/ui-r1"
+    paths:
+      - ".github/workflows/ui-measure.yml"
+      - "probe/ui/browser/p14-measure.spec.mjs"
+
+permissions:
+  contents: read
+
+env:
+  TRUNK_VERSION: "0.22.2"
+
+jobs:
+  measure:
+    name: Measure Leptos/Tauri probe
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk@0.22.2
+
+      - name: Install desktop and measurement dependencies
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils
+          npm install --no-save --package-lock=false @playwright/test@1.65.1
+          npx playwright install --with-deps chromium
+
+      - name: Measure release builds
+        run: |
+          set -euo pipefail
+          mkdir -p probe/ui/out
+
+          started=$(date +%s%3N)
+          (cd apps/leptos-web && trunk build --release=true)
+          finished=$(date +%s%3N)
+          echo $((finished-started)) > probe/ui/out/p14-planner-build-ms.txt
+
+          started=$(date +%s%3N)
+          (cd apps/driver-web && trunk build --release=true)
+          finished=$(date +%s%3N)
+          echo $((finished-started)) > probe/ui/out/p14-driver-build-ms.txt
+
+          started=$(date +%s%3N)
+          cargo build --locked --release -p ui-probe-tauri
+          finished=$(date +%s%3N)
+          echo $((finished-started)) > probe/ui/out/p14-desktop-build-ms.txt
+
+          du -sb apps/leptos-web/dist | awk '{print $1}' > probe/ui/out/p14-planner-dist-bytes.txt
+          du -sb apps/driver-web/dist | awk '{print $1}' > probe/ui/out/p14-driver-dist-bytes.txt
+          stat -c%s target/release/ui-probe-tauri > probe/ui/out/p14-desktop-binary-bytes.txt
+
+      - name: Measure runtime
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory apps/leptos-web/dist > /tmp/p14-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" >/dev/null 2>&1 || true; cat /tmp/p14-http.log || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          npx playwright test probe/ui/browser/p14-measure.spec.mjs --reporter=line --workers=1
+
+      - name: Assemble measurement report
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          out = Path("probe/ui/out")
+          runtime = json.loads((out / "p14-runtime.json").read_text())
+
+          def number(name):
+              return int((out / name).read_text().strip())
+
+          config = json.loads(Path("apps/tauri-shell/src-tauri/tauri.conf.json").read_text())
+          report = {
+              "probe": "P14",
+              "framework": "Tauri 2 + Leptos CSR",
+              "runner": "ubuntu-22.04",
+              "versions": {
+                  "rust": "1.91",
+                  "leptos": "0.8.23",
+                  "tauri": "2.12.7",
+                  "trunk": "0.22.2",
+                  "playwright": "1.65.1",
+              },
+              "build": {
+                  "planner_browser_ms": number("p14-planner-build-ms.txt"),
+                  "driver_browser_ms": number("p14-driver-build-ms.txt"),
+                  "desktop_release_ms": number("p14-desktop-build-ms.txt"),
+              },
+              "size_bytes": {
+                  "planner_browser_dist": number("p14-planner-dist-bytes.txt"),
+                  "driver_browser_dist": number("p14-driver-dist-bytes.txt"),
+                  "desktop_release_binary": number("p14-desktop-binary-bytes.txt"),
+              },
+              "runtime": runtime,
+              "packaging": {
+                  "bundle_active": bool(config.get("bundle", {}).get("active")),
+                  "portable_release_binary_files": 1,
+                  "system_webview_required": True,
+                  "installer_measured": False,
+              },
+              "limitations": [
+                  "Build durations are CI wall-clock measurements on one GitHub-hosted runner and are comparative, not product SLAs.",
+                  "Runtime memory is Chromium JS heap after the 5k table and map are ready; it is a reproducible UI proxy, not total desktop process RSS.",
+                  "Desktop GUI cold-start time is not claimed from headless CI; useful-render and map-ready timings are measured in the browser harness.",
+                  "Installer complexity is not measured because this probe intentionally uses a portable shell with bundle.active=false.",
+              ],
+          }
+          (out / "ui-package-measurements.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-package-measurements
+          path: |
+            probe/ui/out/ui-package-measurements.json
+            probe/ui/out/p14-runtime.json
+          if-no-files-found: error
