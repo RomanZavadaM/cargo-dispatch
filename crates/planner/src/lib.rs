@@ -28,6 +28,123 @@ impl PoolFilter {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AvailableCapacity {
+    pub payload_kg: Option<u32>,
+    pub pallets: Option<u16>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FeasibilityLevel {
+    Impossible,
+    NeedsCheck,
+    Feasible,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HardRejectReason {
+    RequestUnavailable(AvailabilityState),
+    PayloadExceeded {
+        cargo_kg: u32,
+        available_kg: u32,
+    },
+    PalletCapacityExceeded {
+        cargo_pallets: u16,
+        available_pallets: u16,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NeedsCheckReason {
+    RequestAvailabilityNeedsCheck,
+    RequestAvailabilityUnknown,
+    CargoWeightUnknown,
+    AvailablePayloadUnknown,
+    CargoPalletsUnknown,
+    AvailablePalletsUnknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CandidateFeasibility {
+    pub level: FeasibilityLevel,
+    pub hard_reasons: Vec<HardRejectReason>,
+    pub check_reasons: Vec<NeedsCheckReason>,
+}
+
+#[must_use]
+pub fn evaluate_request_candidate(
+    request: &PlanningRequest,
+    capacity: AvailableCapacity,
+) -> CandidateFeasibility {
+    let mut hard_reasons = Vec::new();
+    let mut check_reasons = Vec::new();
+
+    match request.request.availability {
+        AvailabilityState::Active => {}
+        AvailabilityState::NeedsCheck => {
+            check_reasons.push(NeedsCheckReason::RequestAvailabilityNeedsCheck);
+        }
+        AvailabilityState::Unknown => {
+            check_reasons.push(NeedsCheckReason::RequestAvailabilityUnknown);
+        }
+        unavailable @ (AvailabilityState::Taken
+        | AvailabilityState::Rejected
+        | AvailabilityState::Removed) => {
+            hard_reasons.push(HardRejectReason::RequestUnavailable(unavailable));
+        }
+    }
+
+    match (request.request.cargo.weight_kg, capacity.payload_kg) {
+        (Some(cargo_kg), Some(available_kg)) if cargo_kg > available_kg => {
+            hard_reasons.push(HardRejectReason::PayloadExceeded {
+                cargo_kg,
+                available_kg,
+            });
+        }
+        (Some(_), Some(_)) => {}
+        (None, Some(_)) => check_reasons.push(NeedsCheckReason::CargoWeightUnknown),
+        (Some(_), None) => check_reasons.push(NeedsCheckReason::AvailablePayloadUnknown),
+        (None, None) => {
+            check_reasons.push(NeedsCheckReason::CargoWeightUnknown);
+            check_reasons.push(NeedsCheckReason::AvailablePayloadUnknown);
+        }
+    }
+
+    match (request.request.cargo.pallets, capacity.pallets) {
+        (Some(cargo_pallets), Some(available_pallets))
+            if cargo_pallets > available_pallets =>
+        {
+            hard_reasons.push(HardRejectReason::PalletCapacityExceeded {
+                cargo_pallets,
+                available_pallets,
+            });
+        }
+        (Some(_), Some(_)) => {}
+        (None, Some(_)) => check_reasons.push(NeedsCheckReason::CargoPalletsUnknown),
+        (Some(_), None) => check_reasons.push(NeedsCheckReason::AvailablePalletsUnknown),
+        (None, None) => {
+            check_reasons.push(NeedsCheckReason::CargoPalletsUnknown);
+            check_reasons.push(NeedsCheckReason::AvailablePalletsUnknown);
+        }
+    }
+
+    let level = if hard_reasons.is_empty() {
+        if check_reasons.is_empty() {
+            FeasibilityLevel::Feasible
+        } else {
+            FeasibilityLevel::NeedsCheck
+        }
+    } else {
+        FeasibilityLevel::Impossible
+    };
+
+    CandidateFeasibility {
+        level,
+        hard_reasons,
+        check_reasons,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     DuplicateRequest,
     RequestNotFound,
@@ -363,6 +480,119 @@ mod tests {
             service.add_request(item),
             Err(PlannerError::DuplicateRequest)
         );
+    }
+
+    #[test]
+    fn basic_candidate_is_feasible_when_known_capacity_is_sufficient() {
+        let item = request(
+            request_id(8),
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Active,
+            true,
+        );
+        let result = evaluate_request_candidate(
+            &item,
+            AvailableCapacity {
+                payload_kg: Some(3_000),
+                pallets: Some(8),
+            },
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Feasible);
+        assert!(result.hard_reasons.is_empty());
+        assert!(result.check_reasons.is_empty());
+    }
+
+    #[test]
+    fn known_capacity_violation_is_impossible_and_explained() {
+        let item = request(
+            request_id(9),
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Active,
+            true,
+        );
+        let result = evaluate_request_candidate(
+            &item,
+            AvailableCapacity {
+                payload_kg: Some(2_000),
+                pallets: Some(5),
+            },
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Impossible);
+        assert_eq!(
+            result.hard_reasons,
+            vec![
+                HardRejectReason::PayloadExceeded {
+                    cargo_kg: 2_500,
+                    available_kg: 2_000,
+                },
+                HardRejectReason::PalletCapacityExceeded {
+                    cargo_pallets: 6,
+                    available_pallets: 5,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn unavailable_request_is_rejected_before_expensive_routing() {
+        let item = request(
+            request_id(10),
+            "Kyiv",
+            "Berlin",
+            AvailabilityState::Taken,
+            true,
+        );
+        let result = evaluate_request_candidate(
+            &item,
+            AvailableCapacity {
+                payload_kg: Some(5_000),
+                pallets: Some(10),
+            },
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Impossible);
+        assert_eq!(
+            result.hard_reasons,
+            vec![HardRejectReason::RequestUnavailable(
+                AvailabilityState::Taken
+            )]
+        );
+    }
+
+    #[test]
+    fn unknown_capacity_data_needs_check_instead_of_becoming_confirmed_fact() {
+        let mut item = request(
+            request_id(11),
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Unknown,
+            true,
+        );
+        item.request.cargo.pallets = None;
+
+        let result = evaluate_request_candidate(
+            &item,
+            AvailableCapacity {
+                payload_kg: Some(3_000),
+                pallets: None,
+            },
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
+        assert!(result.hard_reasons.is_empty());
+        assert!(result
+            .check_reasons
+            .contains(&NeedsCheckReason::RequestAvailabilityUnknown));
+        assert!(result
+            .check_reasons
+            .contains(&NeedsCheckReason::CargoPalletsUnknown));
+        assert!(result
+            .check_reasons
+            .contains(&NeedsCheckReason::AvailablePalletsUnknown));
     }
 
     #[test]
