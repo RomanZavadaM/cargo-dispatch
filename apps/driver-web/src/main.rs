@@ -51,6 +51,7 @@ fn DriverApp() -> impl IntoView {
                         <span>{move || ui_text(language.get(), UiTextKey::Language)}</span>
                         <select
                             id="driver-language"
+                            aria-label=move || ui_text(language.get(), UiTextKey::Language)
                             prop:value=move || language.get().code()
                             on:change=move |event| {
                                 if let Some(next) = UiLanguage::from_code(&event_target_value(&event)) {
@@ -67,7 +68,9 @@ fn DriverApp() -> impl IntoView {
                             <option value="de">"Deutsch"</option>
                         </select>
                     </label>
-                    <strong id="driver-status">{move || driver_status_text(language.get(), status.get())}</strong>
+                    <strong id="driver-status" role="status" aria-live="polite">
+                        {move || driver_status_text(language.get(), status.get())}
+                    </strong>
                 </div>
             </section>
 
@@ -94,7 +97,11 @@ fn DriverApp() -> impl IntoView {
 
             <section class="card">
                 <p class="eyebrow">{move || ui_text(language.get(), UiTextKey::Documents)}</p>
-                <ul id="driver-documents" class="docs">
+                <ul
+                    id="driver-documents"
+                    class="docs"
+                    aria-label=move || ui_text(language.get(), UiTextKey::Documents)
+                >
                     <For
                         each=move || trip.documents.clone()
                         key=|document| document.id.clone()
@@ -126,6 +133,7 @@ fn DriverApp() -> impl IntoView {
                 <span id="selected-file-metadata" aria-live="polite">{move || ui_text(language.get(), UiTextKey::NoFile)}</span>
                 <a
                     id="document-download"
+                    class="file-label"
                     href="data:application/pdf;base64,JVBERi0xLjQKJSBDYXJnbyBEaXNwYXRjaCBzeW50aGV0aWMgZG9jdW1lbnQKJSVFT0YK"
                     download=download_document.name.clone()
                     data-document-id=download_document.id.clone()

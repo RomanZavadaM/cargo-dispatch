@@ -9,7 +9,11 @@
     :root { font-family: Inter, system-ui, sans-serif; color-scheme: light dark; }
     * { box-sizing: border-box; }
     body { margin: 0; background: Canvas; color: CanvasText; }
-    button, input { font: inherit; }
+    button, input, select { font: inherit; }
+    :where(button, a, input, select):focus-visible {
+      outline: 3px solid Highlight;
+      outline-offset: 3px;
+    }
     .driver-shell { max-width: 760px; margin: 0 auto; padding: 18px; display: grid; gap: 14px; }
     .card { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
     .trip-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
@@ -18,11 +22,18 @@
     .primary { width: 100%; min-height: 52px; font-weight: 700; }
     .docs { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
     .docs li { display: flex; justify-content: space-between; gap: 12px; }
+    .docs li span { min-width: 0; overflow-wrap: anywhere; }
+    #driver-language { min-height: 44px; max-width: 100%; }
     .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .actions a, .actions button, .file-label { min-height: 48px; display: flex; align-items: center; justify-content: center; text-align: center; border: 1px solid color-mix(in srgb, CanvasText 25%, transparent); border-radius: 10px; padding: 10px; color: inherit; text-decoration: none; background: ButtonFace; }
     #driver-file { width: 100%; min-height: 44px; }
     #geo-status { overflow-wrap: anywhere; }
-    @media (max-width: 520px) { .actions { grid-template-columns: 1fr; } .driver-shell { padding: 12px; } }
+    @media (max-width: 520px) {
+      .actions { grid-template-columns: 1fr; }
+      .driver-shell { padding: 12px; }
+      .trip-head { flex-direction: column; }
+      .trip-head > * { width: 100%; }
+    }
   </style>
   <script>
     window.cargoDriverRequestLocation = function () {

@@ -97,7 +97,7 @@ jobs:
             fi
             sleep 1
           done
-          npx playwright test probe/ui/browser/p01.spec.mjs probe/ui/browser/p02.spec.mjs probe/ui/browser/p03.spec.mjs probe/ui/browser/p04.spec.mjs probe/ui/browser/p05.spec.mjs probe/ui/browser/p09-planner.spec.mjs --reporter=line --workers=1
+          npx playwright test probe/ui/browser/p01.spec.mjs probe/ui/browser/p02.spec.mjs probe/ui/browser/p03.spec.mjs probe/ui/browser/p04.spec.mjs probe/ui/browser/p05.spec.mjs probe/ui/browser/p09-planner.spec.mjs probe/ui/browser/p10-planner.spec.mjs --reporter=line --workers=1
 
       - name: Run standalone driver browser contract
         run: |
@@ -111,7 +111,7 @@ jobs:
             fi
             sleep 1
           done
-          npx playwright test probe/ui/browser/p07.spec.mjs probe/ui/browser/p08.spec.mjs probe/ui/browser/p09-driver.spec.mjs --reporter=line --workers=1
+          npx playwright test probe/ui/browser/p07.spec.mjs probe/ui/browser/p08.spec.mjs probe/ui/browser/p09-driver.spec.mjs probe/ui/browser/p10-driver.spec.mjs --reporter=line --workers=1
 
       - name: Record browser artifact
         run: |
@@ -129,6 +129,8 @@ jobs:
           test -s probe/ui/out/p08-documents.json
           test -s probe/ui/out/p09-i18n-planner.json
           test -s probe/ui/out/p09-i18n-driver.json
+          test -s probe/ui/out/p10-accessibility-planner.json
+          test -s probe/ui/out/p10-accessibility-driver.json
 
       - uses: actions/upload-artifact@v4
         with:
@@ -178,7 +180,7 @@ jobs:
         run: cargo test --locked -p ui-probe-tauri --all-targets
 
   report:
-    name: Localization report
+    name: Accessibility and keyboard report
     if: always()
     needs:
       - core
@@ -197,7 +199,7 @@ jobs:
           import json, os
           report = {
               "probe": "ui-r1",
-              "phase": "i18n-localization",
+              "phase": "accessibility-keyboard",
               "commit_sha": os.environ["GIT_SHA"],
               "versions": {
                   "rust_msrv": "1.91",
@@ -220,11 +222,13 @@ jobs:
                   "desktop_document_open_save": os.environ["DESKTOP"],
                   "i18n_runtime_switch": os.environ["BROWSER"],
                   "shared_language_codes": os.environ["CORE"],
+                  "keyboard_focus_contract": os.environ["BROWSER"],
+                  "driver_touch_accessibility": os.environ["BROWSER"],
                   "tauri_cross_platform_check": os.environ["DESKTOP"],
               },
           }
           report["pass"] = all(value == "success" for value in report["checks"].values())
-          with open("ui-i18n-report.json", "w", encoding="utf-8") as handle:
+          with open("ui-accessibility-report.json", "w", encoding="utf-8") as handle:
               json.dump(report, handle, indent=2, sort_keys=True)
               handle.write("\n")
           print(json.dumps(report, indent=2, sort_keys=True))
@@ -235,6 +239,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-i18n-report
-          path: ui-i18n-report.json
+          name: ui-accessibility-report
+          path: ui-accessibility-report.json
           if-no-files-found: error

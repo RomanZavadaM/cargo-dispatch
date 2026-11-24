@@ -10,3 +10,4 @@ publish = false
 leptos = { version = "=0.8.23", features = ["csr"] }
 ui-probe-core = { path = "../../crates/ui-probe-core" }
 console_error_panic_hook = "0.1"
+js-sys = "0.3"

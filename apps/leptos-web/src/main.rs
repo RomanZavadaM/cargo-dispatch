@@ -10,6 +10,20 @@ fn main() {
     leptos::mount::mount_to_body(App);
 }
 
+fn focus_later(id: &str) {
+    let _ = js_sys::eval(&format!(
+        "setTimeout(() => document.getElementById('{}')?.focus(), 0)",
+        id
+    ));
+}
+
+fn set_document_language(language: UiLanguage) {
+    let _ = js_sys::eval(&format!(
+        "document.documentElement.lang = '{}'",
+        language.code()
+    ));
+}
+
 #[component]
 fn App() -> impl IntoView {
     let service = RwSignal::new(ApplicationService::synthetic());
@@ -68,6 +82,7 @@ fn App() -> impl IntoView {
                         on:change=move |event| {
                             if let Some(next) = UiLanguage::from_code(&event_target_value(&event)) {
                                 language.set(next);
+                                set_document_language(next);
                             }
                         }
                     >
@@ -192,7 +207,11 @@ fn App() -> impl IntoView {
                                                 <input
                                                     class="row-select"
                                                     type="checkbox"
-                                                    aria-label=format!("Select request {id}")
+                                                    aria-label=move || format!(
+                                                        "{} {}",
+                                                        ui_text(language.get(), UiTextKey::Select),
+                                                        id
+                                                    )
                                                     prop:checked=move || selected.with(|ids| ids.contains(&id))
                                                     on:change=move |event| {
                                                         let checked = event_target_checked(&event);
@@ -212,7 +231,11 @@ fn App() -> impl IntoView {
                                                 <button
                                                     class="open-row"
                                                     type="button"
-                                                    aria-label=format!("Open request {id}")
+                                                    aria-label=move || format!(
+                                                        "{} {}",
+                                                        ui_text(language.get(), UiTextKey::Open),
+                                                        id
+                                                    )
                                                     on:click=move |_| opened.set(Some(id))
                                                 >
                                                     {move || ui_text(language.get(), UiTextKey::Open)}
@@ -251,6 +274,7 @@ fn App() -> impl IntoView {
                                         editor_issues.set(Vec::new());
                                         editor_message.set(None);
                                         show_unsaved_warning.set(false);
+                                        focus_later("editor-origin");
                                     }
                                 }
                             >
@@ -261,7 +285,30 @@ fn App() -> impl IntoView {
                 })}
 
                 <Show when=move || editor_draft.get().is_some()>
-                    <section id="request-editor" class="editor" aria-label="Request editor">
+                    <section
+                        id="request-editor"
+                        class="editor"
+                        aria-label=move || ui_text(language.get(), UiTextKey::RequestEditor)
+                        on:keydown=move |event| {
+                            if event.key() == "Escape" {
+                                event.prevent_default();
+                                if show_unsaved_warning.get_untracked() {
+                                    show_unsaved_warning.set(false);
+                                    focus_later("editor-close");
+                                } else if editor_dirty.get_untracked() {
+                                    show_unsaved_warning.set(true);
+                                    focus_later("keep-editing");
+                                } else {
+                                    editor_draft.set(None);
+                                    editor_baseline.set(None);
+                                    editor_issues.set(Vec::new());
+                                    editor_message.set(None);
+                                    show_unsaved_warning.set(false);
+                                    focus_later("edit-request");
+                                }
+                            }
+                        }
+                    >
                         <div class="editor-head">
                             <div>
                                 <p class="eyebrow">{move || ui_text(language.get(), UiTextKey::RequestEditor)}</p>
@@ -423,9 +470,16 @@ fn App() -> impl IntoView {
                         </Show>
 
                         <Show when=move || show_unsaved_warning.get()>
-                            <div id="unsaved-warning" class="unsaved-warning" role="alertdialog">
-                                <strong>{move || ui_text(language.get(), UiTextKey::ChangesNotSaved)}</strong>
-                                <span>{move || ui_text(language.get(), UiTextKey::CloseWithoutSaving)}</span>
+                            <div
+                                id="unsaved-warning"
+                                class="unsaved-warning"
+                                role="alertdialog"
+                                aria-modal="true"
+                                aria-labelledby="unsaved-title"
+                                aria-describedby="unsaved-description"
+                            >
+                                <strong id="unsaved-title">{move || ui_text(language.get(), UiTextKey::ChangesNotSaved)}</strong>
+                                <span id="unsaved-description">{move || ui_text(language.get(), UiTextKey::CloseWithoutSaving)}</span>
                                 <div>
                                     <button
                                         id="discard-close"
@@ -436,6 +490,7 @@ fn App() -> impl IntoView {
                                             editor_issues.set(Vec::new());
                                             editor_message.set(None);
                                             show_unsaved_warning.set(false);
+                                            focus_later("edit-request");
                                         }
                                     >
                                         {move || ui_text(language.get(), UiTextKey::DiscardClose)}
@@ -443,7 +498,10 @@ fn App() -> impl IntoView {
                                     <button
                                         id="keep-editing"
                                         type="button"
-                                        on:click=move |_| show_unsaved_warning.set(false)
+                                        on:click=move |_| {
+                                            show_unsaved_warning.set(false);
+                                            focus_later("editor-close");
+                                        }
                                     >
                                         {move || ui_text(language.get(), UiTextKey::ContinueEditing)}
                                     </button>
@@ -493,6 +551,7 @@ fn App() -> impl IntoView {
                                     editor_issues.set(Vec::new());
                                     editor_message.set(None);
                                     show_unsaved_warning.set(false);
+                                    focus_later("edit-request");
                                 }
                             >
                                 {move || ui_text(language.get(), UiTextKey::Cancel)}
@@ -503,12 +562,14 @@ fn App() -> impl IntoView {
                                 on:click=move |_| {
                                     if editor_dirty.get() {
                                         show_unsaved_warning.set(true);
+                                        focus_later("keep-editing");
                                     } else {
                                         editor_draft.set(None);
                                         editor_baseline.set(None);
                                         editor_issues.set(Vec::new());
                                         editor_message.set(None);
                                         show_unsaved_warning.set(false);
+                                        focus_later("edit-request");
                                     }
                                 }
                             >

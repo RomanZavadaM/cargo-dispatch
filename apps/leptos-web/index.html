@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="uk">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -357,8 +357,13 @@
     :root { font-family: Inter, system-ui, sans-serif; color-scheme: light dark; }
     * { box-sizing: border-box; }
     body { margin: 0; background: Canvas; color: CanvasText; }
-    button, input { font: inherit; }
+    button, input, select { font: inherit; }
     button { cursor: pointer; }
+    :where(button, a, input, select, [tabindex]):focus-visible {
+      outline: 3px solid Highlight;
+      outline-offset: 3px;
+    }
+    .row-select { width: 20px; height: 20px; }
     .shell { max-width: 1500px; margin: 0 auto; padding: 28px; }
     .eyebrow { text-transform: uppercase; letter-spacing: .12em; opacity: .65; }
     .metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; margin: 22px 0; }
