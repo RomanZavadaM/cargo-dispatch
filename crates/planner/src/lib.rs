@@ -680,11 +680,14 @@ pub fn recalculate_working_route(
     let points = proposed_point_ids
         .iter()
         .map(|point_id| {
-            existing.get(point_id).copied().unwrap_or(WorkingRoutePoint {
-                point_id: *point_id,
-                locked: false,
-                confirmed: false,
-            })
+            existing
+                .get(point_id)
+                .copied()
+                .unwrap_or(WorkingRoutePoint {
+                    point_id: *point_id,
+                    locked: false,
+                    confirmed: false,
+                })
         })
         .collect();
 
@@ -2841,11 +2844,9 @@ mod tests {
         route.points[0].locked = true;
         route.points[2].confirmed = true;
 
-        let recalculated = recalculate_working_route(
-            &route,
-            &[point_id(35), point_id(38), point_id(37)],
-        )
-        .expect("recalculation");
+        let recalculated =
+            recalculate_working_route(&route, &[point_id(35), point_id(38), point_id(37)])
+                .expect("recalculation");
 
         assert_eq!(route.current_revision, 1);
         assert_eq!(recalculated.current_revision, 2);
@@ -2867,10 +2868,7 @@ mod tests {
         route.points[2].confirmed = true;
         let before = route.clone();
 
-        let result = recalculate_working_route(
-            &route,
-            &[point_id(41), point_id(40), point_id(39)],
-        );
+        let result = recalculate_working_route(&route, &[point_id(41), point_id(40), point_id(39)]);
 
         assert!(matches!(
             result,
@@ -2881,9 +2879,8 @@ mod tests {
 
     #[test]
     fn working_route_revision_overflow_is_explicit() {
-        let mut route =
-            manual_working_route(working_route_id(16), &[point_id(42), point_id(43)])
-                .expect("route");
+        let mut route = manual_working_route(working_route_id(16), &[point_id(42), point_id(43)])
+            .expect("route");
         route.current_revision = u64::MAX;
 
         assert_eq!(
