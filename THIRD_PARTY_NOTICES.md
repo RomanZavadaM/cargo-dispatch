@@ -17,7 +17,8 @@ cargo-dispatch може містити або розповсюджуватися
 - `tauri-build 2.7.6` — MIT або Apache-2.0; build-time Tauri configuration.
 - `leptos 0.8.23` — MIT; accepted CSR UI layer.
 - `wasm-bindgen`, `wasm-bindgen-futures`, `js-sys`, `console_error_panic_hook` — permissive Rust/WASM bridge dependencies for the Leptos frontend; exact versions and transitive graph are fixed by `Cargo.lock` and checked by `cargo deny`.
-- `Trunk 0.22.2` — CI/build-only frontend bundler; installed at an exact version in the Control desktop workflow.
+- `Trunk 0.22.2` — CI/build-only frontend bundler; installed as a prebuilt/checksummed tool through `taiki-e/install-action`.
+- `taiki-e/install-action` — MIT або Apache-2.0, CI-only; pinned to commit `fe3acb53a98b62c772db35de75ce0e4595e7ca8c` (release 2.90.8), fallback disabled.
 - Tauri/Leptos versions are the exact starting versions already accepted by UI probe P01–P15; product code still receives its own CI and dependency/license gate.
 
 ## Дані
