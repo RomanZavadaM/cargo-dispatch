@@ -857,7 +857,7 @@ pub enum PlannerReplanIntakeError {
     StorageUnavailable,
 }
 
-pub trait PlannerTripExportRepository {
+pub trait PlannerTripExportStore {
     fn append(
         &mut self,
         record: PlannerTripExportRecord,
@@ -870,11 +870,11 @@ pub trait PlannerTripExportRepository {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct InMemoryTripExportRepository {
+pub struct InMemoryTripExportStore {
     records: std::collections::BTreeMap<TripId, Vec<PlannerTripExportRecord>>,
 }
 
-impl PlannerTripExportRepository for InMemoryTripExportRepository {
+impl PlannerTripExportStore for InMemoryTripExportStore {
     fn append(
         &mut self,
         record: PlannerTripExportRecord,
@@ -903,27 +903,27 @@ impl PlannerTripExportRepository for InMemoryTripExportRepository {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct PlannerTripExportHistory<R> {
-    repository: R,
+pub struct PlannerTripExportHistory<S> {
+    store: S,
 }
 
-impl<R> PlannerTripExportHistory<R> {
-    pub const fn new(repository: R) -> Self {
-        Self { repository }
+impl<S> PlannerTripExportHistory<S> {
+    pub const fn new(store: S) -> Self {
+        Self { store }
     }
 
     #[must_use]
-    pub fn into_repository(self) -> R {
-        self.repository
+    pub fn into_store(self) -> S {
+        self.store
     }
 }
 
-impl<R: PlannerTripExportRepository> PlannerTripExportHistory<R> {
+impl<S: PlannerTripExportStore> PlannerTripExportHistory<S> {
     pub fn append(
         &mut self,
         record: PlannerTripExportRecord,
     ) -> Result<(), PlannerTripExportHistoryError> {
-        self.repository.append(record)
+        self.store.append(record)
     }
 
     pub fn validate_replan_request(
@@ -931,7 +931,7 @@ impl<R: PlannerTripExportRepository> PlannerTripExportHistory<R> {
         request: &ReplanRequest,
     ) -> Result<PlannerReplanContext, PlannerReplanIntakeError> {
         let records = self
-            .repository
+            .store
             .records_for(request.trip_id)
             .map_err(|_| PlannerReplanIntakeError::StorageUnavailable)?;
         let Some(latest) = records.last() else {
@@ -997,7 +997,7 @@ impl<R: PlannerTripExportRepository> PlannerTripExportHistory<R> {
     }
 }
 
-pub type InMemoryTripExportHistory = PlannerTripExportHistory<InMemoryTripExportRepository>;
+pub type InMemoryTripExportHistory = PlannerTripExportHistory<InMemoryTripExportStore>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkingRouteUpdateError {
@@ -1944,9 +1944,9 @@ mod tests {
     }
 
     #[derive(Debug, Default)]
-    struct UnavailableTripExportRepository;
+    struct UnavailableTripExportStore;
 
-    impl PlannerTripExportRepository for UnavailableTripExportRepository {
+    impl PlannerTripExportStore for UnavailableTripExportStore {
         fn append(
             &mut self,
             _record: PlannerTripExportRecord,
@@ -3804,7 +3804,7 @@ mod tests {
     #[test]
     fn planner_export_history_surfaces_storage_unavailability() {
         let id = trip_id(11);
-        let mut history = PlannerTripExportHistory::new(UnavailableTripExportRepository);
+        let mut history = PlannerTripExportHistory::new(UnavailableTripExportStore);
 
         assert_eq!(
             history.append(PlannerTripExportRecord {
