@@ -477,7 +477,6 @@ impl ControlBrowserState {
         Ok(sessions.get(token).cloned())
     }
 
-
     fn shared_trip(&self, token: &str) -> io::Result<SharedTrip> {
         let sessions = self
             .sessions
