@@ -8,6 +8,10 @@
 
 **cargo-dispatch** wählt Ladungen vom Markt für eine Flotte kleiner Lkw (zulässiges Gesamtgewicht bis 7,5 t) aus, plant Touren mit Zuladungen unterwegs und gibt dem Disponenten die Kontrolle über die Fahrzeugbewegung. Entwicklungssprache: Rust.
 
+## Sprachen der Benutzeroberfläche
+
+Im aktuellen UI-Prototyp sind **Ukrainisch, Englisch und Deutsch** implementiert und geprüft. Die anderen README-Übersetzungen sind Dokumentations- bzw. Zielsprachen und bedeuten noch keine Unterstützung in der Programmoberfläche.
+
 ## Dokumentation
 
 Die Arbeitsdokumentation des Projekts wird privat geführt.
