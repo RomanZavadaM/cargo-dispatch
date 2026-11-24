@@ -177,6 +177,34 @@ pub struct RoutePreview {
     pub excluded_cargo_ids: Vec<u64>,
 }
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct MapCoordinate {
+    pub lng: f64,
+    pub lat: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MapRouteAlternative {
+    pub id: String,
+    pub label: String,
+    pub coordinates: Vec<MapCoordinate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MapProbePoint {
+    pub id: String,
+    pub label: String,
+    pub coordinate: MapCoordinate,
+    pub manual: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MapProbeData {
+    pub routes: Vec<MapRouteAlternative>,
+    pub points: Vec<MapProbePoint>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProbeSummary {
     pub total_requests: usize,
@@ -509,6 +537,11 @@ impl ApplicationService {
         Ok(self.route.clone())
     }
 
+
+    pub fn map_probe_data(&self) -> MapProbeData {
+        synthetic_map_probe_data()
+    }
+
     pub fn query(
         &self,
         filter: &str,
@@ -783,6 +816,69 @@ fn build_editor_draft(row: &LoadRequest) -> RequestDraft {
         confidence_percent: row.confidence_percent,
         fields,
     }
+}
+
+
+fn synthetic_map_probe_data() -> MapProbeData {
+    let routes = vec![
+        MapRouteAlternative {
+            id: "route-a".to_owned(),
+            label: "Balanced".to_owned(),
+            coordinates: vec![
+                map_coordinate(24.0000, 49.0000),
+                map_coordinate(24.0200, 49.0100),
+                map_coordinate(24.0400, 49.0060),
+                map_coordinate(24.0600, 49.0200),
+            ],
+        },
+        MapRouteAlternative {
+            id: "route-b".to_owned(),
+            label: "Shorter".to_owned(),
+            coordinates: vec![
+                map_coordinate(24.0000, 49.0000),
+                map_coordinate(24.0180, 49.0040),
+                map_coordinate(24.0380, 49.0120),
+                map_coordinate(24.0600, 49.0200),
+            ],
+        },
+        MapRouteAlternative {
+            id: "route-c".to_owned(),
+            label: "Lower risk".to_owned(),
+            coordinates: vec![
+                map_coordinate(24.0000, 49.0000),
+                map_coordinate(24.0120, 49.0160),
+                map_coordinate(24.0360, 49.0240),
+                map_coordinate(24.0600, 49.0200),
+            ],
+        },
+    ];
+
+    let mut points = Vec::with_capacity(200);
+    for index in 0..199 {
+        let column = index % 20;
+        let row = index / 20;
+        points.push(MapProbePoint {
+            id: format!("point-{:03}", index + 1),
+            label: format!("Synthetic point {}", index + 1),
+            coordinate: map_coordinate(
+                24.002 + column as f64 * 0.0028,
+                49.002 + row as f64 * 0.0022,
+            ),
+            manual: false,
+        });
+    }
+    points.push(MapProbePoint {
+        id: "manual-1".to_owned(),
+        label: "Manual point".to_owned(),
+        coordinate: map_coordinate(24.0300, 49.0150),
+        manual: true,
+    });
+
+    MapProbeData { routes, points }
+}
+
+fn map_coordinate(lng: f64, lat: f64) -> MapCoordinate {
+    MapCoordinate { lng, lat }
 }
 
 fn synthetic_route() -> WorkingRoute {
@@ -1114,4 +1210,23 @@ mod tests {
         assert_ne!(changed, original);
         assert_eq!(service.route_draft(), original);
     }
+    #[test]
+    fn map_probe_is_deterministic_and_keeps_map_data_outside_widgets() {
+        let service = ApplicationService::synthetic();
+        let a = service.map_probe_data();
+        let b = service.map_probe_data();
+        assert_eq!(a, b);
+        assert_eq!(a.routes.len(), 3);
+        assert_eq!(a.points.len(), 200);
+        assert_eq!(
+            a.points.iter().filter(|point| point.manual).count(),
+            1
+        );
+        assert!(
+            a.routes
+                .iter()
+                .all(|route| route.coordinates.len() >= 4)
+        );
+    }
+
 }

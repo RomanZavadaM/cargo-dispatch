@@ -30,6 +30,10 @@ fn App() -> impl IntoView {
     let route_preview = RwSignal::new(None::<RoutePreview>);
     let route_message = RwSignal::new(String::new());
 
+    let map_data = service.with(|service| service.map_probe_data());
+    let map_routes = map_data.routes;
+    let map_points = map_data.points;
+
     let rows = Memo::new(move |_| {
         service.with(|service| service.query(&filter.get(), sort.get(), ascending.get(), None))
     });
@@ -754,6 +758,102 @@ fn App() -> impl IntoView {
                             </button>
                         </aside>
                     </Show>
+                </section>
+
+
+                <section id="map-probe" class="map-probe" aria-label="Map bridge">
+                    <div class="route-head">
+                        <div>
+                            <p class="eyebrow">"Map"</p>
+                            <h2>"Route alternatives and manual point"</h2>
+                        </div>
+                        <div class="route-state">
+                            <span>
+                                "Routes: "
+                                <strong id="map-route-count">{map_routes.len()}</strong>
+                            </span>
+                            <span>
+                                "Points: "
+                                <strong id="map-point-count">{map_points.len()}</strong>
+                            </span>
+                            <span>
+                                "Map generation: "
+                                <strong id="map-generation">"0"</strong>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="map-layout">
+                        <div class="map-sidebar">
+                            <div class="map-route-choices" aria-label="Route alternatives">
+                                <For
+                                    each=move || map_routes.clone()
+                                    key=|route| route.id.clone()
+                                    children=move |route| {
+                                        let coordinates = route
+                                            .coordinates
+                                            .iter()
+                                            .map(|point| format!("{},{}", point.lng, point.lat))
+                                            .collect::<Vec<_>>()
+                                            .join(";");
+                                        view! {
+                                            <button
+                                                class="map-route-choice"
+                                                type="button"
+                                                data-route-id=route.id.clone()
+                                                data-coordinates=coordinates
+                                                data-selected=(route.id == "route-a").to_string()
+                                            >
+                                                {route.label}
+                                            </button>
+                                        }
+                                    }
+                                />
+                            </div>
+
+                            <div id="map-point-list" class="map-point-list">
+                                <For
+                                    each=move || map_points.clone()
+                                    key=|point| point.id.clone()
+                                    children=move |point| view! {
+                                        <button
+                                            class="map-point-choice"
+                                            type="button"
+                                            data-point-id=point.id.clone()
+                                            data-lng=point.coordinate.lng.to_string()
+                                            data-lat=point.coordinate.lat.to_string()
+                                            data-manual=point.manual.to_string()
+                                            data-selected="false"
+                                        >
+                                            {point.label}
+                                        </button>
+                                    }
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <div id="maplibre-container" class="maplibre-container"></div>
+                            <div class="map-status">
+                                <span>
+                                    "Selected route: "
+                                    <strong id="map-selected-route">"route-a"</strong>
+                                </span>
+                                <span>
+                                    "Selected point: "
+                                    <strong id="map-selected-point"></strong>
+                                </span>
+                                <span>
+                                    "Manual point: "
+                                    <strong id="map-manual-coordinate">"24.030000, 49.015000"</strong>
+                                </span>
+                            </div>
+                            <div class="route-footer-actions">
+                                <button id="map-fit-all" type="button">"Fit all"</button>
+                                <button id="map-remount" type="button">"Reopen map"</button>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
             </section>

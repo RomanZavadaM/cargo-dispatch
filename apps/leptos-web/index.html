@@ -4,6 +4,325 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cargo dispatch UI probe</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.19.0/dist/maplibre-gl.css" />
+  <script>
+    window.cargoMapBridge = (() => {
+      const library = import("https://unpkg.com/maplibre-gl@6.19.0/dist/maplibre-gl.mjs");
+      let map = null;
+      let data = null;
+      let generation = 0;
+      let manualMarker = null;
+      let manualMarkerElement = null;
+      let selectedRoute = "route-a";
+      let selectedPoint = "";
+      let mounting = false;
+
+      const readData = () => {
+        const routeButtons = [...document.querySelectorAll(".map-route-choice")];
+        const pointButtons = [...document.querySelectorAll(".map-point-choice")];
+        if (routeButtons.length !== 3 || pointButtons.length !== 200) return null;
+
+        const routes = routeButtons.map((button) => ({
+          id: button.dataset.routeId,
+          label: button.textContent.trim(),
+          coordinates: button.dataset.coordinates.split(";").map((pair) => {
+            const [lng, lat] = pair.split(",").map(Number);
+            return { lng, lat };
+          }),
+        }));
+
+        const points = pointButtons.map((button) => ({
+          id: button.dataset.pointId,
+          label: button.textContent.trim(),
+          coordinate: {
+            lng: Number(button.dataset.lng),
+            lat: Number(button.dataset.lat),
+          },
+          manual: button.dataset.manual === "true",
+        }));
+        return { routes, points };
+      };
+
+      const emit = (name, detail) => {
+        window.dispatchEvent(new CustomEvent(name, { detail }));
+      };
+
+      const lineFeature = (route) => ({
+        type: "Feature",
+        properties: { id: route.id, label: route.label },
+        geometry: {
+          type: "LineString",
+          coordinates: route.coordinates.map((point) => [point.lng, point.lat]),
+        },
+      });
+
+      const pointCollection = () => ({
+        type: "FeatureCollection",
+        features: data.points.map((point) => ({
+          type: "Feature",
+          properties: { id: point.id, label: point.label, manual: point.manual },
+          geometry: {
+            type: "Point",
+            coordinates: [point.coordinate.lng, point.coordinate.lat],
+          },
+        })),
+      });
+
+      const refreshPointSource = () => {
+        const source = map && map.getSource("probe-points");
+        if (source) source.setData(pointCollection());
+      };
+
+      const syncRouteDom = () => {
+        for (const button of document.querySelectorAll(".map-route-choice")) {
+          button.dataset.selected = String(button.dataset.routeId === selectedRoute);
+        }
+        const output = document.getElementById("map-selected-route");
+        if (output) output.textContent = selectedRoute;
+      };
+
+      const syncPointDom = () => {
+        for (const button of document.querySelectorAll(".map-point-choice")) {
+          button.dataset.selected = String(button.dataset.pointId === selectedPoint);
+        }
+        const output = document.getElementById("map-selected-point");
+        if (output) output.textContent = selectedPoint;
+        if (manualMarkerElement) {
+          manualMarkerElement.dataset.selected = String(selectedPoint === "manual-1");
+        }
+      };
+
+      const applyRouteSelection = () => {
+        if (!map || !map.isStyleLoaded()) return;
+        for (const route of data.routes) {
+          const layerId = "probe-route-" + route.id;
+          const selected = route.id === selectedRoute;
+          map.setPaintProperty(layerId, "line-width", selected ? 7 : 3);
+          map.setPaintProperty(layerId, "line-opacity", selected ? 0.95 : 0.35);
+        }
+      };
+
+      const applyPointSelection = () => {
+        if (!map || !map.isStyleLoaded()) return;
+        map.setFilter(
+          "probe-selected-point",
+          selectedPoint ? ["==", ["get", "id"], selectedPoint] : ["==", ["get", "id"], "__none__"],
+        );
+      };
+
+      const selectRoute = (routeId) => {
+        if (!data || !data.routes.some((route) => route.id === routeId)) return;
+        selectedRoute = routeId;
+        syncRouteDom();
+        applyRouteSelection();
+        emit("cargo-map-selection", "route:" + routeId);
+      };
+
+      const selectPoint = (pointId) => {
+        if (!data || !data.points.some((point) => point.id === pointId)) return;
+        selectedPoint = pointId;
+        syncPointDom();
+        applyPointSelection();
+        emit("cargo-map-selection", "point:" + pointId);
+      };
+
+      const fitAll = () => {
+        if (!map || !data) return;
+        const all = [
+          ...data.routes.flatMap((route) => route.coordinates),
+          ...data.points.map((point) => point.coordinate),
+        ];
+        if (!all.length) return;
+        const minLng = Math.min(...all.map((point) => point.lng));
+        const minLat = Math.min(...all.map((point) => point.lat));
+        const maxLng = Math.max(...all.map((point) => point.lng));
+        const maxLat = Math.max(...all.map((point) => point.lat));
+        map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+          padding: 36,
+          duration: 0,
+        });
+      };
+
+      const destroy = () => {
+        if (manualMarker) {
+          manualMarker.remove();
+          manualMarker = null;
+        }
+        manualMarkerElement = null;
+        if (map) {
+          map.remove();
+          map = null;
+        }
+        mounting = false;
+      };
+
+      const mount = async (nextData) => {
+        const container = document.getElementById("maplibre-container");
+        if (!container || mounting || map) return false;
+        mounting = true;
+        data = nextData;
+
+        const maplibregl = await library;
+        container.replaceChildren();
+        map = new maplibregl.Map({
+          container,
+          style: { version: 8, sources: {}, layers: [] },
+          center: [24.03, 49.015],
+          zoom: 11,
+          attributionControl: false,
+          interactive: true,
+        });
+
+        map.on("load", () => {
+          for (const route of data.routes) {
+            const sourceId = "probe-route-source-" + route.id;
+            const layerId = "probe-route-" + route.id;
+            map.addSource(sourceId, { type: "geojson", data: lineFeature(route) });
+            map.addLayer({
+              id: layerId,
+              type: "line",
+              source: sourceId,
+              paint: {
+                "line-color": route.id === "route-a" ? "#2457c5" : route.id === "route-b" ? "#2b8a3e" : "#9c36b5",
+                "line-width": route.id === selectedRoute ? 7 : 3,
+                "line-opacity": route.id === selectedRoute ? 0.95 : 0.35,
+              },
+            });
+            map.on("click", layerId, () => selectRoute(route.id));
+          }
+
+          map.addSource("probe-points", { type: "geojson", data: pointCollection() });
+          map.addLayer({
+            id: "probe-points",
+            type: "circle",
+            source: "probe-points",
+            paint: {
+              "circle-radius": 4,
+              "circle-color": "#334155",
+              "circle-opacity": 0.75,
+            },
+          });
+          map.addLayer({
+            id: "probe-selected-point",
+            type: "circle",
+            source: "probe-points",
+            filter: ["==", ["get", "id"], "__none__"],
+            paint: {
+              "circle-radius": 8,
+              "circle-color": "#e8590c",
+              "circle-stroke-width": 2,
+              "circle-stroke-color": "#ffffff",
+            },
+          });
+          map.on("click", "probe-points", (event) => {
+            const feature = event.features && event.features[0];
+            const id = feature && feature.properties && feature.properties.id;
+            if (typeof id === "string") selectPoint(id);
+          });
+
+          const manual = data.points.find((point) => point.manual);
+          if (manual) {
+            manualMarkerElement = document.createElement("button");
+            manualMarkerElement.type = "button";
+            manualMarkerElement.className = "manual-map-marker";
+            manualMarkerElement.textContent = "M";
+            manualMarkerElement.setAttribute("aria-label", "Manual route point");
+            manualMarkerElement.dataset.pointId = manual.id;
+            manualMarkerElement.addEventListener("click", (event) => {
+              event.stopPropagation();
+              selectPoint(manual.id);
+            });
+
+            manualMarker = new maplibregl.Marker({
+              element: manualMarkerElement,
+              draggable: true,
+              anchor: "center",
+            })
+              .setLngLat([manual.coordinate.lng, manual.coordinate.lat])
+              .addTo(map);
+
+            manualMarker.on("dragend", () => {
+              const location = manualMarker.getLngLat();
+              manual.coordinate.lng = location.lng;
+              manual.coordinate.lat = location.lat;
+              const button = document.querySelector('.map-point-choice[data-point-id="' + manual.id + '"]');
+              if (button) {
+                button.dataset.lng = String(location.lng);
+                button.dataset.lat = String(location.lat);
+              }
+              const output = document.getElementById("map-manual-coordinate");
+              if (output) output.textContent = location.lng.toFixed(6) + ", " + location.lat.toFixed(6);
+              refreshPointSource();
+              selectPoint(manual.id);
+              emit("cargo-map-point-moved", [manual.id, location.lng.toFixed(6), location.lat.toFixed(6)].join("|"));
+            });
+          }
+
+          syncRouteDom();
+          syncPointDom();
+          applyRouteSelection();
+          applyPointSelection();
+          fitAll();
+          generation += 1;
+          const generationOutput = document.getElementById("map-generation");
+          if (generationOutput) generationOutput.textContent = String(generation);
+          mounting = false;
+          emit("cargo-map-ready", generation);
+        });
+
+        return true;
+      };
+
+      const initFromDom = () => {
+        if (map || mounting) return true;
+        const nextData = readData();
+        if (!nextData || !document.getElementById("maplibre-container")) return false;
+        mount(nextData).catch((error) => {
+          mounting = false;
+          console.error("Map bridge init failed", error);
+        });
+        return true;
+      };
+
+      document.addEventListener("click", (event) => {
+        const routeButton = event.target.closest && event.target.closest(".map-route-choice");
+        if (routeButton) {
+          selectRoute(routeButton.dataset.routeId);
+          return;
+        }
+        const pointButton = event.target.closest && event.target.closest(".map-point-choice");
+        if (pointButton) {
+          selectPoint(pointButton.dataset.pointId);
+          return;
+        }
+        if (event.target.closest && event.target.closest("#map-fit-all")) {
+          fitAll();
+          return;
+        }
+        if (event.target.closest && event.target.closest("#map-remount")) {
+          destroy();
+          initFromDom();
+        }
+      });
+
+      const bootstrap = window.setInterval(() => {
+        if (initFromDom()) window.clearInterval(bootstrap);
+      }, 50);
+
+      const getState = () => ({
+        mounted: Boolean(map),
+        loaded: Boolean(map && map.isStyleLoaded()),
+        generation,
+        routeCount: data ? data.routes.length : 0,
+        pointCount: data ? data.points.length : 0,
+        selectedRoute,
+        selectedPoint,
+        manualCoordinate: data ? data.points.find((point) => point.manual)?.coordinate ?? null : null,
+      });
+
+      return { initFromDom, destroy, selectRoute, selectPoint, fitAll, getState };
+    })();
+  </script>
   <link data-trunk rel="rust" data-bin="ui-probe-leptos" />
   <style>
     :root { font-family: Inter, system-ui, sans-serif; color-scheme: light dark; }
@@ -61,6 +380,19 @@
     .route-message { min-height: 1.3em; margin: 0; opacity: .85; }
     .route-preview { display: grid; gap: 10px; padding: 13px; border: 1px solid color-mix(in srgb, Highlight 60%, CanvasText 20%); border-radius: 10px; }
     .route-preview h3 { margin: 0; }
+    .map-probe { display: grid; gap: 14px; margin-top: 18px; padding: 18px; border: 2px solid color-mix(in srgb, CanvasText 18%, Highlight 35%); border-radius: 14px; }
+    .map-layout { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 12px; }
+    .map-sidebar { display: grid; gap: 10px; min-height: 0; }
+    .map-route-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .map-route-choice, .map-point-choice { padding: 7px 8px; text-align: left; }
+    .map-route-choice[data-selected="true"], .map-point-choice[data-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+    .map-point-list { height: 460px; overflow: auto; display: grid; gap: 4px; align-content: start; border: 1px solid color-mix(in srgb, CanvasText 14%, transparent); border-radius: 9px; padding: 6px; }
+    .maplibre-container { height: 500px; min-height: 360px; border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 10px; overflow: hidden; background: #eef2f4; }
+    .map-status { display: flex; flex-wrap: wrap; gap: 10px; margin: 9px 0; }
+    .map-status span { padding: 6px 8px; border: 1px solid color-mix(in srgb, CanvasText 14%, transparent); border-radius: 8px; }
+    .manual-map-marker { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 2px solid white; background: #e8590c; color: white; font-weight: 700; cursor: grab; box-shadow: 0 1px 5px rgb(0 0 0 / 35%); }
+    .manual-map-marker[data-selected="true"] { outline: 3px solid #111827; outline-offset: 2px; }
+    .manual-map-marker:active { cursor: grabbing; }
     @media (max-width: 1100px) {
       .editor-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
     }
@@ -70,6 +402,8 @@
       .pool-scroll { height: 70vh; }
       .editor-grid { grid-template-columns: 1fr; }
       .route-point { align-items: stretch; flex-direction: column; }
+      .map-layout { grid-template-columns: 1fr; }
+      .map-point-list { height: 260px; }
     }
   </style>
 </head>
