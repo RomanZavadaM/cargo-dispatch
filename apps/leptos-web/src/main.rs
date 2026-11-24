@@ -18,9 +18,8 @@ fn App() -> impl IntoView {
     let opened = RwSignal::new(None::<u64>);
 
     let rows = Memo::new(move |_| {
-        service.with_value(|service| {
-            service.query(&filter.get(), sort.get(), ascending.get(), None)
-        })
+        service
+            .with_value(|service| service.query(&filter.get(), sort.get(), ascending.get(), None))
     });
 
     let opened_row = Memo::new(move |_| {
