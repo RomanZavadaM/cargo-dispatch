@@ -9,9 +9,7 @@ use std::{
     time::Duration,
 };
 use tauri::{AppHandle, Emitter, State};
-use ui_probe_core::{
-    ApplicationService, IntakeMode, LoadRequest, ProbeSummary, SortField,
-};
+use ui_probe_core::{ApplicationService, IntakeMode, LoadRequest, ProbeSummary, SortField};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct RequestPageInput {
@@ -198,10 +196,7 @@ fn file_choice_plan(input: &FileChoiceInput) -> Result<FileChoicePlan, String> {
 
     Ok(FileChoicePlan {
         purpose: input.purpose.clone(),
-        allowed_extensions: allowed_extensions
-            .into_iter()
-            .map(str::to_owned)
-            .collect(),
+        allowed_extensions: allowed_extensions.into_iter().map(str::to_owned).collect(),
         platform_adapter_required: true,
     })
 }
@@ -492,10 +487,9 @@ mod tests {
         let error = parse_settings("{broken").expect_err("broken JSON fails");
         assert!(error.contains("Invalid settings"));
 
-        let valid = parse_settings(
-            r#"{"language":"de","archive_root":"D:/cargo","compact_tables":true}"#,
-        )
-        .expect("valid settings parse");
+        let valid =
+            parse_settings(r#"{"language":"de","archive_root":"D:/cargo","compact_tables":true}"#)
+                .expect("valid settings parse");
         assert_eq!(valid.language, "de");
     }
 
@@ -525,14 +519,10 @@ mod tests {
     fn long_calculation_reports_progress_and_can_finish() {
         let cancel = AtomicBool::new(false);
         let mut progress = Vec::new();
-        let final_state = run_candidate_work(
-            7,
-            1,
-            &[10, 20, 30, 40],
-            &cancel,
-            Duration::ZERO,
-            |item| progress.push(item),
-        );
+        let final_state =
+            run_candidate_work(7, 1, &[10, 20, 30, 40], &cancel, Duration::ZERO, |item| {
+                progress.push(item)
+            });
         assert_eq!(final_state.state, "completed");
         assert_eq!(final_state.percent, 100);
         assert_eq!(final_state.candidate_count, 3);
@@ -543,14 +533,9 @@ mod tests {
     fn long_calculation_observes_cancellation() {
         let cancel = AtomicBool::new(true);
         let mut progress = Vec::new();
-        let final_state = run_candidate_work(
-            8,
-            1,
-            &[10, 20],
-            &cancel,
-            Duration::ZERO,
-            |item| progress.push(item),
-        );
+        let final_state = run_candidate_work(8, 1, &[10, 20], &cancel, Duration::ZERO, |item| {
+            progress.push(item)
+        });
         assert_eq!(final_state.state, "cancelled");
         assert_eq!(final_state.candidate_count, 0);
         assert_eq!(progress.last(), Some(&final_state));
