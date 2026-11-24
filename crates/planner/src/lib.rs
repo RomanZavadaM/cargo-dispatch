@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use cargo_dispatch_contracts::{ContractError, TripPackageHeader, TripVersion};
+use cargo_dispatch_contracts::{ContractError, ReplanRequest, TripPackageHeader, TripVersion};
 use cargo_dispatch_domain::{
     AvailabilityState, CalculationId, CallTaskId, CandidateId, CargoId, CargoSummary, LoadRequest,
     NegotiatedTermsId, OperatorId, PlanningAssignment, PointId, RequestId, RequestRevision,
@@ -800,6 +800,158 @@ pub fn build_trip_export_draft(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannerTripExportRecord {
+    pub trip_id: TripId,
+    pub trip_version: TripVersion,
+    pub working_route_id: WorkingRouteId,
+    pub working_route_revision: u64,
+    pub ordered_point_ids: Vec<PointId>,
+}
+
+impl From<&PlannerTripExportDraft> for PlannerTripExportRecord {
+    fn from(draft: &PlannerTripExportDraft) -> Self {
+        Self {
+            trip_id: draft.header.trip_id,
+            trip_version: draft.header.trip_version,
+            working_route_id: draft.working_route_id,
+            working_route_revision: draft.working_route_revision,
+            ordered_point_ids: draft.ordered_point_ids.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannerReplanContext {
+    pub trip_id: TripId,
+    pub based_on_trip_version: TripVersion,
+    pub working_route_id: WorkingRouteId,
+    pub working_route_revision: u64,
+    pub completed_point_ids: Vec<PointId>,
+    pub current_point_id: Option<PointId>,
+    pub affected_point_ids: Vec<PointId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlannerTripExportHistoryError {
+    DuplicateTripVersion {
+        trip_id: TripId,
+        trip_version: TripVersion,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlannerReplanIntakeError {
+    UnknownTrip(TripId),
+    UnknownTripVersion {
+        trip_id: TripId,
+        trip_version: TripVersion,
+    },
+    StaleTripVersion {
+        current_version: TripVersion,
+        requested_version: TripVersion,
+    },
+    UnknownCompletedPoint(PointId),
+    UnknownCurrentPoint(PointId),
+    UnknownAffectedPoint(PointId),
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryTripExportHistory {
+    records: std::collections::BTreeMap<TripId, Vec<PlannerTripExportRecord>>,
+}
+
+impl InMemoryTripExportHistory {
+    pub fn append(
+        &mut self,
+        record: PlannerTripExportRecord,
+    ) -> Result<(), PlannerTripExportHistoryError> {
+        let records = self.records.entry(record.trip_id).or_default();
+        if records
+            .iter()
+            .any(|existing| existing.trip_version == record.trip_version)
+        {
+            return Err(PlannerTripExportHistoryError::DuplicateTripVersion {
+                trip_id: record.trip_id,
+                trip_version: record.trip_version,
+            });
+        }
+        records.push(record);
+        records.sort_by_key(|record| record.trip_version);
+        Ok(())
+    }
+
+    pub fn validate_replan_request(
+        &self,
+        request: &ReplanRequest,
+    ) -> Result<PlannerReplanContext, PlannerReplanIntakeError> {
+        let records = self
+            .records
+            .get(&request.trip_id)
+            .ok_or(PlannerReplanIntakeError::UnknownTrip(request.trip_id))?;
+        let latest = records
+            .last()
+            .expect("trip export history entry must contain at least one record");
+
+        let Some(basis) = records
+            .iter()
+            .find(|record| record.trip_version == request.based_on_trip_version)
+        else {
+            return Err(PlannerReplanIntakeError::UnknownTripVersion {
+                trip_id: request.trip_id,
+                trip_version: request.based_on_trip_version,
+            });
+        };
+
+        if basis.trip_version != latest.trip_version {
+            return Err(PlannerReplanIntakeError::StaleTripVersion {
+                current_version: latest.trip_version,
+                requested_version: basis.trip_version,
+            });
+        }
+
+        for point_id in &request.completed_point_ids {
+            if !basis.ordered_point_ids.contains(point_id) {
+                return Err(PlannerReplanIntakeError::UnknownCompletedPoint(*point_id));
+            }
+        }
+
+        if let Some(point_id) = request.current_point_id
+            && !basis.ordered_point_ids.contains(&point_id)
+        {
+            return Err(PlannerReplanIntakeError::UnknownCurrentPoint(point_id));
+        }
+
+        for point_id in &request.affected_point_ids {
+            if !basis.ordered_point_ids.contains(point_id) {
+                return Err(PlannerReplanIntakeError::UnknownAffectedPoint(*point_id));
+            }
+        }
+
+        let completed = request
+            .completed_point_ids
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        let completed_point_ids = basis
+            .ordered_point_ids
+            .iter()
+            .copied()
+            .filter(|point_id| completed.contains(point_id))
+            .collect();
+
+        Ok(PlannerReplanContext {
+            trip_id: request.trip_id,
+            based_on_trip_version: request.based_on_trip_version,
+            working_route_id: basis.working_route_id,
+            working_route_revision: basis.working_route_revision,
+            completed_point_ids,
+            current_point_id: request.current_point_id,
+            affected_point_ids: request.affected_point_ids.clone(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkingRouteUpdateError {
     RecalculationRejected(Vec<RecalculationHardRejectReason>),
     RevisionOverflow,
@@ -1591,6 +1743,11 @@ mod tests {
 
     fn trip_id(byte: u8) -> TripId {
         TripId::from_bytes([byte; 16]).expect("fixture trip id")
+    }
+
+    fn replan_request_id(byte: u8) -> cargo_dispatch_domain::ReplanRequestId {
+        cargo_dispatch_domain::ReplanRequestId::from_bytes([byte; 16])
+            .expect("fixture replan request id")
     }
 
     fn request(
@@ -3187,6 +3344,197 @@ mod tests {
             Err(PlannerExportError::Contract(
                 ContractError::LaterVersionRequiresBase
             ))
+        );
+    }
+
+    #[test]
+    fn planner_replan_intake_accepts_latest_export_and_protects_completed_points() {
+        let mut route = manual_working_route(
+            working_route_id(24),
+            &[point_id(58), point_id(59), point_id(60)],
+        )
+        .expect("route");
+        route.state = WorkingRouteState::Ready;
+        route.current_revision = 7;
+
+        let draft = build_trip_export_draft(
+            &route,
+            trip_id(4),
+            TripVersion::new(2).expect("trip version"),
+            Some(TripVersion::new(1).expect("base version")),
+            1_800_000_100_000,
+            operator_id(13),
+        )
+        .expect("export draft");
+
+        let mut history = InMemoryTripExportHistory::default();
+        history
+            .append(PlannerTripExportRecord::from(&draft))
+            .expect("export history");
+
+        let request = cargo_dispatch_contracts::ReplanRequest::new(
+            cargo_dispatch_contracts::ReplanRequestData {
+                request_id: replan_request_id(1),
+                trip_id: trip_id(4),
+                based_on_trip_version: TripVersion::new(2).expect("trip version"),
+                created_at_unix_ms: 1_800_000_110_000,
+                current_time_unix_ms: 1_800_000_115_000,
+                reason_code: cargo_dispatch_contracts::ReplanReasonCode::Delay,
+                operator_note: None,
+                completed_point_ids: vec![point_id(59), point_id(58)],
+                current_point_id: Some(point_id(60)),
+                affected_point_ids: vec![point_id(60)],
+            },
+        )
+        .expect("replan request");
+
+        let context = history
+            .validate_replan_request(&request)
+            .expect("replan context");
+
+        assert_eq!(context.working_route_id, working_route_id(24));
+        assert_eq!(context.working_route_revision, 7);
+        assert_eq!(
+            context.completed_point_ids,
+            vec![point_id(58), point_id(59)]
+        );
+        assert_eq!(context.current_point_id, Some(point_id(60)));
+    }
+
+    #[test]
+    fn planner_replan_intake_rejects_stale_export_version() {
+        let mut route = manual_working_route(
+            working_route_id(25),
+            &[point_id(61), point_id(62)],
+        )
+        .expect("route");
+        route.state = WorkingRouteState::Ready;
+
+        let first = build_trip_export_draft(
+            &route,
+            trip_id(5),
+            TripVersion::new(1).expect("trip version"),
+            None,
+            1,
+            operator_id(14),
+        )
+        .expect("first export");
+        route.current_revision = 2;
+        let second = build_trip_export_draft(
+            &route,
+            trip_id(5),
+            TripVersion::new(2).expect("trip version"),
+            Some(TripVersion::new(1).expect("base version")),
+            2,
+            operator_id(14),
+        )
+        .expect("second export");
+
+        let mut history = InMemoryTripExportHistory::default();
+        history
+            .append(PlannerTripExportRecord::from(&first))
+            .expect("first record");
+        history
+            .append(PlannerTripExportRecord::from(&second))
+            .expect("second record");
+
+        let request = cargo_dispatch_contracts::ReplanRequest::new(
+            cargo_dispatch_contracts::ReplanRequestData {
+                request_id: replan_request_id(2),
+                trip_id: trip_id(5),
+                based_on_trip_version: TripVersion::new(1).expect("trip version"),
+                created_at_unix_ms: 3,
+                current_time_unix_ms: 3,
+                reason_code: cargo_dispatch_contracts::ReplanReasonCode::RoadProblem,
+                operator_note: None,
+                completed_point_ids: Vec::new(),
+                current_point_id: None,
+                affected_point_ids: Vec::new(),
+            },
+        )
+        .expect("replan request");
+
+        assert_eq!(
+            history.validate_replan_request(&request),
+            Err(PlannerReplanIntakeError::StaleTripVersion {
+                current_version: TripVersion::new(2).expect("trip version"),
+                requested_version: TripVersion::new(1).expect("trip version"),
+            })
+        );
+    }
+
+    #[test]
+    fn planner_replan_intake_rejects_unknown_execution_references() {
+        let mut route = manual_working_route(
+            working_route_id(26),
+            &[point_id(63), point_id(64)],
+        )
+        .expect("route");
+        route.state = WorkingRouteState::Ready;
+        let draft = build_trip_export_draft(
+            &route,
+            trip_id(6),
+            TripVersion::new(1).expect("trip version"),
+            None,
+            1,
+            operator_id(15),
+        )
+        .expect("export");
+
+        let mut history = InMemoryTripExportHistory::default();
+        history
+            .append(PlannerTripExportRecord::from(&draft))
+            .expect("record");
+
+        let bad_completed = cargo_dispatch_contracts::ReplanRequest::new(
+            cargo_dispatch_contracts::ReplanRequestData {
+                request_id: replan_request_id(3),
+                trip_id: trip_id(6),
+                based_on_trip_version: TripVersion::new(1).expect("trip version"),
+                created_at_unix_ms: 2,
+                current_time_unix_ms: 2,
+                reason_code: cargo_dispatch_contracts::ReplanReasonCode::Other,
+                operator_note: None,
+                completed_point_ids: vec![point_id(65)],
+                current_point_id: None,
+                affected_point_ids: Vec::new(),
+            },
+        )
+        .expect("replan request");
+
+        assert_eq!(
+            history.validate_replan_request(&bad_completed),
+            Err(PlannerReplanIntakeError::UnknownCompletedPoint(point_id(65)))
+        );
+    }
+
+    #[test]
+    fn planner_export_history_rejects_duplicate_trip_version() {
+        let mut route = manual_working_route(
+            working_route_id(27),
+            &[point_id(66), point_id(67)],
+        )
+        .expect("route");
+        route.state = WorkingRouteState::Ready;
+        let draft = build_trip_export_draft(
+            &route,
+            trip_id(7),
+            TripVersion::new(1).expect("trip version"),
+            None,
+            1,
+            operator_id(16),
+        )
+        .expect("export");
+        let record = PlannerTripExportRecord::from(&draft);
+
+        let mut history = InMemoryTripExportHistory::default();
+        history.append(record.clone()).expect("first record");
+        assert_eq!(
+            history.append(record),
+            Err(PlannerTripExportHistoryError::DuplicateTripVersion {
+                trip_id: trip_id(7),
+                trip_version: TripVersion::new(1).expect("trip version"),
+            })
         );
     }
 
