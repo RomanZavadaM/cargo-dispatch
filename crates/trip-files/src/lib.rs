@@ -96,6 +96,30 @@ fn document_subdir(direction: DocumentDirection) -> &'static str {
     }
 }
 
+fn stored_document_path(root: &Path, document: &StoredDocument) -> PathBuf {
+    root.join("documents")
+        .join(document_subdir(document.direction))
+        .join(&document.stored_name)
+}
+
+fn hash_file(path: &Path) -> io::Result<(u64, [u8; 32])> {
+    let mut file = File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut size = 0_u64;
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+        size = size
+            .checked_add(u64::try_from(read).map_err(invalid)?)
+            .ok_or_else(|| invalid("document size overflow"))?;
+    }
+    Ok((size, hasher.finalize().into()))
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(remote = "TripPointKind")]
 enum Kind {
@@ -368,6 +392,12 @@ impl TripFolder {
             apply(&mut this.registry, &mut this.documents, trip, &event)?;
             this.cursor += 1;
         }
+        for document in this.documents.values() {
+            let (size, sha256) = hash_file(&stored_document_path(path, document))?;
+            if size != document.size || sha256 != document.sha256 {
+                return Err(invalid("stored document integrity mismatch"));
+            }
+        }
         Ok(this)
     }
 
@@ -473,7 +503,6 @@ impl TripFolder {
         ))
     }
 
-
     pub fn store_document(
         &mut self,
         direction: DocumentDirection,
@@ -562,10 +591,7 @@ impl TripFolder {
         }
 
         if destination.try_exists()? {
-            let mut existing = File::open(&destination)?;
-            let mut existing_hasher = Sha256::new();
-            let existing_size = io::copy(&mut existing, &mut existing_hasher)?;
-            let existing_hash: [u8; 32] = existing_hasher.finalize().into();
+            let (existing_size, existing_hash) = hash_file(&destination)?;
             if existing_size != size || existing_hash != sha256 {
                 return Err(invalid("unindexed document file conflicts with incoming content"));
             }
