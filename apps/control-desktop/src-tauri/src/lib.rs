@@ -282,7 +282,6 @@ impl DesktopControlService {
         Ok(ControlUiStatus { listener, sessions })
     }
 
-
     fn dashboard(&self, token: &str) -> Result<TripDashboard, String> {
         let snapshot = self
             .browser
