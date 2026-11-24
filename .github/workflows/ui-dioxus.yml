@@ -1,0 +1,107 @@
+name: Dioxus secondary UI probe
+
+on:
+  push:
+    branches:
+      - "prototype/ui-dioxus-r1"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/ui-probe-core/**"
+      - "apps/dioxus-web/**"
+      - "probe/ui/browser/p15-dioxus.spec.mjs"
+      - ".github/workflows/ui-dioxus.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dioxus-web:
+    name: Shared-core Dioxus web
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk@0.22.2
+
+      - name: Generate deterministic dependency lock for bootstrap
+        run: cargo generate-lockfile
+
+      - name: Verify unchanged shared application service
+        run: |
+          cargo test --locked -p ui-probe-core --all-targets
+          cargo clippy --locked -p ui-probe-core --all-targets -- -D warnings
+          sha256sum crates/ui-probe-core/src/lib.rs | awk '{print $1}' > probe/ui/core-source-sha256.txt
+
+      - name: Build Dioxus web harness
+        working-directory: apps/dioxus-web
+        run: |
+          started=$(date +%s%3N)
+          trunk build --release=true
+          finished=$(date +%s%3N)
+          echo $((finished-started)) > ../../probe/ui/dioxus-build-ms.txt
+
+      - name: Install browser runner
+        run: |
+          npm install --no-save --package-lock=false @playwright/test@1.65.1
+          npx playwright install --with-deps chromium
+
+      - name: Run same-service browser contract
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4175 --bind 127.0.0.1 --directory apps/dioxus-web/dist > /tmp/dioxus-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" >/dev/null 2>&1 || true; cat /tmp/dioxus-http.log || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4175/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          npx playwright test probe/ui/browser/p15-dioxus.spec.mjs --reporter=line --workers=1
+
+      - name: Record comparison artifact
+        run: |
+          set -euo pipefail
+          du -sb apps/dioxus-web/dist | awk '{print $1}' > probe/ui/dioxus-dist-bytes.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          runtime = json.loads(Path("probe/ui/out/p15-dioxus.json").read_text())
+          report = {
+              "probe": "P15-secondary",
+              "framework": "Dioxus Web 0.7.10",
+              "runner": "ubuntu-22.04",
+              "shared_core_source_sha256": Path("probe/ui/core-source-sha256.txt").read_text().strip(),
+              "build_ms": int(Path("probe/ui/dioxus-build-ms.txt").read_text().strip()),
+              "dist_bytes": int(Path("probe/ui/dioxus-dist-bytes.txt").read_text().strip()),
+              "runtime": runtime,
+              "domain_or_application_source_changed": False,
+          }
+          Path("probe/ui/out/dioxus-secondary-report.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dioxus-secondary-bootstrap
+          path: |
+            Cargo.lock
+            apps/dioxus-web/dist/
+            probe/ui/out/p15-dioxus.json
+            probe/ui/out/dioxus-secondary-report.json
+            probe/ui/core-source-sha256.txt
+          if-no-files-found: error

@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "crates/ui-probe-core",
   "apps/leptos-web",
+  "apps/dioxus-web",
   "apps/driver-web",
   "apps/tauri-shell/src-tauri",
 ]

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cargo Dispatch Dioxus Probe</title>
+  <link data-trunk rel="rust" data-bin="ui-probe-dioxus" />
+  <style>
+    :root { font-family: Inter, system-ui, sans-serif; color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: Canvas; color: CanvasText; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    :where(button,input):focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+    .shell { max-width: 1500px; margin: 0 auto; padding: 24px; display: grid; gap: 14px; }
+    .eyebrow { text-transform: uppercase; letter-spacing: .1em; opacity: .65; }
+    .metrics { display: flex; gap: 10px; flex-wrap: wrap; }
+    .metrics span { padding: 8px 10px; border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 9px; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+    .toolbar label { display: grid; gap: 5px; min-width: min(420px, 100%); flex: 1; }
+    .toolbar input { width: 100%; padding: 9px 11px; }
+    .table-wrap { height: 64vh; min-height: 420px; overflow: auto; border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; }
+    th,td { padding: 8px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
+    th { position: sticky; top: 0; background: Canvas; }
+    .editor { display: grid; gap: 10px; padding: 14px; border: 2px solid color-mix(in srgb, Highlight 45%, CanvasText 18%); border-radius: 12px; }
+    .editor label { display: grid; gap: 5px; max-width: 520px; }
+    .editor input { padding: 9px; }
+    .editor-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .editor-actions button { min-height: 42px; padding: 8px 12px; }
+    @media (max-width: 700px) { .shell { padding: 12px; } }
+  </style>
+</head>
+<body>
+  <div id="main"></div>
+</body>
+</html>
