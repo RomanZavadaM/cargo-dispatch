@@ -46,6 +46,9 @@ define_uuid_id!(TaskId);
 define_uuid_id!(DocumentId);
 define_uuid_id!(VehicleId);
 define_uuid_id!(DriverId);
+define_uuid_id!(OperatorId);
+define_uuid_id!(WorkingRouteId);
+define_uuid_id!(ReservationId);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceKind {
@@ -263,5 +266,8 @@ mod tests {
         assert_eq!(TripId::from_bytes([0; 16]), Err(IdError::NilUuid));
         assert_eq!(PointId::from_bytes([0; 16]), Err(IdError::NilUuid));
         assert_eq!(DocumentId::from_bytes([0; 16]), Err(IdError::NilUuid));
+        assert_eq!(OperatorId::from_bytes([0; 16]), Err(IdError::NilUuid));
+        assert_eq!(WorkingRouteId::from_bytes([0; 16]), Err(IdError::NilUuid));
+        assert_eq!(ReservationId::from_bytes([0; 16]), Err(IdError::NilUuid));
     }
 }

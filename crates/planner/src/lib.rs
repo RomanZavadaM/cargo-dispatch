@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_domain::{
-    AvailabilityState, CargoId, LoadRequest, PlanningAssignment, PointId, RequestId,
+    AvailabilityState, CargoId, LoadRequest, OperatorId, PlanningAssignment, PointId,
+    RequestId, ReservationId, WorkingRouteId,
 };
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
@@ -706,6 +707,113 @@ pub fn evaluate_request_freshness(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReservationState {
+    Active,
+    Expired,
+    Released,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SoftReservation {
+    pub reservation_id: ReservationId,
+    pub request_id: RequestId,
+    pub operator_id: OperatorId,
+    pub working_route_id: WorkingRouteId,
+    pub created_at_unix_ms: u64,
+    pub expires_at_unix_ms: Option<u64>,
+    pub released_at_unix_ms: Option<u64>,
+}
+
+impl SoftReservation {
+    #[must_use]
+    pub fn state_at(&self, now_unix_ms: u64) -> ReservationState {
+        if self.released_at_unix_ms.is_some() {
+            ReservationState::Released
+        } else if self
+            .expires_at_unix_ms
+            .is_some_and(|expires_at| now_unix_ms >= expires_at)
+        {
+            ReservationState::Expired
+        } else {
+            ReservationState::Active
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReservationError {
+    DuplicateReservation,
+    ReservationNotFound,
+    AlreadyReleased,
+    ReleaseBeforeCreation,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryReservationBook {
+    reservations: BTreeMap<ReservationId, SoftReservation>,
+}
+
+impl InMemoryReservationBook {
+    pub fn reserve(&mut self, reservation: SoftReservation) -> Result<(), ReservationError> {
+        if self.reservations.contains_key(&reservation.reservation_id) {
+            return Err(ReservationError::DuplicateReservation);
+        }
+        self.reservations
+            .insert(reservation.reservation_id, reservation);
+        Ok(())
+    }
+
+    pub fn release(
+        &mut self,
+        reservation_id: ReservationId,
+        released_at_unix_ms: u64,
+    ) -> Result<(), ReservationError> {
+        let reservation = self
+            .reservations
+            .get_mut(&reservation_id)
+            .ok_or(ReservationError::ReservationNotFound)?;
+
+        if reservation.released_at_unix_ms.is_some() {
+            return Err(ReservationError::AlreadyReleased);
+        }
+        if released_at_unix_ms < reservation.created_at_unix_ms {
+            return Err(ReservationError::ReleaseBeforeCreation);
+        }
+
+        reservation.released_at_unix_ms = Some(released_at_unix_ms);
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn get(&self, reservation_id: ReservationId) -> Option<SoftReservation> {
+        self.reservations.get(&reservation_id).cloned()
+    }
+
+    #[must_use]
+    pub fn for_request(&self, request_id: RequestId) -> Vec<SoftReservation> {
+        self.reservations
+            .values()
+            .filter(|reservation| reservation.request_id == request_id)
+            .cloned()
+            .collect()
+    }
+
+    #[must_use]
+    pub fn active_for_request(
+        &self,
+        request_id: RequestId,
+        now_unix_ms: u64,
+    ) -> Vec<SoftReservation> {
+        self.reservations
+            .values()
+            .filter(|reservation| reservation.request_id == request_id)
+            .filter(|reservation| reservation.state_at(now_unix_ms) == ReservationState::Active)
+            .cloned()
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     DuplicateRequest,
     RequestNotFound,
@@ -924,6 +1032,18 @@ mod tests {
 
     fn point_id(byte: u8) -> PointId {
         PointId::from_bytes([byte; 16]).expect("fixture point id")
+    }
+
+    fn operator_id(byte: u8) -> OperatorId {
+        OperatorId::from_bytes([byte; 16]).expect("fixture operator id")
+    }
+
+    fn working_route_id(byte: u8) -> WorkingRouteId {
+        WorkingRouteId::from_bytes([byte; 16]).expect("fixture working route id")
+    }
+
+    fn reservation_id(byte: u8) -> ReservationId {
+        ReservationId::from_bytes([byte; 16]).expect("fixture reservation id")
     }
 
     fn request(
@@ -1783,6 +1903,120 @@ mod tests {
         assert_eq!(
             evaluate_request_freshness(&item, 1_800_000_000_000, 30_000, 60_000,),
             Err(FreshnessError::ObservationInFuture)
+        );
+    }
+
+    #[test]
+    fn soft_reservation_expiry_does_not_change_request_availability() {
+        let request_id = request_id(18);
+        let item = request(
+            request_id,
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Active,
+            true,
+        );
+        let mut book = InMemoryReservationBook::default();
+        book.reserve(SoftReservation {
+            reservation_id: reservation_id(1),
+            request_id,
+            operator_id: operator_id(1),
+            working_route_id: working_route_id(1),
+            created_at_unix_ms: 1_800_000_000_000,
+            expires_at_unix_ms: Some(1_800_000_060_000),
+            released_at_unix_ms: None,
+        })
+        .expect("reservation");
+
+        assert_eq!(
+            book.active_for_request(request_id, 1_800_000_030_000).len(),
+            1
+        );
+        assert!(book
+            .active_for_request(request_id, 1_800_000_060_000)
+            .is_empty());
+        assert_eq!(
+            book.get(reservation_id(1)).expect("saved").state_at(1_800_000_060_000),
+            ReservationState::Expired
+        );
+        assert_eq!(item.request.availability, AvailabilityState::Active);
+    }
+
+    #[test]
+    fn explicit_reservation_release_is_separate_from_source_availability() {
+        let request_id = request_id(19);
+        let mut service = PlannerService::new(InMemoryRequestRepository::default());
+        service
+            .add_request(request(
+                request_id,
+                "Kyiv",
+                "Berlin",
+                AvailabilityState::Active,
+                true,
+            ))
+            .expect("request");
+        service
+            .set_planning_assignment(request_id, PlanningAssignment::SoftReserved)
+            .expect("soft reserved");
+
+        let mut book = InMemoryReservationBook::default();
+        book.reserve(SoftReservation {
+            reservation_id: reservation_id(2),
+            request_id,
+            operator_id: operator_id(2),
+            working_route_id: working_route_id(2),
+            created_at_unix_ms: 1_800_000_000_000,
+            expires_at_unix_ms: None,
+            released_at_unix_ms: None,
+        })
+        .expect("reservation");
+        book.release(reservation_id(2), 1_800_000_030_000)
+            .expect("release");
+        service
+            .set_planning_assignment(request_id, PlanningAssignment::Released)
+            .expect("planner release");
+
+        let saved = service.pool(&PoolFilter::all());
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].request.availability, AvailabilityState::Active);
+        assert_eq!(
+            saved[0].request.planning_assignment,
+            PlanningAssignment::Released
+        );
+        assert_eq!(
+            book.get(reservation_id(2))
+                .expect("saved")
+                .state_at(1_800_000_030_000),
+            ReservationState::Released
+        );
+    }
+
+    #[test]
+    fn reservation_book_rejects_duplicate_id_and_invalid_release() {
+        let request_id = request_id(20);
+        let reservation = SoftReservation {
+            reservation_id: reservation_id(3),
+            request_id,
+            operator_id: operator_id(3),
+            working_route_id: working_route_id(3),
+            created_at_unix_ms: 1_800_000_100_000,
+            expires_at_unix_ms: None,
+            released_at_unix_ms: None,
+        };
+        let mut book = InMemoryReservationBook::default();
+        book.reserve(reservation.clone()).expect("first reservation");
+
+        assert_eq!(
+            book.reserve(reservation),
+            Err(ReservationError::DuplicateReservation)
+        );
+        assert_eq!(
+            book.release(reservation_id(3), 1_800_000_090_000),
+            Err(ReservationError::ReleaseBeforeCreation)
+        );
+        assert_eq!(
+            book.release(reservation_id(99), 1_800_000_120_000),
+            Err(ReservationError::ReservationNotFound)
         );
     }
 
