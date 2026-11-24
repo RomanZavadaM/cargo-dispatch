@@ -1272,6 +1272,22 @@ mod tests {
         assert!((navigation.latitude - 49.8395).abs() < 0.000001);
         assert!((navigation.longitude - 24.0298).abs() < 0.000001);
 
+        {
+            let shared = state
+                .trip("trip-a-token-0001")
+                .map_err(|status| io::Error::other(format!("state error {status}")))?
+                .expect("trip session");
+            let mut control = shared
+                .lock()
+                .map_err(|_| io::Error::other("trip lock poisoned"))?;
+            let shown = control.state();
+            let mut operator_route = shown.route_points.clone();
+            operator_route[0].title = "Operator updated point".to_owned();
+            control.edit(&shown, &operator_route)?;
+        }
+        trip = get_json(server.address(), "/api/trip/trip-a-token-0001").await?;
+        assert_eq!(trip.points[0].title, "Operator updated point");
+
         let location_body = serde_json::to_vec(&serde_json::json!({
             "latitude": 49.8393,
             "longitude": 24.0296,
