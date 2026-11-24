@@ -4,7 +4,6 @@ use cargo_dispatch_control_ui_contracts::{
     ControlUiStatus, ListenerMode, ListenerStatus, RegisterTripInput, SessionStatus, StartLanInput,
 };
 use cargo_dispatch_control_web::{ControlAccessMode, ControlBrowserState, LoopbackControlServer};
-use cargo_dispatch_domain::TripId;
 use cargo_dispatch_trip_files::TripFolder;
 use std::{
     collections::BTreeMap,
@@ -236,7 +235,7 @@ pub fn run() {
 mod tests {
     use super::*;
     use cargo_dispatch_contracts::{TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion};
-    use cargo_dispatch_domain::{OperatorId, PointId, WorkingRouteId};
+    use cargo_dispatch_domain::{OperatorId, PointId, TripId, WorkingRouteId};
     use cargo_dispatch_planner::PlannerTripExportDraft;
     use cargo_dispatch_trip_files::export_package;
 
@@ -269,7 +268,7 @@ mod tests {
     #[tokio::test]
     async fn desktop_service_keeps_trip_registered_when_listener_stops() -> std::io::Result<()> {
         let tmp = tempfile::tempdir()?;
-        let (trip, folder) = create_trip(tmp.path())?;
+        let (_trip, folder) = create_trip(tmp.path())?;
         let service = DesktopControlService::default();
         let token = "desktop-trip-token-0001";
 
