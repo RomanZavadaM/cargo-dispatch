@@ -502,9 +502,7 @@ pub enum ComplianceHardRejectReason {
 pub enum ComplianceNeedsCheckReason {
     RequiredDrivingUnknown,
     AvailableDrivingUnknown,
-    LowDrivingReserve {
-        reserve_ms: u64,
-    },
+    LowDrivingReserve { reserve_ms: u64 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
