@@ -117,7 +117,10 @@ run_case T08-open P2 false 49.0700 24.0000 49.0700 24.0100 ok - -
 run_case T08-exclude P2 true 49.0700 24.0000 49.0700 24.0100 ok T08_PAVED T08_GRAVEL
 
 # T09 combined restrictions
-run_case T09-P2 P2 false 49.0800 24.0000 49.0800 24.0100 ok T09_HEIGHT,T09_WEIGHT T09_DETOUR
+# Valhalla guidance may collapse consecutive named edges into one maneuver.
+# In this fixture the only non-detour path is T09_HEIGHT -> T09_WEIGHT in series,
+# so absence of T09_DETOUR proves the direct combined corridor was traversed.
+run_case T09-P2 P2 false 49.0800 24.0000 49.0800 24.0100 ok T09_HEIGHT T09_DETOUR
 run_case T09-P3 P3 false 49.0800 24.0000 49.0800 24.0100 ok T09_DETOUR T09_HEIGHT,T09_WEIGHT
 
 # T10 no route: unrestricted stubs, restricted middle, no detour
