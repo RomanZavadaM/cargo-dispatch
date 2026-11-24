@@ -118,6 +118,429 @@ impl ValidationIssue {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum UiLanguage {
+    Uk,
+    En,
+    De,
+}
+
+impl UiLanguage {
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Uk => "uk",
+            Self::En => "en",
+            Self::De => "de",
+        }
+    }
+
+    pub fn from_code(code: &str) -> Option<Self> {
+        match code {
+            "uk" => Some(Self::Uk),
+            "en" => Some(Self::En),
+            "de" => Some(Self::De),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UiTextKey {
+    Language,
+    PlannerEyebrow,
+    PlannerTitle,
+    SyntheticRequests,
+    Requests,
+    Reserved,
+    Assigned,
+    Selected,
+    Filter,
+    SortAge,
+    SortRate,
+    VisibleRows,
+    Select,
+    Open,
+    Age,
+    Source,
+    Origin,
+    Destination,
+    Rate,
+    Confidence,
+    EditRequest,
+    RequestEditor,
+    SourceLabel,
+    ConfidenceLabel,
+    UnsavedChanges,
+    SavedState,
+    Manual,
+    PhoneOrder,
+    CorrectForm,
+    ChangesNotSaved,
+    CloseWithoutSaving,
+    DiscardClose,
+    ContinueEditing,
+    Save,
+    Cancel,
+    Close,
+    WorkingRoute,
+    RouteDraft,
+    FormatSample,
+    DriverTitle,
+    CurrentPoint,
+    Documents,
+    Required,
+    Optional,
+    AddFile,
+    NoFile,
+    DownloadDocument,
+    Phone,
+    CheckLocation,
+    OpenNavigator,
+    ChangeStatus,
+    Driving,
+    Arrived,
+    Done,
+    FieldRequired,
+    InvalidValue,
+    PhoneRequired,
+    OriginDestinationDiffer,
+}
+
+pub fn ui_text(language: UiLanguage, key: UiTextKey) -> &'static str {
+    use UiLanguage::{De, En, Uk};
+    use UiTextKey::*;
+
+    match (language, key) {
+        (Uk, Language) => "Мова",
+        (Uk, PlannerEyebrow) => "Cargo dispatch · перевірка інтерфейсу",
+        (Uk, PlannerTitle) => "Пул заявок і редагування",
+        (Uk, SyntheticRequests) => "тестових заявок",
+        (Uk, Requests) => "заявки",
+        (Uk, Reserved) => "зарезервовано",
+        (Uk, Assigned) => "призначено",
+        (Uk, Selected) => "вибрано",
+        (Uk, Filter) => "Фільтр",
+        (Uk, SortAge) => "За віком",
+        (Uk, SortRate) => "За ставкою",
+        (Uk, VisibleRows) => "видимих рядків",
+        (Uk, Select) => "Вибір",
+        (Uk, Open) => "Відкрити",
+        (Uk, Age) => "Вік",
+        (Uk, Source) => "Джерело",
+        (Uk, Origin) => "Звідки",
+        (Uk, Destination) => "Куди",
+        (Uk, Rate) => "Ставка €",
+        (Uk, Confidence) => "Надійність",
+        (Uk, EditRequest) => "Редагувати заявку",
+        (Uk, RequestEditor) => "Редактор заявки",
+        (Uk, SourceLabel) => "Джерело:",
+        (Uk, ConfidenceLabel) => "Надійність:",
+        (Uk, UnsavedChanges) => "Незбережені зміни",
+        (Uk, SavedState) => "Збережено",
+        (Uk, Manual) => "Вручну",
+        (Uk, PhoneOrder) => "Телефонне замовлення",
+        (Uk, CorrectForm) => "Виправте дані форми:",
+        (Uk, ChangesNotSaved) => "Зміни не збережені.",
+        (Uk, CloseWithoutSaving) => "Закрити без збереження чи продовжити редагування.",
+        (Uk, DiscardClose) => "Відкинути й закрити",
+        (Uk, ContinueEditing) => "Продовжити редагування",
+        (Uk, Save) => "Зберегти",
+        (Uk, Cancel) => "Скасувати",
+        (Uk, Close) => "Закрити",
+        (Uk, WorkingRoute) => "Робочий маршрут",
+        (Uk, RouteDraft) => "Чернетка маршруту",
+        (Uk, FormatSample) => "Формат числа і дати",
+        (Uk, DriverTitle) => "Водій",
+        (Uk, CurrentPoint) => "Поточна точка",
+        (Uk, Documents) => "Документи",
+        (Uk, Required) => "обов’язковий",
+        (Uk, Optional) => "за потреби",
+        (Uk, AddFile) => "Додати фото / PDF / файл",
+        (Uk, NoFile) => "Файл ще не вибрано",
+        (Uk, DownloadDocument) => "Завантажити документ",
+        (Uk, Phone) => "Телефон",
+        (Uk, CheckLocation) => "Перевірити моє місце",
+        (Uk, OpenNavigator) => "Відкрити навігатор",
+        (Uk, ChangeStatus) => "Змінити статус",
+        (Uk, Driving) => "У дорозі",
+        (Uk, Arrived) => "Прибув",
+        (Uk, Done) => "Завдання виконано",
+        (Uk, FieldRequired) => "обов’язкове поле",
+        (Uk, InvalidValue) => "некоректне значення",
+        (Uk, PhoneRequired) => "для телефонного замовлення потрібен номер",
+        (Uk, OriginDestinationDiffer) => "місце відправлення і призначення мають відрізнятися",
+
+        (En, Language) => "Language",
+        (En, PlannerEyebrow) => "Cargo dispatch · UI probe",
+        (En, PlannerTitle) => "Planner pool and request editor",
+        (En, SyntheticRequests) => "synthetic requests",
+        (En, Requests) => "requests",
+        (En, Reserved) => "reserved",
+        (En, Assigned) => "assigned",
+        (En, Selected) => "selected",
+        (En, Filter) => "Filter",
+        (En, SortAge) => "Sort age",
+        (En, SortRate) => "Sort rate",
+        (En, VisibleRows) => "visible rows",
+        (En, Select) => "Select",
+        (En, Open) => "Open",
+        (En, Age) => "Age",
+        (En, Source) => "Source",
+        (En, Origin) => "Origin",
+        (En, Destination) => "Destination",
+        (En, Rate) => "Rate €",
+        (En, Confidence) => "Confidence",
+        (En, EditRequest) => "Edit request",
+        (En, RequestEditor) => "Request editor",
+        (En, SourceLabel) => "Source:",
+        (En, ConfidenceLabel) => "Confidence:",
+        (En, UnsavedChanges) => "Unsaved changes",
+        (En, SavedState) => "Saved state",
+        (En, Manual) => "Manual",
+        (En, PhoneOrder) => "Phone order",
+        (En, CorrectForm) => "Please correct the form:",
+        (En, ChangesNotSaved) => "Changes are not saved.",
+        (En, CloseWithoutSaving) => "Close without saving, or continue editing.",
+        (En, DiscardClose) => "Discard and close",
+        (En, ContinueEditing) => "Continue editing",
+        (En, Save) => "Save",
+        (En, Cancel) => "Cancel",
+        (En, Close) => "Close",
+        (En, WorkingRoute) => "Working route",
+        (En, RouteDraft) => "Route draft",
+        (En, FormatSample) => "Number and date format",
+        (En, DriverTitle) => "Driver",
+        (En, CurrentPoint) => "Current point",
+        (En, Documents) => "Documents",
+        (En, Required) => "required",
+        (En, Optional) => "optional",
+        (En, AddFile) => "Add photo / PDF / file",
+        (En, NoFile) => "No file selected",
+        (En, DownloadDocument) => "Download document",
+        (En, Phone) => "Phone",
+        (En, CheckLocation) => "Check my location",
+        (En, OpenNavigator) => "Open navigator",
+        (En, ChangeStatus) => "Change status",
+        (En, Driving) => "Driving",
+        (En, Arrived) => "Arrived",
+        (En, Done) => "Task completed",
+        (En, FieldRequired) => "required field",
+        (En, InvalidValue) => "invalid value",
+        (En, PhoneRequired) => "phone order requires a contact number",
+        (En, OriginDestinationDiffer) => "origin and destination must differ",
+
+        (De, Language) => "Sprache",
+        (De, PlannerEyebrow) => "Cargo dispatch · Oberflächenprüfung",
+        (De, PlannerTitle) => "Auftragspool und Auftragsbearbeitung",
+        (De, SyntheticRequests) => "Testaufträge",
+        (De, Requests) => "Aufträge",
+        (De, Reserved) => "reserviert",
+        (De, Assigned) => "zugewiesen",
+        (De, Selected) => "ausgewählt",
+        (De, Filter) => "Filter",
+        (De, SortAge) => "Nach Alter sortieren",
+        (De, SortRate) => "Nach Preis sortieren",
+        (De, VisibleRows) => "sichtbare Zeilen",
+        (De, Select) => "Auswahl",
+        (De, Open) => "Öffnen",
+        (De, Age) => "Alter",
+        (De, Source) => "Quelle",
+        (De, Origin) => "Abholort",
+        (De, Destination) => "Zielort",
+        (De, Rate) => "Preis €",
+        (De, Confidence) => "Verlässlichkeit",
+        (De, EditRequest) => "Auftrag bearbeiten",
+        (De, RequestEditor) => "Auftragsbearbeitung",
+        (De, SourceLabel) => "Quelle:",
+        (De, ConfidenceLabel) => "Verlässlichkeit:",
+        (De, UnsavedChanges) => "Nicht gespeicherte Änderungen",
+        (De, SavedState) => "Gespeicherter Stand",
+        (De, Manual) => "Manuell",
+        (De, PhoneOrder) => "Telefonisch aufgenommener Auftrag",
+        (De, CorrectForm) => "Bitte korrigieren Sie die Eingaben:",
+        (De, ChangesNotSaved) => "Änderungen sind nicht gespeichert.",
+        (De, CloseWithoutSaving) => "Ohne Speichern schließen oder weiter bearbeiten.",
+        (De, DiscardClose) => "Verwerfen und schließen",
+        (De, ContinueEditing) => "Weiter bearbeiten",
+        (De, Save) => "Speichern",
+        (De, Cancel) => "Abbrechen",
+        (De, Close) => "Schließen",
+        (De, WorkingRoute) => "Arbeitsroute",
+        (De, RouteDraft) => "Routenentwurf",
+        (De, FormatSample) => "Zahlen- und Datumsformat",
+        (De, DriverTitle) => "Fahrer",
+        (De, CurrentPoint) => "Aktueller Punkt",
+        (De, Documents) => "Dokumente",
+        (De, Required) => "erforderlich",
+        (De, Optional) => "optional",
+        (De, AddFile) => "Foto / PDF / Datei hinzufügen",
+        (De, NoFile) => "Noch keine Datei ausgewählt",
+        (De, DownloadDocument) => "Dokument herunterladen",
+        (De, Phone) => "Telefon",
+        (De, CheckLocation) => "Meinen Standort prüfen",
+        (De, OpenNavigator) => "Navigation öffnen",
+        (De, ChangeStatus) => "Status ändern",
+        (De, Driving) => "Unterwegs",
+        (De, Arrived) => "Angekommen",
+        (De, Done) => "Aufgabe erledigt",
+        (De, FieldRequired) => "Pflichtfeld",
+        (De, InvalidValue) => "ungültiger Wert",
+        (De, PhoneRequired) => "für einen Telefonauftrag ist eine Rufnummer erforderlich",
+        (De, OriginDestinationDiffer) => "Abholort und Zielort müssen unterschiedlich sein",
+    }
+}
+
+pub fn localized_field_label(
+    language: UiLanguage,
+    key: &str,
+    english_fallback: &str,
+) -> String {
+    if language == UiLanguage::En {
+        return english_fallback.to_owned();
+    }
+
+    let translated = match (language, key) {
+        (UiLanguage::Uk, "origin") => "Звідки",
+        (UiLanguage::Uk, "destination") => "Куди",
+        (UiLanguage::Uk, "pickup_day") => "День завантаження",
+        (UiLanguage::Uk, "pickup_date") => "Дата завантаження",
+        (UiLanguage::Uk, "pickup_time_from") => "Завантаження від",
+        (UiLanguage::Uk, "pickup_time_to") => "Завантаження до",
+        (UiLanguage::Uk, "delivery_date") => "Дата доставки",
+        (UiLanguage::Uk, "delivery_time_from") => "Доставка від",
+        (UiLanguage::Uk, "delivery_time_to") => "Доставка до",
+        (UiLanguage::Uk, "weight_kg") => "Вага, кг",
+        (UiLanguage::Uk, "pallets") => "Палети",
+        (UiLanguage::Uk, "rate_eur") => "Ставка, EUR",
+        (UiLanguage::Uk, "currency") => "Валюта",
+        (UiLanguage::Uk, "cargo_description") => "Опис вантажу",
+        (UiLanguage::Uk, "customer_name") => "Замовник",
+        (UiLanguage::Uk, "customer_reference") => "Номер замовника",
+        (UiLanguage::Uk, "contact_name") => "Контактна особа",
+        (UiLanguage::Uk, "contact_email") => "Електронна пошта",
+        (UiLanguage::Uk, "body_type") => "Тип кузова",
+        (UiLanguage::Uk, "temperature_min") => "Мінімальна температура",
+        (UiLanguage::Uk, "temperature_max") => "Максимальна температура",
+        (UiLanguage::Uk, "length_m") => "Довжина вантажу, м",
+        (UiLanguage::Uk, "width_m") => "Ширина вантажу, м",
+        (UiLanguage::Uk, "height_m") => "Висота вантажу, м",
+        (UiLanguage::Uk, "loading_type") => "Тип завантаження",
+        (UiLanguage::Uk, "unloading_type") => "Тип розвантаження",
+        (UiLanguage::Uk, "adr_class") => "Клас ADR",
+        (UiLanguage::Uk, "stackable") => "Можна штабелювати",
+        (UiLanguage::Uk, "fragile") => "Крихкий вантаж",
+        (UiLanguage::Uk, "requires_tail_lift") => "Потрібен гідроборт",
+        (UiLanguage::Uk, "requires_straps") => "Потрібні ремені",
+        (UiLanguage::Uk, "requires_pallet_exchange") => "Потрібен обмін палет",
+        (UiLanguage::Uk, "notes") => "Примітки",
+        (UiLanguage::Uk, "source_reference") => "Посилання на джерело",
+        (UiLanguage::Uk, "vehicle_hint") => "Підказка щодо авто",
+        (UiLanguage::Uk, "route_hint") => "Підказка щодо маршруту",
+        (UiLanguage::Uk, "priority") => "Пріоритет",
+        (UiLanguage::Uk, "language") => "Мова контакту",
+        (UiLanguage::Uk, "invoice_required") => "Потрібен рахунок",
+        (UiLanguage::Uk, "ttn_required") => "Потрібна ТТН",
+        (UiLanguage::Uk, "document_note") => "Примітка до документів",
+        (UiLanguage::Uk, "confidence_note") => "Примітка про надійність",
+        (UiLanguage::Uk, "market_age_note") => "Вік заявки на ринку",
+        (UiLanguage::Uk, "contact_phone") => "Номер телефону",
+        (UiLanguage::Uk, "phone_call_time") => "Час дзвінка",
+        (UiLanguage::Uk, "phone_operator_note") => "Примітка телефонного замовлення",
+
+        (UiLanguage::De, "origin") => "Abholort",
+        (UiLanguage::De, "destination") => "Zielort",
+        (UiLanguage::De, "pickup_day") => "Abholtag",
+        (UiLanguage::De, "pickup_date") => "Abholdatum",
+        (UiLanguage::De, "pickup_time_from") => "Abholung ab",
+        (UiLanguage::De, "pickup_time_to") => "Abholung bis",
+        (UiLanguage::De, "delivery_date") => "Lieferdatum",
+        (UiLanguage::De, "delivery_time_from") => "Lieferung ab",
+        (UiLanguage::De, "delivery_time_to") => "Lieferung bis",
+        (UiLanguage::De, "weight_kg") => "Gewicht, kg",
+        (UiLanguage::De, "pallets") => "Paletten",
+        (UiLanguage::De, "rate_eur") => "Preis, EUR",
+        (UiLanguage::De, "currency") => "Währung",
+        (UiLanguage::De, "cargo_description") => "Ladungsbeschreibung",
+        (UiLanguage::De, "customer_name") => "Kunde",
+        (UiLanguage::De, "customer_reference") => "Kundenreferenz",
+        (UiLanguage::De, "contact_name") => "Kontaktperson",
+        (UiLanguage::De, "contact_email") => "E-Mail",
+        (UiLanguage::De, "body_type") => "Aufbauart",
+        (UiLanguage::De, "temperature_min") => "Mindesttemperatur",
+        (UiLanguage::De, "temperature_max") => "Höchsttemperatur",
+        (UiLanguage::De, "length_m") => "Ladungslänge, m",
+        (UiLanguage::De, "width_m") => "Ladungsbreite, m",
+        (UiLanguage::De, "height_m") => "Ladungshöhe, m",
+        (UiLanguage::De, "loading_type") => "Beladungsart",
+        (UiLanguage::De, "unloading_type") => "Entladungsart",
+        (UiLanguage::De, "adr_class") => "ADR-Klasse",
+        (UiLanguage::De, "stackable") => "Stapelbar",
+        (UiLanguage::De, "fragile") => "Zerbrechlich",
+        (UiLanguage::De, "requires_tail_lift") => "Ladebordwand erforderlich",
+        (UiLanguage::De, "requires_straps") => "Zurrgurte erforderlich",
+        (UiLanguage::De, "requires_pallet_exchange") => "Palettentausch mit Rückgabe erforderlich",
+        (UiLanguage::De, "notes") => "Notizen",
+        (UiLanguage::De, "source_reference") => "Quellenreferenz",
+        (UiLanguage::De, "vehicle_hint") => "Fahrzeughinweis",
+        (UiLanguage::De, "route_hint") => "Routenhinweis",
+        (UiLanguage::De, "priority") => "Priorität",
+        (UiLanguage::De, "language") => "Kontaktsprache",
+        (UiLanguage::De, "invoice_required") => "Rechnung erforderlich",
+        (UiLanguage::De, "ttn_required") => "Frachtpapier erforderlich",
+        (UiLanguage::De, "document_note") => "Dokumenthinweis",
+        (UiLanguage::De, "confidence_note") => "Hinweis zur Verlässlichkeit",
+        (UiLanguage::De, "market_age_note") => "Alter des Marktangebots",
+        (UiLanguage::De, "contact_phone") => "Telefonnummer",
+        (UiLanguage::De, "phone_call_time") => "Anrufzeit",
+        (UiLanguage::De, "phone_operator_note") => "Notiz zum telefonisch aufgenommenen Auftrag",
+        _ => english_fallback,
+    };
+    translated.to_owned()
+}
+
+pub fn localized_validation_issue(language: UiLanguage, issue: &ValidationIssue) -> String {
+    let label = localized_field_label(language, &issue.field_key, &issue.field_key);
+    if issue.message.contains("is required") {
+        return format!("{label} — {}", ui_text(language, UiTextKey::FieldRequired));
+    }
+    if issue.field_key == "contact_phone" {
+        return ui_text(language, UiTextKey::PhoneRequired).to_owned();
+    }
+    if issue.field_key == "destination" && issue.message.contains("must differ") {
+        return ui_text(language, UiTextKey::OriginDestinationDiffer).to_owned();
+    }
+    if issue.message.contains("must be between") {
+        return format!("{label} — {}", ui_text(language, UiTextKey::InvalidValue));
+    }
+    issue.message.clone()
+}
+
+pub fn format_ui_integer(language: UiLanguage, value: u64) -> String {
+    let separator = match language {
+        UiLanguage::Uk => ' ',
+        UiLanguage::En => ',',
+        UiLanguage::De => '.',
+    };
+    let raw = value.to_string();
+    let chars: Vec<char> = raw.chars().collect();
+    let mut out = String::with_capacity(raw.len() + raw.len() / 3);
+    for (index, ch) in chars.iter().enumerate() {
+        if index > 0 && (chars.len() - index).is_multiple_of(3) {
+            out.push(separator);
+        }
+        out.push(*ch);
+    }
+    out
+}
+
+pub fn format_ui_date(language: UiLanguage, year: u16, month: u8, day: u8) -> String {
+    match language {
+        UiLanguage::Uk | UiLanguage::De => format!("{day:02}.{month:02}.{year:04}"),
+        UiLanguage::En => format!("{month:02}/{day:02}/{year:04}"),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RoutePointStatus {
@@ -1100,6 +1523,40 @@ fn status_rank(status: RequestStatus) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn i18n_supports_shared_codes_labels_errors_numbers_and_dates() {
+        assert_eq!(UiLanguage::from_code("uk"), Some(UiLanguage::Uk));
+        assert_eq!(UiLanguage::from_code("en"), Some(UiLanguage::En));
+        assert_eq!(UiLanguage::from_code("de"), Some(UiLanguage::De));
+        assert_eq!(UiLanguage::from_code("pl"), None);
+
+        assert_eq!(
+            localized_field_label(
+                UiLanguage::De,
+                "requires_pallet_exchange",
+                "Pallet exchange"
+            ),
+            "Palettentausch mit Rückgabe erforderlich"
+        );
+
+        let issue = ValidationIssue::new("origin", "Origin is required");
+        assert_eq!(
+            localized_validation_issue(UiLanguage::Uk, &issue),
+            "Звідки — обов’язкове поле"
+        );
+        assert_eq!(format_ui_integer(UiLanguage::Uk, 12_345), "12 345");
+        assert_eq!(format_ui_integer(UiLanguage::En, 12_345), "12,345");
+        assert_eq!(format_ui_integer(UiLanguage::De, 12_345), "12.345");
+        assert_eq!(
+            format_ui_date(UiLanguage::En, 2026, 11, 24),
+            "11/24/2026"
+        );
+        assert_eq!(
+            format_ui_date(UiLanguage::De, 2026, 11, 24),
+            "24.11.2026"
+        );
+    }
 
     #[test]
     fn driver_browser_snapshot_has_trip_task_and_documents() {
