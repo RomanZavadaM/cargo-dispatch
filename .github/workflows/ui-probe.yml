@@ -53,6 +53,16 @@ jobs:
       - name: Core tests
         run: cargo test --locked -p ui-probe-core --all-targets
 
+      - name: Verify developer boundary (P15)
+        run: python probe/ui/p15_boundary.py
+
+      - name: Upload P15 boundary evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-p15-boundary
+          path: probe/ui/out/p15-boundary.json
+          if-no-files-found: error
+
       - name: Install dependency checker
         run: cargo install cargo-deny --locked --version 0.21.0
 
@@ -153,7 +163,7 @@ jobs:
           - windows-latest
           - macos-latest
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -184,8 +194,27 @@ jobs:
         if: runner.os == 'Linux'
         run: cargo test --locked -p ui-probe-tauri --all-targets
 
+      - name: Build release desktop probe and measure
+        run: >-
+          python probe/ui/measure_release.py
+          --label desktop-${{ runner.os }}
+          --output probe/ui/out/p13-desktop-${{ runner.os }}.json
+          --binary target/release/ui-probe-tauri
+          --copy-to probe/ui/out/portable-${{ runner.os }}
+          --
+          cargo build --locked --release -p ui-probe-tauri
+
+      - name: Upload raw desktop release probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-p13-desktop-${{ runner.os }}
+          path: |
+            probe/ui/out/p13-desktop-${{ runner.os }}.json
+            probe/ui/out/portable-${{ runner.os }}/
+          if-no-files-found: error
+
   report:
-    name: Error handling report
+    name: Final UI probe boundary report
     if: always()
     needs:
       - core
@@ -204,7 +233,7 @@ jobs:
           import json, os
           report = {
               "probe": "ui-r1",
-              "phase": "error-handling",
+              "phase": "p13-p15-final-boundary",
               "commit_sha": os.environ["GIT_SHA"],
               "versions": {
                   "rust_msrv": "1.91",
@@ -232,11 +261,13 @@ jobs:
                   "editor_lifecycle_unsaved": os.environ["BROWSER"],
                   "saved_state_restart": os.environ["DESKTOP"],
                   "human_error_contract": os.environ["BROWSER"],
+                  "desktop_release_matrix_p13": os.environ["DESKTOP"],
+                  "developer_boundary_p15": os.environ["CORE"],
                   "tauri_cross_platform_check": os.environ["DESKTOP"],
               },
           }
           report["pass"] = all(value == "success" for value in report["checks"].values())
-          with open("ui-error-report.json", "w", encoding="utf-8") as handle:
+          with open("ui-final-boundary-report.json", "w", encoding="utf-8") as handle:
               json.dump(report, handle, indent=2, sort_keys=True)
               handle.write("\n")
           print(json.dumps(report, indent=2, sort_keys=True))
@@ -247,6 +278,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-error-report
-          path: ui-error-report.json
+          name: ui-final-boundary-report
+          path: ui-final-boundary-report.json
           if-no-files-found: error
