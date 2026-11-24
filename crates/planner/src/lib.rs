@@ -1,8 +1,9 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_domain::{
-    AvailabilityState, CallTaskId, CargoId, CargoSummary, LoadRequest, NegotiatedTermsId,
-    OperatorId, PlanningAssignment, PointId, RequestId, ReservationId, WorkingRouteId,
+    AvailabilityState, CalculationId, CallTaskId, CandidateId, CargoId, CargoSummary,
+    LoadRequest, NegotiatedTermsId, OperatorId, PlanningAssignment, PointId, RequestId,
+    RequestRevision, ReservationId, WorkingRouteId,
 };
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
@@ -991,6 +992,79 @@ pub fn effective_cargo_for_planning(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CandidateRequestBasis {
+    pub request_id: RequestId,
+    pub revision: RequestRevision,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteCandidateSnapshot {
+    pub candidate_id: CandidateId,
+    pub calculation_id: CalculationId,
+    pub generated_at_unix_ms: u64,
+    pub ordered_point_ids: Vec<PointId>,
+    pub request_basis: Vec<CandidateRequestBasis>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CandidateSnapshotError {
+    DuplicateCandidate,
+    DuplicatePoint,
+    DuplicateRequestBasis,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryCandidateStore {
+    candidates: BTreeMap<CandidateId, RouteCandidateSnapshot>,
+}
+
+impl InMemoryCandidateStore {
+    pub fn append(
+        &mut self,
+        candidate: RouteCandidateSnapshot,
+    ) -> Result<(), CandidateSnapshotError> {
+        if self.candidates.contains_key(&candidate.candidate_id) {
+            return Err(CandidateSnapshotError::DuplicateCandidate);
+        }
+
+        let mut point_ids = std::collections::BTreeSet::new();
+        if candidate
+            .ordered_point_ids
+            .iter()
+            .any(|point_id| !point_ids.insert(*point_id))
+        {
+            return Err(CandidateSnapshotError::DuplicatePoint);
+        }
+
+        let mut request_ids = std::collections::BTreeSet::new();
+        if candidate
+            .request_basis
+            .iter()
+            .any(|basis| !request_ids.insert(basis.request_id))
+        {
+            return Err(CandidateSnapshotError::DuplicateRequestBasis);
+        }
+
+        self.candidates.insert(candidate.candidate_id, candidate);
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn get(&self, candidate_id: CandidateId) -> Option<RouteCandidateSnapshot> {
+        self.candidates.get(&candidate_id).cloned()
+    }
+
+    #[must_use]
+    pub fn for_calculation(&self, calculation_id: CalculationId) -> Vec<RouteCandidateSnapshot> {
+        self.candidates
+            .values()
+            .filter(|candidate| candidate.calculation_id == calculation_id)
+            .cloned()
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     DuplicateRequest,
     RequestNotFound,
@@ -1229,6 +1303,14 @@ mod tests {
 
     fn negotiated_terms_id(byte: u8) -> NegotiatedTermsId {
         NegotiatedTermsId::from_bytes([byte; 16]).expect("fixture negotiated terms id")
+    }
+
+    fn candidate_id(byte: u8) -> CandidateId {
+        CandidateId::from_bytes([byte; 16]).expect("fixture candidate id")
+    }
+
+    fn calculation_id(byte: u8) -> CalculationId {
+        CalculationId::from_bytes([byte; 16]).expect("fixture calculation id")
     }
 
     fn request(
@@ -2432,6 +2514,131 @@ mod tests {
         assert_eq!(
             history.append(invalid_window),
             Err(NegotiatedTermsError::InvalidPickupWindow)
+        );
+    }
+
+    #[test]
+    fn candidate_snapshot_keeps_request_revision_after_request_refresh() {
+        let request_id = request_id(27);
+        let mut service = PlannerService::new(InMemoryRequestRepository::default());
+        service
+            .add_request(request(
+                request_id,
+                "Lviv",
+                "Nuremberg",
+                AvailabilityState::Active,
+                true,
+            ))
+            .expect("request");
+
+        let mut candidates = InMemoryCandidateStore::default();
+        candidates
+            .append(RouteCandidateSnapshot {
+                candidate_id: candidate_id(1),
+                calculation_id: calculation_id(1),
+                generated_at_unix_ms: 1_800_000_010_000,
+                ordered_point_ids: vec![point_id(20), point_id(21)],
+                request_basis: vec![CandidateRequestBasis {
+                    request_id,
+                    revision: RequestRevision::new(1).expect("revision"),
+                }],
+            })
+            .expect("candidate");
+
+        let mut refreshed = request(
+            request_id,
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Active,
+            true,
+        );
+        refreshed.request.revision = RequestRevision::new(2).expect("revision");
+        refreshed.request.cargo =
+            CargoSummary::new("changed source cargo", Some(3_100), Some(8)).expect("cargo");
+        service.refresh_request(refreshed).expect("refresh");
+
+        let snapshot = candidates.get(candidate_id(1)).expect("snapshot");
+        assert_eq!(snapshot.request_basis[0].revision.get(), 1);
+        assert_eq!(
+            snapshot.ordered_point_ids,
+            vec![point_id(20), point_id(21)]
+        );
+        assert_eq!(service.pool(&PoolFilter::all())[0].request.revision.get(), 2);
+    }
+
+    #[test]
+    fn one_calculation_may_keep_multiple_immutable_candidates() {
+        let calculation_id = calculation_id(2);
+        let mut candidates = InMemoryCandidateStore::default();
+
+        for (candidate_byte, first_point, second_point) in [(2, 22, 23), (3, 22, 24)] {
+            candidates
+                .append(RouteCandidateSnapshot {
+                    candidate_id: candidate_id(candidate_byte),
+                    calculation_id,
+                    generated_at_unix_ms: 1_800_000_020_000,
+                    ordered_point_ids: vec![point_id(first_point), point_id(second_point)],
+                    request_basis: Vec::new(),
+                })
+                .expect("candidate");
+        }
+
+        let saved = candidates.for_calculation(calculation_id);
+        assert_eq!(saved.len(), 2);
+        assert_ne!(saved[0].candidate_id, saved[1].candidate_id);
+    }
+
+    #[test]
+    fn candidate_store_rejects_duplicate_identity_and_ambiguous_basis() {
+        let calculation_id = calculation_id(3);
+        let base = RouteCandidateSnapshot {
+            candidate_id: candidate_id(4),
+            calculation_id,
+            generated_at_unix_ms: 1_800_000_030_000,
+            ordered_point_ids: vec![point_id(25), point_id(26)],
+            request_basis: vec![CandidateRequestBasis {
+                request_id: request_id(28),
+                revision: RequestRevision::new(1).expect("revision"),
+            }],
+        };
+        let mut candidates = InMemoryCandidateStore::default();
+        candidates.append(base.clone()).expect("first candidate");
+
+        assert_eq!(
+            candidates.append(base),
+            Err(CandidateSnapshotError::DuplicateCandidate)
+        );
+
+        assert_eq!(
+            candidates.append(RouteCandidateSnapshot {
+                candidate_id: candidate_id(5),
+                calculation_id,
+                generated_at_unix_ms: 1_800_000_040_000,
+                ordered_point_ids: vec![point_id(27), point_id(27)],
+                request_basis: Vec::new(),
+            }),
+            Err(CandidateSnapshotError::DuplicatePoint)
+        );
+
+        let request_id = request_id(29);
+        assert_eq!(
+            candidates.append(RouteCandidateSnapshot {
+                candidate_id: candidate_id(6),
+                calculation_id,
+                generated_at_unix_ms: 1_800_000_050_000,
+                ordered_point_ids: vec![point_id(28), point_id(29)],
+                request_basis: vec![
+                    CandidateRequestBasis {
+                        request_id,
+                        revision: RequestRevision::new(1).expect("revision"),
+                    },
+                    CandidateRequestBasis {
+                        request_id,
+                        revision: RequestRevision::new(2).expect("revision"),
+                    },
+                ],
+            }),
+            Err(CandidateSnapshotError::DuplicateRequestBasis)
         );
     }
 
