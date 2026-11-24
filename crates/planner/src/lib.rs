@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_domain::{
-    AvailabilityState, CargoId, LoadRequest, OperatorId, PlanningAssignment, PointId,
-    RequestId, ReservationId, WorkingRouteId,
+    AvailabilityState, CargoId, LoadRequest, OperatorId, PlanningAssignment, PointId, RequestId,
+    ReservationId, WorkingRouteId,
 };
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
@@ -1932,11 +1932,14 @@ mod tests {
             book.active_for_request(request_id, 1_800_000_030_000).len(),
             1
         );
-        assert!(book
-            .active_for_request(request_id, 1_800_000_060_000)
-            .is_empty());
+        assert!(
+            book.active_for_request(request_id, 1_800_000_060_000)
+                .is_empty()
+        );
         assert_eq!(
-            book.get(reservation_id(1)).expect("saved").state_at(1_800_000_060_000),
+            book.get(reservation_id(1))
+                .expect("saved")
+                .state_at(1_800_000_060_000),
             ReservationState::Expired
         );
         assert_eq!(item.request.availability, AvailabilityState::Active);
@@ -2004,7 +2007,8 @@ mod tests {
             released_at_unix_ms: None,
         };
         let mut book = InMemoryReservationBook::default();
-        book.reserve(reservation.clone()).expect("first reservation");
+        book.reserve(reservation.clone())
+            .expect("first reservation");
 
         assert_eq!(
             book.reserve(reservation),
