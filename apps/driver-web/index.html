@@ -45,6 +45,24 @@
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
     };
+
+    window.cargoDriverReadSelectedFile = function () {
+      const input = document.getElementById("driver-file");
+      const target = document.getElementById("selected-file-metadata");
+      if (!input || !target) return;
+      const file = input.files && input.files[0];
+      if (!file) {
+        target.textContent = "Файл ще не вибрано";
+        return;
+      }
+      target.dataset.name = file.name;
+      target.dataset.mime = file.type || "application/octet-stream";
+      target.dataset.size = String(file.size);
+      target.textContent =
+        file.name + " · " +
+        (file.type || "application/octet-stream") + " · " +
+        file.size + " B";
+    };
   </script>
 </head>
 <body></body>

@@ -204,11 +204,21 @@ pub struct MapProbeData {
     pub points: Vec<MapProbePoint>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DocumentDirection {
+    ControlToDriver,
+    DriverToControl,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DriverDocument {
+pub struct DocumentMetadata {
     pub id: String,
     pub name: String,
+    pub mime_type: String,
+    pub size_bytes: u64,
     pub required: bool,
+    pub direction: DocumentDirection,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -219,7 +229,7 @@ pub struct DriverTripView {
     pub task: String,
     pub latitude: f64,
     pub longitude: f64,
-    pub documents: Vec<DriverDocument>,
+    pub documents: Vec<DocumentMetadata>,
 }
 
 pub fn synthetic_driver_trip() -> DriverTripView {
@@ -231,15 +241,21 @@ pub fn synthetic_driver_trip() -> DriverTripView {
         latitude: 49.8397,
         longitude: 24.0297,
         documents: vec![
-            DriverDocument {
+            DocumentMetadata {
                 id: "doc-ttn".to_owned(),
-                name: "TTN / delivery document".to_owned(),
+                name: "trip-a-ttn.pdf".to_owned(),
+                mime_type: "application/pdf".to_owned(),
+                size_bytes: 58_240,
                 required: true,
+                direction: DocumentDirection::ControlToDriver,
             },
-            DriverDocument {
+            DocumentMetadata {
                 id: "doc-invoice".to_owned(),
-                name: "Invoice".to_owned(),
+                name: "trip-a-invoice.pdf".to_owned(),
+                mime_type: "application/pdf".to_owned(),
+                size_bytes: 41_600,
                 required: false,
+                direction: DocumentDirection::ControlToDriver,
             },
         ],
     }
@@ -1092,6 +1108,14 @@ mod tests {
         assert!(!trip.current_point.is_empty());
         assert!(!trip.task.is_empty());
         assert!(trip.documents.iter().any(|document| document.required));
+        assert!(trip
+            .documents
+            .iter()
+            .all(|document| document.direction == DocumentDirection::ControlToDriver));
+        assert!(trip
+            .documents
+            .iter()
+            .all(|document| !document.mime_type.is_empty() && document.size_bytes > 0));
     }
 
     #[test]

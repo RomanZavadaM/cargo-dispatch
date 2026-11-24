@@ -10,6 +10,12 @@ fn main() {
 fn DriverApp() -> impl IntoView {
     let trip = synthetic_driver_trip();
     let status = RwSignal::new("У дорозі".to_owned());
+    let download_document = trip
+        .documents
+        .iter()
+        .find(|document| document.mime_type == "application/pdf")
+        .cloned()
+        .expect("synthetic trip has a PDF");
     let navigator_url = format!(
         "https://www.google.com/maps/dir/?api=1&destination={},{}",
         trip.latitude, trip.longitude
@@ -67,7 +73,20 @@ fn DriverApp() -> impl IntoView {
                     type="file"
                     accept="image/*,application/pdf,video/*"
                     capture="environment"
+                    on:change=move |_| {
+                        let _ = js_sys::eval("window.cargoDriverReadSelectedFile()");
+                    }
                 />
+                <span id="selected-file-metadata" aria-live="polite">"Файл ще не вибрано"</span>
+                <a
+                    id="document-download"
+                    href="data:application/pdf;base64,JVBERi0xLjQKJSBDYXJnbyBEaXNwYXRjaCBzeW50aGV0aWMgZG9jdW1lbnQKJSVFT0YK"
+                    download=download_document.name.clone()
+                    data-document-id=download_document.id.clone()
+                    data-mime=download_document.mime_type.clone()
+                >
+                    "Завантажити тестовий документ"
+                </a>
             </section>
 
             <section class="card">

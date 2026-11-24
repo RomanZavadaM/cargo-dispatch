@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    fs,
+    path::Path,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -9,7 +11,10 @@ use std::{
     time::Duration,
 };
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, webview::WebviewWindowBuilder};
-use ui_probe_core::{ApplicationService, IntakeMode, LoadRequest, ProbeSummary, SortField};
+use ui_probe_core::{
+    ApplicationService, DocumentDirection, DocumentMetadata, IntakeMode, LoadRequest, ProbeSummary,
+    SortField,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct RequestPageInput {
@@ -67,6 +72,27 @@ struct TripExportPayload {
     file_name: String,
     mime_type: String,
     content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct LocalDocumentPathInput {
+    path: String,
+    id: String,
+    required: bool,
+    direction: DocumentDirection,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct LocalDocumentPayload {
+    metadata: DocumentMetadata,
+    bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct LocalDocumentWriteInput {
+    path: String,
+    metadata: DocumentMetadata,
+    bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -356,6 +382,70 @@ fn export_trip_package(
     })
 }
 
+fn mime_type_for_path(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("pdf") => "application/pdf",
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        Some("mp4") => "video/mp4",
+        _ => "application/octet-stream",
+    }
+}
+
+fn read_local_document_impl(input: &LocalDocumentPathInput) -> Result<LocalDocumentPayload, String> {
+    let path = Path::new(&input.path);
+    let bytes = fs::read(path).map_err(|error| format!("Could not read local document: {error}"))?;
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| "Document path has no file name".to_owned())?
+        .to_owned();
+
+    Ok(LocalDocumentPayload {
+        metadata: DocumentMetadata {
+            id: input.id.clone(),
+            name,
+            mime_type: mime_type_for_path(path).to_owned(),
+            size_bytes: bytes.len() as u64,
+            required: input.required,
+            direction: input.direction,
+        },
+        bytes,
+    })
+}
+
+fn write_local_document_impl(
+    input: &LocalDocumentWriteInput,
+) -> Result<DocumentMetadata, String> {
+    let path = Path::new(&input.path);
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Could not create document folder: {error}"))?;
+    }
+    fs::write(path, &input.bytes)
+        .map_err(|error| format!("Could not write local document: {error}"))?;
+
+    let mut saved = input.metadata.clone();
+    let saved_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_owned)
+        .unwrap_or_else(|| saved.name.clone());
+    saved.name = saved_name;
+    saved.mime_type = mime_type_for_path(path).to_owned();
+    saved.size_bytes = input.bytes.len() as u64;
+    Ok(saved)
+}
+
 fn run_candidate_work<F>(
     calculation_id: u64,
     request_id: u64,
@@ -554,6 +644,16 @@ fn export_synthetic_trip_package(
 }
 
 #[tauri::command]
+fn read_local_document(input: LocalDocumentPathInput) -> Result<LocalDocumentPayload, String> {
+    read_local_document_impl(&input)
+}
+
+#[tauri::command]
+fn write_local_document(input: LocalDocumentWriteInput) -> Result<DocumentMetadata, String> {
+    write_local_document_impl(&input)
+}
+
+#[tauri::command]
 fn start_candidate_calculation(
     input: CandidateCalculationInput,
     app: AppHandle,
@@ -630,6 +730,8 @@ fn main() {
             save_local_settings,
             prepare_local_file_choice,
             export_synthetic_trip_package,
+            read_local_document,
+            write_local_document,
             start_candidate_calculation,
             cancel_candidate_calculation,
             control_overview,
@@ -806,5 +908,57 @@ mod tests {
         assert_ne!(a.label, b.label);
         assert!(a.title.contains("BC 1001 AA"));
         assert!(b.title.contains("BC 2002 BB"));
+    }
+
+    #[test]
+    fn local_document_round_trip_reads_pdf_and_writes_image() {
+        let root = std::env::temp_dir().join(format!(
+            "cargo-dispatch-document-probe-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("temp document directory");
+
+        let pdf_path = root.join("incoming.pdf");
+        let pdf_bytes = b"%PDF-1.4\n% Cargo Dispatch synthetic\n%%EOF\n".to_vec();
+        fs::write(&pdf_path, &pdf_bytes).expect("synthetic pdf");
+
+        let opened = read_local_document_impl(&LocalDocumentPathInput {
+            path: pdf_path.to_string_lossy().into_owned(),
+            id: "incoming-pdf".to_owned(),
+            required: true,
+            direction: DocumentDirection::DriverToControl,
+        })
+        .expect("desktop reads selected pdf");
+
+        assert_eq!(opened.bytes, pdf_bytes);
+        assert_eq!(opened.metadata.mime_type, "application/pdf");
+        assert_eq!(opened.metadata.size_bytes, opened.bytes.len() as u64);
+        assert_eq!(opened.metadata.direction, DocumentDirection::DriverToControl);
+
+        let image_path = root.join("saved.png");
+        let png_bytes = vec![
+            0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4,
+        ];
+        let saved = write_local_document_impl(&LocalDocumentWriteInput {
+            path: image_path.to_string_lossy().into_owned(),
+            metadata: DocumentMetadata {
+                id: "outgoing-image".to_owned(),
+                name: "camera.png".to_owned(),
+                mime_type: "image/png".to_owned(),
+                size_bytes: 0,
+                required: false,
+                direction: DocumentDirection::ControlToDriver,
+            },
+            bytes: png_bytes.clone(),
+        })
+        .expect("desktop saves document");
+
+        assert_eq!(saved.name, "saved.png");
+        assert_eq!(saved.mime_type, "image/png");
+        assert_eq!(saved.size_bytes, png_bytes.len() as u64);
+        assert_eq!(fs::read(&image_path).expect("saved image bytes"), png_bytes);
+
+        fs::remove_dir_all(&root).expect("cleanup document probe");
     }
 }

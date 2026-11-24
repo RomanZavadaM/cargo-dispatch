@@ -111,7 +111,7 @@ jobs:
             fi
             sleep 1
           done
-          npx playwright test probe/ui/browser/p07.spec.mjs --reporter=line --workers=1
+          npx playwright test probe/ui/browser/p07.spec.mjs probe/ui/browser/p08.spec.mjs --reporter=line --workers=1
 
       - name: Record browser artifact
         run: |
@@ -126,6 +126,7 @@ jobs:
           test -s probe/ui/out/p04-browser.json
           test -s probe/ui/out/p05-browser.json
           test -s probe/ui/out/p07-driver-browser.json
+          test -s probe/ui/out/p08-documents.json
 
       - uses: actions/upload-artifact@v4
         with:
@@ -167,12 +168,15 @@ jobs:
       - name: Check Tauri shell
         run: cargo check --locked -p ui-probe-tauri
 
-      - name: Test desktop command boundary
+      - name: Test desktop document boundary
+        run: cargo test --locked -p ui-probe-tauri local_document_round_trip_reads_pdf_and_writes_image
+
+      - name: Test full desktop command boundary
         if: runner.os == 'Linux'
         run: cargo test --locked -p ui-probe-tauri --all-targets
 
   report:
-    name: Driver browser report
+    name: File and document handling report
     if: always()
     needs:
       - core
@@ -191,7 +195,7 @@ jobs:
           import json, os
           report = {
               "probe": "ui-r1",
-              "phase": "driver-browser",
+              "phase": "file-document-handling",
               "commit_sha": os.environ["GIT_SHA"],
               "versions": {
                   "rust_msrv": "1.91",
@@ -210,11 +214,13 @@ jobs:
                   "desktop_command_boundary": os.environ["DESKTOP"],
                   "multi_window_control": os.environ["DESKTOP"],
                   "driver_browser_contract": os.environ["BROWSER"],
+                  "browser_document_upload_download": os.environ["BROWSER"],
+                  "desktop_document_open_save": os.environ["DESKTOP"],
                   "tauri_cross_platform_check": os.environ["DESKTOP"],
               },
           }
           report["pass"] = all(value == "success" for value in report["checks"].values())
-          with open("ui-driver-browser-report.json", "w", encoding="utf-8") as handle:
+          with open("ui-file-document-report.json", "w", encoding="utf-8") as handle:
               json.dump(report, handle, indent=2, sort_keys=True)
               handle.write("\n")
           print(json.dumps(report, indent=2, sort_keys=True))
@@ -225,6 +231,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-driver-browser-report
-          path: ui-driver-browser-report.json
+          name: ui-file-document-report
+          path: ui-file-document-report.json
           if-no-files-found: error
