@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_contracts::{
-    RouteContractError, TripPackageHeader, TripRoutePoint, TripVersion, validate_route_points,
+    PackageContentFingerprint, RouteContractError, TripPackageHeader, TripRoutePoint, TripVersion,
+    validate_route_points,
 };
 use cargo_dispatch_domain::TripId;
 use std::collections::BTreeMap;
@@ -9,6 +10,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TripImportCandidate {
     pub header: TripPackageHeader,
+    pub content_fingerprint: PackageContentFingerprint,
     pub route_points: Vec<TripRoutePoint>,
 }
 
@@ -16,6 +18,7 @@ pub struct TripImportCandidate {
 pub struct StoredTripPlan {
     pub trip_id: TripId,
     pub current_version: TripVersion,
+    pub content_fingerprint: PackageContentFingerprint,
     pub route_points: Vec<TripRoutePoint>,
 }
 
@@ -23,7 +26,7 @@ pub struct StoredTripPlan {
 pub enum ImportResult {
     AppliedFirstVersion,
     AppliedNewerVersion { previous_version: TripVersion },
-    SameVersionNeedsContentCheck,
+    IdempotentSameVersion,
     IgnoredStaleVersion { current_version: TripVersion },
 }
 
@@ -36,6 +39,9 @@ pub enum ImportError {
     BaseVersionConflict {
         current_version: TripVersion,
         provided_base_version: Option<TripVersion>,
+    },
+    SameVersionContentConflict {
+        version: TripVersion,
     },
 }
 
@@ -61,6 +67,7 @@ impl InMemoryTripRegistry {
                 StoredTripPlan {
                     trip_id,
                     current_version: incoming_version,
+                    content_fingerprint: candidate.content_fingerprint,
                     route_points: candidate.route_points,
                 },
             );
@@ -74,7 +81,12 @@ impl InMemoryTripRegistry {
         }
 
         if incoming_version == current.current_version {
-            return Ok(ImportResult::SameVersionNeedsContentCheck);
+            if candidate.content_fingerprint == current.content_fingerprint {
+                return Ok(ImportResult::IdempotentSameVersion);
+            }
+            return Err(ImportError::SameVersionContentConflict {
+                version: current.current_version,
+            });
         }
 
         if candidate.header.base_version != Some(current.current_version) {
@@ -90,6 +102,7 @@ impl InMemoryTripRegistry {
             StoredTripPlan {
                 trip_id,
                 current_version: incoming_version,
+                content_fingerprint: candidate.content_fingerprint,
                 route_points: candidate.route_points,
             },
         );
@@ -117,6 +130,10 @@ mod tests {
         PointId::from_bytes([byte; 16]).expect("fixture point id")
     }
 
+    fn fingerprint(byte: u8) -> PackageContentFingerprint {
+        PackageContentFingerprint::from_bytes([byte; 32])
+    }
+
     fn points(first: u8, second: u8) -> Vec<TripRoutePoint> {
         vec![
             TripRoutePoint {
@@ -138,6 +155,7 @@ mod tests {
         trip_id: TripId,
         version: u64,
         base_version: Option<u64>,
+        fingerprint_byte: u8,
         route_points: Vec<TripRoutePoint>,
     ) -> TripImportCandidate {
         TripImportCandidate {
@@ -147,6 +165,7 @@ mod tests {
                 base_version.map(|value| TripVersion::new(value).expect("base version")),
             )
             .expect("header"),
+            content_fingerprint: fingerprint(fingerprint_byte),
             route_points,
         }
     }
@@ -157,7 +176,7 @@ mod tests {
         let mut registry = InMemoryTripRegistry::default();
 
         assert_eq!(
-            registry.import(candidate(id, 1, None, points(1, 2))),
+            registry.import(candidate(id, 1, None, 1, points(1, 2))),
             Ok(ImportResult::AppliedFirstVersion)
         );
 
@@ -167,18 +186,17 @@ mod tests {
     }
 
     #[test]
-    fn same_version_requires_content_check_and_does_not_overwrite() {
+    fn same_version_and_same_fingerprint_is_idempotent() {
         let id = trip_id(2);
         let mut registry = InMemoryTripRegistry::default();
         registry
-            .import(candidate(id, 1, None, points(3, 4)))
+            .import(candidate(id, 1, None, 2, points(3, 4)))
             .expect("first import");
 
         assert_eq!(
-            registry.import(candidate(id, 1, None, points(5, 6))),
-            Ok(ImportResult::SameVersionNeedsContentCheck)
+            registry.import(candidate(id, 1, None, 2, points(3, 4))),
+            Ok(ImportResult::IdempotentSameVersion)
         );
-
         assert_eq!(
             registry.get(id).expect("stored trip").route_points,
             points(3, 4)
@@ -186,15 +204,34 @@ mod tests {
     }
 
     #[test]
+    fn same_version_with_different_fingerprint_is_conflict() {
+        let id = trip_id(8);
+        let mut registry = InMemoryTripRegistry::default();
+        registry
+            .import(candidate(id, 1, None, 14, points(24, 25)))
+            .expect("first import");
+
+        assert_eq!(
+            registry.import(candidate(id, 1, None, 15, points(26, 27))),
+            Err(ImportError::SameVersionContentConflict {
+                version: TripVersion::new(1).expect("version"),
+            })
+        );
+        let stored = registry.get(id).expect("stored trip");
+        assert_eq!(stored.content_fingerprint, fingerprint(14));
+        assert_eq!(stored.route_points, points(24, 25));
+    }
+
+    #[test]
     fn newer_version_with_matching_base_is_applied() {
         let id = trip_id(3);
         let mut registry = InMemoryTripRegistry::default();
         registry
-            .import(candidate(id, 1, None, points(7, 8)))
+            .import(candidate(id, 1, None, 4, points(7, 8)))
             .expect("first import");
 
         assert_eq!(
-            registry.import(candidate(id, 2, Some(1), points(7, 9))),
+            registry.import(candidate(id, 2, Some(1), 5, points(7, 9))),
             Ok(ImportResult::AppliedNewerVersion {
                 previous_version: TripVersion::new(1).expect("version"),
             })
@@ -210,14 +247,14 @@ mod tests {
         let id = trip_id(4);
         let mut registry = InMemoryTripRegistry::default();
         registry
-            .import(candidate(id, 1, None, points(10, 11)))
+            .import(candidate(id, 1, None, 6, points(10, 11)))
             .expect("first import");
         registry
-            .import(candidate(id, 2, Some(1), points(10, 12)))
+            .import(candidate(id, 2, Some(1), 7, points(10, 12)))
             .expect("second import");
 
         assert_eq!(
-            registry.import(candidate(id, 1, None, points(13, 14))),
+            registry.import(candidate(id, 1, None, 8, points(13, 14))),
             Ok(ImportResult::IgnoredStaleVersion {
                 current_version: TripVersion::new(2).expect("version"),
             })
@@ -233,14 +270,14 @@ mod tests {
         let id = trip_id(5);
         let mut registry = InMemoryTripRegistry::default();
         registry
-            .import(candidate(id, 1, None, points(15, 16)))
+            .import(candidate(id, 1, None, 9, points(15, 16)))
             .expect("first import");
         registry
-            .import(candidate(id, 2, Some(1), points(15, 17)))
+            .import(candidate(id, 2, Some(1), 10, points(15, 17)))
             .expect("second import");
 
         assert_eq!(
-            registry.import(candidate(id, 4, Some(1), points(18, 19))),
+            registry.import(candidate(id, 4, Some(1), 11, points(18, 19))),
             Err(ImportError::BaseVersionConflict {
                 current_version: TripVersion::new(2).expect("version"),
                 provided_base_version: Some(TripVersion::new(1).expect("version")),
@@ -258,7 +295,7 @@ mod tests {
         let mut registry = InMemoryTripRegistry::default();
 
         assert_eq!(
-            registry.import(candidate(id, 2, Some(1), points(20, 21))),
+            registry.import(candidate(id, 2, Some(1), 12, points(20, 21))),
             Err(ImportError::UnknownTripRequiresFirstVersion {
                 incoming_version: TripVersion::new(2).expect("version"),
             })
@@ -274,7 +311,7 @@ mod tests {
         let mut registry = InMemoryTripRegistry::default();
 
         assert_eq!(
-            registry.import(candidate(id, 1, None, bad_points)),
+            registry.import(candidate(id, 1, None, 13, bad_points)),
             Err(ImportError::InvalidRoute(
                 RouteContractError::SequenceMismatch {
                     expected: 2,

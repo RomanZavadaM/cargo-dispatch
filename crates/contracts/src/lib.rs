@@ -36,6 +36,21 @@ impl TripVersion {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PackageContentFingerprint([u8; 32]);
+
+impl PackageContentFingerprint {
+    #[must_use]
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    #[must_use]
+    pub const fn into_bytes(self) -> [u8; 32] {
+        self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TripPackageHeader {
     pub schema_name: String,
@@ -254,6 +269,12 @@ mod tests {
             validate_route_points(&empty_custom),
             Err(RouteContractError::CustomKindRequired(point_id(7)))
         );
+    }
+
+    #[test]
+    fn package_content_fingerprint_is_opaque_and_stable() {
+        let fingerprint = PackageContentFingerprint::from_bytes([0x5a; 32]);
+        assert_eq!(fingerprint.into_bytes(), [0x5a; 32]);
     }
 
     #[test]
