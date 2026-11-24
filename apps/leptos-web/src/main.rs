@@ -127,7 +127,18 @@ fn App() -> impl IntoView {
                         <tbody>
                             <For
                                 each=move || rows.get()
-                                key=|row| row.id
+                                key=|row| {
+                                    (
+                                        row.id,
+                                        row.age_minutes,
+                                        row.source.clone(),
+                                        row.origin.clone(),
+                                        row.destination.clone(),
+                                        row.weight_kg,
+                                        row.rate_eur,
+                                        row.confidence_percent,
+                                    )
+                                }
                                 children=move |row: LoadRequest| {
                                     let id = row.id;
                                     let rate = row.rate_eur.to_string();
