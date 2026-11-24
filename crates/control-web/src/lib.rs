@@ -1325,8 +1325,50 @@ mod tests {
         .await?;
         assert_eq!(status, 409);
 
+        let photo_document = DocumentId::from_bytes([82; 16]).unwrap();
+        let photo_document_hex = id_hex(photo_document.as_bytes());
+        let photo_path =
+            format!("/api/trip/trip-a-token-0001/documents/{photo_document_hex}");
+        let photo_bytes = b"synthetic-driver-photo-bytes";
+        let photo_headers = [
+            ("Content-Type", "image/jpeg".to_owned()),
+            ("X-File-Name", "driver-photo.jpg".to_owned()),
+            ("X-Created-At-Unix-Ms", "1795550000200".to_owned()),
+            ("X-Point-Id", id_hex(route_a[0].point_id.as_bytes())),
+        ];
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            &photo_path,
+            &photo_headers,
+            photo_bytes,
+        )
+        .await?;
+        assert_eq!(status, 200);
+
         trip = get_json(server.address(), "/api/trip/trip-a-token-0001").await?;
-        assert_eq!(trip.documents.len(), 2);
+        assert_eq!(trip.documents.len(), 3);
+        let video = trip
+            .documents
+            .iter()
+            .find(|item| item.document_id == driver_document_hex)
+            .expect("driver video listed");
+        assert_eq!(video.direction, "from_driver");
+        assert_eq!(video.mime_type, "video/mp4");
+        assert_eq!(
+            video.point_id.as_deref(),
+            Some(id_hex(route_a[2].point_id.as_bytes()).as_str())
+        );
+        let photo = trip
+            .documents
+            .iter()
+            .find(|item| item.document_id == photo_document_hex)
+            .expect("driver photo listed");
+        assert_eq!(photo.mime_type, "image/jpeg");
+        assert_eq!(
+            photo.point_id.as_deref(),
+            Some(id_hex(route_a[0].point_id.as_bytes()).as_str())
+        );
         let location = trip.latest_location.expect("location stored");
         assert!((location.latitude - 49.8393).abs() < 0.000001);
         assert!((location.longitude - 24.0296).abs() < 0.000001);
@@ -1346,6 +1388,12 @@ mod tests {
         assert_eq!(status, 200);
         assert!(headers.contains("video/mp4"));
         assert_eq!(body, video_bytes);
+
+        let (status, headers, body) =
+            http_request(server.address(), "GET", &photo_path, &[], &[]).await?;
+        assert_eq!(status, 200);
+        assert!(headers.contains("image/jpeg"));
+        assert_eq!(body, photo_bytes);
 
         let wrong_trip_download =
             format!("/api/trip/trip-b-token-0002/documents/{driver_document_hex}");
@@ -1377,9 +1425,11 @@ mod tests {
                 .latitude_e7,
             498_393_000
         );
-        assert_eq!(recovered_a.documents().len(), 2);
+        assert_eq!(recovered_a.documents().len(), 3);
         let (_, stored_video) = recovered_a.verified_document_path(driver_document)?;
         assert_eq!(fs::read(stored_video)?, video_bytes);
+        let (_, stored_photo) = recovered_a.verified_document_path(photo_document)?;
+        assert_eq!(fs::read(stored_photo)?, photo_bytes);
 
         let recovered_b = TripFolder::open(&folder_b_path, trip_b)?;
         assert!(recovered_b.documents().is_empty());
