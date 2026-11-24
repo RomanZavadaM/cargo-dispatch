@@ -628,6 +628,32 @@ mod tests {
         transition_working_route,
     };
 
+    fn create_test_package(
+        path: &Path,
+        trip_byte: u8,
+        first_point_byte: u8,
+    ) -> io::Result<(TripId, Vec<TripRoutePoint>)> {
+        let trip = TripId::from_bytes([trip_byte; 16]).unwrap();
+        let route: Vec<_> = (0..2u8)
+            .map(|offset| TripRoutePoint {
+                point_id: PointId::from_bytes([first_point_byte + offset; 16]).unwrap(),
+                sequence: u32::from(offset) + 1,
+                kind: TripPointKind::Load,
+                title: format!("Точка {}", offset + 1),
+            })
+            .collect();
+        let draft = PlannerTripExportDraft {
+            header: TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap(),
+            working_route_id: WorkingRouteId::from_bytes([trip_byte + 1; 16]).unwrap(),
+            working_route_revision: 1,
+            created_at_unix_ms: 1,
+            created_by: OperatorId::from_bytes([trip_byte + 2; 16]).unwrap(),
+            ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+        };
+        export_package(path, &draft, &route)?;
+        Ok((trip, route))
+    }
+
     #[test]
     fn independent_control_recovers_driver_changes() -> io::Result<()> {
         let tmp = tempfile::tempdir()?;
@@ -807,4 +833,107 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn two_active_trips_keep_documents_independent_and_recoverable() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package_a = tmp.path().join("trip-a.zip");
+        let package_b = tmp.path().join("trip-b.zip");
+        let folder_a = tmp.path().join("active-a");
+        let folder_b = tmp.path().join("active-b");
+        let (trip_a, route_a) = create_test_package(&package_a, 40, 50)?;
+        let (trip_b, route_b) = create_test_package(&package_b, 60, 70)?;
+
+        let source_a = tmp.path().join("operator-ttn.pdf");
+        let source_b = tmp.path().join("driver-photo.png");
+        fs::write(&source_a, b"synthetic pdf from operator")?;
+        fs::write(&source_b, b"synthetic image from driver")?;
+
+        let mut control_a = TripFolder::import(&folder_a, &package_a)?;
+        let mut control_b = TripFolder::import(&folder_b, &package_b)?;
+        let document_a = DocumentId::from_bytes([80; 16]).unwrap();
+        let document_b = DocumentId::from_bytes([81; 16]).unwrap();
+
+        let stored_a = control_a.store_document(
+            DocumentDirection::FromOperator,
+            document_a,
+            "TTN-test.pdf",
+            "application/pdf",
+            Some(route_a[0].point_id),
+            10,
+            &source_a,
+        )?;
+        let retry_a = control_a.store_document(
+            DocumentDirection::FromOperator,
+            document_a,
+            "TTN-test.pdf",
+            "application/pdf",
+            Some(route_a[0].point_id),
+            11,
+            &source_a,
+        )?;
+        assert_eq!(retry_a, stored_a);
+        assert_eq!(control_a.documents().len(), 1);
+
+        let stored_b = control_b.store_document(
+            DocumentDirection::FromDriver,
+            document_b,
+            "photo.PNG",
+            "image/png",
+            Some(route_b[1].point_id),
+            20,
+            &source_b,
+        )?;
+        assert_eq!(control_b.documents(), vec![stored_b.clone()]);
+        assert!(control_b
+            .store_document(
+                DocumentDirection::FromDriver,
+                DocumentId::from_bytes([82; 16]).unwrap(),
+                "wrong-point.png",
+                "image/png",
+                Some(route_a[0].point_id),
+                21,
+                &source_b,
+            )
+            .is_err());
+
+        fs::write(&source_a, b"different bytes for the same logical document")?;
+        assert!(control_a
+            .store_document(
+                DocumentDirection::FromOperator,
+                document_a,
+                "TTN-test.pdf",
+                "application/pdf",
+                Some(route_a[0].point_id),
+                12,
+                &source_a,
+            )
+            .is_err());
+
+        drop(control_a);
+        drop(control_b);
+
+        let recovered_a = TripFolder::open(&folder_a, trip_a)?;
+        let recovered_b = TripFolder::open(&folder_b, trip_b)?;
+        assert_eq!(recovered_a.documents(), vec![stored_a.clone()]);
+        assert_eq!(recovered_b.documents(), vec![stored_b.clone()]);
+        assert_eq!(
+            fs::read(stored_document_path(&folder_a, &stored_a))?,
+            b"synthetic pdf from operator"
+        );
+        assert_eq!(
+            fs::read(stored_document_path(&folder_b, &stored_b))?,
+            b"synthetic image from driver"
+        );
+
+        fs::write(
+            stored_document_path(&folder_b, &stored_b),
+            b"corrupted stored content",
+        )?;
+        assert!(TripFolder::open(&folder_b, trip_b).is_err());
+        assert!(TripFolder::open(&folder_a, trip_a).is_ok());
+
+        Ok(())
+    }
+
 }
