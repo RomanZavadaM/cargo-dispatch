@@ -12,8 +12,8 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, webview::WebviewWindowBuilder};
 use ui_probe_core::{
-    ApplicationService, DocumentDirection, DocumentMetadata, IntakeMode, LoadRequest, ProbeSummary,
-    SortField, UiLanguage,
+    ApplicationService, ApplicationSnapshot, DocumentDirection, DocumentMetadata, IntakeMode,
+    LoadRequest, ProbeSummary, SortField, UiLanguage,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -909,6 +909,42 @@ mod tests {
         assert_ne!(a.label, b.label);
         assert!(a.title.contains("BC 1001 AA"));
         assert!(b.title.contains("BC 2002 BB"));
+    }
+
+    #[test]
+    fn lifecycle_snapshot_survives_process_style_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "cargo-dispatch-lifecycle-probe-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("temp lifecycle directory");
+        let state_path = root.join("application-state.json");
+
+        let mut running = ApplicationService::synthetic();
+        let mut saved = running.editor_snapshot(1).expect("request exists");
+        saved.set_field("origin", "Vienna");
+        running.save_draft(&saved).expect("save before restart");
+
+        let mut unsaved = running.editor_snapshot(1).expect("request reopens");
+        unsaved.set_field("origin", "Paris");
+
+        let bytes =
+            serde_json::to_vec_pretty(&running.persistent_snapshot()).expect("serialize state");
+        fs::write(&state_path, bytes).expect("persist state to disk");
+        drop(running);
+        drop(unsaved);
+
+        let restored_bytes = fs::read(&state_path).expect("read state after restart");
+        let snapshot: ApplicationSnapshot =
+            serde_json::from_slice(&restored_bytes).expect("decode state after restart");
+        let restarted = ApplicationService::from_persistent_snapshot(snapshot);
+
+        assert_eq!(
+            restarted.get_request(1).expect("restored request").origin,
+            "Vienna"
+        );
+        fs::remove_dir_all(&root).expect("cleanup lifecycle probe");
     }
 
     #[test]

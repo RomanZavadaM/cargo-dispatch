@@ -97,7 +97,7 @@ jobs:
             fi
             sleep 1
           done
-          npx playwright test probe/ui/browser/p01.spec.mjs probe/ui/browser/p02.spec.mjs probe/ui/browser/p03.spec.mjs probe/ui/browser/p04.spec.mjs probe/ui/browser/p05.spec.mjs probe/ui/browser/p09-planner.spec.mjs probe/ui/browser/p10-planner.spec.mjs --reporter=line --workers=1
+          npx playwright test probe/ui/browser/p01.spec.mjs probe/ui/browser/p02.spec.mjs probe/ui/browser/p03.spec.mjs probe/ui/browser/p04.spec.mjs probe/ui/browser/p05.spec.mjs probe/ui/browser/p09-planner.spec.mjs probe/ui/browser/p10-planner.spec.mjs probe/ui/browser/p11.spec.mjs --reporter=line --workers=1
 
       - name: Run standalone driver browser contract
         run: |
@@ -131,6 +131,7 @@ jobs:
           test -s probe/ui/out/p09-i18n-driver.json
           test -s probe/ui/out/p10-accessibility-planner.json
           test -s probe/ui/out/p10-accessibility-driver.json
+          test -s probe/ui/out/p11-lifecycle.json
 
       - uses: actions/upload-artifact@v4
         with:
@@ -175,12 +176,15 @@ jobs:
       - name: Test desktop document boundary
         run: cargo test --locked -p ui-probe-tauri local_document_round_trip_reads_pdf_and_writes_image
 
+      - name: Test saved-state restart boundary
+        run: cargo test --locked -p ui-probe-tauri lifecycle_snapshot_survives_process_style_restart
+
       - name: Test full desktop command boundary
         if: runner.os == 'Linux'
         run: cargo test --locked -p ui-probe-tauri --all-targets
 
   report:
-    name: Accessibility and keyboard report
+    name: Lifecycle and unsaved changes report
     if: always()
     needs:
       - core
@@ -199,7 +203,7 @@ jobs:
           import json, os
           report = {
               "probe": "ui-r1",
-              "phase": "accessibility-keyboard",
+              "phase": "lifecycle-unsaved",
               "commit_sha": os.environ["GIT_SHA"],
               "versions": {
                   "rust_msrv": "1.91",
@@ -224,11 +228,13 @@ jobs:
                   "shared_language_codes": os.environ["CORE"],
                   "keyboard_focus_contract": os.environ["BROWSER"],
                   "driver_touch_accessibility": os.environ["BROWSER"],
+                  "editor_lifecycle_unsaved": os.environ["BROWSER"],
+                  "saved_state_restart": os.environ["DESKTOP"],
                   "tauri_cross_platform_check": os.environ["DESKTOP"],
               },
           }
           report["pass"] = all(value == "success" for value in report["checks"].values())
-          with open("ui-accessibility-report.json", "w", encoding="utf-8") as handle:
+          with open("ui-lifecycle-report.json", "w", encoding="utf-8") as handle:
               json.dump(report, handle, indent=2, sort_keys=True)
               handle.write("\n")
           print(json.dumps(report, indent=2, sort_keys=True))
@@ -239,6 +245,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-accessibility-report
-          path: ui-accessibility-report.json
+          name: ui-lifecycle-report
+          path: ui-lifecycle-report.json
           if-no-files-found: error

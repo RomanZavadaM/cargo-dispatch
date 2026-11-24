@@ -319,6 +319,28 @@ fn App() -> impl IntoView {
                                         .unwrap_or_default()
                                 }}</h2>
                             </div>
+                            <button
+                                id="editor-x"
+                                class="editor-x"
+                                type="button"
+                                aria-label=move || ui_text(language.get(), UiTextKey::Close)
+                                title=move || ui_text(language.get(), UiTextKey::Close)
+                                on:click=move |_| {
+                                    if editor_dirty.get() {
+                                        show_unsaved_warning.set(true);
+                                        focus_later("keep-editing");
+                                    } else {
+                                        editor_draft.set(None);
+                                        editor_baseline.set(None);
+                                        editor_issues.set(Vec::new());
+                                        editor_message.set(None);
+                                        show_unsaved_warning.set(false);
+                                        focus_later("edit-request");
+                                    }
+                                }
+                            >
+                                "×"
+                            </button>
                             <div class="editor-origin">
                                 <span>
                                     {move || ui_text(language.get(), UiTextKey::SourceLabel)}

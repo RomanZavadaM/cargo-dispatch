@@ -704,6 +704,13 @@ pub struct ProbeSummary {
     pub assigned_requests: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationSnapshot {
+    pub rows: Vec<LoadRequest>,
+    pub route: WorkingRoute,
+    pub revision: u64,
+}
+
 #[derive(Debug, Clone)]
 pub struct ApplicationService {
     rows: Vec<LoadRequest>,
@@ -749,6 +756,22 @@ impl ApplicationService {
             rows,
             route: synthetic_route(),
             revision: 1,
+        }
+    }
+
+    pub fn persistent_snapshot(&self) -> ApplicationSnapshot {
+        ApplicationSnapshot {
+            rows: self.rows.clone(),
+            route: self.route.clone(),
+            revision: self.revision,
+        }
+    }
+
+    pub fn from_persistent_snapshot(snapshot: ApplicationSnapshot) -> Self {
+        Self {
+            rows: snapshot.rows,
+            route: snapshot.route,
+            revision: snapshot.revision,
         }
     }
 
@@ -1535,6 +1558,36 @@ fn status_rank(status: RequestStatus) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn saved_snapshot_survives_restart_but_unsaved_draft_does_not() {
+        let mut service = ApplicationService::synthetic();
+
+        let mut saved = service.editor_snapshot(1).expect("request exists");
+        saved.set_field("origin", "Vienna");
+        service.save_draft(&saved).expect("saved draft");
+
+        let mut unsaved = service.editor_snapshot(1).expect("saved request reopens");
+        unsaved.set_field("origin", "Paris");
+        assert_eq!(unsaved.field_value("origin"), Some("Paris"));
+
+        let encoded = serde_json::to_vec(&service.persistent_snapshot()).expect("snapshot serializes");
+        let decoded: ApplicationSnapshot =
+            serde_json::from_slice(&encoded).expect("snapshot deserializes");
+        let restarted = ApplicationService::from_persistent_snapshot(decoded);
+
+        assert_eq!(
+            restarted.get_request(1).expect("request restored").origin,
+            "Vienna"
+        );
+        assert_eq!(
+            restarted
+                .editor_snapshot(1)
+                .expect("restored request edits")
+                .field_value("origin"),
+            Some("Vienna")
+        );
+    }
 
     #[test]
     fn i18n_supports_shared_codes_labels_errors_numbers_and_dates() {
