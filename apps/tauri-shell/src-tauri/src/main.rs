@@ -13,7 +13,7 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, webview::WebviewWindowBuilder};
 use ui_probe_core::{
     ApplicationService, DocumentDirection, DocumentMetadata, IntakeMode, LoadRequest, ProbeSummary,
-    SortField,
+    SortField, UiLanguage,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -333,7 +333,7 @@ fn parse_settings(raw_json: &str) -> Result<ProbeSettings, String> {
     let settings: ProbeSettings =
         serde_json::from_str(raw_json).map_err(|error| format!("Invalid settings: {error}"))?;
 
-    if !matches!(settings.language.as_str(), "uk" | "en" | "de") {
+    if UiLanguage::from_code(&settings.language).is_none() {
         return Err("Language must be uk, en or de in this probe".to_owned());
     }
     if settings.archive_root.trim().is_empty() {
