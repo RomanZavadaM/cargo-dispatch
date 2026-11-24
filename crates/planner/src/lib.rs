@@ -3110,11 +3110,8 @@ mod tests {
 
     #[test]
     fn ready_working_route_builds_frozen_first_trip_export_draft() {
-        let mut route = manual_working_route(
-            working_route_id(21),
-            &[point_id(52), point_id(53)],
-        )
-        .expect("route");
+        let mut route = manual_working_route(working_route_id(21), &[point_id(52), point_id(53)])
+            .expect("route");
         route.state = WorkingRouteState::Ready;
         route.current_revision = 4;
 
@@ -3134,19 +3131,13 @@ mod tests {
         assert_eq!(draft.header.trip_version.get(), 1);
         assert_eq!(draft.header.base_version, None);
         assert_eq!(draft.working_route_revision, 4);
-        assert_eq!(
-            draft.ordered_point_ids,
-            vec![point_id(52), point_id(53)]
-        );
+        assert_eq!(draft.ordered_point_ids, vec![point_id(52), point_id(53)]);
     }
 
     #[test]
     fn trip_export_version_is_separate_from_working_route_revision() {
-        let mut route = manual_working_route(
-            working_route_id(22),
-            &[point_id(54), point_id(55)],
-        )
-        .expect("route");
+        let mut route = manual_working_route(working_route_id(22), &[point_id(54), point_id(55)])
+            .expect("route");
         route.state = WorkingRouteState::Ready;
         route.current_revision = 9;
 
@@ -3167,11 +3158,8 @@ mod tests {
 
     #[test]
     fn export_draft_rejects_non_ready_route_and_bad_trip_version_chain() {
-        let route = manual_working_route(
-            working_route_id(23),
-            &[point_id(56), point_id(57)],
-        )
-        .expect("route");
+        let route = manual_working_route(working_route_id(23), &[point_id(56), point_id(57)])
+            .expect("route");
 
         assert_eq!(
             build_trip_export_draft(
