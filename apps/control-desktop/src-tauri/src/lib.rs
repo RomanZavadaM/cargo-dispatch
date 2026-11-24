@@ -1,17 +1,24 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_control_ui_contracts::{
-    ControlUiStatus, ListenerMode, ListenerStatus, RegisterTripInput, SessionStatus, StartLanInput,
+    ControlUiStatus, DashboardDocument, DashboardDocumentDirection, DashboardLocation,
+    DashboardNavigation, DashboardPoint, ListenerMode, ListenerStatus, OperatorDocumentInput,
+    PickedFile, RegisterTripInput, ReorderRouteInput, SessionInput, SessionStatus, StartLanInput,
+    TripDashboard,
 };
-use cargo_dispatch_control_web::{ControlAccessMode, ControlBrowserState, LoopbackControlServer};
-use cargo_dispatch_trip_files::TripFolder;
+use cargo_dispatch_control_web::{
+    ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
+};
+use cargo_dispatch_domain::{DocumentId, PointId};
+use cargo_dispatch_trip_files::{DocumentDirection, DocumentStoreDraft, TripFolder};
 use std::{
     collections::BTreeMap,
     net::{IpAddr, SocketAddr},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Mutex,
 };
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_dialog::DialogExt;
 use tokio::sync::Mutex as AsyncMutex;
 
 #[derive(Debug, Clone)]
@@ -38,6 +45,102 @@ impl Default for DesktopControlService {
 
 fn driver_url(address: SocketAddr, token: &str) -> String {
     format!("http://{address}/driver/{token}")
+}
+
+fn parse_id_bytes(value: &str, label: &str) -> Result<[u8; 16], String> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(format!("{label} має містити рівно 32 hex-символи"));
+    }
+    let mut bytes = [0_u8; 16];
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        let start = index * 2;
+        *byte = u8::from_str_radix(&value[start..start + 2], 16)
+            .map_err(|_| format!("Некоректний {label}"))?;
+    }
+    Ok(bytes)
+}
+
+fn point_id(value: &str) -> Result<PointId, String> {
+    PointId::from_bytes(parse_id_bytes(value, "Point ID")?)
+        .map_err(|error| format!("Некоректний Point ID: {error:?}"))
+}
+
+fn document_id(value: &str) -> Result<DocumentId, String> {
+    DocumentId::from_bytes(parse_id_bytes(value, "Document ID")?)
+        .map_err(|error| format!("Некоректний Document ID: {error:?}"))
+}
+
+fn mime_for_path(path: &Path) -> String {
+    match path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "pdf" => "application/pdf",
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "webp" => "image/webp",
+        "heic" => "image/heic",
+        "mp4" => "video/mp4",
+        "mov" => "video/quicktime",
+        "mkv" => "video/x-matroska",
+        "webm" => "video/webm",
+        "txt" => "text/plain",
+        _ => "application/octet-stream",
+    }
+    .to_owned()
+}
+
+fn dashboard(snapshot: DriverTripSnapshot) -> Result<TripDashboard, String> {
+    let documents = snapshot
+        .documents
+        .into_iter()
+        .map(|document| {
+            let direction = match document.direction.as_str() {
+                "from_operator" => DashboardDocumentDirection::FromOperator,
+                "from_driver" => DashboardDocumentDirection::FromDriver,
+                other => return Err(format!("Невідомий напрямок документа: {other}")),
+            };
+            Ok(DashboardDocument {
+                document_id: document.document_id,
+                direction,
+                original_name: document.original_name,
+                mime_type: document.mime_type,
+                size: document.size,
+                point_id: document.point_id,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    Ok(TripDashboard {
+        trip_id: snapshot.trip_id,
+        trip_version: snapshot.trip_version,
+        local_route_revision: snapshot.local_route_revision,
+        points: snapshot
+            .points
+            .into_iter()
+            .map(|point| DashboardPoint {
+                point_id: point.point_id,
+                sequence: point.sequence,
+                title: point.title,
+                completed: point.completed,
+                navigation: point.navigation.map(|navigation| DashboardNavigation {
+                    latitude: navigation.latitude,
+                    longitude: navigation.longitude,
+                    address: navigation.address,
+                }),
+            })
+            .collect(),
+        documents,
+        latest_location: snapshot.latest_location.map(|location| DashboardLocation {
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy_m: location.accuracy_m,
+            observed_at_unix_ms: location.observed_at_unix_ms,
+        }),
+    })
 }
 
 impl DesktopControlService {
@@ -178,6 +281,131 @@ impl DesktopControlService {
 
         Ok(ControlUiStatus { listener, sessions })
     }
+
+
+    fn dashboard(&self, token: &str) -> Result<TripDashboard, String> {
+        let snapshot = self
+            .browser
+            .session_snapshot(token)
+            .map_err(|error| format!("Не вдалося прочитати рейс: {error}"))?;
+        dashboard(snapshot)
+    }
+
+    fn reorder_route(&self, input: ReorderRouteInput) -> Result<TripDashboard, String> {
+        let order = input
+            .open_point_ids
+            .iter()
+            .map(|value| point_id(value))
+            .collect::<Result<Vec<_>, _>>()?;
+        let snapshot = self
+            .browser
+            .reorder_session_route(&input.token, input.based_on_revision, &order)
+            .map_err(|error| format!("Control не прийняв нову черговість: {error}"))?;
+        dashboard(snapshot)
+    }
+
+    async fn add_operator_document(
+        &self,
+        input: OperatorDocumentInput,
+    ) -> Result<TripDashboard, String> {
+        let id = document_id(&input.document_id)?;
+        let point = input.point_id.as_deref().map(point_id).transpose()?;
+        let source = PathBuf::from(&input.source_path);
+        if !source.is_file() {
+            return Err("Вибраний файл більше недоступний".to_owned());
+        }
+        let mime_type = if input.mime_type.trim().is_empty() {
+            mime_for_path(&source)
+        } else {
+            input.mime_type
+        };
+        let draft = DocumentStoreDraft {
+            document_id: id,
+            direction: DocumentDirection::FromOperator,
+            original_name: input.original_name,
+            mime_type,
+            created_at_unix_ms: input.created_at_unix_ms,
+            point_id: point,
+        };
+        let browser = self.browser.clone();
+        let token = input.token;
+        let snapshot = tokio::task::spawn_blocking(move || {
+            browser.store_operator_document(&token, draft, &source)
+        })
+        .await
+        .map_err(|error| format!("Не вдалося виконати файлову операцію: {error}"))?
+        .map_err(|error| format!("Control не прийняв файл: {error}"))?;
+        dashboard(snapshot)
+    }
+}
+
+#[tauri::command]
+async fn pick_trip_folder(app: AppHandle) -> Result<Option<String>, String> {
+    tokio::task::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .blocking_pick_folder()
+            .map(|value| {
+                value
+                    .into_path()
+                    .map(|path| path.to_string_lossy().into_owned())
+                    .map_err(|error| format!("Не вдалося прочитати вибрану папку: {error}"))
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|error| format!("Не вдалося відкрити вибір папки: {error}"))?
+}
+
+#[tauri::command]
+async fn pick_operator_file(app: AppHandle) -> Result<Option<PickedFile>, String> {
+    tokio::task::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .blocking_pick_file()
+            .map(|value| {
+                let path = value
+                    .into_path()
+                    .map_err(|error| format!("Не вдалося прочитати вибраний файл: {error}"))?;
+                let original_name = path
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .ok_or_else(|| "Назва файла має бути UTF-8".to_owned())?
+                    .to_owned();
+                Ok(PickedFile {
+                    mime_type: mime_for_path(&path),
+                    path: path.to_string_lossy().into_owned(),
+                    original_name,
+                })
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|error| format!("Не вдалося відкрити вибір файла: {error}"))?
+}
+
+#[tauri::command]
+fn trip_dashboard(
+    input: SessionInput,
+    state: State<'_, DesktopControlService>,
+) -> Result<TripDashboard, String> {
+    state.dashboard(&input.token)
+}
+
+#[tauri::command]
+fn reorder_trip_route(
+    input: ReorderRouteInput,
+    state: State<'_, DesktopControlService>,
+) -> Result<TripDashboard, String> {
+    state.reorder_route(input)
+}
+
+#[tauri::command]
+async fn send_operator_document(
+    input: OperatorDocumentInput,
+    state: State<'_, DesktopControlService>,
+) -> Result<TripDashboard, String> {
+    state.add_operator_document(input).await
 }
 
 #[tauri::command]
@@ -219,6 +447,7 @@ async fn stop_browser_server(
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(DesktopControlService::default())
         .invoke_handler(tauri::generate_handler![
             control_status,
@@ -226,6 +455,11 @@ pub fn run() {
             start_loopback,
             start_lan,
             stop_browser_server,
+            pick_trip_folder,
+            pick_operator_file,
+            trip_dashboard,
+            reorder_trip_route,
+            send_operator_document,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Cargo Dispatch Control");
@@ -298,6 +532,30 @@ mod tests {
         assert!(stopped.listener.is_none());
         assert_eq!(stopped.sessions.len(), 1);
         assert!(stopped.sessions[0].driver_url.is_none());
+
+        let initial = service.dashboard(token).expect("dashboard");
+        assert_eq!(initial.points.len(), 1);
+        assert!(initial.documents.is_empty());
+
+        let operator_file = tmp.path().join("operator-note.pdf");
+        std::fs::write(&operator_file, b"synthetic operator document")?;
+        let updated = service
+            .add_operator_document(OperatorDocumentInput {
+                token: token.to_owned(),
+                document_id: "19191919191919191919191919191919".to_owned(),
+                source_path: operator_file.to_string_lossy().into_owned(),
+                original_name: "operator-note.pdf".to_owned(),
+                mime_type: "application/pdf".to_owned(),
+                point_id: Some(initial.points[0].point_id.clone()),
+                created_at_unix_ms: 2,
+            })
+            .await
+            .expect("operator document");
+        assert_eq!(updated.documents.len(), 1);
+        assert_eq!(
+            updated.documents[0].direction,
+            DashboardDocumentDirection::FromOperator
+        );
 
         Ok(())
     }
