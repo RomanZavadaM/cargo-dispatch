@@ -220,7 +220,9 @@ fn collect_checksum_files(root: &Path) -> io::Result<Vec<(String, PathBuf)>> {
             let file_type = entry.file_type()?;
             let path = entry.path();
             if file_type.is_symlink() {
-                return Err(invalid("symlinks are not allowed in completed trip package"));
+                return Err(invalid(
+                    "symlinks are not allowed in completed trip package",
+                ));
             }
             if file_type.is_dir() {
                 if path == root.join("checksums") {
@@ -284,7 +286,9 @@ fn write_execution_summary(root: &Path, summary: &ExecutionSummary) -> io::Resul
         if existing == expected {
             return Ok(());
         }
-        return Err(invalid("execution summary already exists with different content"));
+        return Err(invalid(
+            "execution summary already exists with different content",
+        ));
     }
     let bytes = serde_json::to_vec_pretty(&expected)?;
     let mut temporary = NamedTempFile::new_in(&directory)?;
@@ -870,7 +874,6 @@ impl TripFolder {
             .ok_or_else(|| invalid("document record was not stored"))
     }
 
-
     pub fn archive(
         self,
         completed_root: &Path,
@@ -906,7 +909,6 @@ impl TripFolder {
         Ok(destination)
     }
 }
-
 
 pub fn verify_archive(path: &Path, trip: TripId) -> io::Result<ExecutionSummary> {
     verify_checksums(path)?;
@@ -1362,5 +1364,4 @@ mod tests {
 
         Ok(())
     }
-
 }
