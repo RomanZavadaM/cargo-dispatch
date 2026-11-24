@@ -35,7 +35,7 @@ test("P02 request editor protects unsaved data and validates outside widgets", a
   await expect(page.locator("#unsaved-warning")).toBeHidden();
 
   await page.locator("#editor-save").click();
-  await expect(page.locator("#validation-errors")).toContainText("Origin is required");
+  await expect(page.locator("#validation-errors")).toContainText("Origin — required field");
   await expect(firstRow.locator(".origin-cell")).toHaveText(originalOrigin ?? "");
 
   await page.locator("#editor-origin").fill("Vienna");
