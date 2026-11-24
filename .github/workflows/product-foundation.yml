@@ -10,7 +10,7 @@ on:
       - "crates/domain/**"
       - "crates/contracts/**"
       - "crates/geo/**"
-      - "crates/geo/**"
+      - "crates/planner/**"
       - "deny.toml"
       - ".github/workflows/product-foundation.yml"
   pull_request:
@@ -20,7 +20,7 @@ on:
       - "crates/domain/**"
       - "crates/contracts/**"
       - "crates/geo/**"
-      - "crates/geo/**"
+      - "crates/planner/**"
       - "deny.toml"
       - ".github/workflows/product-foundation.yml"
 

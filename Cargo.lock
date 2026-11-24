@@ -17,3 +17,11 @@ version = "0.1.0"
 [[package]]
 name = "cargo-dispatch-geo"
 version = "0.1.0"
+
+[[package]]
+name = "cargo-dispatch-planner"
+version = "0.1.0"
+dependencies = [
+ "cargo-dispatch-domain",
+ "cargo-dispatch-geo",
+]
