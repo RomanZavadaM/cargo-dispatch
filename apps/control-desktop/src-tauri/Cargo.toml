@@ -1,0 +1,25 @@
+[package]
+name = "cargo-dispatch-control-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[build-dependencies]
+tauri-build = "=2.7.6"
+
+[dependencies]
+cargo-dispatch-control-ui-contracts = { path = "../../../crates/control-ui-contracts" }
+cargo-dispatch-control-web = { path = "../../../crates/control-web" }
+cargo-dispatch-domain = { path = "../../../crates/domain" }
+cargo-dispatch-trip-files = { path = "../../../crates/trip-files" }
+serde = { version = "1", features = ["derive"] }
+tauri = "=2.12.7"
+tauri-plugin-dialog = "=2.8.4"
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "sync"] }
+
+[dev-dependencies]
+cargo-dispatch-contracts = { path = "../../../crates/contracts" }
+cargo-dispatch-planner = { path = "../../../crates/planner" }
+tempfile = "=3.27.0"

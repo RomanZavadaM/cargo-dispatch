@@ -1,0 +1,18 @@
+[package]
+name = "cargo-dispatch-trip-files"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+cargo-dispatch-contracts = { path = "../contracts" }
+cargo-dispatch-domain = { path = "../domain" }
+cargo-dispatch-control = { path = "../control" }
+cargo-dispatch-planner = { path = "../planner" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+zip = { version = ">=4, <10", default-features = false, features = ["deflate"] }

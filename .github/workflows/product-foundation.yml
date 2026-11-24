@@ -1,0 +1,99 @@
+name: Product foundation
+
+on:
+  push:
+    branches:
+      - "product/**"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domain/**"
+      - "crates/contracts/**"
+      - "crates/geo/**"
+      - "crates/planner/**"
+      - "crates/control/**"
+      - "crates/trip-files/**"
+      - "crates/control-web/**"
+      - "crates/control-ui-contracts/**"
+      - "apps/control-ui/**"
+      - "apps/control-desktop/**"
+      - "THIRD_PARTY_NOTICES.md"
+      - "deny.toml"
+      - ".github/workflows/product-foundation.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domain/**"
+      - "crates/contracts/**"
+      - "crates/geo/**"
+      - "crates/planner/**"
+      - "crates/control/**"
+      - "crates/trip-files/**"
+      - "crates/control-web/**"
+      - "crates/control-ui-contracts/**"
+      - "apps/control-ui/**"
+      - "apps/control-desktop/**"
+      - "THIRD_PARTY_NOTICES.md"
+      - "deny.toml"
+      - ".github/workflows/product-foundation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Product core quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          components: rustfmt, clippy
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Check
+        run: cargo check --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --all-targets
+
+      - name: Clippy
+        run: cargo clippy --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --all-targets
+
+      - name: Install dependency checker
+        run: cargo install cargo-deny --locked --version 0.21.0
+
+      - name: Dependency licenses and advisories
+        run: cargo deny check licenses advisories bans sources
+
+  portability:
+    name: Product core portability (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+
+      - name: Check
+        run: cargo check --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --all-targets
+
+      - name: Tests
+        run: cargo test --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --all-targets

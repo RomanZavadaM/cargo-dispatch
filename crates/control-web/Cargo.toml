@@ -1,0 +1,21 @@
+[package]
+name = "cargo-dispatch-control-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "tokio"] }
+cargo-dispatch-domain = { path = "../domain" }
+cargo-dispatch-trip-files = { path = "../trip-files" }
+futures-util = { version = "=0.3.34", default-features = false, features = ["std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "=3.27.0"
+tokio = { version = "=1.54.1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "sync"] }
+
+[dev-dependencies]
+cargo-dispatch-contracts = { path = "../contracts" }
+cargo-dispatch-planner = { path = "../planner" }
