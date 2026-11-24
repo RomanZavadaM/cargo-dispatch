@@ -1,6 +1,6 @@
 use cargo_geo_probe::valhalla::{
-    ENGINE_NAME, ENGINE_VERSION, matrix_payload, normalize_matrix_response, normalize_route_response,
-    normalize_transport_failure, route_payload,
+    ENGINE_NAME, ENGINE_VERSION, matrix_payload, normalize_matrix_response,
+    normalize_route_response, normalize_transport_failure, route_payload,
 };
 use cargo_geo_probe::{
     CacheKey, GeoPoint, MatrixRequest, RouteRequest, TransportFailure, VehicleProfile,
