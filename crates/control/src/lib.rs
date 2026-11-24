@@ -22,13 +22,9 @@ pub struct StoredTripPlan {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImportResult {
     AppliedFirstVersion,
-    AppliedNewerVersion {
-        previous_version: TripVersion,
-    },
+    AppliedNewerVersion { previous_version: TripVersion },
     SameVersionNeedsContentCheck,
-    IgnoredStaleVersion {
-        current_version: TripVersion,
-    },
+    IgnoredStaleVersion { current_version: TripVersion },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,10 +45,7 @@ pub struct InMemoryTripRegistry {
 }
 
 impl InMemoryTripRegistry {
-    pub fn import(
-        &mut self,
-        candidate: TripImportCandidate,
-    ) -> Result<ImportResult, ImportError> {
+    pub fn import(&mut self, candidate: TripImportCandidate) -> Result<ImportResult, ImportError> {
         validate_route_points(&candidate.route_points).map_err(ImportError::InvalidRoute)?;
 
         let trip_id = candidate.header.trip_id;
@@ -60,9 +53,7 @@ impl InMemoryTripRegistry {
 
         let Some(current) = self.trips.get(&trip_id) else {
             if incoming_version.get() != 1 {
-                return Err(ImportError::UnknownTripRequiresFirstVersion {
-                    incoming_version,
-                });
+                return Err(ImportError::UnknownTripRequiresFirstVersion { incoming_version });
             }
 
             self.trips.insert(
