@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · **🇰🇷 한국어** · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **상태:** 개발 중입니다. 아직 애플리케이션은 없습니다.
+> **상태:** 현재 개발 중입니다. 테스트용 UI 프리뷰는 있지만, 아직 안정적인 완성 제품은 없습니다.
 
 ## 제품 소개
 
