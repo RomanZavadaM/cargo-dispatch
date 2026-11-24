@@ -89,6 +89,7 @@ const token = decodeURIComponent(location.pathname.split("/").pop());
 let currentTrip = null;
 let watchId = null;
 let lastLocationSentAt = 0;
+let pendingUpload = null;
 
 function endpoint(path) {
   return "/api/trip/" + encodeURIComponent(token) + path;
@@ -259,7 +260,18 @@ document.getElementById("sendFile").addEventListener("click", async () => {
     status.className = "error";
     return;
   }
-  const documentId = newDocumentId();
+  const pointId = document.getElementById("filePoint").value;
+  const signature = [
+    file.name,
+    file.size,
+    file.lastModified,
+    file.type,
+    pointId
+  ].join("|");
+  if (!pendingUpload || pendingUpload.signature !== signature) {
+    pendingUpload = {signature, documentId: newDocumentId()};
+  }
+  const documentId = pendingUpload.documentId;
   status.textContent = "Передача…";
   status.className = "";
   try {
@@ -268,7 +280,6 @@ document.getElementById("sendFile").addEventListener("click", async () => {
       "X-File-Name": encodeURIComponent(file.name),
       "X-Created-At-Unix-Ms": String(Date.now())
     };
-    const pointId = document.getElementById("filePoint").value;
     if (pointId) headers["X-Point-Id"] = pointId;
     await api("/documents/" + documentId, {
       method: "POST",
@@ -277,11 +288,14 @@ document.getElementById("sendFile").addEventListener("click", async () => {
     });
     input.value = "";
     camera.value = "";
+    pendingUpload = null;
     status.textContent = "Файл прийнятий Control";
     status.className = "ok";
     await loadTrip();
   } catch (error) {
-    status.textContent = "Передача не вдалася: " + error.message;
+    status.textContent =
+      "Передача не вдалася: " + error.message +
+      ". Повтор для того самого файла використає той самий ID.";
     status.className = "error";
   }
 });
