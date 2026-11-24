@@ -2,21 +2,38 @@
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
-    http::StatusCode,
+    body::{Body, Bytes},
+    extract::{Path, Request, State},
+    http::{
+        HeaderMap, HeaderValue, StatusCode,
+        header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE},
+    },
     response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
-use cargo_dispatch_domain::PointId;
-use cargo_dispatch_trip_files::TripFolder;
+use cargo_dispatch_domain::{DocumentId, PointId};
+use cargo_dispatch_trip_files::{
+    DocumentDirection, DocumentStoreDraft, DriverLocationSample, StoredDocument, TripFolder,
+};
+use futures_util::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     io,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     sync::{Arc, Mutex, RwLock},
 };
-use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle};
+use tempfile::NamedTempFile;
+use tokio::{
+    fs::File as TokioFile,
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpListener,
+    sync::oneshot,
+    task::JoinHandle,
+};
+
+const MAX_UPLOAD_BYTES: u64 = 512 * 1024 * 1024;
+const STREAM_CHUNK_BYTES: usize = 64 * 1024;
 
 const DRIVER_HTML: &str = r#"<!doctype html>
 <html lang="uk">
@@ -24,46 +41,259 @@ const DRIVER_HTML: &str = r#"<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cargo Dispatch — рейс</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#f6f7f8;color:#202124}
+main{max-width:760px;margin:auto;padding:16px}
+section{background:white;border:1px solid #ddd;border-radius:12px;padding:14px;margin:12px 0}
+button,input{font:inherit}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.point{padding:8px 0;border-bottom:1px solid #eee}.point:last-child{border-bottom:0}
+small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
+</style>
 </head>
 <body>
 <main>
 <h1>Cargo Dispatch — рейс</h1>
 <p id="status">Завантаження…</p>
-<ol id="points"></ol>
+
+<section>
+<h2>Маршрут</h2>
+<div id="points"></div>
+</section>
+
+<section>
+<h2>Документи / фото / відео</h2>
+<div id="documents"></div>
+<div class="row">
+<input id="file" type="file" accept="image/*,video/*,application/pdf,*/*">
+<button id="sendFile" type="button">Передати в Control</button>
+</div>
+<p id="fileStatus"></p>
+</section>
+
+<section>
+<h2>Геолокація</h2>
+<p id="location">Ще не передавалась</p>
+<div class="row">
+<button id="startLocation" type="button">Почати передачу геолокації</button>
+<button id="stopLocation" type="button" disabled>Зупинити</button>
+</div>
+<p id="locationStatus"></p>
+</section>
 </main>
 <script>
 const token = decodeURIComponent(location.pathname.split("/").pop());
+let currentTrip = null;
+let watchId = null;
+let lastLocationSentAt = 0;
+
+function endpoint(path) {
+  return "/api/trip/" + encodeURIComponent(token) + path;
+}
+
+function newDocumentId() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  if (bytes.every(value => value === 0)) bytes[0] = 1;
+  return Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+}
+
+async function api(path, options) {
+  const response = await fetch(endpoint(path), Object.assign({cache: "no-store"}, options || {}));
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  return response;
+}
+
 async function loadTrip() {
-  const response = await fetch("/api/trip/" + encodeURIComponent(token), {cache: "no-store"});
-  if (!response.ok) {
+  try {
+    const response = await api("");
+    currentTrip = await response.json();
+    document.getElementById("status").textContent =
+      "Версія " + currentTrip.trip_version + ", зміна " + currentTrip.local_route_revision;
+    renderRoute();
+    renderDocuments();
+    renderLocation();
+  } catch (error) {
     document.getElementById("status").textContent = "Немає доступу до рейсу";
-    return;
-  }
-  const trip = await response.json();
-  document.getElementById("status").textContent =
-    "Версія " + trip.trip_version + ", зміна " + trip.local_route_revision;
-  const list = document.getElementById("points");
-  list.replaceChildren();
-  for (const point of trip.points) {
-    const row = document.createElement("li");
-    row.textContent = point.sequence + ". " + point.title +
-      (point.completed ? " — виконано" : " — відкрито");
-    if (!point.completed) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = "Виконано";
-      button.addEventListener("click", async () => {
-        const result = await fetch(
-          "/api/trip/" + encodeURIComponent(token) + "/complete/" + point.point_id,
-          {method: "POST"}
-        );
-        if (result.ok) await loadTrip();
-      });
-      row.append(" ", button);
-    }
-    list.append(row);
+    document.getElementById("status").className = "error";
   }
 }
+
+function renderRoute() {
+  const host = document.getElementById("points");
+  host.replaceChildren();
+  const openPoints = currentTrip.points.filter(point => !point.completed);
+  for (const point of currentTrip.points) {
+    const row = document.createElement("div");
+    row.className = "point";
+    const text = document.createElement("span");
+    text.textContent = point.sequence + ". " + point.title +
+      (point.completed ? " — виконано" : " — відкрито");
+    row.append(text);
+
+    if (!point.completed) {
+      const done = document.createElement("button");
+      done.type = "button";
+      done.textContent = "Виконано";
+      done.addEventListener("click", async () => {
+        try {
+          await api("/complete/" + point.point_id, {method: "POST"});
+          await loadTrip();
+        } catch (error) {
+          alert("Control не прийняв зміну: " + error.message);
+        }
+      });
+      row.append(" ", done);
+
+      const openIndex = openPoints.findIndex(item => item.point_id === point.point_id);
+      for (const move of [-1, 1]) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = move < 0 ? "↑" : "↓";
+        button.disabled =
+          (move < 0 && openIndex === 0) ||
+          (move > 0 && openIndex === openPoints.length - 1);
+        button.addEventListener("click", async () => {
+          const ids = openPoints.map(item => item.point_id);
+          const target = openIndex + move;
+          [ids[openIndex], ids[target]] = [ids[target], ids[openIndex]];
+          try {
+            await api("/route/order", {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({
+                based_on_revision: currentTrip.local_route_revision,
+                open_point_ids: ids
+              })
+            });
+            await loadTrip();
+          } catch (error) {
+            alert("Маршрут уже змінився або Control відхилив порядок: " + error.message);
+            await loadTrip();
+          }
+        });
+        row.append(" ", button);
+      }
+    }
+    host.append(row);
+  }
+}
+
+function renderDocuments() {
+  const host = document.getElementById("documents");
+  host.replaceChildren();
+  if (!currentTrip.documents.length) {
+    host.textContent = "Документів ще немає";
+    return;
+  }
+  const list = document.createElement("ul");
+  for (const item of currentTrip.documents) {
+    const row = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = endpoint("/documents/" + item.document_id);
+    link.textContent = item.original_name;
+    const direction = item.direction === "from_operator" ? "Control → водій" : "водій → Control";
+    row.append(link, " — " + direction + " — " + item.size + " байт");
+    list.append(row);
+  }
+  host.append(list);
+}
+
+function renderLocation() {
+  const host = document.getElementById("location");
+  if (!currentTrip.latest_location) {
+    host.textContent = "Ще не передавалась";
+    return;
+  }
+  const item = currentTrip.latest_location;
+  const accuracy = item.accuracy_m == null ? "" : ", ±" + item.accuracy_m.toFixed(1) + " м";
+  host.textContent =
+    item.latitude.toFixed(6) + ", " + item.longitude.toFixed(6) + accuracy +
+    " — " + new Date(item.observed_at_unix_ms).toLocaleString();
+}
+
+document.getElementById("sendFile").addEventListener("click", async () => {
+  const input = document.getElementById("file");
+  const status = document.getElementById("fileStatus");
+  if (!input.files || !input.files.length) {
+    status.textContent = "Спочатку виберіть файл";
+    status.className = "error";
+    return;
+  }
+  const file = input.files[0];
+  const documentId = newDocumentId();
+  status.textContent = "Передача…";
+  status.className = "";
+  try {
+    await api("/documents/" + documentId, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+        "X-File-Name": encodeURIComponent(file.name),
+        "X-Created-At-Unix-Ms": String(Date.now())
+      },
+      body: file
+    });
+    input.value = "";
+    status.textContent = "Файл прийнятий Control";
+    status.className = "ok";
+    await loadTrip();
+  } catch (error) {
+    status.textContent = "Передача не вдалася: " + error.message;
+    status.className = "error";
+  }
+});
+
+document.getElementById("startLocation").addEventListener("click", () => {
+  const status = document.getElementById("locationStatus");
+  if (!navigator.geolocation) {
+    status.textContent = "Браузер не підтримує геолокацію";
+    status.className = "error";
+    return;
+  }
+  if (!window.isSecureContext &&
+      location.hostname !== "127.0.0.1" &&
+      location.hostname !== "localhost") {
+    status.textContent =
+      "Для геолокації телефонний браузер зазвичай вимагає HTTPS. LAN HTTP можна використовувати для маршруту й файлів.";
+    status.className = "error";
+  }
+  watchId = navigator.geolocation.watchPosition(async position => {
+    const now = Date.now();
+    if (now - lastLocationSentAt < 10000) return;
+    lastLocationSentAt = now;
+    try {
+      await api("/location", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy_m: position.coords.accuracy,
+          observed_at_unix_ms: Math.round(position.timestamp || now)
+        })
+      });
+      status.textContent = "Позиція прийнята Control";
+      status.className = "ok";
+      await loadTrip();
+    } catch (error) {
+      status.textContent = "Control не прийняв позицію: " + error.message;
+      status.className = "error";
+    }
+  }, error => {
+    status.textContent = "Геолокація недоступна: " + error.message;
+    status.className = "error";
+  }, {enableHighAccuracy: true, maximumAge: 5000, timeout: 15000});
+  document.getElementById("startLocation").disabled = true;
+  document.getElementById("stopLocation").disabled = false;
+});
+
+document.getElementById("stopLocation").addEventListener("click", () => {
+  if (watchId != null) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
+  document.getElementById("startLocation").disabled = false;
+  document.getElementById("stopLocation").disabled = true;
+});
+
 loadTrip();
 setInterval(loadTrip, 2000);
 </script>
@@ -86,12 +316,58 @@ pub struct DriverPointSnapshot {
     pub completed: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DriverLocationSnapshot {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub accuracy_m: Option<f64>,
+    pub observed_at_unix_ms: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DriverDocumentSnapshot {
+    pub document_id: String,
+    pub direction: String,
+    pub original_name: String,
+    pub mime_type: String,
+    pub size: u64,
+    pub point_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DriverTripSnapshot {
     pub trip_id: String,
     pub trip_version: u64,
     pub local_route_revision: u64,
     pub points: Vec<DriverPointSnapshot>,
+    pub documents: Vec<DriverDocumentSnapshot>,
+    pub latest_location: Option<DriverLocationSnapshot>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RouteOrderRequest {
+    based_on_revision: u64,
+    open_point_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct LocationUpdate {
+    latitude: f64,
+    longitude: f64,
+    accuracy_m: Option<f64>,
+    observed_at_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlAccessMode {
+    Loopback,
+    Lan,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ControlServerInfo {
+    pub mode: ControlAccessMode,
+    pub address: SocketAddr,
 }
 
 type SharedTrip = Arc<Mutex<TripFolder>>;
@@ -147,17 +423,91 @@ fn id_hex(bytes: [u8; 16]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-fn parse_point_id(value: &str) -> Result<PointId, StatusCode> {
+fn parse_uuid_bytes(value: &str) -> Result<[u8; 16], StatusCode> {
     if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(StatusCode::BAD_REQUEST);
     }
     let mut bytes = [0_u8; 16];
     for (index, byte) in bytes.iter_mut().enumerate() {
         let start = index * 2;
-        *byte = u8::from_str_radix(&value[start..start + 2], 16)
-            .map_err(|_| StatusCode::BAD_REQUEST)?;
+        *byte =
+            u8::from_str_radix(&value[start..start + 2], 16).map_err(|_| StatusCode::BAD_REQUEST)?;
     }
-    PointId::from_bytes(bytes).map_err(|_| StatusCode::BAD_REQUEST)
+    Ok(bytes)
+}
+
+fn parse_point_id(value: &str) -> Result<PointId, StatusCode> {
+    PointId::from_bytes(parse_uuid_bytes(value)?).map_err(|_| StatusCode::BAD_REQUEST)
+}
+
+fn parse_document_id(value: &str) -> Result<DocumentId, StatusCode> {
+    DocumentId::from_bytes(parse_uuid_bytes(value)?).map_err(|_| StatusCode::BAD_REQUEST)
+}
+
+fn location_sample(update: LocationUpdate) -> Result<DriverLocationSample, StatusCode> {
+    if !update.latitude.is_finite()
+        || !(-90.0..=90.0).contains(&update.latitude)
+        || !update.longitude.is_finite()
+        || !(-180.0..=180.0).contains(&update.longitude)
+        || update.observed_at_unix_ms == 0
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let latitude_e7 = (update.latitude * 10_000_000.0).round();
+    let longitude_e7 = (update.longitude * 10_000_000.0).round();
+    if latitude_e7 < f64::from(i32::MIN)
+        || latitude_e7 > f64::from(i32::MAX)
+        || longitude_e7 < f64::from(i32::MIN)
+        || longitude_e7 > f64::from(i32::MAX)
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let accuracy_cm = match update.accuracy_m {
+        Some(value)
+            if value.is_finite()
+                && value >= 0.0
+                && value <= f64::from(u32::MAX) / 100.0 =>
+        {
+            Some((value * 100.0).round() as u32)
+        }
+        Some(_) => return Err(StatusCode::BAD_REQUEST),
+        None => None,
+    };
+
+    DriverLocationSample {
+        latitude_e7: latitude_e7 as i32,
+        longitude_e7: longitude_e7 as i32,
+        accuracy_cm,
+        observed_at_unix_ms: update.observed_at_unix_ms,
+    }
+    .validate()
+    .map_err(|_| StatusCode::BAD_REQUEST)
+}
+
+fn document_snapshot(document: &StoredDocument) -> DriverDocumentSnapshot {
+    DriverDocumentSnapshot {
+        document_id: id_hex(document.document_id.as_bytes()),
+        direction: match document.direction {
+            DocumentDirection::FromOperator => "from_operator",
+            DocumentDirection::FromDriver => "from_driver",
+        }
+        .to_owned(),
+        original_name: document.original_name.clone(),
+        mime_type: document.mime_type.clone(),
+        size: document.size,
+        point_id: document.point_id.map(|point| id_hex(point.as_bytes())),
+    }
+}
+
+fn location_snapshot(sample: DriverLocationSample) -> DriverLocationSnapshot {
+    DriverLocationSnapshot {
+        latitude: sample.latitude(),
+        longitude: sample.longitude(),
+        accuracy_m: sample.accuracy_m(),
+        observed_at_unix_ms: sample.observed_at_unix_ms,
+    }
 }
 
 fn snapshot(trip: &TripFolder) -> DriverTripSnapshot {
@@ -176,7 +526,67 @@ fn snapshot(trip: &TripFolder) -> DriverTripSnapshot {
                 completed: state.completed_point_ids.contains(&point.point_id),
             })
             .collect(),
+        documents: trip.documents().iter().map(document_snapshot).collect(),
+        latest_location: trip.latest_location().map(location_snapshot),
     }
+}
+
+fn decode_uri_component(value: &str) -> Result<String, StatusCode> {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            if index + 2 >= bytes.len() {
+                return Err(StatusCode::BAD_REQUEST);
+            }
+            let high = (bytes[index + 1] as char)
+                .to_digit(16)
+                .ok_or(StatusCode::BAD_REQUEST)?;
+            let low = (bytes[index + 2] as char)
+                .to_digit(16)
+                .ok_or(StatusCode::BAD_REQUEST)?;
+            decoded.push(((high << 4) | low) as u8);
+            index += 3;
+        } else {
+            decoded.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8(decoded).map_err(|_| StatusCode::BAD_REQUEST)
+}
+
+fn validate_original_name(value: &str) -> Result<(), StatusCode> {
+    if value.trim().is_empty()
+        || value.len() > 512
+        || value.contains('/')
+        || value.contains('\\')
+        || value.contains('\0')
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    Ok(())
+}
+
+fn encode_header_filename(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.as_bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(*byte, b'-' | b'.' | b'_' | b'~') {
+            encoded.push(char::from(*byte));
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    encoded
+}
+
+fn header_text(headers: &HeaderMap, name: &'static str) -> Result<String, StatusCode> {
+    headers
+        .get(name)
+        .ok_or(StatusCode::BAD_REQUEST)?
+        .to_str()
+        .map(str::to_owned)
+        .map_err(|_| StatusCode::BAD_REQUEST)
 }
 
 async fn driver_page(
@@ -229,6 +639,253 @@ async fn complete_point(
     Json(snapshot(&trip)).into_response()
 }
 
+async fn reorder_route(
+    State(state): State<ControlBrowserState>,
+    Path(token): Path<String>,
+    Json(request): Json<RouteOrderRequest>,
+) -> Response {
+    let trip = match state.trip(&token) {
+        Ok(Some(trip)) => trip,
+        Ok(None) => return (StatusCode::NOT_FOUND, "trip session not found").into_response(),
+        Err(status) => return status.into_response(),
+    };
+    let mut trip = match trip.lock() {
+        Ok(trip) => trip,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+    let shown = trip.state();
+    if shown.local_route_revision != request.based_on_revision {
+        return (StatusCode::CONFLICT, "stale route revision").into_response();
+    }
+    let order = match request
+        .open_point_ids
+        .iter()
+        .map(|value| parse_point_id(value))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(order) => order,
+        Err(status) => return status.into_response(),
+    };
+    if trip.driver_order(&shown, &order).is_err() {
+        return (StatusCode::CONFLICT, "route order rejected").into_response();
+    }
+    Json(snapshot(&trip)).into_response()
+}
+
+async fn update_location(
+    State(state): State<ControlBrowserState>,
+    Path(token): Path<String>,
+    Json(update): Json<LocationUpdate>,
+) -> Response {
+    let sample = match location_sample(update) {
+        Ok(sample) => sample,
+        Err(status) => return status.into_response(),
+    };
+    let trip = match state.trip(&token) {
+        Ok(Some(trip)) => trip,
+        Ok(None) => return (StatusCode::NOT_FOUND, "trip session not found").into_response(),
+        Err(status) => return status.into_response(),
+    };
+    let mut trip = match trip.lock() {
+        Ok(trip) => trip,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+    if trip.record_location(sample).is_err() {
+        return (StatusCode::CONFLICT, "location not stored").into_response();
+    }
+    Json(location_snapshot(sample)).into_response()
+}
+
+async fn upload_document(
+    State(state): State<ControlBrowserState>,
+    Path((token, document_id)): Path<(String, String)>,
+    request: Request,
+) -> Response {
+    let document_id = match parse_document_id(&document_id) {
+        Ok(document_id) => document_id,
+        Err(status) => return status.into_response(),
+    };
+    let trip = match state.trip(&token) {
+        Ok(Some(trip)) => trip,
+        Ok(None) => return (StatusCode::NOT_FOUND, "trip session not found").into_response(),
+        Err(status) => return status.into_response(),
+    };
+
+    let headers = request.headers();
+    if let Some(length) = headers
+        .get(CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok())
+        && length > MAX_UPLOAD_BYTES
+    {
+        return StatusCode::PAYLOAD_TOO_LARGE.into_response();
+    }
+
+    let original_name = match header_text(headers, "x-file-name")
+        .and_then(|value| decode_uri_component(&value))
+        .and_then(|value| {
+            validate_original_name(&value)?;
+            Ok(value)
+        }) {
+        Ok(value) => value,
+        Err(status) => return status.into_response(),
+    };
+    let mime_type = headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.trim().is_empty() && value.len() <= 256)
+        .unwrap_or("application/octet-stream")
+        .to_owned();
+    let created_at_unix_ms = match header_text(headers, "x-created-at-unix-ms")
+        .and_then(|value| value.parse::<u64>().map_err(|_| StatusCode::BAD_REQUEST))
+    {
+        Ok(value) if value > 0 => value,
+        _ => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    let point_id = match headers.get("x-point-id") {
+        Some(value) => match value
+            .to_str()
+            .map_err(|_| StatusCode::BAD_REQUEST)
+            .and_then(parse_point_id)
+        {
+            Ok(value) => Some(value),
+            Err(status) => return status.into_response(),
+        },
+        None => None,
+    };
+
+    let temporary = match NamedTempFile::new() {
+        Ok(file) => file,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+    let std_file = match temporary.reopen() {
+        Ok(file) => file,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+    let mut file = TokioFile::from_std(std_file);
+    let mut stream = request.into_body().into_data_stream();
+    let mut total = 0_u64;
+    while let Some(chunk) = stream.next().await {
+        let chunk = match chunk {
+            Ok(chunk) => chunk,
+            Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+        };
+        total = match total.checked_add(u64::try_from(chunk.len()).unwrap_or(u64::MAX)) {
+            Some(total) if total <= MAX_UPLOAD_BYTES => total,
+            _ => return StatusCode::PAYLOAD_TOO_LARGE.into_response(),
+        };
+        if file.write_all(&chunk).await.is_err() {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    }
+    if file.sync_all().await.is_err() {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+    drop(file);
+
+    let draft = DocumentStoreDraft {
+        document_id,
+        direction: DocumentDirection::FromDriver,
+        original_name,
+        mime_type,
+        created_at_unix_ms,
+        point_id,
+    };
+    let stored = match tokio::task::spawn_blocking(move || {
+        let _keep_temporary_alive = &temporary;
+        let mut trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.store_document(draft, temporary.path())
+    })
+    .await
+    {
+        Ok(Ok(stored)) => stored,
+        Ok(Err(error)) if error.kind() == io::ErrorKind::InvalidData => {
+            return StatusCode::CONFLICT.into_response();
+        }
+        _ => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    Json(document_snapshot(&stored)).into_response()
+}
+
+fn file_body(file: TokioFile) -> Body {
+    let stream = stream::unfold(Some(file), |state| async move {
+        let mut file = state?;
+        let mut buffer = vec![0_u8; STREAM_CHUNK_BYTES];
+        match file.read(&mut buffer).await {
+            Ok(0) => None,
+            Ok(read) => {
+                buffer.truncate(read);
+                Some((Ok::<Bytes, io::Error>(Bytes::from(buffer)), Some(file)))
+            }
+            Err(error) => Some((Err(error), None)),
+        }
+    });
+    Body::from_stream(stream)
+}
+
+async fn download_document(
+    State(state): State<ControlBrowserState>,
+    Path((token, document_id)): Path<(String, String)>,
+) -> Response {
+    let document_id = match parse_document_id(&document_id) {
+        Ok(document_id) => document_id,
+        Err(status) => return status.into_response(),
+    };
+    let trip = match state.trip(&token) {
+        Ok(Some(trip)) => trip,
+        Ok(None) => return (StatusCode::NOT_FOUND, "trip session not found").into_response(),
+        Err(status) => return status.into_response(),
+    };
+
+    let verified = match tokio::task::spawn_blocking(move || {
+        let trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.verified_document_path(document_id)
+    })
+    .await
+    {
+        Ok(Ok(value)) => value,
+        Ok(Err(error)) if error.kind() == io::ErrorKind::NotFound => {
+            return StatusCode::NOT_FOUND.into_response();
+        }
+        Ok(Err(_)) => return StatusCode::CONFLICT.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+    let (document, path) = verified;
+    let file = match TokioFile::open(path).await {
+        Ok(file) => file,
+        Err(_) => return StatusCode::NOT_FOUND.into_response(),
+    };
+
+    let mut response = Response::new(file_body(file));
+    *response.status_mut() = StatusCode::OK;
+    let headers = response.headers_mut();
+    if let Ok(value) = HeaderValue::from_str(&document.mime_type) {
+        headers.insert(CONTENT_TYPE, value);
+    } else {
+        headers.insert(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/octet-stream"),
+        );
+    }
+    if let Ok(value) = HeaderValue::from_str(&document.size.to_string()) {
+        headers.insert(CONTENT_LENGTH, value);
+    }
+    let disposition = format!(
+        "attachment; filename*=UTF-8''{}",
+        encode_header_filename(&document.original_name)
+    );
+    if let Ok(value) = HeaderValue::from_str(&disposition) {
+        headers.insert(CONTENT_DISPOSITION, value);
+    }
+    headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+}
+
 fn router(state: ControlBrowserState) -> Router {
     Router::new()
         .route("/driver/{token}", get(driver_page))
@@ -237,22 +894,65 @@ fn router(state: ControlBrowserState) -> Router {
             "/api/trip/{token}/complete/{point_id}",
             post(complete_point),
         )
+        .route("/api/trip/{token}/route/order", post(reorder_route))
+        .route("/api/trip/{token}/location", post(update_location))
+        .route(
+            "/api/trip/{token}/documents/{document_id}",
+            get(download_document).post(upload_document),
+        )
         .with_state(state)
 }
 
+fn is_private_lan_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => ip.is_private() && !ip.is_loopback() && !ip.is_unspecified(),
+        IpAddr::V6(ip) => {
+            let first = ip.segments()[0];
+            let unique_local = first & 0xfe00 == 0xfc00;
+            let link_local = first & 0xffc0 == 0xfe80;
+            (unique_local || link_local) && !ip.is_loopback() && !ip.is_unspecified()
+        }
+    }
+}
+
+fn validate_lan_address(address: SocketAddr) -> io::Result<()> {
+    if address.port() == 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "LAN test port must be explicit",
+        ));
+    }
+    if !is_private_lan_ip(address.ip()) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "LAN test address must be an explicit private/local interface",
+        ));
+    }
+    Ok(())
+}
+
 pub struct LoopbackControlServer {
-    address: SocketAddr,
+    info: ControlServerInfo,
     shutdown: Option<oneshot::Sender<()>>,
     task: Option<JoinHandle<io::Result<()>>>,
 }
 
 impl LoopbackControlServer {
-    pub async fn start(state: ControlBrowserState) -> io::Result<Self> {
-        let listener =
-            TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0)).await?;
+    async fn start_bound(
+        state: ControlBrowserState,
+        requested: SocketAddr,
+        mode: ControlAccessMode,
+    ) -> io::Result<Self> {
+        let listener = TcpListener::bind(requested).await?;
         let address = listener.local_addr()?;
-        if address.ip() != IpAddr::V4(Ipv4Addr::LOCALHOST) {
-            return Err(io::Error::other("loopback server bound outside 127.0.0.1"));
+        match mode {
+            ControlAccessMode::Loopback if !address.ip().is_loopback() => {
+                return Err(io::Error::other(
+                    "loopback server bound outside loopback interface",
+                ));
+            }
+            ControlAccessMode::Lan => validate_lan_address(address)?,
+            _ => {}
         }
 
         let (shutdown, shutdown_rx) = oneshot::channel();
@@ -265,15 +965,37 @@ impl LoopbackControlServer {
         });
 
         Ok(Self {
-            address,
+            info: ControlServerInfo { mode, address },
             shutdown: Some(shutdown),
             task: Some(task),
         })
     }
 
+    pub async fn start(state: ControlBrowserState) -> io::Result<Self> {
+        Self::start_bound(
+            state,
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
+            ControlAccessMode::Loopback,
+        )
+        .await
+    }
+
+    pub async fn start_lan(
+        state: ControlBrowserState,
+        address: SocketAddr,
+    ) -> io::Result<Self> {
+        validate_lan_address(address)?;
+        Self::start_bound(state, address, ControlAccessMode::Lan).await
+    }
+
+    #[must_use]
+    pub const fn info(&self) -> ControlServerInfo {
+        self.info
+    }
+
     #[must_use]
     pub const fn address(&self) -> SocketAddr {
-        self.address
+        self.info.address
     }
 
     pub async fn shutdown(mut self) -> io::Result<()> {
@@ -301,7 +1023,7 @@ mod tests {
     use cargo_dispatch_contracts::{TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion};
     use cargo_dispatch_domain::{OperatorId, TripId, WorkingRouteId};
     use cargo_dispatch_planner::PlannerTripExportDraft;
-    use cargo_dispatch_trip_files::{TripFolder, export_package};
+    use cargo_dispatch_trip_files::{DocumentStoreDraft, TripFolder, export_package};
     use std::{fs, path::Path};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -337,48 +1059,96 @@ mod tests {
         Ok((trip_id, route, folder))
     }
 
-    async fn http_request(
-        address: SocketAddr,
-        method: &str,
-        path: &str,
-    ) -> io::Result<(u16, String)> {
-        let mut stream = tokio::net::TcpStream::connect(address).await?;
-        let request = format!(
-            "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\nContent-Length: 0\r\n\r\n"
-        );
-        stream.write_all(request.as_bytes()).await?;
-        let mut response = Vec::new();
-        stream.read_to_end(&mut response).await?;
-        let response = String::from_utf8(response)
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        let (headers, body) = response
-            .split_once("\r\n\r\n")
+    fn response_parts(response: Vec<u8>) -> io::Result<(u16, String, Vec<u8>)> {
+        let split = response
+            .windows(4)
+            .position(|window| window == b"\r\n\r\n")
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid HTTP response"))?;
+        let headers = String::from_utf8(response[..split].to_vec())
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
         let status = headers
             .lines()
             .next()
             .and_then(|line| line.split_whitespace().nth(1))
             .and_then(|value| value.parse::<u16>().ok())
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "missing HTTP status"))?;
-        Ok((status, body.to_owned()))
+        Ok((status, headers, response[split + 4..].to_vec()))
+    }
+
+    async fn http_request(
+        address: SocketAddr,
+        method: &str,
+        path: &str,
+        headers: &[(&str, String)],
+        body: &[u8],
+    ) -> io::Result<(u16, String, Vec<u8>)> {
+        let mut stream = tokio::net::TcpStream::connect(address).await?;
+        let mut request = format!(
+            "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\nContent-Length: {}\r\n",
+            body.len()
+        );
+        for (name, value) in headers {
+            request.push_str(name);
+            request.push_str(": ");
+            request.push_str(value);
+            request.push_str("\r\n");
+        }
+        request.push_str("\r\n");
+        stream.write_all(request.as_bytes()).await?;
+        stream.write_all(body).await?;
+        let mut response = Vec::new();
+        stream.read_to_end(&mut response).await?;
+        response_parts(response)
+    }
+
+    async fn get_json<T: for<'de> Deserialize<'de>>(
+        address: SocketAddr,
+        path: &str,
+    ) -> io::Result<T> {
+        let (status, _, body) = http_request(address, "GET", path, &[], &[]).await?;
+        if status != 200 {
+            return Err(io::Error::other(format!("unexpected HTTP {status}")));
+        }
+        serde_json::from_slice(&body)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    }
+
+    #[test]
+    fn lan_mode_requires_explicit_private_address_and_port() {
+        assert!(validate_lan_address("192.168.1.25:8080".parse().unwrap()).is_ok());
+        assert!(validate_lan_address("10.10.1.5:9090".parse().unwrap()).is_ok());
+        assert!(validate_lan_address("[fd00::10]:8080".parse().unwrap()).is_ok());
+        assert!(validate_lan_address("0.0.0.0:8080".parse().unwrap()).is_err());
+        assert!(validate_lan_address("127.0.0.1:8080".parse().unwrap()).is_err());
+        assert!(validate_lan_address("8.8.8.8:8080".parse().unwrap()).is_err());
+        assert!(validate_lan_address("192.168.1.25:0".parse().unwrap()).is_err());
+        assert!(!is_private_lan_ip(IpAddr::V6(Ipv6Addr::LOCALHOST)));
     }
 
     #[tokio::test]
-    async fn loopback_browser_clients_share_control_truth_and_keep_trips_isolated() -> io::Result<()>
-    {
+    async fn browser_exchanges_route_location_and_binary_files_with_control() -> io::Result<()> {
         let tmp = tempfile::tempdir()?;
         let folder_a_path = tmp.path().join("trip-a");
         let folder_b_path = tmp.path().join("trip-b");
-        let (trip_a, route_a, folder_a) = create_trip(tmp.path(), "trip-a", 10, 20)?;
+        let (trip_a, route_a, mut folder_a) = create_trip(tmp.path(), "trip-a", 10, 20)?;
         let (trip_b, route_b, folder_b) = create_trip(tmp.path(), "trip-b", 30, 40)?;
 
-        let state = ControlBrowserState::new();
-        assert_eq!(
-            state.register_trip("short", folder_a),
-            Err(SessionRegistrationError::InvalidToken)
-        );
+        let operator_file = tmp.path().join("operator-ttn.pdf");
+        fs::write(&operator_file, b"synthetic operator pdf")?;
+        let operator_document = DocumentId::from_bytes([80; 16]).unwrap();
+        folder_a.store_document(
+            DocumentStoreDraft {
+                document_id: operator_document,
+                direction: DocumentDirection::FromOperator,
+                original_name: "TTN-test.pdf".to_owned(),
+                mime_type: "application/pdf".to_owned(),
+                created_at_unix_ms: 100,
+                point_id: Some(route_a[0].point_id),
+            },
+            &operator_file,
+        )?;
 
-        let folder_a = TripFolder::open(&folder_a_path, trip_a)?;
+        let state = ControlBrowserState::new();
         state
             .register_trip("trip-a-token-0001", folder_a)
             .expect("register trip A");
@@ -386,83 +1156,156 @@ mod tests {
             .register_trip("trip-b-token-0002", folder_b)
             .expect("register trip B");
 
-        let (_, _, duplicate_folder) = create_trip(tmp.path(), "duplicate", 60, 70)?;
-        assert_eq!(
-            state.register_trip("trip-a-token-0001", duplicate_folder),
-            Err(SessionRegistrationError::DuplicateToken)
-        );
-
         let server = LoopbackControlServer::start(state.clone()).await?;
+        assert_eq!(server.info().mode, ControlAccessMode::Loopback);
         assert_eq!(server.address().ip(), IpAddr::V4(Ipv4Addr::LOCALHOST));
 
-        let (status, _) = http_request(server.address(), "GET", "/driver/wrong-token-0000").await?;
-        assert_eq!(status, 404);
-
-        let (status, page) =
-            http_request(server.address(), "GET", "/driver/trip-a-token-0001").await?;
+        let (status, _, page) =
+            http_request(server.address(), "GET", "/driver/trip-a-token-0001", &[], &[]).await?;
         assert_eq!(status, 200);
-        assert!(page.contains("Cargo Dispatch"));
+        assert!(String::from_utf8_lossy(&page).contains("Передати в Control"));
 
-        let (status, body_before) =
-            http_request(server.address(), "GET", "/api/trip/trip-a-token-0001").await?;
-        assert_eq!(status, 200);
-        let before: DriverTripSnapshot = serde_json::from_str(&body_before)
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        assert!(before.points.iter().all(|point| !point.completed));
+        let mut trip: DriverTripSnapshot =
+            get_json(server.address(), "/api/trip/trip-a-token-0001").await?;
+        assert_eq!(trip.documents.len(), 1);
+        assert!(trip.latest_location.is_none());
 
-        let point_a = id_hex(route_a[1].point_id.as_bytes());
-        let (status, _) = http_request(
+        let order_body = serde_json::to_vec(&serde_json::json!({
+            "based_on_revision": trip.local_route_revision,
+            "open_point_ids": [
+                id_hex(route_a[2].point_id.as_bytes()),
+                id_hex(route_a[0].point_id.as_bytes()),
+                id_hex(route_a[1].point_id.as_bytes())
+            ]
+        }))?;
+        let (status, _, _) = http_request(
             server.address(),
             "POST",
-            &format!("/api/trip/trip-a-token-0001/complete/{point_a}"),
+            "/api/trip/trip-a-token-0001/route/order",
+            &[("Content-Type", "application/json".to_owned())],
+            &order_body,
         )
         .await?;
         assert_eq!(status, 200);
 
-        let (_, client_one_body) =
-            http_request(server.address(), "GET", "/api/trip/trip-a-token-0001").await?;
-        let (_, client_two_body) =
-            http_request(server.address(), "GET", "/api/trip/trip-a-token-0001").await?;
-        let client_one: DriverTripSnapshot = serde_json::from_str(&client_one_body)
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        let client_two: DriverTripSnapshot = serde_json::from_str(&client_two_body)
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        assert_eq!(client_one, client_two);
-        assert!(client_one.points[1].completed);
+        trip = get_json(server.address(), "/api/trip/trip-a-token-0001").await?;
+        assert_eq!(trip.points[0].point_id, id_hex(route_a[2].point_id.as_bytes()));
 
-        let (_, trip_b_body) =
-            http_request(server.address(), "GET", "/api/trip/trip-b-token-0002").await?;
-        let trip_b_snapshot: DriverTripSnapshot = serde_json::from_str(&trip_b_body)
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        assert!(trip_b_snapshot.points.iter().all(|point| !point.completed));
-
-        let (status, _) = http_request(
+        let location_body = serde_json::to_vec(&serde_json::json!({
+            "latitude": 49.8393,
+            "longitude": 24.0296,
+            "accuracy_m": 8.5,
+            "observed_at_unix_ms": 1_795_550_000_000_u64
+        }))?;
+        let (status, _, _) = http_request(
             server.address(),
             "POST",
-            &format!("/api/trip/trip-b-token-0002/complete/{point_a}"),
+            "/api/trip/trip-a-token-0001/location",
+            &[("Content-Type", "application/json".to_owned())],
+            &location_body,
+        )
+        .await?;
+        assert_eq!(status, 200);
+
+        let driver_document = DocumentId::from_bytes([81; 16]).unwrap();
+        let driver_document_hex = id_hex(driver_document.as_bytes());
+        let video_bytes = b"synthetic-driver-video-bytes";
+        let upload_path = format!(
+            "/api/trip/trip-a-token-0001/documents/{driver_document_hex}"
+        );
+        let upload_headers = [
+            ("Content-Type", "video/mp4".to_owned()),
+            ("X-File-Name", "driver-video.mp4".to_owned()),
+            ("X-Created-At-Unix-Ms", "1795550000100".to_owned()),
+            ("X-Point-Id", id_hex(route_a[2].point_id.as_bytes())),
+        ];
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            &upload_path,
+            &upload_headers,
+            video_bytes,
+        )
+        .await?;
+        assert_eq!(status, 200);
+
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            &upload_path,
+            &upload_headers,
+            video_bytes,
+        )
+        .await?;
+        assert_eq!(status, 200);
+
+        let different = b"different bytes for same document id";
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            &upload_path,
+            &upload_headers,
+            different,
         )
         .await?;
         assert_eq!(status, 409);
 
+        trip = get_json(server.address(), "/api/trip/trip-a-token-0001").await?;
+        assert_eq!(trip.documents.len(), 2);
+        let location = trip.latest_location.expect("location stored");
+        assert!((location.latitude - 49.8393).abs() < 0.000001);
+        assert!((location.longitude - 24.0296).abs() < 0.000001);
+
+        let operator_download = format!(
+            "/api/trip/trip-a-token-0001/documents/{}",
+            id_hex(operator_document.as_bytes())
+        );
+        let (status, headers, body) =
+            http_request(server.address(), "GET", &operator_download, &[], &[]).await?;
+        assert_eq!(status, 200);
+        assert!(headers.contains("application/pdf"));
+        assert_eq!(body, b"synthetic operator pdf");
+
+        let (status, headers, body) =
+            http_request(server.address(), "GET", &upload_path, &[], &[]).await?;
+        assert_eq!(status, 200);
+        assert!(headers.contains("video/mp4"));
+        assert_eq!(body, video_bytes);
+
+        let wrong_trip_download = format!(
+            "/api/trip/trip-b-token-0002/documents/{driver_document_hex}"
+        );
+        let (status, _, _) =
+            http_request(server.address(), "GET", &wrong_trip_download, &[], &[]).await?;
+        assert_eq!(status, 404);
+
+        let trip_b_snapshot: DriverTripSnapshot =
+            get_json(server.address(), "/api/trip/trip-b-token-0002").await?;
+        assert!(trip_b_snapshot.documents.is_empty());
+        assert!(trip_b_snapshot.latest_location.is_none());
+        assert_eq!(
+            trip_b_snapshot.points[0].point_id,
+            id_hex(route_b[0].point_id.as_bytes())
+        );
+
         server.shutdown().await?;
         drop(state);
 
-        let durable_a = TripFolder::open(&folder_a_path, trip_a)?;
-        assert!(
-            durable_a
-                .state()
-                .completed_point_ids
-                .contains(&route_a[1].point_id)
-        );
-
-        let durable_b = TripFolder::open(&folder_b_path, trip_b)?;
-        assert!(durable_b.state().completed_point_ids.is_empty());
+        let recovered_a = TripFolder::open(&folder_a_path, trip_a)?;
+        assert_eq!(recovered_a.state().route_points[0].point_id, route_a[2].point_id);
         assert_eq!(
-            durable_b.state().route_points[0].point_id,
-            route_b[0].point_id
+            recovered_a.latest_location().expect("durable location").latitude_e7,
+            498_393_000
         );
+        assert_eq!(recovered_a.documents().len(), 2);
+        let (_, stored_video) = recovered_a.verified_document_path(driver_document)?;
+        assert_eq!(fs::read(stored_video)?, video_bytes);
 
-        fs::remove_file(tmp.path().join("trip-a.zip")).ok();
+        let recovered_b = TripFolder::open(&folder_b_path, trip_b)?;
+        assert!(recovered_b.documents().is_empty());
+        assert!(recovered_b.latest_location().is_none());
+        assert_eq!(recovered_b.state().route_points[0].point_id, route_b[0].point_id);
+
         Ok(())
     }
 }
