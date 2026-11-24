@@ -2135,7 +2135,10 @@ mod tests {
         assert_eq!(attempts[0].result, CallResult::NoAnswer);
         assert_eq!(attempts[1].result, CallResult::Confirmed);
         assert_eq!(
-            history.latest_for_request(request_id).expect("latest").result,
+            history
+                .latest_for_request(request_id)
+                .expect("latest")
+                .result,
             CallResult::Confirmed
         );
     }
