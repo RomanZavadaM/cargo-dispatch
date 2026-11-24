@@ -861,40 +861,40 @@ mod tests {
         let document_b = DocumentId::from_bytes([81; 16]).unwrap();
 
         let stored_a = control_a.store_document(
-DocumentStoreDraft {
-                    document_id: document_a,
-                    direction: DocumentDirection::FromOperator,
-                    original_name: "TTN-test.pdf".to_owned(),
-                    mime_type: "application/pdf".to_owned(),
-                    created_at_unix_ms: 10,
-                    point_id: Some(route_a[0].point_id),
-                },
-                &source_a,
+            DocumentStoreDraft {
+                document_id: document_a,
+                direction: DocumentDirection::FromOperator,
+                original_name: "TTN-test.pdf".to_owned(),
+                mime_type: "application/pdf".to_owned(),
+                created_at_unix_ms: 10,
+                point_id: Some(route_a[0].point_id),
+            },
+            &source_a,
         )?;
         let retry_a = control_a.store_document(
-DocumentStoreDraft {
-                    document_id: document_a,
-                    direction: DocumentDirection::FromOperator,
-                    original_name: "TTN-test.pdf".to_owned(),
-                    mime_type: "application/pdf".to_owned(),
-                    created_at_unix_ms: 11,
-                    point_id: Some(route_a[0].point_id),
-                },
-                &source_a,
+            DocumentStoreDraft {
+                document_id: document_a,
+                direction: DocumentDirection::FromOperator,
+                original_name: "TTN-test.pdf".to_owned(),
+                mime_type: "application/pdf".to_owned(),
+                created_at_unix_ms: 11,
+                point_id: Some(route_a[0].point_id),
+            },
+            &source_a,
         )?;
         assert_eq!(retry_a, stored_a);
         assert_eq!(control_a.documents().len(), 1);
 
         let stored_b = control_b.store_document(
-DocumentStoreDraft {
-                    document_id: document_b,
-                    direction: DocumentDirection::FromDriver,
-                    original_name: "photo.PNG".to_owned(),
-                    mime_type: "image/png".to_owned(),
-                    created_at_unix_ms: 20,
-                    point_id: Some(route_b[1].point_id),
-                },
-                &source_b,
+            DocumentStoreDraft {
+                document_id: document_b,
+                direction: DocumentDirection::FromDriver,
+                original_name: "photo.PNG".to_owned(),
+                mime_type: "image/png".to_owned(),
+                created_at_unix_ms: 20,
+                point_id: Some(route_b[1].point_id),
+            },
+            &source_b,
         )?;
         assert_eq!(control_b.documents(), vec![stored_b.clone()]);
         assert!(
