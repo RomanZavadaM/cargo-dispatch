@@ -655,6 +655,53 @@ pub fn manual_working_route(
     })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WorkingRouteUpdateError {
+    RecalculationRejected(Vec<RecalculationHardRejectReason>),
+    RevisionOverflow,
+}
+
+pub fn recalculate_working_route(
+    route: &WorkingRoute,
+    proposed_point_ids: &[PointId],
+) -> Result<WorkingRoute, WorkingRouteUpdateError> {
+    let validation = validate_recalculation(&route.points, proposed_point_ids);
+    if !validation.hard_reasons.is_empty() {
+        return Err(WorkingRouteUpdateError::RecalculationRejected(
+            validation.hard_reasons,
+        ));
+    }
+
+    let existing: BTreeMap<_, _> = route
+        .points
+        .iter()
+        .map(|point| (point.point_id, *point))
+        .collect();
+    let points = proposed_point_ids
+        .iter()
+        .map(|point_id| {
+            existing.get(point_id).copied().unwrap_or(WorkingRoutePoint {
+                point_id: *point_id,
+                locked: false,
+                confirmed: false,
+            })
+        })
+        .collect();
+
+    let current_revision = route
+        .current_revision
+        .checked_add(1)
+        .ok_or(WorkingRouteUpdateError::RevisionOverflow)?;
+
+    Ok(WorkingRoute {
+        working_route_id: route.working_route_id,
+        origin: route.origin,
+        points,
+        current_revision,
+        state: WorkingRouteState::Replanning,
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WorkingRoutePoint {
     pub point_id: PointId,
@@ -2781,6 +2828,67 @@ mod tests {
         assert_eq!(
             manual_working_route(working_route_id(13), &[point_id(34), point_id(34)],),
             Err(WorkingRouteError::DuplicatePoint)
+        );
+    }
+
+    #[test]
+    fn safe_recalculation_creates_new_revision_and_preserves_protected_flags() {
+        let mut route = manual_working_route(
+            working_route_id(14),
+            &[point_id(35), point_id(36), point_id(37)],
+        )
+        .expect("route");
+        route.points[0].locked = true;
+        route.points[2].confirmed = true;
+
+        let recalculated = recalculate_working_route(
+            &route,
+            &[point_id(35), point_id(38), point_id(37)],
+        )
+        .expect("recalculation");
+
+        assert_eq!(route.current_revision, 1);
+        assert_eq!(recalculated.current_revision, 2);
+        assert_eq!(recalculated.state, WorkingRouteState::Replanning);
+        assert!(recalculated.points[0].locked);
+        assert!(!recalculated.points[1].locked);
+        assert!(!recalculated.points[1].confirmed);
+        assert!(recalculated.points[2].confirmed);
+    }
+
+    #[test]
+    fn rejected_recalculation_leaves_original_working_route_unchanged() {
+        let mut route = manual_working_route(
+            working_route_id(15),
+            &[point_id(39), point_id(40), point_id(41)],
+        )
+        .expect("route");
+        route.points[0].locked = true;
+        route.points[2].confirmed = true;
+        let before = route.clone();
+
+        let result = recalculate_working_route(
+            &route,
+            &[point_id(41), point_id(40), point_id(39)],
+        );
+
+        assert!(matches!(
+            result,
+            Err(WorkingRouteUpdateError::RecalculationRejected(_))
+        ));
+        assert_eq!(route, before);
+    }
+
+    #[test]
+    fn working_route_revision_overflow_is_explicit() {
+        let mut route =
+            manual_working_route(working_route_id(16), &[point_id(42), point_id(43)])
+                .expect("route");
+        route.current_revision = u64::MAX;
+
+        assert_eq!(
+            recalculate_working_route(&route, &[point_id(42), point_id(43)]),
+            Err(WorkingRouteUpdateError::RevisionOverflow)
         );
     }
 
