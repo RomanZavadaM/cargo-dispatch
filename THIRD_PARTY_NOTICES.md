@@ -7,7 +7,9 @@ cargo-dispatch може містити або розповсюджуватися
 
 ### Control loopback HTTP boundary
 - `axum 0.8.9` — MIT, crates.io / upstream `tokio-rs/axum`; HTTP router/server boundary усередині Control.
-- `tokio 1.54.1` — MIT, crates.io / upstream `tokio-rs/tokio`; loopback TCP runtime та graceful shutdown.
+- `tokio 1.54.1` — MIT, crates.io / upstream `tokio-rs/tokio`; TCP/runtime, async file streaming та graceful shutdown.
+- `futures-util 0.3.34` — MIT або Apache-2.0; використовується напряму для потокової передачі upload/download без завантаження всього відео/файла в RAM.
+- `tempfile 3.27.0` — MIT або Apache-2.0; уже використовувався файловим шаром, тепер також створює тимчасовий файл browser upload до атомарного приймання в trip folder.
 - Цей product slice не додає WebRTC/TURN/gateway runtime. Непрямі залежності цих crates фіксує `Cargo.lock` і перевіряє `cargo deny`.
 
 ## Дані
