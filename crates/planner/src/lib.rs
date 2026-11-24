@@ -110,9 +110,7 @@ pub fn evaluate_request_candidate(
     }
 
     match (request.request.cargo.pallets, capacity.pallets) {
-        (Some(cargo_pallets), Some(available_pallets))
-            if cargo_pallets > available_pallets =>
-        {
+        (Some(cargo_pallets), Some(available_pallets)) if cargo_pallets > available_pallets => {
             hard_reasons.push(HardRejectReason::PalletCapacityExceeded {
                 cargo_pallets,
                 available_pallets,
@@ -584,15 +582,21 @@ mod tests {
 
         assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
         assert!(result.hard_reasons.is_empty());
-        assert!(result
-            .check_reasons
-            .contains(&NeedsCheckReason::RequestAvailabilityUnknown));
-        assert!(result
-            .check_reasons
-            .contains(&NeedsCheckReason::CargoPalletsUnknown));
-        assert!(result
-            .check_reasons
-            .contains(&NeedsCheckReason::AvailablePalletsUnknown));
+        assert!(
+            result
+                .check_reasons
+                .contains(&NeedsCheckReason::RequestAvailabilityUnknown)
+        );
+        assert!(
+            result
+                .check_reasons
+                .contains(&NeedsCheckReason::CargoPalletsUnknown)
+        );
+        assert!(
+            result
+                .check_reasons
+                .contains(&NeedsCheckReason::AvailablePalletsUnknown)
+        );
     }
 
     #[test]
