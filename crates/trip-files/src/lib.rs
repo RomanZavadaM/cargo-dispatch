@@ -1481,18 +1481,22 @@ mod tests {
         assert_eq!(control.locations(), &[sample]);
         assert_eq!(control.latest_location(), Some(sample));
 
-        assert!(control
-            .record_location(DriverLocationSample {
-                latitude_e7: 901_000_000,
-                ..sample
-            })
-            .is_err());
-        assert!(control
-            .record_location(DriverLocationSample {
-                observed_at_unix_ms: 0,
-                ..sample
-            })
-            .is_err());
+        assert!(
+            control
+                .record_location(DriverLocationSample {
+                    latitude_e7: 901_000_000,
+                    ..sample
+                })
+                .is_err()
+        );
+        assert!(
+            control
+                .record_location(DriverLocationSample {
+                    observed_at_unix_ms: 0,
+                    ..sample
+                })
+                .is_err()
+        );
 
         drop(control);
         let recovered = TripFolder::open(&folder, trip)?;
@@ -1500,5 +1504,4 @@ mod tests {
         assert_eq!(recovered.latest_location(), Some(sample));
         Ok(())
     }
-
 }
