@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="cargo-dispatch-routing-probe">
+  <!-- T01 height -->
+  <node id="1001" lat="49.0000" lon="24.0000"/><node id="1002" lat="49.0000" lon="24.0050"/><node id="1003" lat="49.0000" lon="24.0100"/>
+  <node id="1004" lat="49.0030" lon="24.0000"/><node id="1005" lat="49.0030" lon="24.0100"/>
+  <way id="1101"><nd ref="1001"/><nd ref="1002"/><nd ref="1003"/><tag k="highway" v="primary"/><tag k="name" v="T01_HEIGHT"/><tag k="maxheight" v="3.2"/></way>
+  <way id="1102"><nd ref="1001"/><nd ref="1004"/><nd ref="1005"/><nd ref="1003"/><tag k="highway" v="primary"/><tag k="name" v="T01_DETOUR"/></way>
+
+  <!-- T02 weight -->
+  <node id="2001" lat="49.0100" lon="24.0000"/><node id="2002" lat="49.0100" lon="24.0050"/><node id="2003" lat="49.0100" lon="24.0100"/>
+  <node id="2004" lat="49.0130" lon="24.0000"/><node id="2005" lat="49.0130" lon="24.0100"/>
+  <way id="2101"><nd ref="2001"/><nd ref="2002"/><nd ref="2003"/><tag k="highway" v="primary"/><tag k="name" v="T02_WEIGHT"/><tag k="maxweight" v="12"/></way>
+  <way id="2102"><nd ref="2001"/><nd ref="2004"/><nd ref="2005"/><nd ref="2003"/><tag k="highway" v="primary"/><tag k="name" v="T02_DETOUR"/></way>
+
+  <!-- T03 width -->
+  <node id="3001" lat="49.0200" lon="24.0000"/><node id="3002" lat="49.0200" lon="24.0050"/><node id="3003" lat="49.0200" lon="24.0100"/>
+  <node id="3004" lat="49.0230" lon="24.0000"/><node id="3005" lat="49.0230" lon="24.0100"/>
+  <way id="3101"><nd ref="3001"/><nd ref="3002"/><nd ref="3003"/><tag k="highway" v="primary"/><tag k="name" v="T03_WIDTH"/><tag k="maxwidth" v="2.3"/></way>
+  <way id="3102"><nd ref="3001"/><nd ref="3004"/><nd ref="3005"/><nd ref="3003"/><tag k="highway" v="primary"/><tag k="name" v="T03_DETOUR"/></way>
+
+  <!-- T04 length -->
+  <node id="4001" lat="49.0300" lon="24.0000"/><node id="4002" lat="49.0300" lon="24.0050"/><node id="4003" lat="49.0300" lon="24.0100"/>
+  <node id="4004" lat="49.0330" lon="24.0000"/><node id="4005" lat="49.0330" lon="24.0100"/>
+  <way id="4101"><nd ref="4001"/><nd ref="4002"/><nd ref="4003"/><tag k="highway" v="primary"/><tag k="name" v="T04_LENGTH"/><tag k="maxlength" v="10"/></way>
+  <way id="4102"><nd ref="4001"/><nd ref="4004"/><nd ref="4005"/><nd ref="4003"/><tag k="highway" v="primary"/><tag k="name" v="T04_DETOUR"/></way>
+
+  <!-- T05 axle load -->
+  <node id="5001" lat="49.0400" lon="24.0000"/><node id="5002" lat="49.0400" lon="24.0050"/><node id="5003" lat="49.0400" lon="24.0100"/>
+  <node id="5004" lat="49.0430" lon="24.0000"/><node id="5005" lat="49.0430" lon="24.0100"/>
+  <way id="5101"><nd ref="5001"/><nd ref="5002"/><nd ref="5003"/><tag k="highway" v="primary"/><tag k="name" v="T05_AXLE"/><tag k="maxaxleload" v="6"/></way>
+  <way id="5102"><nd ref="5001"/><nd ref="5004"/><nd ref="5005"/><nd ref="5003"/><tag k="highway" v="primary"/><tag k="name" v="T05_DETOUR"/></way>
+
+  <!-- T06 HGV access -->
+  <node id="6001" lat="49.0500" lon="24.0000"/><node id="6002" lat="49.0500" lon="24.0050"/><node id="6003" lat="49.0500" lon="24.0100"/>
+  <node id="6004" lat="49.0530" lon="24.0000"/><node id="6005" lat="49.0530" lon="24.0100"/>
+  <way id="6101"><nd ref="6001"/><nd ref="6002"/><nd ref="6003"/><tag k="highway" v="primary"/><tag k="name" v="T06_HGV_NO"/><tag k="hgv" v="no"/></way>
+  <way id="6102"><nd ref="6001"/><nd ref="6004"/><nd ref="6005"/><nd ref="6003"/><tag k="highway" v="primary"/><tag k="name" v="T06_DETOUR"/><tag k="hgv" v="designated"/></way>
+
+  <!-- T07 hazmat -->
+  <node id="7001" lat="49.0600" lon="24.0000"/><node id="7002" lat="49.0600" lon="24.0050"/><node id="7003" lat="49.0600" lon="24.0100"/>
+  <node id="7004" lat="49.0630" lon="24.0000"/><node id="7005" lat="49.0630" lon="24.0100"/>
+  <way id="7101"><nd ref="7001"/><nd ref="7002"/><nd ref="7003"/><tag k="highway" v="primary"/><tag k="name" v="T07_HAZMAT_NO"/><tag k="hazmat" v="no"/></way>
+  <way id="7102"><nd ref="7001"/><nd ref="7004"/><nd ref="7005"/><nd ref="7003"/><tag k="highway" v="primary"/><tag k="name" v="T07_DETOUR"/></way>
+
+  <!-- T08 unpaved -->
+  <node id="8001" lat="49.0700" lon="24.0000"/><node id="8002" lat="49.0700" lon="24.0050"/><node id="8003" lat="49.0700" lon="24.0100"/>
+  <node id="8004" lat="49.0730" lon="24.0000"/><node id="8005" lat="49.0730" lon="24.0100"/>
+  <way id="8101"><nd ref="8001"/><nd ref="8002"/><nd ref="8003"/><tag k="highway" v="primary"/><tag k="name" v="T08_GRAVEL"/><tag k="surface" v="gravel"/></way>
+  <way id="8102"><nd ref="8001"/><nd ref="8004"/><nd ref="8005"/><nd ref="8003"/><tag k="highway" v="primary"/><tag k="name" v="T08_PAVED"/><tag k="surface" v="asphalt"/></way>
+
+  <!-- T09 combined restrictions -->
+  <node id="9001" lat="49.0800" lon="24.0000"/><node id="9002" lat="49.0800" lon="24.0050"/><node id="9003" lat="49.0800" lon="24.0100"/>
+  <node id="9004" lat="49.0830" lon="24.0000"/><node id="9005" lat="49.0830" lon="24.0100"/>
+  <way id="9101"><nd ref="9001"/><nd ref="9002"/><tag k="highway" v="primary"/><tag k="name" v="T09_HEIGHT"/><tag k="maxheight" v="3.2"/></way>
+  <way id="9102"><nd ref="9002"/><nd ref="9003"/><tag k="highway" v="primary"/><tag k="name" v="T09_WEIGHT"/><tag k="maxweight" v="12"/></way>
+  <way id="9103"><nd ref="9001"/><nd ref="9004"/><nd ref="9005"/><nd ref="9003"/><tag k="highway" v="primary"/><tag k="name" v="T09_DETOUR"/></way>
+
+  <!-- T10 unreachable for tall/heavy profile -->
+  <node id="10001" lat="49.0900" lon="24.0000"/><node id="10002" lat="49.0900" lon="24.0050"/><node id="10003" lat="49.0900" lon="24.0100"/>
+  <way id="10101"><nd ref="10001"/><nd ref="10002"/><nd ref="10003"/><tag k="highway" v="primary"/><tag k="name" v="T10_ONLY"/><tag k="maxheight" v="3.2"/><tag k="maxweight" v="12"/></way>
+</osm>
