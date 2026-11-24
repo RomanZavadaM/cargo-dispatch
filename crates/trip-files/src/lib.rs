@@ -735,6 +735,21 @@ impl TripFolder {
         Ok(this)
     }
 
+    pub fn open_detected(path: &Path) -> io::Result<Self> {
+        let first = path.join("00000000000000000001.json");
+        let event: Change = serde_json::from_slice(&bounded(File::open(first)?)?)?;
+        let Change::Import(manifest) = event else {
+            return Err(invalid("trip history must start with import"));
+        };
+        let trip = manifest.candidate()?.header.trip_id;
+        Self::open(path, trip)
+    }
+
+    #[must_use]
+    pub const fn trip_id(&self) -> TripId {
+        self.trip
+    }
+
     pub fn import(path: &Path, package: &Path) -> io::Result<Self> {
         let plan = read_package(package)?;
         let trip = plan.candidate()?.header.trip_id;
@@ -1583,4 +1598,19 @@ mod tests {
         assert_eq!(recovered.latest_location(), Some(sample));
         Ok(())
     }
+
+    #[test]
+    fn trip_folder_detects_its_trip_id_from_durable_history() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package = tmp.path().join("detected-trip.zip");
+        let folder = tmp.path().join("detected-trip");
+        let (trip, _) = create_test_package(&package, 160, 170)?;
+        TripFolder::import(&folder, &package)?;
+
+        let detected = TripFolder::open_detected(&folder)?;
+        assert_eq!(detected.trip_id(), trip);
+        assert_eq!(detected.state().trip_id, trip);
+        Ok(())
+    }
+
 }
