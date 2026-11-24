@@ -173,7 +173,7 @@ fn ControlApp() -> impl IntoView {
                         <input
                             id="trip-folder"
                             type="text"
-                            placeholder="D:\CargoDispatch\active\trip-..."
+                            placeholder=r"D:\CargoDispatch\active\trip-..."
                             prop:value=move || folder.get()
                             on:input=move |event| folder.set(event_target_value(&event))
                         />
