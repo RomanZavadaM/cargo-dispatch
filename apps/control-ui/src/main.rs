@@ -123,14 +123,13 @@ fn ControlApp() -> impl IntoView {
                 }
             });
         }) as Box<dyn FnMut()>);
-        let _ = cargo_control_set_interval(
-            refresh.as_ref().unchecked_ref::<js_sys::Function>(),
-            2_000,
-        );
+        let _ =
+            cargo_control_set_interval(refresh.as_ref().unchecked_ref::<js_sys::Function>(), 2_000);
         refresh.forget();
     });
 
-    let set_status_result = move |result: Result<ControlUiStatus, String>, success: &'static str| {
+    let set_status_result = move |result: Result<ControlUiStatus, String>,
+                                  success: &'static str| {
         busy.set(false);
         match result {
             Ok(current) => {
@@ -251,7 +250,8 @@ fn ControlApp() -> impl IntoView {
 
     let pick_file = move |_| {
         spawn_local(async move {
-            match invoke::<Option<PickedFile>, _>("pick_operator_file", &serde_json::json!({})).await
+            match invoke::<Option<PickedFile>, _>("pick_operator_file", &serde_json::json!({}))
+                .await
             {
                 Ok(file) => {
                     picked_file.set(file);
