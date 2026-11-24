@@ -143,23 +143,25 @@ impl DesktopControlService {
     }
 
     async fn status(&self) -> Result<ControlUiStatus, String> {
-        let listener = self.server.lock().await.as_ref().map(|server| {
-            let info = server.info();
-            ListenerStatus {
-                mode: match info.mode {
-                    ControlAccessMode::Loopback => ListenerMode::Loopback,
-                    ControlAccessMode::Lan => ListenerMode::Lan,
-                },
-                address: info.address.to_string(),
+        let (listener, address) = {
+            let server = self.server.lock().await;
+            match server.as_ref() {
+                Some(server) => {
+                    let info = server.info();
+                    (
+                        Some(ListenerStatus {
+                            mode: match info.mode {
+                                ControlAccessMode::Loopback => ListenerMode::Loopback,
+                                ControlAccessMode::Lan => ListenerMode::Lan,
+                            },
+                            address: info.address.to_string(),
+                        }),
+                        Some(server.address()),
+                    )
+                }
+                None => (None, None),
             }
-        });
-
-        let address = self
-            .server
-            .lock()
-            .await
-            .as_ref()
-            .map(LoopbackControlServer::address);
+        };
         let sessions = self
             .sessions
             .lock()
