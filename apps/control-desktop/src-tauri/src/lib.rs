@@ -3,8 +3,8 @@
 use cargo_dispatch_control_ui_contracts::{
     ControlUiStatus, DashboardDocument, DashboardDocumentDirection, DashboardLocation,
     DashboardNavigation, DashboardPoint, ListenerMode, ListenerStatus, OperatorDocumentInput,
-    PickedFile, RegisterTripInput, ReorderRouteInput, SessionInput, SessionStatus, StartLanInput,
-    TripDashboard,
+    PickedFile, RegisterTripInput, ReorderRouteInput, SaveDocumentInput, SessionInput,
+    SessionStatus, StartLanInput, TripDashboard,
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
@@ -13,6 +13,7 @@ use cargo_dispatch_domain::{DocumentId, PointId};
 use cargo_dispatch_trip_files::{DocumentDirection, DocumentStoreDraft, TripFolder};
 use std::{
     collections::BTreeMap,
+    fs,
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
     sync::Mutex,
@@ -336,6 +337,17 @@ impl DesktopControlService {
         .map_err(|error| format!("Control не прийняв файл: {error}"))?;
         dashboard(snapshot)
     }
+
+    fn verified_document(
+        &self,
+        input: &SaveDocumentInput,
+    ) -> Result<(cargo_dispatch_trip_files::StoredDocument, PathBuf), String> {
+        let id = document_id(&input.document_id)?;
+        self.browser
+            .verified_session_document_path(&input.token, id)
+            .map_err(|error| format!("Не вдалося перевірити файл рейсу: {error}"))
+    }
+
 }
 
 #[tauri::command]
@@ -381,6 +393,37 @@ async fn pick_operator_file(app: AppHandle) -> Result<Option<PickedFile>, String
     })
     .await
     .map_err(|error| format!("Не вдалося відкрити вибір файла: {error}"))?
+}
+
+#[tauri::command]
+async fn save_session_document(
+    input: SaveDocumentInput,
+    app: AppHandle,
+    state: State<'_, DesktopControlService>,
+) -> Result<Option<String>, String> {
+    let (document, source) = state.verified_document(&input)?;
+    tokio::task::spawn_blocking(move || {
+        let target = app
+            .dialog()
+            .file()
+            .set_file_name(document.original_name.clone())
+            .blocking_save_file();
+        let Some(target) = target else {
+            return Ok(None);
+        };
+        let target = target
+            .into_path()
+            .map_err(|error| format!("Не вдалося прочитати шлях збереження: {error}"))?;
+        let copied = fs::copy(&source, &target)
+            .map_err(|error| format!("Не вдалося зберегти файл: {error}"))?;
+        if copied != document.size {
+            let _ = fs::remove_file(&target);
+            return Err("Збережений файл має неправильний розмір".to_owned());
+        }
+        Ok(Some(target.to_string_lossy().into_owned()))
+    })
+    .await
+    .map_err(|error| format!("Не вдалося виконати збереження файла: {error}"))?
 }
 
 #[tauri::command]
@@ -456,6 +499,7 @@ pub fn run() {
             stop_browser_server,
             pick_trip_folder,
             pick_operator_file,
+            save_session_document,
             trip_dashboard,
             reorder_trip_route,
             send_operator_document,
@@ -555,6 +599,15 @@ mod tests {
             updated.documents[0].direction,
             DashboardDocumentDirection::FromOperator
         );
+        let save_input = SaveDocumentInput {
+            token: token.to_owned(),
+            document_id: updated.documents[0].document_id.clone(),
+        };
+        let (verified, source) = service
+            .verified_document(&save_input)
+            .expect("stored document verifies before native save dialog");
+        assert_eq!(verified.original_name, "operator-note.pdf");
+        assert_eq!(std::fs::read(source)?, b"synthetic operator document");
 
         Ok(())
     }
