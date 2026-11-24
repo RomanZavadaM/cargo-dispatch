@@ -166,7 +166,10 @@ mod tests {
 
     #[test]
     fn cache_key_includes_profile_hash() {
-        let point_a = GeoPoint {\n            lat: 49.0,\n            lon: 24.0,\n        };
+        let point_a = GeoPoint {
+            lat: 49.0,
+            lon: 24.0,
+        };
         let point_b = GeoPoint {
             lat: 49.0,
             lon: 24.01,
