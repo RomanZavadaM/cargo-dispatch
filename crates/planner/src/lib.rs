@@ -491,6 +491,89 @@ pub fn evaluate_route_time_windows(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComplianceHardRejectReason {
+    DrivingBudgetExceeded {
+        required_driving_ms: u64,
+        available_driving_ms: u64,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComplianceNeedsCheckReason {
+    RequiredDrivingUnknown,
+    AvailableDrivingUnknown,
+    LowDrivingReserve {
+        reserve_ms: u64,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComplianceFeasibility {
+    pub level: FeasibilityLevel,
+    pub hard_reasons: Vec<ComplianceHardRejectReason>,
+    pub check_reasons: Vec<ComplianceNeedsCheckReason>,
+    pub known_driving_reserve_ms: Option<u64>,
+}
+
+#[must_use]
+pub fn evaluate_driving_budget(
+    required_driving_ms: Option<u64>,
+    available_driving_ms: Option<u64>,
+    low_reserve_threshold_ms: u64,
+) -> ComplianceFeasibility {
+    match (required_driving_ms, available_driving_ms) {
+        (Some(required), Some(available)) if required > available => ComplianceFeasibility {
+            level: FeasibilityLevel::Impossible,
+            hard_reasons: vec![ComplianceHardRejectReason::DrivingBudgetExceeded {
+                required_driving_ms: required,
+                available_driving_ms: available,
+            }],
+            check_reasons: Vec::new(),
+            known_driving_reserve_ms: Some(0),
+        },
+        (Some(required), Some(available)) => {
+            let reserve_ms = available - required;
+            let check_reasons = if reserve_ms <= low_reserve_threshold_ms {
+                vec![ComplianceNeedsCheckReason::LowDrivingReserve { reserve_ms }]
+            } else {
+                Vec::new()
+            };
+            ComplianceFeasibility {
+                level: if check_reasons.is_empty() {
+                    FeasibilityLevel::Feasible
+                } else {
+                    FeasibilityLevel::NeedsCheck
+                },
+                hard_reasons: Vec::new(),
+                check_reasons,
+                known_driving_reserve_ms: Some(reserve_ms),
+            }
+        }
+        (None, Some(_)) => ComplianceFeasibility {
+            level: FeasibilityLevel::NeedsCheck,
+            hard_reasons: Vec::new(),
+            check_reasons: vec![ComplianceNeedsCheckReason::RequiredDrivingUnknown],
+            known_driving_reserve_ms: None,
+        },
+        (Some(_), None) => ComplianceFeasibility {
+            level: FeasibilityLevel::NeedsCheck,
+            hard_reasons: Vec::new(),
+            check_reasons: vec![ComplianceNeedsCheckReason::AvailableDrivingUnknown],
+            known_driving_reserve_ms: None,
+        },
+        (None, None) => ComplianceFeasibility {
+            level: FeasibilityLevel::NeedsCheck,
+            hard_reasons: Vec::new(),
+            check_reasons: vec![
+                ComplianceNeedsCheckReason::RequiredDrivingUnknown,
+                ComplianceNeedsCheckReason::AvailableDrivingUnknown,
+            ],
+            known_driving_reserve_ms: None,
+        },
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     DuplicateRequest,
     RequestNotFound,
@@ -1307,6 +1390,73 @@ mod tests {
                     slack_ms: 5 * 60 * 1_000,
                 })
         );
+    }
+
+    #[test]
+    fn driving_budget_violation_is_hard_reject() {
+        let result = evaluate_driving_budget(
+            Some(6 * 60 * 60 * 1_000),
+            Some(5 * 60 * 60 * 1_000),
+            30 * 60 * 1_000,
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Impossible);
+        assert_eq!(
+            result.hard_reasons,
+            vec![ComplianceHardRejectReason::DrivingBudgetExceeded {
+                required_driving_ms: 6 * 60 * 60 * 1_000,
+                available_driving_ms: 5 * 60 * 60 * 1_000,
+            }]
+        );
+    }
+
+    #[test]
+    fn low_but_legal_driving_reserve_is_warning() {
+        let result = evaluate_driving_budget(
+            Some(4 * 60 * 60 * 1_000 + 45 * 60 * 1_000),
+            Some(5 * 60 * 60 * 1_000),
+            30 * 60 * 1_000,
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
+        assert!(result.hard_reasons.is_empty());
+        assert_eq!(result.known_driving_reserve_ms, Some(15 * 60 * 1_000));
+        assert_eq!(
+            result.check_reasons,
+            vec![ComplianceNeedsCheckReason::LowDrivingReserve {
+                reserve_ms: 15 * 60 * 1_000,
+            }]
+        );
+    }
+
+    #[test]
+    fn sufficient_known_driving_budget_is_feasible() {
+        let result = evaluate_driving_budget(
+            Some(4 * 60 * 60 * 1_000),
+            Some(6 * 60 * 60 * 1_000),
+            30 * 60 * 1_000,
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Feasible);
+        assert!(result.hard_reasons.is_empty());
+        assert!(result.check_reasons.is_empty());
+        assert_eq!(result.known_driving_reserve_ms, Some(2 * 60 * 60 * 1_000));
+    }
+
+    #[test]
+    fn unknown_driving_budget_data_needs_check() {
+        let result = evaluate_driving_budget(None, None, 30 * 60 * 1_000);
+
+        assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
+        assert!(result.hard_reasons.is_empty());
+        assert_eq!(
+            result.check_reasons,
+            vec![
+                ComplianceNeedsCheckReason::RequiredDrivingUnknown,
+                ComplianceNeedsCheckReason::AvailableDrivingUnknown,
+            ]
+        );
+        assert_eq!(result.known_driving_reserve_ms, None);
     }
 
     #[test]
