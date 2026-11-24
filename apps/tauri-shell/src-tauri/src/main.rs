@@ -8,10 +8,7 @@ use std::{
     thread,
     time::Duration,
 };
-use tauri::{
-    AppHandle, Emitter, Manager, State, WebviewUrl,
-    webview::WebviewWindowBuilder,
-};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, webview::WebviewWindowBuilder};
 use ui_probe_core::{ApplicationService, IntakeMode, LoadRequest, ProbeSummary, SortField};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
