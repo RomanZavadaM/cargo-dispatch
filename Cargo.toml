@@ -7,6 +7,7 @@ members = [
   "crates/planner",
   "crates/control",
   "crates/trip-files",
+  "crates/control-web",
 ]
 
 [workspace.package]
