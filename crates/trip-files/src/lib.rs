@@ -2,7 +2,8 @@
 
 use cargo_dispatch_contracts::{
     CURRENT_SCHEMA_VERSION, PackageContentFingerprint, ReplanRequest, TRIP_PACKAGE_SCHEMA_NAME,
-    TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion, validate_route_points,
+    TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion,
+    validate_route_points,
 };
 use cargo_dispatch_control::{
     InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft, StoredTripPlan, TripImportCandidate,
@@ -394,6 +395,35 @@ enum Kind {
     Custom(String),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Navigation {
+    latitude_e7: i32,
+    longitude_e7: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    address: Option<String>,
+}
+
+impl From<&TripNavigationTarget> for Navigation {
+    fn from(target: &TripNavigationTarget) -> Self {
+        Self {
+            latitude_e7: target.latitude_e7,
+            longitude_e7: target.longitude_e7,
+            address: target.address.clone(),
+        }
+    }
+}
+
+impl From<&Navigation> for TripNavigationTarget {
+    fn from(target: &Navigation) -> Self {
+        Self {
+            latitude_e7: target.latitude_e7,
+            longitude_e7: target.longitude_e7,
+            address: target.address.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Point {
@@ -401,6 +431,8 @@ struct Point {
     #[serde(with = "Kind")]
     kind: TripPointKind,
     title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    navigation: Option<Navigation>,
 }
 impl From<&TripRoutePoint> for Point {
     fn from(p: &TripRoutePoint) -> Self {
@@ -408,6 +440,7 @@ impl From<&TripRoutePoint> for Point {
             id: p.point_id.as_bytes(),
             kind: p.kind.clone(),
             title: p.title.clone(),
+            navigation: p.navigation.as_ref().map(Navigation::from),
         }
     }
 }
@@ -421,6 +454,7 @@ fn points(rows: &[Point]) -> io::Result<Vec<TripRoutePoint>> {
                 sequence: u32::try_from(i + 1).map_err(invalid)?,
                 kind: p.kind.clone(),
                 title: p.title.clone(),
+                navigation: p.navigation.as_ref().map(TripNavigationTarget::from),
             })
         })
         .collect()
@@ -1053,6 +1087,11 @@ mod tests {
                 sequence: u32::from(offset) + 1,
                 kind: TripPointKind::Load,
                 title: format!("Точка {}", offset + 1),
+                navigation: Some(TripNavigationTarget {
+                    latitude_e7: 498_393_000 + i32::from(offset) * 1_000,
+                    longitude_e7: 240_296_000 + i32::from(offset) * 1_000,
+                    address: Some(format!("Synthetic address {}", offset + 1)),
+                }),
             })
             .collect();
         let draft = PlannerTripExportDraft {
@@ -1079,6 +1118,7 @@ mod tests {
                 sequence: n.into(),
                 kind: TripPointKind::Load,
                 title: format!("Точка {n}"),
+                navigation: None,
             })
             .collect();
         let draft = PlannerTripExportDraft {
@@ -1134,6 +1174,7 @@ mod tests {
                 sequence: u32::try_from(index + 1).unwrap(),
                 kind: TripPointKind::Load,
                 title: format!("Точка {}", index + 1),
+                navigation: None,
             })
             .collect();
 
