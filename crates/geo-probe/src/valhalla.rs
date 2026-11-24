@@ -27,7 +27,6 @@ pub fn route_payload(request: &RouteRequest) -> Value {
     }
     truck.insert("hazmat".into(), json!(profile.hazmat));
     truck.insert("exclude_unpaved".into(), json!(profile.exclude_unpaved));
-    truck.insert("exclude_restricted".into(), json!(true));
     truck.insert(
         "use_truck_route".into(),
         json!(if profile.use_truck_route { 1.0 } else { 0.0 }),
@@ -127,7 +126,13 @@ pub fn normalize_route_response(
 }
 
 fn point_json(lat: f64, lon: f64) -> Value {
-    json!({"lat": lat, "lon": lon})
+    json!({
+        "lat": lat,
+        "lon": lon,
+        "search_filter": {
+            "exclude_restricted": true
+        }
+    })
 }
 
 fn insert_optional_f64(target: &mut Map<String, Value>, key: &str, value: Option<f64>) {
@@ -203,7 +208,7 @@ mod tests {
         assert_eq!(payload["costing_options"]["truck"]["height"], 3.1);
         assert_eq!(payload["costing_options"]["truck"]["weight"], 10.0);
         assert_eq!(
-            payload["costing_options"]["truck"]["exclude_restricted"],
+            payload["locations"][0]["search_filter"]["exclude_restricted"],
             true
         );
     }
