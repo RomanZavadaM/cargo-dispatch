@@ -104,6 +104,10 @@ impl ApplicationService {
         }
     }
 
+    pub fn get_request(&self, id: u64) -> Option<LoadRequest> {
+        self.rows.iter().find(|row| row.id == id).cloned()
+    }
+
     pub fn query(
         &self,
         filter: &str,
@@ -202,6 +206,15 @@ mod tests {
             a.query("", SortField::Id, true, None),
             b.query("", SortField::Id, true, None)
         );
+    }
+
+    #[test]
+    fn get_request_returns_application_record() {
+        let service = ApplicationService::synthetic();
+        let row = service.get_request(4_321).expect("synthetic row exists");
+        assert_eq!(row.id, 4_321);
+        assert_eq!(service.get_request(0), None);
+        assert_eq!(service.get_request(5_001), None);
     }
 
     #[test]
