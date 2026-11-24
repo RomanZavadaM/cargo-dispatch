@@ -8,6 +8,10 @@
 
 **cargo-dispatch** sélectionne des chargements sur le marché pour une flotte de petits camions (poids total jusqu'à 7,5 t), construit des tournées avec des chargements complémentaires en route et donne au dispatcheur le contrôle des déplacements des véhicules. Langage de développement : Rust.
 
+## Langues de l’interface
+
+Le prototype actuel de l’interface implémente et vérifie **l’ukrainien, l’anglais et l’allemand**. Les autres traductions du README sont des langues de documentation ou des langues cibles et ne signifient pas encore que l’interface du programme les prend en charge.
+
 ## Documentation
 
 La documentation de travail du projet est conservée en privé.
