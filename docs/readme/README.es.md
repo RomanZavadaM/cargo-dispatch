@@ -8,6 +8,10 @@
 
 **cargo-dispatch** selecciona cargas del mercado para una flota de camiones pequeños (masa total hasta 7,5 t), crea rutas con cargas adicionales por el camino y da al despachador el control del movimiento de los vehículos. Lenguaje de desarrollo: Rust.
 
+## Idiomas de la interfaz
+
+El prototipo actual de la interfaz implementa y verifica **ucraniano, inglés y alemán**. Las demás traducciones del README son idiomas de documentación u objetivos y todavía no significan que la interfaz del programa los admita.
+
 ## Documentación
 
 La documentación de trabajo del proyecto se mantiene de forma privada.
