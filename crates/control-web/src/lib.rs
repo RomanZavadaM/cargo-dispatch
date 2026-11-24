@@ -430,8 +430,8 @@ fn parse_uuid_bytes(value: &str) -> Result<[u8; 16], StatusCode> {
     let mut bytes = [0_u8; 16];
     for (index, byte) in bytes.iter_mut().enumerate() {
         let start = index * 2;
-        *byte =
-            u8::from_str_radix(&value[start..start + 2], 16).map_err(|_| StatusCode::BAD_REQUEST)?;
+        *byte = u8::from_str_radix(&value[start..start + 2], 16)
+            .map_err(|_| StatusCode::BAD_REQUEST)?;
     }
     Ok(bytes)
 }
@@ -466,9 +466,7 @@ fn location_sample(update: LocationUpdate) -> Result<DriverLocationSample, Statu
 
     let accuracy_cm = match update.accuracy_m {
         Some(value)
-            if value.is_finite()
-                && value >= 0.0
-                && value <= f64::from(u32::MAX) / 100.0 =>
+            if value.is_finite() && value >= 0.0 && value <= f64::from(u32::MAX) / 100.0 =>
         {
             Some((value * 100.0).round() as u32)
         }
@@ -980,10 +978,7 @@ impl LoopbackControlServer {
         .await
     }
 
-    pub async fn start_lan(
-        state: ControlBrowserState,
-        address: SocketAddr,
-    ) -> io::Result<Self> {
+    pub async fn start_lan(state: ControlBrowserState, address: SocketAddr) -> io::Result<Self> {
         validate_lan_address(address)?;
         Self::start_bound(state, address, ControlAccessMode::Lan).await
     }
@@ -1160,8 +1155,14 @@ mod tests {
         assert_eq!(server.info().mode, ControlAccessMode::Loopback);
         assert_eq!(server.address().ip(), IpAddr::V4(Ipv4Addr::LOCALHOST));
 
-        let (status, _, page) =
-            http_request(server.address(), "GET", "/driver/trip-a-token-0001", &[], &[]).await?;
+        let (status, _, page) = http_request(
+            server.address(),
+            "GET",
+            "/driver/trip-a-token-0001",
+            &[],
+            &[],
+        )
+        .await?;
         assert_eq!(status, 200);
         assert!(String::from_utf8_lossy(&page).contains("Передати в Control"));
 
@@ -1189,7 +1190,10 @@ mod tests {
         assert_eq!(status, 200);
 
         trip = get_json(server.address(), "/api/trip/trip-a-token-0001").await?;
-        assert_eq!(trip.points[0].point_id, id_hex(route_a[2].point_id.as_bytes()));
+        assert_eq!(
+            trip.points[0].point_id,
+            id_hex(route_a[2].point_id.as_bytes())
+        );
 
         let location_body = serde_json::to_vec(&serde_json::json!({
             "latitude": 49.8393,
@@ -1210,9 +1214,7 @@ mod tests {
         let driver_document = DocumentId::from_bytes([81; 16]).unwrap();
         let driver_document_hex = id_hex(driver_document.as_bytes());
         let video_bytes = b"synthetic-driver-video-bytes";
-        let upload_path = format!(
-            "/api/trip/trip-a-token-0001/documents/{driver_document_hex}"
-        );
+        let upload_path = format!("/api/trip/trip-a-token-0001/documents/{driver_document_hex}");
         let upload_headers = [
             ("Content-Type", "video/mp4".to_owned()),
             ("X-File-Name", "driver-video.mp4".to_owned()),
@@ -1272,9 +1274,8 @@ mod tests {
         assert!(headers.contains("video/mp4"));
         assert_eq!(body, video_bytes);
 
-        let wrong_trip_download = format!(
-            "/api/trip/trip-b-token-0002/documents/{driver_document_hex}"
-        );
+        let wrong_trip_download =
+            format!("/api/trip/trip-b-token-0002/documents/{driver_document_hex}");
         let (status, _, _) =
             http_request(server.address(), "GET", &wrong_trip_download, &[], &[]).await?;
         assert_eq!(status, 404);
@@ -1292,9 +1293,15 @@ mod tests {
         drop(state);
 
         let recovered_a = TripFolder::open(&folder_a_path, trip_a)?;
-        assert_eq!(recovered_a.state().route_points[0].point_id, route_a[2].point_id);
         assert_eq!(
-            recovered_a.latest_location().expect("durable location").latitude_e7,
+            recovered_a.state().route_points[0].point_id,
+            route_a[2].point_id
+        );
+        assert_eq!(
+            recovered_a
+                .latest_location()
+                .expect("durable location")
+                .latitude_e7,
             498_393_000
         );
         assert_eq!(recovered_a.documents().len(), 2);
@@ -1304,7 +1311,10 @@ mod tests {
         let recovered_b = TripFolder::open(&folder_b_path, trip_b)?;
         assert!(recovered_b.documents().is_empty());
         assert!(recovered_b.latest_location().is_none());
-        assert_eq!(recovered_b.state().route_points[0].point_id, route_b[0].point_id);
+        assert_eq!(
+            recovered_b.state().route_points[0].point_id,
+            route_b[0].point_id
+        );
 
         Ok(())
     }
