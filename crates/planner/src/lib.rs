@@ -3403,11 +3403,8 @@ mod tests {
 
     #[test]
     fn planner_replan_intake_rejects_stale_export_version() {
-        let mut route = manual_working_route(
-            working_route_id(25),
-            &[point_id(61), point_id(62)],
-        )
-        .expect("route");
+        let mut route = manual_working_route(working_route_id(25), &[point_id(61), point_id(62)])
+            .expect("route");
         route.state = WorkingRouteState::Ready;
 
         let first = build_trip_export_draft(
@@ -3465,11 +3462,8 @@ mod tests {
 
     #[test]
     fn planner_replan_intake_rejects_unknown_execution_references() {
-        let mut route = manual_working_route(
-            working_route_id(26),
-            &[point_id(63), point_id(64)],
-        )
-        .expect("route");
+        let mut route = manual_working_route(working_route_id(26), &[point_id(63), point_id(64)])
+            .expect("route");
         route.state = WorkingRouteState::Ready;
         let draft = build_trip_export_draft(
             &route,
@@ -3504,17 +3498,16 @@ mod tests {
 
         assert_eq!(
             history.validate_replan_request(&bad_completed),
-            Err(PlannerReplanIntakeError::UnknownCompletedPoint(point_id(65)))
+            Err(PlannerReplanIntakeError::UnknownCompletedPoint(point_id(
+                65
+            )))
         );
     }
 
     #[test]
     fn planner_export_history_rejects_duplicate_trip_version() {
-        let mut route = manual_working_route(
-            working_route_id(27),
-            &[point_id(66), point_id(67)],
-        )
-        .expect("route");
+        let mut route = manual_working_route(working_route_id(27), &[point_id(66), point_id(67)])
+            .expect("route");
         route.state = WorkingRouteState::Ready;
         let draft = build_trip_export_draft(
             &route,
