@@ -1461,4 +1461,44 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn driver_location_is_durable_validated_and_idempotent() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package = tmp.path().join("location-trip.zip");
+        let folder = tmp.path().join("location-trip");
+        let (trip, _) = create_test_package(&package, 140, 150)?;
+        let mut control = TripFolder::import(&folder, &package)?;
+
+        let sample = DriverLocationSample {
+            latitude_e7: 498_393_000,
+            longitude_e7: 240_296_000,
+            accuracy_cm: Some(850),
+            observed_at_unix_ms: 1_795_550_000_000,
+        };
+        control.record_location(sample)?;
+        control.record_location(sample)?;
+        assert_eq!(control.locations(), &[sample]);
+        assert_eq!(control.latest_location(), Some(sample));
+
+        assert!(control
+            .record_location(DriverLocationSample {
+                latitude_e7: 901_000_000,
+                ..sample
+            })
+            .is_err());
+        assert!(control
+            .record_location(DriverLocationSample {
+                observed_at_unix_ms: 0,
+                ..sample
+            })
+            .is_err());
+
+        drop(control);
+        let recovered = TripFolder::open(&folder, trip)?;
+        assert_eq!(recovered.locations(), &[sample]);
+        assert_eq!(recovered.latest_location(), Some(sample));
+        Ok(())
+    }
+
 }
