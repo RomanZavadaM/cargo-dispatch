@@ -129,6 +129,21 @@ function renderRoute() {
     text.textContent = point.sequence + ". " + point.title +
       (point.completed ? " — виконано" : " — відкрито");
     row.append(text);
+    if (point.navigation) {
+      const nav = document.createElement("div");
+      const address = point.navigation.address ? point.navigation.address + " — " : "";
+      nav.textContent = address +
+        point.navigation.latitude.toFixed(6) + ", " +
+        point.navigation.longitude.toFixed(6) + " ";
+      const link = document.createElement("a");
+      link.href = "https://www.google.com/maps/dir/?api=1&destination=" +
+        encodeURIComponent(point.navigation.latitude + "," + point.navigation.longitude);
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "Відкрити навігацію";
+      nav.append(link);
+      row.append(nav);
+    }
 
     if (!point.completed) {
       const done = document.createElement("button");
@@ -308,12 +323,20 @@ pub enum SessionRegistrationError {
     StateUnavailable,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DriverNavigationSnapshot {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub address: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DriverPointSnapshot {
     pub point_id: String,
     pub sequence: u32,
     pub title: String,
     pub completed: bool,
+    pub navigation: Option<DriverNavigationSnapshot>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -522,6 +545,13 @@ fn snapshot(trip: &TripFolder) -> DriverTripSnapshot {
                 sequence: point.sequence,
                 title: point.title.clone(),
                 completed: state.completed_point_ids.contains(&point.point_id),
+                navigation: point.navigation.as_ref().map(|navigation| {
+                    DriverNavigationSnapshot {
+                        latitude: navigation.latitude(),
+                        longitude: navigation.longitude(),
+                        address: navigation.address.clone(),
+                    }
+                }),
             })
             .collect(),
         documents: trip.documents().iter().map(document_snapshot).collect(),
@@ -1015,7 +1045,9 @@ impl Drop for LoopbackControlServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cargo_dispatch_contracts::{TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion};
+    use cargo_dispatch_contracts::{
+        TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion,
+    };
     use cargo_dispatch_domain::{OperatorId, TripId, WorkingRouteId};
     use cargo_dispatch_planner::PlannerTripExportDraft;
     use cargo_dispatch_trip_files::{DocumentStoreDraft, TripFolder, export_package};
@@ -1038,6 +1070,11 @@ mod tests {
                 sequence: u32::from(offset) + 1,
                 kind: TripPointKind::Load,
                 title: format!("Synthetic point {}", offset + 1),
+                navigation: Some(TripNavigationTarget {
+                    latitude_e7: 498_393_000 + i32::from(offset) * 1_000,
+                    longitude_e7: 240_296_000 + i32::from(offset) * 1_000,
+                    address: Some(format!("Synthetic address {}", offset + 1)),
+                }),
             })
             .collect();
         let draft = PlannerTripExportDraft {
@@ -1194,6 +1231,13 @@ mod tests {
             trip.points[0].point_id,
             id_hex(route_a[2].point_id.as_bytes())
         );
+        let navigation = trip.points[0]
+            .navigation
+            .as_ref()
+            .expect("navigation target delivered");
+        assert_eq!(navigation.address.as_deref(), Some("Synthetic address 3"));
+        assert!((navigation.latitude - 49.8395).abs() < 0.000001);
+        assert!((navigation.longitude - 24.0298).abs() < 0.000001);
 
         let location_body = serde_json::to_vec(&serde_json::json!({
             "latitude": 49.8393,
