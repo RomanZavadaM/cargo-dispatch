@@ -97,6 +97,12 @@ pub struct SessionInput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SaveDocumentInput {
+    pub token: String,
+    pub document_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReorderRouteInput {
     pub token: String,
     pub based_on_revision: u64,
