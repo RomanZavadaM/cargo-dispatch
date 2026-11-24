@@ -263,11 +263,13 @@
           applyRouteSelection();
           applyPointSelection();
           fitAll();
-          generation += 1;
-          const generationOutput = document.getElementById("map-generation");
-          if (generationOutput) generationOutput.textContent = String(generation);
-          mounting = false;
-          emit("cargo-map-ready", generation);
+          map.once("idle", () => {
+            generation += 1;
+            const generationOutput = document.getElementById("map-generation");
+            if (generationOutput) generationOutput.textContent = String(generation);
+            mounting = false;
+            emit("cargo-map-ready", generation);
+          });
         });
 
         return true;
