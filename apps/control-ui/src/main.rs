@@ -275,13 +275,16 @@ fn ControlApp() -> impl IntoView {
                                 <li>
                                     <div><strong>"Trip: "</strong><code>{trip}</code></div>
                                     <div><strong>"Token: "</strong><code>{token_text}</code></div>
-                                    {url.map(|driver_url| view! {
-                                        <div>
-                                            <strong>"Driver URL: "</strong>
-                                            <a href=driver_url.clone() target="_blank" rel="noopener">
-                                                {driver_url.clone()}
-                                            </a>
-                                        </div>
+                                    {url.map(|driver_url| {
+                                        let href = driver_url.clone();
+                                        view! {
+                                            <div>
+                                                <strong>"Driver URL: "</strong>
+                                                <a href=href target="_blank" rel="noopener">
+                                                    {driver_url}
+                                                </a>
+                                            </div>
+                                        }
                                     })}
                                 </li>
                             }
