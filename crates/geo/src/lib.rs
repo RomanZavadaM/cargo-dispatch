@@ -2,68 +2,140 @@
 
 use core::fmt;
 
-const FNV_OFFSET: u64 = 0xcbf29ce484222325;
-const FNV_PRIME: u64 = 0x100000001b3;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GeoValidationError {
-    LatitudeOutOfRange,
-    LongitudeOutOfRange,
-    NonFiniteCoordinate,
-    InvalidVehicleDimension,
-    InvalidAxleCount,
-    EmptyDatasetId,
-    EmptyRoute,
-    EmptyMatrix,
-}
-
-impl fmt::Display for GeoValidationError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let message = match self {
-            Self::LatitudeOutOfRange => "latitude must be between -90 and 90",
-            Self::LongitudeOutOfRange => "longitude must be between -180 and 180",
-            Self::NonFiniteCoordinate => "coordinate must be finite",
-            Self::InvalidVehicleDimension => "vehicle dimensions and weights must be positive",
-            Self::InvalidAxleCount => "axle count must be greater than zero when known",
-            Self::EmptyDatasetId => "map dataset id must not be empty",
-            Self::EmptyRoute => "route requires at least origin and destination",
-            Self::EmptyMatrix => "matrix requires at least one source and one target",
-        };
-        formatter.write_str(message)
-    }
-}
-
-impl std::error::Error for GeoValidationError {}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GeoPoint {
-    pub lat: f64,
-    pub lon: f64,
+    lat: f64,
+    lon: f64,
 }
 
 impl GeoPoint {
-    pub fn new(lat: f64, lon: f64) -> Result<Self, GeoValidationError> {
-        if !lat.is_finite() || !lon.is_finite() {
-            return Err(GeoValidationError::NonFiniteCoordinate);
+    pub fn new(lat: f64, lon: f64) -> Result<Self, GeoContractError> {
+        if !lat.is_finite() || !(-90.0..=90.0).contains(&lat) {
+            return Err(GeoContractError::InvalidLatitude);
         }
-        if !(-90.0..=90.0).contains(&lat) {
-            return Err(GeoValidationError::LatitudeOutOfRange);
-        }
-        if !(-180.0..=180.0).contains(&lon) {
-            return Err(GeoValidationError::LongitudeOutOfRange);
+        if !lon.is_finite() || !(-180.0..=180.0).contains(&lon) {
+            return Err(GeoContractError::InvalidLongitude);
         }
         Ok(Self { lat, lon })
     }
+
+    #[must_use]
+    pub const fn lat(self) -> f64 {
+        self.lat
+    }
+
+    #[must_use]
+    pub const fn lon(self) -> f64 {
+        self.lon
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TollPreference {
+    Allow,
+    PreferAvoid,
+    Avoid,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct VehicleRoutingProfile {
+    pub height_m: Option<f64>,
+    pub width_m: Option<f64>,
+    pub length_m: Option<f64>,
+    pub gross_weight_t: Option<f64>,
+    pub axle_load_t: Option<f64>,
+    pub axle_count: Option<u8>,
+    pub hazmat: bool,
+    pub hgv: bool,
+    pub exclude_unpaved: bool,
+    pub prefer_truck_routes: bool,
+    pub toll_preference: TollPreference,
+    pub max_speed_kmh: Option<f64>,
+}
+
+impl VehicleRoutingProfile {
+    pub fn validate(&self) -> Result<(), GeoContractError> {
+        validate_optional_positive("height_m", self.height_m)?;
+        validate_optional_positive("width_m", self.width_m)?;
+        validate_optional_positive("length_m", self.length_m)?;
+        validate_optional_positive("gross_weight_t", self.gross_weight_t)?;
+        validate_optional_positive("axle_load_t", self.axle_load_t)?;
+        validate_optional_positive("max_speed_kmh", self.max_speed_kmh)?;
+
+        if self.axle_count == Some(0) {
+            return Err(GeoContractError::InvalidVehicleValue("axle_count"));
+        }
+
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn warnings(&self) -> Vec<GeoWarning> {
+        let mut warnings = Vec::new();
+
+        if self.height_m.is_none() {
+            warnings.push(GeoWarning::MissingVehicleDimension(
+                VehicleDimension::Height,
+            ));
+        }
+        if self.width_m.is_none() {
+            warnings.push(GeoWarning::MissingVehicleDimension(
+                VehicleDimension::Width,
+            ));
+        }
+        if self.length_m.is_none() {
+            warnings.push(GeoWarning::MissingVehicleDimension(
+                VehicleDimension::Length,
+            ));
+        }
+        if self.gross_weight_t.is_none() {
+            warnings.push(GeoWarning::MissingVehicleDimension(
+                VehicleDimension::GrossWeight,
+            ));
+        }
+        if self.axle_load_t.is_none() {
+            warnings.push(GeoWarning::MissingVehicleDimension(
+                VehicleDimension::AxleLoad,
+            ));
+        }
+        if self.axle_count.is_none() {
+            warnings.push(GeoWarning::MissingVehicleDimension(
+                VehicleDimension::AxleCount,
+            ));
+        }
+
+        warnings
+    }
+}
+
+fn validate_optional_positive(
+    field: &'static str,
+    value: Option<f64>,
+) -> Result<(), GeoContractError> {
+    if value.is_some_and(|value| !value.is_finite() || value <= 0.0) {
+        return Err(GeoContractError::InvalidVehicleValue(field));
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VehicleDimension {
+    Height,
+    Width,
+    Length,
+    GrossWeight,
+    AxleLoad,
+    AxleCount,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GeoWarning {
-    VehicleDimensionUnknown,
+    MissingVehicleDimension(VehicleDimension),
     ApproximateEstimate,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GeoStatus {
+pub enum NormalizedStatus {
     Ok,
     NoRoute,
     InvalidPoint,
@@ -74,174 +146,145 @@ pub enum GeoStatus {
     EngineError,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct VehicleRoutingProfile {
-    pub height_m: Option<f64>,
-    pub width_m: Option<f64>,
-    pub length_m: Option<f64>,
-    pub weight_t: Option<f64>,
-    pub axle_load_t: Option<f64>,
-    pub axle_count: Option<u8>,
-    pub hazmat: bool,
-    pub hgv: bool,
-    pub exclude_unpaved: bool,
-    pub prefer_truck_routes: bool,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoutingIdentity {
+    engine: String,
+    engine_version: String,
+    map_dataset_id: String,
+    profile_fingerprint: String,
 }
 
-impl VehicleRoutingProfile {
-    pub fn validate(&self) -> Result<(), GeoValidationError> {
-        for value in [
-            self.height_m,
-            self.width_m,
-            self.length_m,
-            self.weight_t,
-            self.axle_load_t,
-        ]
-        .into_iter()
-        .flatten()
-        {
-            if !value.is_finite() || value <= 0.0 {
-                return Err(GeoValidationError::InvalidVehicleDimension);
-            }
+impl RoutingIdentity {
+    pub fn new(
+        engine: impl Into<String>,
+        engine_version: impl Into<String>,
+        map_dataset_id: impl Into<String>,
+        profile_fingerprint: impl Into<String>,
+    ) -> Result<Self, GeoContractError> {
+        let identity = Self {
+            engine: engine.into(),
+            engine_version: engine_version.into(),
+            map_dataset_id: map_dataset_id.into(),
+            profile_fingerprint: profile_fingerprint.into(),
+        };
+
+        if identity.engine.trim().is_empty() {
+            return Err(GeoContractError::EmptyIdentity("engine"));
+        }
+        if identity.engine_version.trim().is_empty() {
+            return Err(GeoContractError::EmptyIdentity("engine_version"));
+        }
+        if identity.map_dataset_id.trim().is_empty() {
+            return Err(GeoContractError::EmptyIdentity("map_dataset_id"));
+        }
+        if identity.profile_fingerprint.trim().is_empty() {
+            return Err(GeoContractError::EmptyIdentity("profile_fingerprint"));
         }
 
-        if self.axle_count == Some(0) {
-            return Err(GeoValidationError::InvalidAxleCount);
-        }
-        Ok(())
+        Ok(identity)
     }
 
     #[must_use]
-    pub fn warnings(&self) -> Vec<GeoWarning> {
-        let missing = self.height_m.is_none()
-            || self.width_m.is_none()
-            || self.length_m.is_none()
-            || self.weight_t.is_none()
-            || self.axle_load_t.is_none()
-            || self.axle_count.is_none();
-
-        if missing {
-            vec![GeoWarning::VehicleDimensionUnknown]
-        } else {
-            Vec::new()
-        }
-    }
-
-    pub fn profile_hash(&self) -> Result<RoutingProfileHash, GeoValidationError> {
-        self.validate()?;
-        let mut hash = FNV_OFFSET;
-
-        for value in [
-            self.height_m,
-            self.width_m,
-            self.length_m,
-            self.weight_t,
-            self.axle_load_t,
-        ] {
-            hash = hash_option_f64(hash, value);
-        }
-        hash = hash_option_u8(hash, self.axle_count);
-
-        for flag in [
-            self.hazmat,
-            self.hgv,
-            self.exclude_unpaved,
-            self.prefer_truck_routes,
-        ] {
-            hash = fnv_update(hash, &[u8::from(flag)]);
-        }
-
-        Ok(RoutingProfileHash(hash))
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct RoutingProfileHash(u64);
-
-impl RoutingProfileHash {
-    #[must_use]
-    pub const fn value(self) -> u64 {
-        self.0
+    pub fn engine(&self) -> &str {
+        &self.engine
     }
 
     #[must_use]
-    pub fn to_hex(self) -> String {
-        format!("{:016x}", self.0)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MapDatasetId(String);
-
-impl MapDatasetId {
-    pub fn new(value: impl Into<String>) -> Result<Self, GeoValidationError> {
-        let value = value.into();
-        if value.trim().is_empty() {
-            return Err(GeoValidationError::EmptyDatasetId);
-        }
-        Ok(Self(value))
+    pub fn engine_version(&self) -> &str {
+        &self.engine_version
     }
 
     #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
+    pub fn map_dataset_id(&self) -> &str {
+        &self.map_dataset_id
+    }
+
+    #[must_use]
+    pub fn profile_fingerprint(&self) -> &str {
+        &self.profile_fingerprint
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RouteRequest {
-    pub from: GeoPoint,
-    pub to: GeoPoint,
-    pub via: Vec<GeoPoint>,
-    pub profile: VehicleRoutingProfile,
+    points: Vec<GeoPoint>,
+    profile: VehicleRoutingProfile,
 }
 
 impl RouteRequest {
-    pub fn validate(&self) -> Result<(), GeoValidationError> {
-        self.profile.validate()
+    pub fn new(
+        points: Vec<GeoPoint>,
+        profile: VehicleRoutingProfile,
+    ) -> Result<Self, GeoContractError> {
+        if points.len() < 2 {
+            return Err(GeoContractError::RouteNeedsAtLeastTwoPoints);
+        }
+        profile.validate()?;
+        Ok(Self { points, profile })
     }
 
-    pub fn cache_key(&self, dataset_id: MapDatasetId) -> Result<RouteCacheKey, GeoValidationError> {
-        self.validate()?;
+    #[must_use]
+    pub fn points(&self) -> &[GeoPoint] {
+        &self.points
+    }
 
-        let mut coordinates_hash = FNV_OFFSET;
-        coordinates_hash = hash_point(coordinates_hash, self.from);
-        for point in &self.via {
-            coordinates_hash = hash_point(coordinates_hash, *point);
-        }
-        coordinates_hash = hash_point(coordinates_hash, self.to);
-
-        Ok(RouteCacheKey {
-            dataset_id,
-            profile_hash: self.profile.profile_hash()?,
-            coordinates_hash,
-        })
+    #[must_use]
+    pub const fn profile(&self) -> &VehicleRoutingProfile {
+        &self.profile
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RouteResult {
-    pub status: GeoStatus,
-    pub profile_hash: RoutingProfileHash,
-    pub map_dataset_id: MapDatasetId,
+    pub status: NormalizedStatus,
+    pub identity: RoutingIdentity,
     pub distance_m: Option<f64>,
     pub duration_s: Option<f64>,
+    pub geometry: Vec<GeoPoint>,
+    pub snapped_points: Vec<GeoPoint>,
     pub warnings: Vec<GeoWarning>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatrixRequest {
-    pub sources: Vec<GeoPoint>,
-    pub targets: Vec<GeoPoint>,
-    pub profile: VehicleRoutingProfile,
+    sources: Vec<GeoPoint>,
+    targets: Vec<GeoPoint>,
+    profile: VehicleRoutingProfile,
 }
 
 impl MatrixRequest {
-    pub fn validate(&self) -> Result<(), GeoValidationError> {
-        if self.sources.is_empty() || self.targets.is_empty() {
-            return Err(GeoValidationError::EmptyMatrix);
+    pub fn new(
+        sources: Vec<GeoPoint>,
+        targets: Vec<GeoPoint>,
+        profile: VehicleRoutingProfile,
+    ) -> Result<Self, GeoContractError> {
+        if sources.is_empty() {
+            return Err(GeoContractError::MatrixNeedsSource);
         }
-        self.profile.validate()
+        if targets.is_empty() {
+            return Err(GeoContractError::MatrixNeedsTarget);
+        }
+        profile.validate()?;
+        Ok(Self {
+            sources,
+            targets,
+            profile,
+        })
+    }
+
+    #[must_use]
+    pub fn sources(&self) -> &[GeoPoint] {
+        &self.sources
+    }
+
+    #[must_use]
+    pub fn targets(&self) -> &[GeoPoint] {
+        &self.targets
+    }
+
+    #[must_use]
+    pub const fn profile(&self) -> &VehicleRoutingProfile {
+        &self.profile
     }
 }
 
@@ -249,208 +292,167 @@ impl MatrixRequest {
 pub struct MatrixCell {
     pub source_index: usize,
     pub target_index: usize,
-    pub status: GeoStatus,
+    pub status: NormalizedStatus,
     pub distance_m: Option<f64>,
     pub duration_s: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatrixResult {
-    pub status: GeoStatus,
-    pub profile_hash: RoutingProfileHash,
-    pub map_dataset_id: MapDatasetId,
+    pub status: NormalizedStatus,
+    pub identity: RoutingIdentity,
     pub source_count: usize,
     pub target_count: usize,
     pub cells: Vec<MatrixCell>,
     pub warnings: Vec<GeoWarning>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RouteCacheKey {
-    pub dataset_id: MapDatasetId,
-    pub profile_hash: RoutingProfileHash,
-    pub coordinates_hash: u64,
-}
-
-fn canonical_f64_bits(value: f64) -> u64 {
-    if value == 0.0 {
-        0.0f64.to_bits()
-    } else {
-        value.to_bits()
+impl MatrixResult {
+    #[must_use]
+    pub fn is_complete(&self) -> bool {
+        self.cells.len() == self.source_count.saturating_mul(self.target_count)
     }
 }
 
-fn hash_option_f64(mut hash: u64, value: Option<f64>) -> u64 {
-    match value {
-        Some(value) => {
-            hash = fnv_update(hash, &[1]);
-            fnv_update(hash, &canonical_f64_bits(value).to_be_bytes())
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeoContractError {
+    InvalidLatitude,
+    InvalidLongitude,
+    InvalidVehicleValue(&'static str),
+    EmptyIdentity(&'static str),
+    RouteNeedsAtLeastTwoPoints,
+    MatrixNeedsSource,
+    MatrixNeedsTarget,
+}
+
+impl fmt::Display for GeoContractError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLatitude => formatter.write_str("latitude must be finite and within -90..=90"),
+            Self::InvalidLongitude => {
+                formatter.write_str("longitude must be finite and within -180..=180")
+            }
+            Self::InvalidVehicleValue(field) => write!(formatter, "{field} must be positive and finite"),
+            Self::EmptyIdentity(field) => write!(formatter, "{field} must not be empty"),
+            Self::RouteNeedsAtLeastTwoPoints => {
+                formatter.write_str("route request needs at least two ordered points")
+            }
+            Self::MatrixNeedsSource => formatter.write_str("matrix request needs at least one source"),
+            Self::MatrixNeedsTarget => formatter.write_str("matrix request needs at least one target"),
         }
-        None => fnv_update(hash, &[0]),
     }
 }
 
-fn hash_option_u8(mut hash: u64, value: Option<u8>) -> u64 {
-    match value {
-        Some(value) => {
-            hash = fnv_update(hash, &[1]);
-            fnv_update(hash, &[value])
-        }
-        None => fnv_update(hash, &[0]),
-    }
-}
-
-fn hash_point(mut hash: u64, point: GeoPoint) -> u64 {
-    hash = fnv_update(hash, &canonical_f64_bits(point.lat).to_be_bytes());
-    fnv_update(hash, &canonical_f64_bits(point.lon).to_be_bytes())
-}
-
-fn fnv_update(mut hash: u64, bytes: &[u8]) -> u64 {
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(FNV_PRIME);
-    }
-    hash
-}
+impl std::error::Error for GeoContractError {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn point(lat: f64, lon: f64) -> GeoPoint {
-        GeoPoint::new(lat, lon).expect("fixture point is valid")
-    }
-
-    fn profile(height_m: Option<f64>) -> VehicleRoutingProfile {
+    fn profile() -> VehicleRoutingProfile {
         VehicleRoutingProfile {
-            height_m,
-            width_m: Some(2.2),
-            length_m: Some(7.0),
-            weight_t: Some(7.5),
-            axle_load_t: Some(4.0),
+            height_m: Some(3.2),
+            width_m: Some(2.4),
+            length_m: Some(8.5),
+            gross_weight_t: Some(12.0),
+            axle_load_t: Some(5.0),
             axle_count: Some(2),
             hazmat: false,
             hgv: true,
             exclude_unpaved: false,
             prefer_truck_routes: true,
+            toll_preference: TollPreference::Allow,
+            max_speed_kmh: None,
         }
     }
 
     #[test]
-    fn coordinates_are_validated_before_an_adapter_sees_them() {
+    fn coordinates_are_validated_before_entering_requests() {
+        assert!(GeoPoint::new(49.0, 24.0).is_ok());
         assert_eq!(
             GeoPoint::new(91.0, 24.0),
-            Err(GeoValidationError::LatitudeOutOfRange)
+            Err(GeoContractError::InvalidLatitude)
         );
         assert_eq!(
-            GeoPoint::new(49.0, 181.0),
-            Err(GeoValidationError::LongitudeOutOfRange)
-        );
-        assert_eq!(
-            GeoPoint::new(f64::NAN, 24.0),
-            Err(GeoValidationError::NonFiniteCoordinate)
+            GeoPoint::new(49.0, f64::NAN),
+            Err(GeoContractError::InvalidLongitude)
         );
     }
 
     #[test]
-    fn unknown_vehicle_dimensions_remain_explicit() {
+    fn unknown_vehicle_dimensions_warn_but_do_not_invent_defaults() {
+        let mut incomplete = profile();
+        incomplete.height_m = None;
+        incomplete.axle_count = None;
+
         assert_eq!(
-            profile(None).warnings(),
-            vec![GeoWarning::VehicleDimensionUnknown]
+            incomplete.warnings(),
+            vec![
+                GeoWarning::MissingVehicleDimension(VehicleDimension::Height),
+                GeoWarning::MissingVehicleDimension(VehicleDimension::AxleCount),
+            ]
         );
+        assert!(incomplete.validate().is_ok());
     }
 
     #[test]
-    fn invalid_vehicle_profile_is_rejected() {
-        let mut invalid = profile(Some(3.2));
-        invalid.weight_t = Some(0.0);
+    fn invalid_provided_vehicle_value_is_rejected() {
+        let mut invalid = profile();
+        invalid.gross_weight_t = Some(0.0);
+
         assert_eq!(
             invalid.validate(),
-            Err(GeoValidationError::InvalidVehicleDimension)
+            Err(GeoContractError::InvalidVehicleValue("gross_weight_t"))
         );
+    }
 
-        invalid.weight_t = Some(7.5);
-        invalid.axle_count = Some(0);
+    #[test]
+    fn route_keeps_operator_ordered_points() {
+        let a = GeoPoint::new(49.0, 24.0).expect("valid point");
+        let via = GeoPoint::new(49.01, 24.01).expect("valid point");
+        let b = GeoPoint::new(49.02, 24.02).expect("valid point");
+        let request = RouteRequest::new(vec![a, via, b], profile()).expect("valid route request");
+
+        assert_eq!(request.points(), &[a, via, b]);
+    }
+
+    #[test]
+    fn matrix_requires_both_sides_and_exposes_expected_shape() {
+        let a = GeoPoint::new(49.0, 24.0).expect("valid point");
+        let b = GeoPoint::new(49.01, 24.01).expect("valid point");
+
         assert_eq!(
-            invalid.validate(),
-            Err(GeoValidationError::InvalidAxleCount)
+            MatrixRequest::new(Vec::new(), vec![b], profile()),
+            Err(GeoContractError::MatrixNeedsSource)
         );
-    }
 
-    #[test]
-    fn profile_hash_changes_when_truck_constraints_change() {
-        let low = profile(Some(3.0)).profile_hash().expect("valid profile");
-        let high = profile(Some(4.0)).profile_hash().expect("valid profile");
-        assert_ne!(low, high);
-
-        let mut hazmat = profile(Some(3.0));
-        hazmat.hazmat = true;
-        assert_ne!(low, hazmat.profile_hash().expect("valid profile"));
-    }
-
-    #[test]
-    fn cache_identity_separates_profile_from_coordinates_and_dataset() {
-        let request_a = RouteRequest {
-            from: point(49.0, 24.0),
-            to: point(49.0, 24.01),
-            via: Vec::new(),
-            profile: profile(Some(3.0)),
+        let identity =
+            RoutingIdentity::new("engine", "1", "dataset", "profile").expect("valid identity");
+        let result = MatrixResult {
+            status: NormalizedStatus::Ok,
+            identity,
+            source_count: 1,
+            target_count: 2,
+            cells: vec![
+                MatrixCell {
+                    source_index: 0,
+                    target_index: 0,
+                    status: NormalizedStatus::Ok,
+                    distance_m: Some(0.0),
+                    duration_s: Some(0.0),
+                },
+                MatrixCell {
+                    source_index: 0,
+                    target_index: 1,
+                    status: NormalizedStatus::Ok,
+                    distance_m: Some(1000.0),
+                    duration_s: Some(90.0),
+                },
+            ],
+            warnings: Vec::new(),
         };
-        let request_b = RouteRequest {
-            profile: profile(Some(4.0)),
-            ..request_a.clone()
-        };
 
-        let key_a = request_a
-            .cache_key(MapDatasetId::new("fixture-v1").expect("dataset id"))
-            .expect("cache key");
-        let key_b = request_b
-            .cache_key(MapDatasetId::new("fixture-v1").expect("dataset id"))
-            .expect("cache key");
-
-        assert_ne!(key_a.profile_hash, key_b.profile_hash);
-        assert_eq!(key_a.coordinates_hash, key_b.coordinates_hash);
-        assert_eq!(key_a.dataset_id, key_b.dataset_id);
-    }
-
-    #[test]
-    fn route_and_matrix_share_the_same_vehicle_profile_identity() {
-        let profile = profile(Some(3.2));
-        let route_hash = profile.profile_hash().expect("route profile hash");
-
-        let matrix = MatrixRequest {
-            sources: vec![point(49.0, 24.0)],
-            targets: vec![point(49.0, 24.01)],
-            profile,
-        };
-        matrix.validate().expect("matrix request is valid");
-        assert_eq!(
-            route_hash,
-            matrix.profile.profile_hash().expect("matrix profile hash")
-        );
-    }
-
-    #[test]
-    fn matrix_requires_sources_and_targets() {
-        let empty = MatrixRequest {
-            sources: Vec::new(),
-            targets: vec![point(49.0, 24.01)],
-            profile: profile(Some(3.2)),
-        };
-        assert_eq!(empty.validate(), Err(GeoValidationError::EmptyMatrix));
-    }
-
-    #[test]
-    fn map_dataset_identity_is_never_implicit() {
-        assert_eq!(
-            MapDatasetId::new("   "),
-            Err(GeoValidationError::EmptyDatasetId)
-        );
-        assert_eq!(
-            MapDatasetId::new("fixture-v2")
-                .expect("dataset id")
-                .as_str(),
-            "fixture-v2"
-        );
+        assert!(result.is_complete());
+        assert!(MatrixRequest::new(vec![a], vec![a, b], profile()).is_ok());
     }
 }
