@@ -109,6 +109,127 @@ pub struct ValidationIssue {
     pub message: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SyntheticFailureKind {
+    Storage,
+    RouteCalculation,
+    ConnectivityOffline,
+    InvalidTripPackage,
+    FileTransfer,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UiFailure {
+    pub kind: SyntheticFailureKind,
+    pub code: String,
+    pub title: String,
+    pub message: String,
+    pub action: String,
+    pub details: String,
+    pub retryable: bool,
+}
+
+pub fn synthetic_ui_failure(language: UiLanguage, kind: SyntheticFailureKind) -> UiFailure {
+    let (code, retryable) = match kind {
+        SyntheticFailureKind::Storage => ("storage_write_failed", true),
+        SyntheticFailureKind::RouteCalculation => ("route_calculation_failed", true),
+        SyntheticFailureKind::ConnectivityOffline => ("connectivity_offline", true),
+        SyntheticFailureKind::InvalidTripPackage => ("invalid_trip_package", false),
+        SyntheticFailureKind::FileTransfer => ("file_transfer_failed", true),
+    };
+
+    let (title, message, action) = match (language, kind) {
+        (UiLanguage::Uk, SyntheticFailureKind::Storage) => (
+            "Не вдалося зберегти дані",
+            "Зміни не записані. Поточні дані залишилися відкритими.",
+            "Перевірте доступ до сховища і повторіть збереження.",
+        ),
+        (UiLanguage::Uk, SyntheticFailureKind::RouteCalculation) => (
+            "Не вдалося перерахувати маршрут",
+            "Поточний маршрут не змінено.",
+            "Повторіть розрахунок або залиште чинний маршрут.",
+        ),
+        (UiLanguage::Uk, SyntheticFailureKind::ConnectivityOffline) => (
+            "Немає зв’язку",
+            "Онлайн-дані зараз недоступні, але локальна робота продовжується.",
+            "Перевірте мережу і повторіть синхронізацію пізніше.",
+        ),
+        (UiLanguage::Uk, SyntheticFailureKind::InvalidTripPackage) => (
+            "Файл рейсу пошкоджений або несумісний",
+            "Імпорт не виконано. Наявні дані не змінено.",
+            "Виберіть інший пакет рейсу або отримайте нову копію.",
+        ),
+        (UiLanguage::Uk, SyntheticFailureKind::FileTransfer) => (
+            "Не вдалося передати файл",
+            "Документ не втрачено і його можна надіслати повторно.",
+            "Перевірте зв’язок або файл і повторіть передачу.",
+        ),
+        (UiLanguage::En, SyntheticFailureKind::Storage) => (
+            "Could not save data",
+            "Changes were not written. The current data remains open.",
+            "Check storage access and try saving again.",
+        ),
+        (UiLanguage::En, SyntheticFailureKind::RouteCalculation) => (
+            "Could not recalculate route",
+            "The current route was not changed.",
+            "Retry the calculation or keep the current route.",
+        ),
+        (UiLanguage::En, SyntheticFailureKind::ConnectivityOffline) => (
+            "Connection is offline",
+            "Online data is unavailable, but local work can continue.",
+            "Check the network and retry synchronization later.",
+        ),
+        (UiLanguage::En, SyntheticFailureKind::InvalidTripPackage) => (
+            "Trip package is damaged or incompatible",
+            "Import was not applied. Existing data was not changed.",
+            "Choose another trip package or request a new copy.",
+        ),
+        (UiLanguage::En, SyntheticFailureKind::FileTransfer) => (
+            "Could not transfer file",
+            "The document was not lost and can be sent again.",
+            "Check the connection or file and retry the transfer.",
+        ),
+        (UiLanguage::De, SyntheticFailureKind::Storage) => (
+            "Daten konnten nicht gespeichert werden",
+            "Die Änderungen wurden nicht geschrieben. Die aktuellen Daten bleiben geöffnet.",
+            "Speicherzugriff prüfen und erneut speichern.",
+        ),
+        (UiLanguage::De, SyntheticFailureKind::RouteCalculation) => (
+            "Route konnte nicht neu berechnet werden",
+            "Die aktuelle Route wurde nicht geändert.",
+            "Berechnung wiederholen oder die aktuelle Route beibehalten.",
+        ),
+        (UiLanguage::De, SyntheticFailureKind::ConnectivityOffline) => (
+            "Keine Verbindung",
+            "Onlinedaten sind nicht verfügbar, lokale Arbeit bleibt möglich.",
+            "Netzwerk prüfen und die Synchronisierung später erneut versuchen.",
+        ),
+        (UiLanguage::De, SyntheticFailureKind::InvalidTripPackage) => (
+            "Fahrtpaket ist beschädigt oder inkompatibel",
+            "Der Import wurde nicht angewendet. Bestehende Daten blieben unverändert.",
+            "Anderes Fahrtpaket wählen oder eine neue Kopie anfordern.",
+        ),
+        (UiLanguage::De, SyntheticFailureKind::FileTransfer) => (
+            "Datei konnte nicht übertragen werden",
+            "Das Dokument ist nicht verloren und kann erneut gesendet werden.",
+            "Verbindung oder Datei prüfen und die Übertragung wiederholen.",
+        ),
+    };
+
+    UiFailure {
+        kind,
+        code: code.to_owned(),
+        title: title.to_owned(),
+        message: message.to_owned(),
+        action: action.to_owned(),
+        details: format!(
+            "synthetic failure; code={code}; component=ui-probe; retryable={retryable}"
+        ),
+        retryable,
+    }
+}
+
 impl ValidationIssue {
     fn new(field_key: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
@@ -1558,6 +1679,33 @@ fn status_rank(status: RequestStatus) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn synthetic_failures_are_human_readable_and_keep_details_separate() {
+        let kinds = [
+            SyntheticFailureKind::Storage,
+            SyntheticFailureKind::RouteCalculation,
+            SyntheticFailureKind::ConnectivityOffline,
+            SyntheticFailureKind::InvalidTripPackage,
+            SyntheticFailureKind::FileTransfer,
+        ];
+
+        for kind in kinds {
+            let failure = synthetic_ui_failure(UiLanguage::Uk, kind);
+            assert!(!failure.title.is_empty());
+            assert!(!failure.message.is_empty());
+            assert!(!failure.action.is_empty());
+            assert!(failure.details.contains("synthetic failure"));
+            assert!(!failure.message.contains("panicked at"));
+            assert!(!failure.title.contains("panicked at"));
+        }
+
+        assert!(!synthetic_ui_failure(
+            UiLanguage::Uk,
+            SyntheticFailureKind::InvalidTripPackage
+        )
+        .retryable);
+    }
 
     #[test]
     fn saved_snapshot_survives_restart_but_unsaved_draft_does_not() {

@@ -1,8 +1,9 @@
 use leptos::prelude::*;
 use ui_probe_core::{
     ApplicationService, EditorField, IntakeMode, LoadRequest, RequestDraft, RoutePointStatus,
-    RoutePreview, SortField, UiLanguage, UiTextKey, ValidationIssue, format_ui_date,
-    format_ui_integer, localized_field_label, localized_validation_issue, ui_text,
+    RoutePreview, SortField, SyntheticFailureKind, UiFailure, UiLanguage, UiTextKey,
+    ValidationIssue, format_ui_date, format_ui_integer, localized_field_label,
+    localized_validation_issue, synthetic_ui_failure, ui_text,
 };
 
 fn main() {
@@ -41,6 +42,7 @@ fn App() -> impl IntoView {
     let editor_issues = RwSignal::new(Vec::<ValidationIssue>::new());
     let editor_message = RwSignal::new(None::<String>);
     let show_unsaved_warning = RwSignal::new(false);
+    let active_failure = RwSignal::new(None::<UiFailure>);
 
     let route_draft = RwSignal::new(service.with(|service| service.route_draft()));
     let route_preview = RwSignal::new(None::<RoutePreview>);
@@ -896,6 +898,89 @@ fn App() -> impl IntoView {
                     </Show>
                 </section>
 
+
+                <section id="error-probe" class="error-probe" aria-label="Error handling">
+                    <div class="route-head">
+                        <div>
+                            <p class="eyebrow">"Error handling"</p>
+                            <h2>"Synthetic failures"</h2>
+                        </div>
+                    </div>
+                    <div class="error-actions">
+                        <button id="fail-storage" type="button" on:click=move |_| {
+                            active_failure.set(Some(synthetic_ui_failure(
+                                language.get_untracked(),
+                                SyntheticFailureKind::Storage,
+                            )));
+                        }>"Storage"</button>
+                        <button id="fail-route" type="button" on:click=move |_| {
+                            active_failure.set(Some(synthetic_ui_failure(
+                                language.get_untracked(),
+                                SyntheticFailureKind::RouteCalculation,
+                            )));
+                        }>"Route"</button>
+                        <button id="fail-offline" type="button" on:click=move |_| {
+                            active_failure.set(Some(synthetic_ui_failure(
+                                language.get_untracked(),
+                                SyntheticFailureKind::ConnectivityOffline,
+                            )));
+                        }>"Offline"</button>
+                        <button id="fail-package" type="button" on:click=move |_| {
+                            active_failure.set(Some(synthetic_ui_failure(
+                                language.get_untracked(),
+                                SyntheticFailureKind::InvalidTripPackage,
+                            )));
+                        }>"Invalid package"</button>
+                        <button id="fail-transfer" type="button" on:click=move |_| {
+                            active_failure.set(Some(synthetic_ui_failure(
+                                language.get_untracked(),
+                                SyntheticFailureKind::FileTransfer,
+                            )));
+                        }>"File transfer"</button>
+                    </div>
+                    <Show when=move || active_failure.get().is_some()>
+                        {move || active_failure.get().map(|failure| {
+                            let code = failure.code.clone();
+                            let title = failure.title.clone();
+                            let message = failure.message.clone();
+                            let action = failure.action.clone();
+                            let details = failure.details.clone();
+                            let retryable = failure.retryable;
+                            view! {
+                                <aside
+                                    id="error-panel"
+                                    class="error-panel"
+                                    role="alert"
+                                    data-code=code
+                                >
+                                    <strong id="error-title">{title}</strong>
+                                    <span id="error-message">{message}</span>
+                                    <span id="error-action">{action}</span>
+                                    <Show when=move || retryable>
+                                        <button
+                                            id="error-retry"
+                                            type="button"
+                                            on:click=move |_| active_failure.set(None)
+                                        >
+                                            "Retry later"
+                                        </button>
+                                    </Show>
+                                    <details>
+                                        <summary>"Technical details"</summary>
+                                        <code id="error-details">{details}</code>
+                                    </details>
+                                    <button
+                                        id="error-dismiss"
+                                        type="button"
+                                        on:click=move |_| active_failure.set(None)
+                                    >
+                                        "Close message"
+                                    </button>
+                                </aside>
+                            }
+                        })}
+                    </Show>
+                </section>
 
                 <section id="map-probe" class="map-probe" aria-label="Map bridge">
                     <div class="route-head">
