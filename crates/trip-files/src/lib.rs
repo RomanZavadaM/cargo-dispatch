@@ -1612,5 +1612,4 @@ mod tests {
         assert_eq!(detected.state().trip_id, trip);
         Ok(())
     }
-
 }
