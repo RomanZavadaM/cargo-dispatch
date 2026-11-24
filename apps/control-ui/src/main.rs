@@ -1,11 +1,12 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_control_ui_contracts::{
-    ControlUiStatus, ListenerMode, RegisterTripInput, StartLanInput,
+    ControlUiStatus, DashboardDocumentDirection, ListenerMode, OperatorDocumentInput, PickedFile,
+    RegisterTripInput, ReorderRouteInput, SessionInput, StartLanInput, TripDashboard,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{JsCast, closure::Closure, prelude::*};
 use wasm_bindgen_futures::JsFuture;
 
 #[wasm_bindgen(inline_js = r#"
@@ -18,6 +19,18 @@ export function cargoControlRandomToken() {
   crypto.getRandomValues(bytes);
   return "trip-" + Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
 }
+export function cargoControlRandomId() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  if (bytes.every(value => value === 0)) bytes[0] = 1;
+  return Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+}
+export function cargoControlNow() {
+  return Date.now();
+}
+export function cargoControlSetInterval(callback, ms) {
+  return window.setInterval(callback, ms);
+}
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = cargoControlInvoke)]
@@ -25,6 +38,15 @@ extern "C" {
 
     #[wasm_bindgen(js_name = cargoControlRandomToken)]
     fn cargo_control_random_token() -> String;
+
+    #[wasm_bindgen(js_name = cargoControlRandomId)]
+    fn cargo_control_random_id() -> String;
+
+    #[wasm_bindgen(js_name = cargoControlNow)]
+    fn cargo_control_now() -> f64;
+
+    #[wasm_bindgen(js_name = cargoControlSetInterval)]
+    fn cargo_control_set_interval(callback: &js_sys::Function, milliseconds: i32) -> i32;
 }
 
 fn js_error(value: JsValue) -> String {
@@ -47,6 +69,14 @@ async fn load_status() -> Result<ControlUiStatus, String> {
     invoke("control_status", &serde_json::json!({})).await
 }
 
+async fn load_dashboard(token: String) -> Result<TripDashboard, String> {
+    invoke(
+        "trip_dashboard",
+        &serde_json::json!({ "input": SessionInput { token } }),
+    )
+    .await
+}
+
 fn main() {
     console_error_panic_hook::set_once();
     leptos::mount::mount_to_body(ControlApp);
@@ -59,6 +89,10 @@ fn ControlApp() -> impl IntoView {
     let lan_ip = RwSignal::new(String::new());
     let lan_port = RwSignal::new("8080".to_owned());
     let status = RwSignal::new(None::<ControlUiStatus>);
+    let selected_token = RwSignal::new(String::new());
+    let dashboard = RwSignal::new(None::<TripDashboard>);
+    let picked_file = RwSignal::new(None::<PickedFile>);
+    let attachment_point = RwSignal::new(String::new());
     let message = RwSignal::new(String::new());
     let error = RwSignal::new(false);
     let busy = RwSignal::new(false);
@@ -69,15 +103,42 @@ fn ControlApp() -> impl IntoView {
         }
         spawn_local(async move {
             if let Ok(current) = load_status().await {
+                if selected_token.get_untracked().is_empty()
+                    && let Some(first) = current.sessions.first()
+                {
+                    selected_token.set(first.token.clone());
+                }
                 status.set(Some(current));
             }
         });
+
+        let refresh = Closure::wrap(Box::new(move || {
+            let active = selected_token.get_untracked();
+            if active.is_empty() {
+                return;
+            }
+            spawn_local(async move {
+                if let Ok(current) = load_dashboard(active).await {
+                    dashboard.set(Some(current));
+                }
+            });
+        }) as Box<dyn FnMut()>);
+        let _ = cargo_control_set_interval(
+            refresh.as_ref().unchecked_ref::<js_sys::Function>(),
+            2_000,
+        );
+        refresh.forget();
     });
 
-    let set_result = move |result: Result<ControlUiStatus, String>, success: &'static str| {
+    let set_status_result = move |result: Result<ControlUiStatus, String>, success: &'static str| {
         busy.set(false);
         match result {
             Ok(current) => {
+                if selected_token.get_untracked().is_empty()
+                    && let Some(first) = current.sessions.first()
+                {
+                    selected_token.set(first.token.clone());
+                }
                 status.set(Some(current));
                 message.set(success.to_owned());
                 error.set(false);
@@ -87,6 +148,43 @@ fn ControlApp() -> impl IntoView {
                 error.set(true);
             }
         }
+    };
+
+    let refresh_dashboard = move |_| {
+        let active = selected_token.get_untracked();
+        if active.is_empty() {
+            message.set("Спочатку виберіть browser session.".to_owned());
+            error.set(true);
+            return;
+        }
+        spawn_local(async move {
+            match load_dashboard(active).await {
+                Ok(current) => {
+                    dashboard.set(Some(current));
+                    error.set(false);
+                }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
+            }
+        });
+    };
+
+    let pick_folder = move |_| {
+        spawn_local(async move {
+            match invoke::<Option<String>, _>("pick_trip_folder", &serde_json::json!({})).await {
+                Ok(Some(path)) => {
+                    folder.set(path);
+                    error.set(false);
+                }
+                Ok(None) => {}
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
+            }
+        });
     };
 
     let register = move |_| {
@@ -102,7 +200,7 @@ fn ControlApp() -> impl IntoView {
         };
         spawn_local(async move {
             let result = invoke("register_trip", &serde_json::json!({ "input": input })).await;
-            set_result(result, "Рейс зареєстрований у Control.");
+            set_status_result(result, "Рейс зареєстрований у Control.");
         });
     };
 
@@ -113,7 +211,7 @@ fn ControlApp() -> impl IntoView {
         busy.set(true);
         spawn_local(async move {
             let result = invoke("start_loopback", &serde_json::json!({})).await;
-            set_result(result, "Loopback-трансляцію запущено.");
+            set_status_result(result, "Loopback-трансляцію запущено.");
         });
     };
 
@@ -136,7 +234,7 @@ fn ControlApp() -> impl IntoView {
         };
         spawn_local(async move {
             let result = invoke("start_lan", &serde_json::json!({ "input": input })).await;
-            set_result(result, "LAN test mode запущено.");
+            set_status_result(result, "LAN test mode запущено.");
         });
     };
 
@@ -147,7 +245,71 @@ fn ControlApp() -> impl IntoView {
         busy.set(true);
         spawn_local(async move {
             let result = invoke("stop_browser_server", &serde_json::json!({})).await;
-            set_result(result, "Трансляцію вимкнено. Рейс лишився зареєстрованим.");
+            set_status_result(result, "Трансляцію вимкнено. Рейс лишився зареєстрованим.");
+        });
+    };
+
+    let pick_file = move |_| {
+        spawn_local(async move {
+            match invoke::<Option<PickedFile>, _>("pick_operator_file", &serde_json::json!({})).await
+            {
+                Ok(file) => {
+                    picked_file.set(file);
+                    error.set(false);
+                }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
+            }
+        });
+    };
+
+    let send_file = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let active = selected_token.get_untracked();
+        let Some(file) = picked_file.get_untracked() else {
+            message.set("Спочатку виберіть файл.".to_owned());
+            error.set(true);
+            return;
+        };
+        if active.is_empty() {
+            message.set("Спочатку виберіть browser session.".to_owned());
+            error.set(true);
+            return;
+        }
+        busy.set(true);
+        let point = attachment_point.get_untracked();
+        let input = OperatorDocumentInput {
+            token: active,
+            document_id: cargo_control_random_id(),
+            source_path: file.path,
+            original_name: file.original_name,
+            mime_type: file.mime_type,
+            point_id: (!point.is_empty()).then_some(point),
+            created_at_unix_ms: cargo_control_now().round() as u64,
+        };
+        spawn_local(async move {
+            match invoke::<TripDashboard, _>(
+                "send_operator_document",
+                &serde_json::json!({ "input": input }),
+            )
+            .await
+            {
+                Ok(current) => {
+                    dashboard.set(Some(current));
+                    picked_file.set(None);
+                    message.set("Файл записаний у рейс і доступний водієві.".to_owned());
+                    error.set(false);
+                }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
+            }
+            busy.set(false);
         });
     };
 
@@ -155,9 +317,9 @@ fn ControlApp() -> impl IntoView {
         <main>
             <header>
                 <p>"Cargo Dispatch"</p>
-                <h1>"Control — трансляція рейсу"</h1>
+                <h1>"Control — рейс і трансляція"</h1>
                 <p class="note">
-                    "Control є джерелом рейсу. Це вікно лише керує browser-сесією і listener."
+                    "Control є єдиним джерелом факту рейсу. Desktop UI і Driver Browser працюють з тим самим durable state."
                 </p>
             </header>
 
@@ -180,15 +342,17 @@ fn ControlApp() -> impl IntoView {
                             id="session-token"
                             type="text"
                             minlength="16"
-                            placeholder="trip-session-..."
                             prop:value=move || token.get()
                             on:input=move |event| token.set(event_target_value(&event))
                         />
                     </label>
                 </div>
                 <div class="actions">
+                    <button type="button" on:click=pick_folder disabled=move || busy.get()>
+                        "Вибрати папку…"
+                    </button>
                     <button class="primary" type="button" on:click=register disabled=move || busy.get()>
-                        "Підключити папку рейсу"
+                        "Підключити рейс"
                     </button>
                 </div>
             </section>
@@ -232,12 +396,12 @@ fn ControlApp() -> impl IntoView {
                     </button>
                 </div>
                 <p class="note">
-                    "LAN не відкриває роутер/NAT автоматично. GPS у телефонному браузері через звичайний HTTP зазвичай потребуватиме HTTPS."
+                    "LAN не відкриває роутер/NAT автоматично. Route/files/media працюють напряму; GPS у телефонному браузері через HTTP зазвичай потребує HTTPS."
                 </p>
             </section>
 
             <section>
-                <h2>"3. Стан"</h2>
+                <h2>"3. Browser sessions"</h2>
                 <div class="status">
                     {move || {
                         status.get().map(|current| {
@@ -254,44 +418,230 @@ fn ControlApp() -> impl IntoView {
                         }).unwrap_or_else(|| "Читаю стан…".to_owned())
                     }}
                 </div>
-                <p
-                    class=move || if error.get() { "error" } else { "ok" }
-                    role="status"
-                    aria-live="polite"
-                >
-                    {move || message.get()}
-                </p>
-
-                <h3>"Browser sessions"</h3>
                 <ul>
                     <For
                         each=move || status.get().map(|current| current.sessions).unwrap_or_default()
                         key=|session| session.token.clone()
                         children=move |session| {
                             let trip = session.trip_id.clone();
-                            let token_text = session.token.clone();
+                            let session_token = session.token.clone();
+                            let dashboard_token = session.token.clone();
                             let url = session.driver_url.clone();
                             view! {
                                 <li>
                                     <div><strong>"Trip: "</strong><code>{trip}</code></div>
-                                    <div><strong>"Token: "</strong><code>{token_text}</code></div>
+                                    <div><strong>"Token: "</strong><code>{session_token}</code></div>
                                     {url.map(|driver_url| {
                                         let href = driver_url.clone();
                                         view! {
                                             <div>
                                                 <strong>"Driver URL: "</strong>
-                                                <a href=href target="_blank" rel="noopener">
-                                                    {driver_url}
-                                                </a>
+                                                <a href=href target="_blank" rel="noopener">{driver_url}</a>
                                             </div>
                                         }
                                     })}
+                                    <button
+                                        type="button"
+                                        on:click=move |_| {
+                                            selected_token.set(dashboard_token.clone());
+                                            spawn_local({
+                                                let token = dashboard_token.clone();
+                                                async move {
+                                                    if let Ok(current) = load_dashboard(token).await {
+                                                        dashboard.set(Some(current));
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    >
+                                        "Відкрити в dashboard"
+                                    </button>
                                 </li>
                             }
                         }
                     />
                 </ul>
             </section>
+
+            <section>
+                <h2>"4. Живий рейс"</h2>
+                <div class="actions">
+                    <button type="button" on:click=refresh_dashboard>"Оновити"</button>
+                </div>
+                {move || dashboard.get().map(|trip| {
+                    let revision = trip.local_route_revision;
+                    let open_points = trip
+                        .points
+                        .iter()
+                        .filter(|point| !point.completed)
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    let route_rows = trip.points.clone();
+                    let documents = trip.documents.clone();
+                    let location = trip.latest_location.clone();
+                    let trip_id = trip.trip_id.clone();
+                    let version = trip.trip_version;
+
+                    view! {
+                        <div>
+                            <p>
+                                <strong>"Trip: "</strong><code>{trip_id}</code>
+                                " · version " {version}
+                                " · route revision " {revision}
+                            </p>
+
+                            <h3>"Маршрут"</h3>
+                            <div>
+                                <For
+                                    each=move || route_rows.clone()
+                                    key=|point| point.point_id.clone()
+                                    children=move |point| {
+                                        let point_id = point.point_id.clone();
+                                        let open_for_buttons = open_points.clone();
+                                        let current_index = open_for_buttons
+                                            .iter()
+                                            .position(|item| item.point_id == point_id);
+                                        let move_point = move |delta: isize| {
+                                            let Some(index) = current_index else { return; };
+                                            let target = index as isize + delta;
+                                            if target < 0 || target >= open_for_buttons.len() as isize {
+                                                return;
+                                            }
+                                            let mut ids = open_for_buttons
+                                                .iter()
+                                                .map(|item| item.point_id.clone())
+                                                .collect::<Vec<_>>();
+                                            ids.swap(index, target as usize);
+                                            let input = ReorderRouteInput {
+                                                token: selected_token.get_untracked(),
+                                                based_on_revision: revision,
+                                                open_point_ids: ids,
+                                            };
+                                            spawn_local(async move {
+                                                match invoke::<TripDashboard, _>(
+                                                    "reorder_trip_route",
+                                                    &serde_json::json!({ "input": input }),
+                                                )
+                                                .await
+                                                {
+                                                    Ok(current) => {
+                                                        dashboard.set(Some(current));
+                                                        error.set(false);
+                                                    }
+                                                    Err(problem) => {
+                                                        message.set(problem);
+                                                        error.set(true);
+                                                    }
+                                                }
+                                            });
+                                        };
+                                        let navigation = point.navigation.clone();
+                                        view! {
+                                            <div class="point">
+                                                <strong>{format!("{}. {}", point.sequence, point.title)}</strong>
+                                                <span>{if point.completed { " — виконано" } else { " — відкрито" }}</span>
+                                                {navigation.map(|nav| view! {
+                                                    <div class="note">
+                                                        {nav.address.unwrap_or_default()}
+                                                        " · "
+                                                        {format!("{:.6}, {:.6}", nav.latitude, nav.longitude)}
+                                                    </div>
+                                                })}
+                                                {(!point.completed).then(|| view! {
+                                                    <span class="actions">
+                                                        <button type="button" on:click=move |_| move_point(-1)>"↑"</button>
+                                                        <button type="button" on:click=move |_| move_point(1)>"↓"</button>
+                                                    </span>
+                                                })}
+                                            </div>
+                                        }
+                                    }
+                                />
+                            </div>
+
+                            <h3>"Остання позиція водія"</h3>
+                            {match location {
+                                Some(location) => view! {
+                                    <p>
+                                        {format!("{:.6}, {:.6}", location.latitude, location.longitude)}
+                                        {location.accuracy_m.map(|accuracy| format!(" · ±{accuracy:.1} м")).unwrap_or_default()}
+                                        " · "
+                                        {format!("timestamp {}", location.observed_at_unix_ms)}
+                                    </p>
+                                }.into_any(),
+                                None => view! { <p class="note">"Позиція ще не надходила."</p> }.into_any(),
+                            }}
+
+                            <h3>"Документи / фото / відео"</h3>
+                            <ul>
+                                <For
+                                    each=move || documents.clone()
+                                    key=|document| document.document_id.clone()
+                                    children=move |document| {
+                                        let direction = match document.direction {
+                                            DashboardDocumentDirection::FromOperator => "Control → водій",
+                                            DashboardDocumentDirection::FromDriver => "водій → Control",
+                                        };
+                                        view! {
+                                            <li>
+                                                <strong>{document.original_name}</strong>
+                                                " · " {direction}
+                                                " · " {document.mime_type}
+                                                " · " {document.size} " байт"
+                                                {document.point_id.map(|point| view! {
+                                                    <span>" · point " <code>{point}</code></span>
+                                                })}
+                                            </li>
+                                        }
+                                    }
+                                />
+                            </ul>
+
+                            <h3>"Передати файл водієві"</h3>
+                            <div class="actions">
+                                <button type="button" on:click=pick_file disabled=move || busy.get()>
+                                    "Вибрати файл…"
+                                </button>
+                                <span>
+                                    {move || picked_file.get()
+                                        .map(|file| file.original_name)
+                                        .unwrap_or_else(|| "Файл не вибрано".to_owned())}
+                                </span>
+                            </div>
+                            <label>
+                                "Прив'язати до точки"
+                                <select
+                                    on:change=move |event| attachment_point.set(event_target_value(&event))
+                                >
+                                    <option value="">"Рейс у цілому"</option>
+                                    <For
+                                        each=move || trip.points.clone()
+                                        key=|point| point.point_id.clone()
+                                        children=move |point| view! {
+                                            <option value=point.point_id>
+                                                {format!("{}. {}", point.sequence, point.title)}
+                                            </option>
+                                        }
+                                    />
+                                </select>
+                            </label>
+                            <div class="actions">
+                                <button class="primary" type="button" on:click=send_file disabled=move || busy.get()>
+                                    "Передати водієві"
+                                </button>
+                            </div>
+                        </div>
+                    }
+                })}
+            </section>
+
+            <p
+                class=move || if error.get() { "error" } else { "ok" }
+                role="status"
+                aria-live="polite"
+            >
+                {move || message.get()}
+            </p>
         </main>
     }
 }
