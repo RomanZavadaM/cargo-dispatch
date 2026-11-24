@@ -347,7 +347,6 @@ impl DesktopControlService {
             .verified_session_document_path(&input.token, id)
             .map_err(|error| format!("Не вдалося перевірити файл рейсу: {error}"))
     }
-
 }
 
 #[tauri::command]
