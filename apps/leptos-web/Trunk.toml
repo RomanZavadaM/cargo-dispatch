@@ -1,0 +1,10 @@
+trunk-version = "0.22.2"
+
+[build]
+target = "index.html"
+release = true
+dist = "dist"
+filehash = true
+inject_scripts = true
+minify = "on_release"
+locked = true

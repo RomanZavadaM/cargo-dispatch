@@ -15,7 +15,7 @@ on:
       - ".github/workflows/ui-probe.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ui-${{ github.ref }}
@@ -35,40 +35,20 @@ jobs:
           toolchain: "1.91"
           components: rustfmt, clippy
 
-      - name: Generate dependency lock
-        run: cargo generate-lockfile
+      - name: Verify committed dependency lock
+        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
 
       - name: Format
         run: cargo fmt --all -- --check
 
       - name: Core check
-        run: cargo check -p ui-probe-core --all-targets
+        run: cargo check --locked -p ui-probe-core --all-targets
 
       - name: Core clippy
-        run: cargo clippy -p ui-probe-core --all-targets -- -D warnings
+        run: cargo clippy --locked -p ui-probe-core --all-targets -- -D warnings
 
       - name: Core tests
-        run: cargo test -p ui-probe-core --all-targets
-
-      - name: Pin generated lock on bootstrap
-        if: github.event_name == 'push'
-        run: |
-          if git ls-files --error-unmatch Cargo.lock >/dev/null 2>&1; then
-            echo "Cargo.lock already tracked"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.lock
-          git commit -m "prototype: pin UI probe dependencies"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
-
-      - name: Upload generated lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-bootstrap-lock
-          path: Cargo.lock
-          if-no-files-found: error
+        run: cargo test --locked -p ui-probe-core --all-targets
 
   browser:
     name: Leptos CSR browser
@@ -131,7 +111,7 @@ jobs:
             xdg-utils
 
       - name: Check Tauri shell
-        run: cargo check -p ui-probe-tauri
+        run: cargo check --locked -p ui-probe-tauri
 
   report:
     name: Foundation report
