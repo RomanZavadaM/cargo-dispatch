@@ -1,9 +1,9 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_domain::{
-    AvailabilityState, CalculationId, CallTaskId, CandidateId, CargoId, CargoSummary,
-    LoadRequest, NegotiatedTermsId, OperatorId, PlanningAssignment, PointId, RequestId,
-    RequestRevision, ReservationId, WorkingRouteId,
+    AvailabilityState, CalculationId, CallTaskId, CandidateId, CargoId, CargoSummary, LoadRequest,
+    NegotiatedTermsId, OperatorId, PlanningAssignment, PointId, RequestId, RequestRevision,
+    ReservationId, WorkingRouteId,
 };
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
@@ -2559,11 +2559,11 @@ mod tests {
 
         let snapshot = candidates.get(candidate_id(1)).expect("snapshot");
         assert_eq!(snapshot.request_basis[0].revision.get(), 1);
+        assert_eq!(snapshot.ordered_point_ids, vec![point_id(20), point_id(21)]);
         assert_eq!(
-            snapshot.ordered_point_ids,
-            vec![point_id(20), point_id(21)]
+            service.pool(&PoolFilter::all())[0].request.revision.get(),
+            2
         );
-        assert_eq!(service.pool(&PoolFilter::all())[0].request.revision.get(), 2);
     }
 
     #[test]
