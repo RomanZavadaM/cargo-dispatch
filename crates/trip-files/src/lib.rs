@@ -478,11 +478,12 @@ struct Manifest {
 impl Manifest {
     fn candidate(&self) -> io::Result<TripImportCandidate> {
         if self.schema != TRIP_PACKAGE_SCHEMA_NAME
-            || self.schema_version != [CURRENT_SCHEMA_VERSION.major, CURRENT_SCHEMA_VERSION.minor]
+            || self.schema_version[0] != CURRENT_SCHEMA_VERSION.major
+            || self.schema_version[1] > CURRENT_SCHEMA_VERSION.minor
         {
             return Err(invalid("unsupported trip package schema"));
         }
-        let header = TripPackageHeader::new(
+        let mut header = TripPackageHeader::new(
             TripId::from_bytes(self.trip).map_err(invalid)?,
             TripVersion::new(self.version).map_err(invalid)?,
             self.base
@@ -491,6 +492,10 @@ impl Manifest {
                 .map_err(invalid)?,
         )
         .map_err(invalid)?;
+        header.schema_version = cargo_dispatch_contracts::SchemaVersion::new(
+            self.schema_version[0],
+            self.schema_version[1],
+        );
         let route_points = points(&self.points)?;
         validate_route_points(&route_points).map_err(invalid)?;
         let hash = Sha256::digest(serde_json::to_vec(self)?);
@@ -1104,6 +1109,39 @@ mod tests {
         };
         export_package(path, &draft, &route)?;
         Ok((trip, route))
+    }
+
+    #[test]
+    fn schema_1_1_reader_accepts_legacy_point_without_navigation() -> io::Result<()> {
+        let point = Point {
+            id: [1; 16],
+            kind: TripPointKind::Load,
+            title: "Legacy point".to_owned(),
+            navigation: None,
+        };
+        let encoded = serde_json::to_value(&point)?;
+        assert!(encoded.get("navigation").is_none());
+        let decoded: Point = serde_json::from_value(encoded)?;
+        assert!(decoded.navigation.is_none());
+
+        let trip = TripId::from_bytes([2; 16]).unwrap();
+        let manifest = Manifest {
+            schema: TRIP_PACKAGE_SCHEMA_NAME.to_owned(),
+            schema_version: [1, 0],
+            trip: trip.as_bytes(),
+            version: 1,
+            base: None,
+            working_route: WorkingRouteId::from_bytes([3; 16]).unwrap().as_bytes(),
+            revision: 1,
+            created_at_unix_ms: 1,
+            operator: OperatorId::from_bytes([4; 16]).unwrap().as_bytes(),
+            points: vec![decoded],
+        };
+        let candidate = manifest.candidate()?;
+        assert_eq!(candidate.header.schema_version.major, 1);
+        assert_eq!(candidate.header.schema_version.minor, 0);
+        assert!(candidate.route_points[0].navigation.is_none());
+        Ok(())
     }
 
     #[test]
