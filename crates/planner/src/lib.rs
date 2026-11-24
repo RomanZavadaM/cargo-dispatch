@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_domain::{
-    AvailabilityState, CallTaskId, CargoId, LoadRequest, OperatorId, PlanningAssignment, PointId,
-    RequestId, ReservationId, WorkingRouteId,
+    AvailabilityState, CallTaskId, CargoId, CargoSummary, LoadRequest, NegotiatedTermsId,
+    OperatorId, PlanningAssignment, PointId, RequestId, ReservationId, WorkingRouteId,
 };
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
@@ -886,6 +886,110 @@ impl InMemoryCallHistory {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NegotiatedTerms {
+    pub negotiated_terms_id: NegotiatedTermsId,
+    pub request_id: RequestId,
+    pub working_route_id: WorkingRouteId,
+    pub operator_id: OperatorId,
+    pub confirmed_by_call_task_id: CallTaskId,
+    pub confirmed_at_unix_ms: u64,
+    pub cargo_weight_kg: Option<u32>,
+    pub cargo_pallets: Option<u16>,
+    pub pickup_window: Option<ConfirmedTimeWindow>,
+    pub delivery_window: Option<ConfirmedTimeWindow>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NegotiatedTermsError {
+    DuplicateTerms,
+    NoConfirmedChanges,
+    WeightMustBePositive,
+    PalletsMustBePositive,
+    InvalidPickupWindow,
+    InvalidDeliveryWindow,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryNegotiatedTermsHistory {
+    terms: Vec<NegotiatedTerms>,
+}
+
+impl InMemoryNegotiatedTermsHistory {
+    pub fn append(&mut self, terms: NegotiatedTerms) -> Result<(), NegotiatedTermsError> {
+        if self
+            .terms
+            .iter()
+            .any(|saved| saved.negotiated_terms_id == terms.negotiated_terms_id)
+        {
+            return Err(NegotiatedTermsError::DuplicateTerms);
+        }
+        if terms.cargo_weight_kg == Some(0) {
+            return Err(NegotiatedTermsError::WeightMustBePositive);
+        }
+        if terms.cargo_pallets == Some(0) {
+            return Err(NegotiatedTermsError::PalletsMustBePositive);
+        }
+        if terms
+            .pickup_window
+            .is_some_and(|window| window.earliest_unix_ms > window.latest_unix_ms)
+        {
+            return Err(NegotiatedTermsError::InvalidPickupWindow);
+        }
+        if terms
+            .delivery_window
+            .is_some_and(|window| window.earliest_unix_ms > window.latest_unix_ms)
+        {
+            return Err(NegotiatedTermsError::InvalidDeliveryWindow);
+        }
+        if terms.cargo_weight_kg.is_none()
+            && terms.cargo_pallets.is_none()
+            && terms.pickup_window.is_none()
+            && terms.delivery_window.is_none()
+        {
+            return Err(NegotiatedTermsError::NoConfirmedChanges);
+        }
+
+        self.terms.push(terms);
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn for_request(&self, request_id: RequestId) -> Vec<NegotiatedTerms> {
+        self.terms
+            .iter()
+            .filter(|terms| terms.request_id == request_id)
+            .cloned()
+            .collect()
+    }
+
+    #[must_use]
+    pub fn latest_for_request(&self, request_id: RequestId) -> Option<NegotiatedTerms> {
+        self.terms
+            .iter()
+            .rev()
+            .find(|terms| terms.request_id == request_id)
+            .cloned()
+    }
+}
+
+#[must_use]
+pub fn effective_cargo_for_planning(
+    request: &PlanningRequest,
+    terms: Option<&NegotiatedTerms>,
+) -> CargoSummary {
+    let mut cargo = request.request.cargo.clone();
+    if let Some(terms) = terms {
+        if let Some(weight_kg) = terms.cargo_weight_kg {
+            cargo.weight_kg = Some(weight_kg);
+        }
+        if let Some(pallets) = terms.cargo_pallets {
+            cargo.pallets = Some(pallets);
+        }
+    }
+    cargo
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     DuplicateRequest,
@@ -1121,6 +1225,10 @@ mod tests {
 
     fn call_task_id(byte: u8) -> CallTaskId {
         CallTaskId::from_bytes([byte; 16]).expect("fixture call task id")
+    }
+
+    fn negotiated_terms_id(byte: u8) -> NegotiatedTermsId {
+        NegotiatedTermsId::from_bytes([byte; 16]).expect("fixture negotiated terms id")
     }
 
     fn request(
@@ -2204,6 +2312,127 @@ mod tests {
         assert_eq!(history.for_request(item.request.request_id).len(), 1);
         assert_eq!(item.request.availability, AvailabilityState::Active);
         assert_eq!(item.request.planning_assignment, PlanningAssignment::Free);
+    }
+
+    #[test]
+    fn negotiated_terms_override_planning_view_without_overwriting_source_request() {
+        let item = request(
+            request_id(24),
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Active,
+            true,
+        );
+        let source_cargo = item.request.cargo.clone();
+        let terms = NegotiatedTerms {
+            negotiated_terms_id: negotiated_terms_id(1),
+            request_id: item.request.request_id,
+            working_route_id: working_route_id(7),
+            operator_id: operator_id(7),
+            confirmed_by_call_task_id: call_task_id(6),
+            confirmed_at_unix_ms: 1_800_000_060_000,
+            cargo_weight_kg: Some(3_200),
+            cargo_pallets: Some(8),
+            pickup_window: None,
+            delivery_window: None,
+        };
+
+        let effective = effective_cargo_for_planning(&item, Some(&terms));
+
+        assert_eq!(effective.weight_kg, Some(3_200));
+        assert_eq!(effective.pallets, Some(8));
+        assert_eq!(item.request.cargo, source_cargo);
+    }
+
+    #[test]
+    fn negotiated_terms_history_preserves_previous_confirmations() {
+        let request_id = request_id(25);
+        let mut history = InMemoryNegotiatedTermsHistory::default();
+        history
+            .append(NegotiatedTerms {
+                negotiated_terms_id: negotiated_terms_id(2),
+                request_id,
+                working_route_id: working_route_id(8),
+                operator_id: operator_id(8),
+                confirmed_by_call_task_id: call_task_id(7),
+                confirmed_at_unix_ms: 1_800_000_060_000,
+                cargo_weight_kg: Some(2_800),
+                cargo_pallets: None,
+                pickup_window: None,
+                delivery_window: None,
+            })
+            .expect("first terms");
+        history
+            .append(NegotiatedTerms {
+                negotiated_terms_id: negotiated_terms_id(3),
+                request_id,
+                working_route_id: working_route_id(8),
+                operator_id: operator_id(8),
+                confirmed_by_call_task_id: call_task_id(8),
+                confirmed_at_unix_ms: 1_800_000_120_000,
+                cargo_weight_kg: Some(3_000),
+                cargo_pallets: Some(7),
+                pickup_window: Some(ConfirmedTimeWindow {
+                    earliest_unix_ms: 1_800_003_600_000,
+                    latest_unix_ms: 1_800_007_200_000,
+                }),
+                delivery_window: None,
+            })
+            .expect("second terms");
+
+        let saved = history.for_request(request_id);
+        assert_eq!(saved.len(), 2);
+        assert_eq!(saved[0].cargo_weight_kg, Some(2_800));
+        assert_eq!(saved[1].cargo_weight_kg, Some(3_000));
+        assert_eq!(
+            history
+                .latest_for_request(request_id)
+                .expect("latest")
+                .negotiated_terms_id,
+            negotiated_terms_id(3)
+        );
+    }
+
+    #[test]
+    fn negotiated_terms_validate_confirmed_values_and_windows() {
+        let request_id = request_id(26);
+        let base = NegotiatedTerms {
+            negotiated_terms_id: negotiated_terms_id(4),
+            request_id,
+            working_route_id: working_route_id(9),
+            operator_id: operator_id(9),
+            confirmed_by_call_task_id: call_task_id(9),
+            confirmed_at_unix_ms: 1_800_000_000_000,
+            cargo_weight_kg: None,
+            cargo_pallets: None,
+            pickup_window: None,
+            delivery_window: None,
+        };
+        let mut history = InMemoryNegotiatedTermsHistory::default();
+
+        assert_eq!(
+            history.append(base.clone()),
+            Err(NegotiatedTermsError::NoConfirmedChanges)
+        );
+
+        let mut invalid_weight = base.clone();
+        invalid_weight.negotiated_terms_id = negotiated_terms_id(5);
+        invalid_weight.cargo_weight_kg = Some(0);
+        assert_eq!(
+            history.append(invalid_weight),
+            Err(NegotiatedTermsError::WeightMustBePositive)
+        );
+
+        let mut invalid_window = base;
+        invalid_window.negotiated_terms_id = negotiated_terms_id(6);
+        invalid_window.pickup_window = Some(ConfirmedTimeWindow {
+            earliest_unix_ms: 1_800_000_100_000,
+            latest_unix_ms: 1_800_000_050_000,
+        });
+        assert_eq!(
+            history.append(invalid_window),
+            Err(NegotiatedTermsError::InvalidPickupWindow)
+        );
     }
 
     #[test]

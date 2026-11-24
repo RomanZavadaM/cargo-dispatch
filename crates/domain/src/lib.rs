@@ -50,6 +50,7 @@ define_uuid_id!(OperatorId);
 define_uuid_id!(WorkingRouteId);
 define_uuid_id!(ReservationId);
 define_uuid_id!(CallTaskId);
+define_uuid_id!(NegotiatedTermsId);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceKind {
@@ -271,5 +272,6 @@ mod tests {
         assert_eq!(WorkingRouteId::from_bytes([0; 16]), Err(IdError::NilUuid));
         assert_eq!(ReservationId::from_bytes([0; 16]), Err(IdError::NilUuid));
         assert_eq!(CallTaskId::from_bytes([0; 16]), Err(IdError::NilUuid));
+        assert_eq!(NegotiatedTermsId::from_bytes([0; 16]), Err(IdError::NilUuid));
     }
 }
