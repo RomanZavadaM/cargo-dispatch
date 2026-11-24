@@ -107,6 +107,7 @@ dependencies = [
  "cargo-dispatch-domain",
  "cargo-dispatch-planner",
  "cargo-dispatch-trip-files",
+ "futures-util",
  "serde",
  "serde_json",
  "tempfile",
