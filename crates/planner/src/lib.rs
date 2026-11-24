@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_domain::{
-    AvailabilityState, CargoId, LoadRequest, PlanningAssignment, RequestId,
+    AvailabilityState, CargoId, LoadRequest, PlanningAssignment, PointId, RequestId,
 };
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
@@ -572,6 +572,92 @@ pub fn evaluate_driving_budget(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WorkingRoutePoint {
+    pub point_id: PointId,
+    pub locked: bool,
+    pub confirmed: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecalculationHardRejectReason {
+    DuplicateProposedPoint(PointId),
+    ProtectedPointRemoved(PointId),
+    ProtectedOrderChanged {
+        earlier_point_id: PointId,
+        later_point_id: PointId,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecalculationValidation {
+    pub level: FeasibilityLevel,
+    pub hard_reasons: Vec<RecalculationHardRejectReason>,
+}
+
+#[must_use]
+pub fn validate_recalculation(
+    current_points: &[WorkingRoutePoint],
+    proposed_point_ids: &[PointId],
+) -> RecalculationValidation {
+    let mut hard_reasons = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+
+    for point_id in proposed_point_ids {
+        if !seen.insert(*point_id) {
+            hard_reasons.push(RecalculationHardRejectReason::DuplicateProposedPoint(*point_id));
+        }
+    }
+
+    let protected_points: Vec<_> = current_points
+        .iter()
+        .filter(|point| point.locked || point.confirmed)
+        .map(|point| point.point_id)
+        .collect();
+
+    for protected_point_id in &protected_points {
+        if !seen.contains(protected_point_id) {
+            hard_reasons.push(RecalculationHardRejectReason::ProtectedPointRemoved(
+                *protected_point_id,
+            ));
+        }
+    }
+
+    let proposed_positions: BTreeMap<_, _> = proposed_point_ids
+        .iter()
+        .enumerate()
+        .map(|(index, point_id)| (*point_id, index))
+        .collect();
+
+    for pair in protected_points.windows(2) {
+        let [earlier_point_id, later_point_id] = pair else {
+            continue;
+        };
+        let (Some(earlier_position), Some(later_position)) = (
+            proposed_positions.get(earlier_point_id),
+            proposed_positions.get(later_point_id),
+        ) else {
+            continue;
+        };
+
+        if earlier_position > later_position {
+            hard_reasons.push(RecalculationHardRejectReason::ProtectedOrderChanged {
+                earlier_point_id: *earlier_point_id,
+                later_point_id: *later_point_id,
+            });
+        }
+    }
+
+    RecalculationValidation {
+        level: if hard_reasons.is_empty() {
+            FeasibilityLevel::Feasible
+        } else {
+            FeasibilityLevel::Impossible
+        },
+        hard_reasons,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     DuplicateRequest,
     RequestNotFound,
@@ -786,6 +872,10 @@ mod tests {
 
     fn cargo_id(byte: u8) -> CargoId {
         CargoId::from_bytes([byte; 16]).expect("fixture cargo id")
+    }
+
+    fn point_id(byte: u8) -> PointId {
+        PointId::from_bytes([byte; 16]).expect("fixture point id")
     }
 
     fn request(
@@ -1455,6 +1545,126 @@ mod tests {
             ]
         );
         assert_eq!(result.known_driving_reserve_ms, None);
+    }
+
+    #[test]
+    fn recalculation_cannot_remove_confirmed_or_locked_point() {
+        let current = [
+            WorkingRoutePoint {
+                point_id: point_id(1),
+                locked: false,
+                confirmed: true,
+            },
+            WorkingRoutePoint {
+                point_id: point_id(2),
+                locked: true,
+                confirmed: false,
+            },
+            WorkingRoutePoint {
+                point_id: point_id(3),
+                locked: false,
+                confirmed: false,
+            },
+        ];
+
+        let result = validate_recalculation(&current, &[point_id(1), point_id(3)]);
+
+        assert_eq!(result.level, FeasibilityLevel::Impossible);
+        assert_eq!(
+            result.hard_reasons,
+            vec![RecalculationHardRejectReason::ProtectedPointRemoved(
+                point_id(2)
+            )]
+        );
+    }
+
+    #[test]
+    fn recalculation_cannot_reverse_protected_point_order() {
+        let current = [
+            WorkingRoutePoint {
+                point_id: point_id(4),
+                locked: true,
+                confirmed: false,
+            },
+            WorkingRoutePoint {
+                point_id: point_id(5),
+                locked: false,
+                confirmed: false,
+            },
+            WorkingRoutePoint {
+                point_id: point_id(6),
+                locked: false,
+                confirmed: true,
+            },
+        ];
+
+        let result =
+            validate_recalculation(&current, &[point_id(6), point_id(5), point_id(4)]);
+
+        assert_eq!(result.level, FeasibilityLevel::Impossible);
+        assert_eq!(
+            result.hard_reasons,
+            vec![RecalculationHardRejectReason::ProtectedOrderChanged {
+                earlier_point_id: point_id(4),
+                later_point_id: point_id(6),
+            }]
+        );
+    }
+
+    #[test]
+    fn recalculation_may_change_only_unprotected_part() {
+        let current = [
+            WorkingRoutePoint {
+                point_id: point_id(7),
+                locked: true,
+                confirmed: false,
+            },
+            WorkingRoutePoint {
+                point_id: point_id(8),
+                locked: false,
+                confirmed: false,
+            },
+            WorkingRoutePoint {
+                point_id: point_id(9),
+                locked: false,
+                confirmed: true,
+            },
+            WorkingRoutePoint {
+                point_id: point_id(10),
+                locked: false,
+                confirmed: false,
+            },
+        ];
+
+        let result = validate_recalculation(
+            &current,
+            &[point_id(11), point_id(7), point_id(10), point_id(9)],
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Feasible);
+        assert!(result.hard_reasons.is_empty());
+    }
+
+    #[test]
+    fn recalculation_rejects_duplicate_point_ids() {
+        let current = [WorkingRoutePoint {
+            point_id: point_id(12),
+            locked: false,
+            confirmed: false,
+        }];
+
+        let result = validate_recalculation(
+            &current,
+            &[point_id(12), point_id(13), point_id(13)],
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Impossible);
+        assert_eq!(
+            result.hard_reasons,
+            vec![RecalculationHardRejectReason::DuplicateProposedPoint(
+                point_id(13)
+            )]
+        );
     }
 
     #[test]
