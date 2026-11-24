@@ -63,8 +63,12 @@ small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
 <section>
 <h2>Документи / фото / відео</h2>
 <div id="documents"></div>
+<label>Прив'язати до точки:
+<select id="filePoint"><option value="">Рейс у цілому</option></select>
+</label>
 <div class="row">
 <input id="file" type="file" accept="image/*,video/*,application/pdf,*/*">
+<input id="camera" type="file" accept="image/*,video/*" capture="environment">
 <button id="sendFile" type="button">Передати в Control</button>
 </div>
 <p id="fileStatus"></p>
@@ -121,6 +125,23 @@ async function loadTrip() {
 function renderRoute() {
   const host = document.getElementById("points");
   host.replaceChildren();
+  const pointSelect = document.getElementById("filePoint");
+  const selectedPoint = pointSelect.value;
+  pointSelect.replaceChildren();
+  const tripOption = document.createElement("option");
+  tripOption.value = "";
+  tripOption.textContent = "Рейс у цілому";
+  pointSelect.append(tripOption);
+  for (const point of currentTrip.points) {
+    const option = document.createElement("option");
+    option.value = point.point_id;
+    option.textContent = point.sequence + ". " + point.title;
+    pointSelect.append(option);
+  }
+  if (Array.from(pointSelect.options).some(option => option.value === selectedPoint)) {
+    pointSelect.value = selectedPoint;
+  }
+
   const openPoints = currentTrip.points.filter(point => !point.completed);
   for (const point of currentTrip.points) {
     const row = document.createElement("div");
@@ -228,27 +249,34 @@ function renderLocation() {
 
 document.getElementById("sendFile").addEventListener("click", async () => {
   const input = document.getElementById("file");
+  const camera = document.getElementById("camera");
   const status = document.getElementById("fileStatus");
-  if (!input.files || !input.files.length) {
-    status.textContent = "Спочатку виберіть файл";
+  const file =
+    input.files && input.files.length ? input.files[0] :
+    camera.files && camera.files.length ? camera.files[0] : null;
+  if (!file) {
+    status.textContent = "Спочатку виберіть файл або фото/відео";
     status.className = "error";
     return;
   }
-  const file = input.files[0];
   const documentId = newDocumentId();
   status.textContent = "Передача…";
   status.className = "";
   try {
+    const headers = {
+      "Content-Type": file.type || "application/octet-stream",
+      "X-File-Name": encodeURIComponent(file.name),
+      "X-Created-At-Unix-Ms": String(Date.now())
+    };
+    const pointId = document.getElementById("filePoint").value;
+    if (pointId) headers["X-Point-Id"] = pointId;
     await api("/documents/" + documentId, {
       method: "POST",
-      headers: {
-        "Content-Type": file.type || "application/octet-stream",
-        "X-File-Name": encodeURIComponent(file.name),
-        "X-Created-At-Unix-Ms": String(Date.now())
-      },
+      headers,
       body: file
     });
     input.value = "";
+    camera.value = "";
     status.textContent = "Файл прийнятий Control";
     status.className = "ok";
     await loadTrip();
