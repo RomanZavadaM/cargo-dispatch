@@ -1060,13 +1060,14 @@ pub enum PlannerReplanApplyError {
         actual: u64,
     },
     DuplicateCompletedPoint(PointId),
-    CompletedPrefixMismatch {
-        index: usize,
-        expected_point_id: PointId,
-        actual_point_id: Option<PointId>,
-    },
+    CompletedPointMissing(PointId),
     CompletedPointRepeatedInFuture(PointId),
     DuplicateFuturePoint(PointId),
+    InsufficientFuturePointsToPreserveCompletedPosition {
+        completed_index: usize,
+        required_open_points: usize,
+        provided_open_points: usize,
+    },
     RevisionOverflow,
 }
 
@@ -1090,19 +1091,20 @@ pub fn apply_planner_replan(
     }
 
     let mut completed = std::collections::BTreeSet::new();
-    for (index, point_id) in context.completed_point_ids.iter().enumerate() {
+    let mut last_completed_index = None;
+    for point_id in &context.completed_point_ids {
         if !completed.insert(*point_id) {
             return Err(PlannerReplanApplyError::DuplicateCompletedPoint(*point_id));
         }
 
-        let actual_point_id = route.points.get(index).map(|point| point.point_id);
-        if actual_point_id != Some(*point_id) {
-            return Err(PlannerReplanApplyError::CompletedPrefixMismatch {
-                index,
-                expected_point_id: *point_id,
-                actual_point_id,
-            });
-        }
+        let Some(index) = route
+            .points
+            .iter()
+            .position(|point| point.point_id == *point_id)
+        else {
+            return Err(PlannerReplanApplyError::CompletedPointMissing(*point_id));
+        };
+        last_completed_index = Some(last_completed_index.map_or(index, |last: usize| last.max(index)));
     }
 
     let mut future_seen = std::collections::BTreeSet::new();
@@ -1117,6 +1119,22 @@ pub fn apply_planner_replan(
         }
     }
 
+    if let Some(completed_index) = last_completed_index {
+        let required_open_points = route.points[..=completed_index]
+            .iter()
+            .filter(|point| !completed.contains(&point.point_id))
+            .count();
+        if proposed_future_point_ids.len() < required_open_points {
+            return Err(
+                PlannerReplanApplyError::InsufficientFuturePointsToPreserveCompletedPosition {
+                    completed_index,
+                    required_open_points,
+                    provided_open_points: proposed_future_point_ids.len(),
+                },
+            );
+        }
+    }
+
     let current_revision = route
         .current_revision
         .checked_add(1)
@@ -1126,13 +1144,41 @@ pub fn apply_planner_replan(
         .iter()
         .map(|point| (point.point_id, *point))
         .collect();
-    let mut points = route.points[..context.completed_point_ids.len()].to_vec();
-    points.extend(proposed_future_point_ids.iter().map(|point_id| {
+    let mut future = proposed_future_point_ids.iter().copied();
+    let mut points = Vec::with_capacity(
+        route
+            .points
+            .len()
+            .max(context.completed_point_ids.len() + proposed_future_point_ids.len()),
+    );
+
+    for original in &route.points {
+        if completed.contains(&original.point_id) {
+            points.push(*original);
+            continue;
+        }
+
+        let Some(point_id) = future.next() else {
+            break;
+        };
+        points.push(
+            existing
+                .get(&point_id)
+                .copied()
+                .unwrap_or(WorkingRoutePoint {
+                    point_id,
+                    locked: false,
+                    confirmed: false,
+                }),
+        );
+    }
+
+    points.extend(future.map(|point_id| {
         existing
-            .get(point_id)
+            .get(&point_id)
             .copied()
             .unwrap_or(WorkingRoutePoint {
-                point_id: *point_id,
+                point_id,
                 locked: false,
                 confirmed: false,
             })
@@ -3760,43 +3806,122 @@ mod tests {
     }
 
     #[test]
-    fn planner_replan_application_keeps_completed_points_as_leading_facts() {
+    fn planner_replan_application_preserves_completed_points_in_their_actual_slots() {
         let mut route = manual_working_route(
             working_route_id(31),
-            &[point_id(76), point_id(77), point_id(78)],
+            &[
+                point_id(76),
+                point_id(77),
+                point_id(78),
+                point_id(79),
+            ],
         )
         .expect("route");
         route.current_revision = 5;
+        route.points[2].confirmed = true;
         let before = route.clone();
-        let mut context = PlannerReplanContext {
+        let context = PlannerReplanContext {
             trip_id: trip_id(10),
             based_on_trip_version: TripVersion::new(2).expect("trip version"),
             working_route_id: working_route_id(31),
             working_route_revision: 5,
-            completed_point_ids: vec![point_id(76), point_id(78)],
+            completed_point_ids: vec![point_id(78)],
             current_point_id: Some(point_id(77)),
-            affected_point_ids: vec![point_id(77)],
+            affected_point_ids: vec![point_id(76), point_id(77), point_id(79)],
         };
 
-        assert_eq!(
-            apply_planner_replan(&route, &context, &[point_id(77)]),
-            Err(PlannerReplanApplyError::CompletedPrefixMismatch {
-                index: 1,
-                expected_point_id: point_id(78),
-                actual_point_id: Some(point_id(77)),
-            })
-        );
+        let replanned = apply_planner_replan(
+            &route,
+            &context,
+            &[point_id(77), point_id(80), point_id(76), point_id(79)],
+        )
+        .expect("out-of-order completion is a protected fact");
 
-        context.completed_point_ids = vec![point_id(76)];
+        assert_eq!(route, before);
+        assert_eq!(replanned.current_revision, 6);
+        assert_eq!(replanned.state, WorkingRouteState::Replanning);
+        assert_eq!(replanned.points[2], route.points[2]);
         assert_eq!(
-            apply_planner_replan(&route, &context, &[point_id(76), point_id(77)]),
+            replanned
+                .points
+                .iter()
+                .map(|point| point.point_id)
+                .collect::<Vec<_>>(),
+            vec![
+                point_id(77),
+                point_id(80),
+                point_id(78),
+                point_id(76),
+                point_id(79),
+            ]
+        );
+        assert!(!replanned.points[1].locked);
+        assert!(!replanned.points[1].confirmed);
+    }
+
+    #[test]
+    fn planner_replan_application_keeps_multiple_completed_slots_and_rejects_invalid_future() {
+        let mut route = manual_working_route(
+            working_route_id(33),
+            &[point_id(81), point_id(82), point_id(83), point_id(84)],
+        )
+        .expect("route");
+        route.current_revision = 7;
+        let before = route.clone();
+        let context = PlannerReplanContext {
+            trip_id: trip_id(12),
+            based_on_trip_version: TripVersion::new(3).expect("trip version"),
+            working_route_id: working_route_id(33),
+            working_route_revision: 7,
+            completed_point_ids: vec![point_id(81), point_id(83)],
+            current_point_id: Some(point_id(82)),
+            affected_point_ids: vec![point_id(82), point_id(84)],
+        };
+
+        let replanned = apply_planner_replan(
+            &route,
+            &context,
+            &[point_id(85), point_id(84)],
+        )
+        .expect("completed slots stay fixed");
+        assert_eq!(
+            replanned
+                .points
+                .iter()
+                .map(|point| point.point_id)
+                .collect::<Vec<_>>(),
+            vec![point_id(81), point_id(85), point_id(83), point_id(84)]
+        );
+        assert_eq!(replanned.points[0], route.points[0]);
+        assert_eq!(replanned.points[2], route.points[2]);
+
+        assert_eq!(
+            apply_planner_replan(&route, &context, &[point_id(84)]),
+            Err(
+                PlannerReplanApplyError::InsufficientFuturePointsToPreserveCompletedPosition {
+                    completed_index: 2,
+                    required_open_points: 1,
+                    provided_open_points: 1,
+                }
+            )
+        );
+        assert_eq!(
+            apply_planner_replan(
+                &route,
+                &context,
+                &[point_id(81), point_id(82), point_id(84)]
+            ),
             Err(PlannerReplanApplyError::CompletedPointRepeatedInFuture(
-                point_id(76)
+                point_id(81)
             ))
         );
         assert_eq!(
-            apply_planner_replan(&route, &context, &[point_id(77), point_id(77)]),
-            Err(PlannerReplanApplyError::DuplicateFuturePoint(point_id(77)))
+            apply_planner_replan(
+                &route,
+                &context,
+                &[point_id(82), point_id(82), point_id(84)]
+            ),
+            Err(PlannerReplanApplyError::DuplicateFuturePoint(point_id(82)))
         );
         assert_eq!(route, before);
     }
