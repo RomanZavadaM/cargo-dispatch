@@ -15,6 +15,7 @@ cargo-dispatch може містити або розповсюджуватися
 ### Control desktop UI
 - `tauri 2.12.7` — MIT або Apache-2.0; accepted desktop shell для Windows/macOS/Linux.
 - `tauri-build 2.7.6` — MIT або Apache-2.0; build-time Tauri configuration.
+- `tauri-plugin-dialog 2.8.4` — MIT або Apache-2.0; native folder/file picker for Control without moving file bytes through the Leptos JSON bridge.
 - `leptos 0.8.23` — MIT; accepted CSR UI layer.
 - `wasm-bindgen`, `wasm-bindgen-futures`, `js-sys`, `console_error_panic_hook` — permissive Rust/WASM bridge dependencies for the Leptos frontend; exact versions and transitive graph are fixed by `Cargo.lock` and checked by `cargo deny`.
 - `Trunk 0.22.2` — CI/build-only frontend bundler; installed as a prebuilt/checksummed tool through `taiki-e/install-action`.
