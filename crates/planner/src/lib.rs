@@ -354,10 +354,7 @@ pub enum TimeNeedsCheckReason {
     TimeWindowUnknown(usize),
     HandlingTimeUnknown(usize),
     RoadTimeUnknown(usize),
-    TightTimeWindow {
-        point_index: usize,
-        slack_ms: u64,
-    },
+    TightTimeWindow { point_index: usize, slack_ms: u64 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -421,8 +418,7 @@ pub fn evaluate_route_time_windows(
                 } else {
                     let slack_ms = window.latest_unix_ms - service_start;
                     minimum_known_slack_ms = Some(
-                        minimum_known_slack_ms
-                            .map_or(slack_ms, |minimum| minimum.min(slack_ms)),
+                        minimum_known_slack_ms.map_or(slack_ms, |minimum| minimum.min(slack_ms)),
                     );
                     if slack_ms <= tight_slack_ms {
                         check_reasons.push(TimeNeedsCheckReason::TightTimeWindow {
@@ -1192,7 +1188,10 @@ mod tests {
         assert!(result.hard_reasons.is_empty());
         assert!(result.check_reasons.is_empty());
         assert_eq!(result.earliest_arrivals_unix_ms[1], base + 75 * 60 * 1_000);
-        assert_eq!(result.earliest_departures_unix_ms[1], base + 100 * 60 * 1_000);
+        assert_eq!(
+            result.earliest_departures_unix_ms[1],
+            base + 100 * 60 * 1_000
+        );
         assert_eq!(result.minimum_known_slack_ms, Some(60 * 60 * 1_000));
     }
 
@@ -1221,11 +1220,15 @@ mod tests {
         );
 
         assert_eq!(result.level, FeasibilityLevel::Impossible);
-        assert!(result.hard_reasons.contains(&TimeHardRejectReason::WindowMissed {
-            point_index: 1,
-            earliest_possible_arrival_unix_ms: base + 60 * 60 * 1_000,
-            latest_unix_ms: base + 50 * 60 * 1_000,
-        }));
+        assert!(
+            result
+                .hard_reasons
+                .contains(&TimeHardRejectReason::WindowMissed {
+                    point_index: 1,
+                    earliest_possible_arrival_unix_ms: base + 60 * 60 * 1_000,
+                    latest_unix_ms: base + 50 * 60 * 1_000,
+                })
+        );
     }
 
     #[test]
@@ -1255,12 +1258,16 @@ mod tests {
 
         assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
         assert!(result.hard_reasons.is_empty());
-        assert!(result
-            .check_reasons
-            .contains(&TimeNeedsCheckReason::HandlingTimeUnknown(0)));
-        assert!(result
-            .check_reasons
-            .contains(&TimeNeedsCheckReason::RoadTimeUnknown(0)));
+        assert!(
+            result
+                .check_reasons
+                .contains(&TimeNeedsCheckReason::HandlingTimeUnknown(0))
+        );
+        assert!(
+            result
+                .check_reasons
+                .contains(&TimeNeedsCheckReason::RoadTimeUnknown(0))
+        );
     }
 
     #[test]
@@ -1292,12 +1299,14 @@ mod tests {
 
         assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
         assert!(result.hard_reasons.is_empty());
-        assert!(result
-            .check_reasons
-            .contains(&TimeNeedsCheckReason::TightTimeWindow {
-                point_index: 1,
-                slack_ms: 5 * 60 * 1_000,
-            }));
+        assert!(
+            result
+                .check_reasons
+                .contains(&TimeNeedsCheckReason::TightTimeWindow {
+                    point_index: 1,
+                    slack_ms: 5 * 60 * 1_000,
+                })
+        );
     }
 
     #[test]
