@@ -382,7 +382,7 @@ mod tests {
             Err(SessionRegistrationError::InvalidToken)
         );
 
-        let (_, _, folder_a) = create_trip(tmp.path(), "trip-a-retry", 11, 50)?;
+        let folder_a = TripFolder::open(&folder_a_path, trip_a)?;
         state
             .register_trip("trip-a-token-0001", folder_a)
             .expect("register trip A");
@@ -452,11 +452,7 @@ mod tests {
         server.shutdown().await?;
         drop(state);
 
-        let durable_a = TripFolder::open(&folder_a_path, trip_a);
-        assert!(durable_a.is_err(), "rejected short-token folder is unrelated");
-
-        let retry_path = tmp.path().join("trip-a-retry");
-        let durable_a = TripFolder::open(&retry_path, TripId::from_bytes([11; 16]).unwrap())?;
+        let durable_a = TripFolder::open(&folder_a_path, trip_a)?;
         assert!(durable_a
             .state()
             .completed_point_ids
