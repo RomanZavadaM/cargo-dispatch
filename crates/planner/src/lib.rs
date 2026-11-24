@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_domain::{
-    AvailabilityState, CargoId, LoadRequest, OperatorId, PlanningAssignment, PointId, RequestId,
-    ReservationId, WorkingRouteId,
+    AvailabilityState, CallTaskId, CargoId, LoadRequest, OperatorId, PlanningAssignment, PointId,
+    RequestId, ReservationId, WorkingRouteId,
 };
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
@@ -814,6 +814,79 @@ impl InMemoryReservationBook {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallResult {
+    Confirmed,
+    Rejected,
+    LostTaken,
+    Callback,
+    TermsChanged,
+    NoAnswer,
+    ContactInvalid,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletedCallAttempt {
+    pub call_task_id: CallTaskId,
+    pub request_id: RequestId,
+    pub working_route_id: WorkingRouteId,
+    pub operator_id: OperatorId,
+    pub created_at_unix_ms: u64,
+    pub started_at_unix_ms: u64,
+    pub finished_at_unix_ms: u64,
+    pub result: CallResult,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallHistoryError {
+    DuplicateCallTask,
+    InvalidTimeline,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryCallHistory {
+    attempts: Vec<CompletedCallAttempt>,
+}
+
+impl InMemoryCallHistory {
+    pub fn append(&mut self, attempt: CompletedCallAttempt) -> Result<(), CallHistoryError> {
+        if attempt.created_at_unix_ms > attempt.started_at_unix_ms
+            || attempt.started_at_unix_ms > attempt.finished_at_unix_ms
+        {
+            return Err(CallHistoryError::InvalidTimeline);
+        }
+        if self
+            .attempts
+            .iter()
+            .any(|saved| saved.call_task_id == attempt.call_task_id)
+        {
+            return Err(CallHistoryError::DuplicateCallTask);
+        }
+
+        self.attempts.push(attempt);
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn for_request(&self, request_id: RequestId) -> Vec<CompletedCallAttempt> {
+        self.attempts
+            .iter()
+            .filter(|attempt| attempt.request_id == request_id)
+            .cloned()
+            .collect()
+    }
+
+    #[must_use]
+    pub fn latest_for_request(&self, request_id: RequestId) -> Option<CompletedCallAttempt> {
+        self.attempts
+            .iter()
+            .rev()
+            .find(|attempt| attempt.request_id == request_id)
+            .cloned()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     DuplicateRequest,
     RequestNotFound,
@@ -1044,6 +1117,10 @@ mod tests {
 
     fn reservation_id(byte: u8) -> ReservationId {
         ReservationId::from_bytes([byte; 16]).expect("fixture reservation id")
+    }
+
+    fn call_task_id(byte: u8) -> CallTaskId {
+        CallTaskId::from_bytes([byte; 16]).expect("fixture call task id")
     }
 
     fn request(
@@ -2022,6 +2099,108 @@ mod tests {
             book.release(reservation_id(99), 1_800_000_120_000),
             Err(ReservationError::ReservationNotFound)
         );
+    }
+
+    #[test]
+    fn call_history_keeps_all_attempts_and_exposes_latest_separately() {
+        let request_id = request_id(21);
+        let mut history = InMemoryCallHistory::default();
+        history
+            .append(CompletedCallAttempt {
+                call_task_id: call_task_id(1),
+                request_id,
+                working_route_id: working_route_id(4),
+                operator_id: operator_id(4),
+                created_at_unix_ms: 1_800_000_000_000,
+                started_at_unix_ms: 1_800_000_010_000,
+                finished_at_unix_ms: 1_800_000_020_000,
+                result: CallResult::NoAnswer,
+            })
+            .expect("first call");
+        history
+            .append(CompletedCallAttempt {
+                call_task_id: call_task_id(2),
+                request_id,
+                working_route_id: working_route_id(4),
+                operator_id: operator_id(4),
+                created_at_unix_ms: 1_800_000_030_000,
+                started_at_unix_ms: 1_800_000_040_000,
+                finished_at_unix_ms: 1_800_000_050_000,
+                result: CallResult::Confirmed,
+            })
+            .expect("second call");
+
+        let attempts = history.for_request(request_id);
+        assert_eq!(attempts.len(), 2);
+        assert_eq!(attempts[0].result, CallResult::NoAnswer);
+        assert_eq!(attempts[1].result, CallResult::Confirmed);
+        assert_eq!(
+            history.latest_for_request(request_id).expect("latest").result,
+            CallResult::Confirmed
+        );
+    }
+
+    #[test]
+    fn call_history_rejects_duplicate_task_id_and_invalid_timeline() {
+        let request_id = request_id(22);
+        let attempt = CompletedCallAttempt {
+            call_task_id: call_task_id(3),
+            request_id,
+            working_route_id: working_route_id(5),
+            operator_id: operator_id(5),
+            created_at_unix_ms: 1_800_000_000_000,
+            started_at_unix_ms: 1_800_000_010_000,
+            finished_at_unix_ms: 1_800_000_020_000,
+            result: CallResult::Callback,
+        };
+        let mut history = InMemoryCallHistory::default();
+        history.append(attempt.clone()).expect("first call");
+
+        assert_eq!(
+            history.append(attempt),
+            Err(CallHistoryError::DuplicateCallTask)
+        );
+        assert_eq!(
+            history.append(CompletedCallAttempt {
+                call_task_id: call_task_id(4),
+                request_id,
+                working_route_id: working_route_id(5),
+                operator_id: operator_id(5),
+                created_at_unix_ms: 1_800_000_030_000,
+                started_at_unix_ms: 1_800_000_020_000,
+                finished_at_unix_ms: 1_800_000_040_000,
+                result: CallResult::Other,
+            }),
+            Err(CallHistoryError::InvalidTimeline)
+        );
+    }
+
+    #[test]
+    fn call_result_does_not_silently_change_request_state() {
+        let item = request(
+            request_id(23),
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Active,
+            true,
+        );
+        let mut history = InMemoryCallHistory::default();
+        history
+            .append(CompletedCallAttempt {
+                call_task_id: call_task_id(5),
+                request_id: item.request.request_id,
+                working_route_id: working_route_id(6),
+                operator_id: operator_id(6),
+                created_at_unix_ms: 1_800_000_000_000,
+                started_at_unix_ms: 1_800_000_010_000,
+                finished_at_unix_ms: 1_800_000_020_000,
+                result: CallResult::LostTaken,
+            })
+            .expect("call");
+
+        assert_eq!(history.for_request(item.request.request_id).len(), 1);
+        assert_eq!(item.request.availability, AvailabilityState::Active);
+        assert_eq!(item.request.planning_assignment, PlanningAssignment::Free);
     }
 
     #[test]
