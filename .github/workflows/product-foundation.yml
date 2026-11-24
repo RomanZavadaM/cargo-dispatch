@@ -41,6 +41,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: product-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     name: Product core quality
