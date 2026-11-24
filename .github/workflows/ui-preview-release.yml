@@ -44,11 +44,11 @@ jobs:
           New-Item -ItemType Directory -Force preview/windows | Out-Null
           New-Item -ItemType Directory -Force preview/browser | Out-Null
           Copy-Item target/release/ui-probe-tauri.exe preview/windows/Cargo-Dispatch-UI-Preview.exe
-          Copy-Item LICENSE preview/windows/LICENSE.txt
+          Copy-Item LICENSE.md preview/windows/LICENSE.txt
           Copy-Item THIRD_PARTY_NOTICES.md preview/windows/THIRD_PARTY_NOTICES.md
           Copy-Item README.md preview/windows/README.md
           Copy-Item apps/leptos-web/dist/* preview/browser/ -Recurse
-          Copy-Item LICENSE preview/browser/LICENSE.txt
+          Copy-Item LICENSE.md preview/browser/LICENSE.txt
           Copy-Item THIRD_PARTY_NOTICES.md preview/browser/THIRD_PARTY_NOTICES.md
           @"
           Cargo Dispatch UI Preview 0.1
