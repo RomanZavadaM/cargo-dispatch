@@ -8,6 +8,10 @@
 
 **cargo-dispatch** selects loads from the market for a small-truck fleet (gross weight up to 7.5 t), builds trips with additional loads picked up along the way, and gives the dispatcher control over vehicle movement. Development language: Rust.
 
+## Interface languages
+
+The current UI prototype implements and verifies **Ukrainian, English, and German**. The other README translations are documentation/target languages and do not yet mean that the program UI supports them.
+
 ## Documentation
 
 Working project documentation is kept privately.
