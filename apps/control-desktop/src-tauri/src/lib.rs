@@ -75,7 +75,10 @@ impl DesktopControlService {
                 .sessions
                 .lock()
                 .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
-            if sessions.values().any(|session| session.trip_id == trip_id_text) {
+            if sessions
+                .values()
+                .any(|session| session.trip_id == trip_id_text)
+            {
                 return Err("Цей рейс уже зареєстрований у Control".to_owned());
             }
         }
