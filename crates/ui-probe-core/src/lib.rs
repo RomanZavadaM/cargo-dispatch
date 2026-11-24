@@ -57,15 +57,7 @@ pub struct ApplicationService {
 impl ApplicationService {
     pub fn synthetic() -> Self {
         let cities = [
-            "Lviv",
-            "Kyiv",
-            "Dnipro",
-            "Odesa",
-            "Warsaw",
-            "Krakow",
-            "Berlin",
-            "Munich",
-            "Prague",
+            "Lviv", "Kyiv", "Dnipro", "Odesa", "Warsaw", "Krakow", "Berlin", "Munich", "Prague",
             "Brno",
         ];
         let sources = ["phone", "email", "api", "manual", "file"];
@@ -217,7 +209,10 @@ mod tests {
         let service = ApplicationService::synthetic();
         let rows = service.query("berlin", SortField::WeightKg, false, Some(50));
         assert!(!rows.is_empty());
-        assert!(rows.windows(2).all(|pair| pair[0].weight_kg >= pair[1].weight_kg));
+        assert!(
+            rows.windows(2)
+                .all(|pair| pair[0].weight_kg >= pair[1].weight_kg)
+        );
         assert!(rows.iter().all(|row| {
             row.origin.eq_ignore_ascii_case("berlin")
                 || row.destination.eq_ignore_ascii_case("berlin")
@@ -233,7 +228,10 @@ mod tests {
         let after = service.summary();
         assert_eq!(after.revision, before.revision + 1);
         let row = service.query("17", SortField::Id, true, None);
-        assert!(row.iter().any(|item| item.id == 17 && item.status == RequestStatus::Assigned));
+        assert!(
+            row.iter()
+                .any(|item| item.id == 17 && item.status == RequestStatus::Assigned)
+        );
     }
 
     #[test]

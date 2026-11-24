@@ -72,7 +72,7 @@ jobs:
 
       - name: Build browser harness
         working-directory: apps/leptos-web
-        run: trunk build --release index.html
+        run: trunk build --release=true
 
       - name: Record browser artifact
         run: |
