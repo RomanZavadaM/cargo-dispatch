@@ -20,6 +20,7 @@ cargo-dispatch може містити або розповсюджуватися
 - `Trunk 0.22.2` — CI/build-only frontend bundler; installed as a prebuilt/checksummed tool through `taiki-e/install-action`.
 - `taiki-e/install-action` — MIT або Apache-2.0, CI-only; pinned to commit `fe3acb53a98b62c772db35de75ce0e4595e7ca8c` (release 2.90.8), fallback disabled.
 - Tauri/Leptos versions are the exact starting versions already accepted by UI probe P01–P15; product code still receives its own CI and dependency/license gate.
+- Control desktop shell reuses the already accepted UI-probe icon resource; no additional icon/runtime dependency is introduced.
 
 ## Дані
 - Дорожні дані OpenStreetMap, якщо будуть використані, поширюються за ліцензією ODbL; потрібна атрибуція «© OpenStreetMap contributors».
