@@ -1144,10 +1144,15 @@ mod tests {
         body: &[u8],
     ) -> io::Result<(u16, String, Vec<u8>)> {
         let mut stream = tokio::net::TcpStream::connect(address).await?;
+        let has_content_length = headers
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("content-length"));
         let mut request = format!(
-            "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\nContent-Length: {}\r\n",
-            body.len()
+            "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n"
         );
+        if !has_content_length {
+            request.push_str(&format!("Content-Length: {}\r\n", body.len()));
+        }
         for (name, value) in headers {
             request.push_str(name);
             request.push_str(": ");
@@ -1440,4 +1445,109 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn browser_boundary_rejects_invalid_session_stale_route_and_bad_input() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let folder_path = tmp.path().join("guard-trip");
+        let (trip, route, folder) = create_trip(tmp.path(), "guard-trip", 90, 100)?;
+
+        let state = ControlBrowserState::new();
+        assert_eq!(
+            state.register_trip("short", folder),
+            Err(SessionRegistrationError::InvalidToken)
+        );
+        let folder = TripFolder::open(&folder_path, trip)?;
+        state
+            .register_trip("guard-trip-token-0001", folder)
+            .expect("valid session");
+
+        let (_, _, duplicate) = create_trip(tmp.path(), "duplicate-trip", 110, 120)?;
+        assert_eq!(
+            state.register_trip("guard-trip-token-0001", duplicate),
+            Err(SessionRegistrationError::DuplicateToken)
+        );
+
+        let server = LoopbackControlServer::start(state.clone()).await?;
+        let (status, _, _) =
+            http_request(server.address(), "GET", "/api/trip/wrong-token-0000", &[], &[]).await?;
+        assert_eq!(status, 404);
+
+        let before: DriverTripSnapshot =
+            get_json(server.address(), "/api/trip/guard-trip-token-0001").await?;
+        let stale_order = serde_json::to_vec(&serde_json::json!({
+            "based_on_revision": before.local_route_revision + 1,
+            "open_point_ids": before
+                .points
+                .iter()
+                .filter(|point| !point.completed)
+                .map(|point| point.point_id.clone())
+                .collect::<Vec<_>>()
+        }))?;
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            "/api/trip/guard-trip-token-0001/route/order",
+            &[("Content-Type", "application/json".to_owned())],
+            &stale_order,
+        )
+        .await?;
+        assert_eq!(status, 409);
+
+        let invalid_location = serde_json::to_vec(&serde_json::json!({
+            "latitude": 95.0,
+            "longitude": 24.0,
+            "accuracy_m": 5.0,
+            "observed_at_unix_ms": 1_u64
+        }))?;
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            "/api/trip/guard-trip-token-0001/location",
+            &[("Content-Type", "application/json".to_owned())],
+            &invalid_location,
+        )
+        .await?;
+        assert_eq!(status, 400);
+
+        let oversized_document = DocumentId::from_bytes([140; 16]).unwrap();
+        let oversized_path = format!(
+            "/api/trip/guard-trip-token-0001/documents/{}",
+            id_hex(oversized_document.as_bytes())
+        );
+        let oversized_headers = [
+            ("Content-Type", "video/mp4".to_owned()),
+            ("X-File-Name", "too-large.mp4".to_owned()),
+            ("X-Created-At-Unix-Ms", "2".to_owned()),
+            ("Content-Length", (MAX_UPLOAD_BYTES + 1).to_string()),
+        ];
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            &oversized_path,
+            &oversized_headers,
+            &[],
+        )
+        .await?;
+        assert_eq!(status, 413);
+
+        let after: DriverTripSnapshot =
+            get_json(server.address(), "/api/trip/guard-trip-token-0001").await?;
+        assert_eq!(after.points, before.points);
+        assert_eq!(after.local_route_revision, before.local_route_revision);
+        assert!(after.latest_location.is_none());
+        assert!(after
+            .documents
+            .iter()
+            .all(|document| document.document_id != id_hex(oversized_document.as_bytes())));
+
+        server.shutdown().await?;
+        drop(state);
+        let recovered = TripFolder::open(&folder_path, trip)?;
+        assert_eq!(recovered.state().route_points[0].point_id, route[0].point_id);
+        assert!(recovered.latest_location().is_none());
+        assert!(recovered.document(oversized_document).is_none());
+        Ok(())
+    }
+
 }
