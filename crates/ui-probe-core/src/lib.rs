@@ -40,6 +40,85 @@ pub struct LoadRequest {
     pub reserved: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IntakeMode {
+    Manual,
+    Phone,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EditorFieldSection {
+    Common,
+    PhoneOnly,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EditorField {
+    pub key: String,
+    pub label: String,
+    pub value: String,
+    pub required: bool,
+    pub section: EditorFieldSection,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RequestDraft {
+    pub request_id: u64,
+    pub mode: IntakeMode,
+    pub source: String,
+    pub confidence_percent: u8,
+    pub fields: Vec<EditorField>,
+}
+
+impl RequestDraft {
+    pub fn field_value(&self, key: &str) -> Option<&str> {
+        self.fields
+            .iter()
+            .find(|field| field.key == key)
+            .map(|field| field.value.as_str())
+    }
+
+    pub fn set_field(&mut self, key: &str, value: impl Into<String>) -> bool {
+        let Some(field) = self.fields.iter_mut().find(|field| field.key == key) else {
+            return false;
+        };
+        field.value = value.into();
+        true
+    }
+
+    pub fn visible_fields(&self) -> Vec<EditorField> {
+        self.fields
+            .iter()
+            .filter(|field| {
+                field.section == EditorFieldSection::Common
+                    || self.mode == IntakeMode::Phone
+            })
+            .cloned()
+            .collect()
+    }
+
+    pub fn visible_field_count(&self) -> usize {
+        self.visible_fields().len()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ValidationIssue {
+    pub field_key: String,
+    pub message: String,
+}
+
+impl ValidationIssue {
+    fn new(field_key: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            field_key: field_key.into(),
+            message: message.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProbeSummary {
     pub total_requests: usize,
@@ -108,6 +187,122 @@ impl ApplicationService {
         self.rows.iter().find(|row| row.id == id).cloned()
     }
 
+    pub fn editor_snapshot(&self, id: u64) -> Option<RequestDraft> {
+        self.rows.iter().find(|row| row.id == id).map(build_editor_draft)
+    }
+
+    pub fn validate_draft(&self, draft: &RequestDraft) -> Vec<ValidationIssue> {
+        let mut issues = Vec::new();
+
+        for (key, label) in [
+            ("origin", "Origin"),
+            ("destination", "Destination"),
+            ("cargo_description", "Cargo description"),
+            ("customer_name", "Customer"),
+        ] {
+            if draft
+                .field_value(key)
+                .is_none_or(|value| value.trim().is_empty())
+            {
+                issues.push(ValidationIssue::new(key, format!("{label} is required")));
+            }
+        }
+
+        validate_number(
+            draft,
+            "weight_kg",
+            "Weight",
+            1,
+            30_000,
+            &mut issues,
+        );
+        validate_number(draft, "rate_eur", "Rate", 1, 100_000, &mut issues);
+        validate_number(draft, "pickup_day", "Pickup day", 1, 31, &mut issues);
+        validate_number(draft, "pallets", "Pallets", 0, 80, &mut issues);
+
+        if draft.mode == IntakeMode::Phone {
+            let phone = draft.field_value("contact_phone").unwrap_or_default().trim();
+            let digits = phone.chars().filter(|ch| ch.is_ascii_digit()).count();
+            if digits < 7 {
+                issues.push(ValidationIssue::new(
+                    "contact_phone",
+                    "Phone order requires a contact number",
+                ));
+            }
+        }
+
+        if let (Some(origin), Some(destination)) = (
+            draft.field_value("origin"),
+            draft.field_value("destination"),
+        ) && !origin.trim().is_empty()
+            && origin.trim().eq_ignore_ascii_case(destination.trim())
+        {
+            issues.push(ValidationIssue::new(
+                "destination",
+                "Origin and destination must differ",
+            ));
+        }
+
+        issues
+    }
+
+    pub fn save_draft(
+        &mut self,
+        draft: &RequestDraft,
+    ) -> Result<LoadRequest, Vec<ValidationIssue>> {
+        let issues = self.validate_draft(draft);
+        if !issues.is_empty() {
+            return Err(issues);
+        }
+
+        let Some(row) = self.rows.iter_mut().find(|row| row.id == draft.request_id) else {
+            return Err(vec![ValidationIssue::new(
+                "request_id",
+                "Request no longer exists",
+            )]);
+        };
+
+        row.origin = draft.field_value("origin").unwrap_or_default().trim().to_owned();
+        row.destination = draft
+            .field_value("destination")
+            .unwrap_or_default()
+            .trim()
+            .to_owned();
+        row.weight_kg = draft
+            .field_value("weight_kg")
+            .unwrap_or_default()
+            .trim()
+            .parse()
+            .expect("validated weight");
+        row.pallets = draft
+            .field_value("pallets")
+            .unwrap_or_default()
+            .trim()
+            .parse()
+            .expect("validated pallets");
+        row.rate_eur = draft
+            .field_value("rate_eur")
+            .unwrap_or_default()
+            .trim()
+            .parse()
+            .expect("validated rate");
+        row.pickup_day = draft
+            .field_value("pickup_day")
+            .unwrap_or_default()
+            .trim()
+            .parse()
+            .expect("validated pickup day");
+        row.source = match draft.mode {
+            IntakeMode::Manual => "manual",
+            IntakeMode::Phone => "phone",
+        }
+        .to_owned();
+
+        let saved = row.clone();
+        self.revision += 1;
+        Ok(saved)
+    }
+
     pub fn query(
         &self,
         filter: &str,
@@ -162,6 +357,201 @@ impl ApplicationService {
             self.revision += 1;
         }
         changed
+    }
+}
+
+fn validate_number(
+    draft: &RequestDraft,
+    key: &str,
+    label: &str,
+    min: u32,
+    max: u32,
+    issues: &mut Vec<ValidationIssue>,
+) {
+    let raw = draft.field_value(key).unwrap_or_default().trim();
+    match raw.parse::<u32>() {
+        Ok(value) if (min..=max).contains(&value) => {}
+        _ => issues.push(ValidationIssue::new(
+            key,
+            format!("{label} must be between {min} and {max}"),
+        )),
+    }
+}
+
+fn field(
+    key: &str,
+    label: &str,
+    value: impl Into<String>,
+    required: bool,
+    section: EditorFieldSection,
+) -> EditorField {
+    EditorField {
+        key: key.to_owned(),
+        label: label.to_owned(),
+        value: value.into(),
+        required,
+        section,
+    }
+}
+
+fn build_editor_draft(row: &LoadRequest) -> RequestDraft {
+    use EditorFieldSection::{Common, PhoneOnly};
+
+    let fields = vec![
+        field("origin", "Origin", row.origin.clone(), true, Common),
+        field(
+            "destination",
+            "Destination",
+            row.destination.clone(),
+            true,
+            Common,
+        ),
+        field(
+            "pickup_day",
+            "Pickup day",
+            row.pickup_day.to_string(),
+            true,
+            Common,
+        ),
+        field(
+            "pickup_date",
+            "Pickup date",
+            format!("2026-11-{:02}", row.pickup_day),
+            false,
+            Common,
+        ),
+        field("pickup_time_from", "Pickup from", "08:00", false, Common),
+        field("pickup_time_to", "Pickup to", "12:00", false, Common),
+        field("delivery_date", "Delivery date", "2026-11-25", false, Common),
+        field("delivery_time_from", "Delivery from", "09:00", false, Common),
+        field("delivery_time_to", "Delivery to", "17:00", false, Common),
+        field(
+            "weight_kg",
+            "Weight kg",
+            row.weight_kg.to_string(),
+            true,
+            Common,
+        ),
+        field("pallets", "Pallets", row.pallets.to_string(), false, Common),
+        field(
+            "rate_eur",
+            "Rate EUR",
+            row.rate_eur.to_string(),
+            true,
+            Common,
+        ),
+        field("currency", "Currency", "EUR", false, Common),
+        field(
+            "cargo_description",
+            "Cargo description",
+            "Synthetic cargo",
+            true,
+            Common,
+        ),
+        field(
+            "customer_name",
+            "Customer",
+            "Synthetic customer",
+            true,
+            Common,
+        ),
+        field(
+            "customer_reference",
+            "Customer reference",
+            format!("CUST-{:05}", row.id),
+            false,
+            Common,
+        ),
+        field("contact_name", "Contact name", "Test contact", false, Common),
+        field(
+            "contact_email",
+            "Contact email",
+            "test@example.invalid",
+            false,
+            Common,
+        ),
+        field("body_type", "Body type", "curtain", false, Common),
+        field("temperature_min", "Temperature min", "", false, Common),
+        field("temperature_max", "Temperature max", "", false, Common),
+        field("length_m", "Cargo length m", "2.4", false, Common),
+        field("width_m", "Cargo width m", "1.2", false, Common),
+        field("height_m", "Cargo height m", "1.4", false, Common),
+        field("loading_type", "Loading type", "rear", false, Common),
+        field("unloading_type", "Unloading type", "rear", false, Common),
+        field("adr_class", "ADR class", "", false, Common),
+        field("stackable", "Stackable", "yes", false, Common),
+        field("fragile", "Fragile", "no", false, Common),
+        field(
+            "requires_tail_lift",
+            "Tail lift required",
+            "no",
+            false,
+            Common,
+        ),
+        field("requires_straps", "Straps required", "yes", false, Common),
+        field(
+            "requires_pallet_exchange",
+            "Pallet exchange",
+            "no",
+            false,
+            Common,
+        ),
+        field("notes", "Notes", "", false, Common),
+        field(
+            "source_reference",
+            "Source reference",
+            format!("SYN-{:05}", row.id),
+            false,
+            Common,
+        ),
+        field("vehicle_hint", "Vehicle hint", "3.5t", false, Common),
+        field("route_hint", "Route hint", "", false, Common),
+        field("priority", "Priority", "normal", false, Common),
+        field("language", "Contact language", "uk", false, Common),
+        field("invoice_required", "Invoice required", "yes", false, Common),
+        field("ttn_required", "TTN required", "client-policy", false, Common),
+        field("document_note", "Document note", "", false, Common),
+        field(
+            "confidence_note",
+            "Confidence note",
+            format!("{}%", row.confidence_percent),
+            false,
+            Common,
+        ),
+        field(
+            "market_age_note",
+            "Market age note",
+            format!("{} min", row.age_minutes),
+            false,
+            Common,
+        ),
+        field(
+            "contact_phone",
+            "Phone number",
+            "+49000000000",
+            true,
+            PhoneOnly,
+        ),
+        field("phone_call_time", "Call time", "09:00", false, PhoneOnly),
+        field(
+            "phone_operator_note",
+            "Phone order note",
+            "Synthetic phone order",
+            false,
+            PhoneOnly,
+        ),
+    ];
+
+    RequestDraft {
+        request_id: row.id,
+        mode: if row.source == "phone" {
+            IntakeMode::Phone
+        } else {
+            IntakeMode::Manual
+        },
+        source: row.source.clone(),
+        confidence_percent: row.confidence_percent,
+        fields,
     }
 }
 
@@ -258,5 +648,46 @@ mod tests {
             let row = service.query(&id.to_string(), SortField::Id, true, None);
             assert!(row.iter().any(|item| item.id == id && item.reserved));
         }
+    }
+
+    #[test]
+    fn editor_has_more_than_forty_visible_fields() {
+        let service = ApplicationService::synthetic();
+        let draft = service.editor_snapshot(1).expect("draft exists");
+        assert!(draft.visible_field_count() >= 40);
+    }
+
+    #[test]
+    fn editor_validation_is_independent_from_browser() {
+        let service = ApplicationService::synthetic();
+        let mut draft = service.editor_snapshot(1).expect("draft exists");
+        draft.set_field("origin", "");
+        draft.mode = IntakeMode::Phone;
+        draft.set_field("contact_phone", "");
+        let issues = service.validate_draft(&draft);
+        assert!(issues.iter().any(|issue| issue.field_key == "origin"));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.field_key == "contact_phone")
+        );
+    }
+
+    #[test]
+    fn draft_does_not_write_until_explicit_save() {
+        let mut service = ApplicationService::synthetic();
+        let before = service.get_request(1).expect("row exists");
+        let mut draft = service.editor_snapshot(1).expect("draft exists");
+        draft.set_field("origin", "Vienna");
+
+        assert_eq!(service.get_request(1), Some(before.clone()));
+
+        let saved = service.save_draft(&draft).expect("valid draft saves");
+        assert_eq!(saved.origin, "Vienna");
+        assert_eq!(
+            service.get_request(1).expect("row still exists").origin,
+            "Vienna"
+        );
+        assert_eq!(service.summary().revision, 2);
     }
 }

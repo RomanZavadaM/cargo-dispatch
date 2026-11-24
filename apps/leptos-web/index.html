@@ -10,6 +10,7 @@
     * { box-sizing: border-box; }
     body { margin: 0; background: Canvas; color: CanvasText; }
     button, input { font: inherit; }
+    button { cursor: pointer; }
     .shell { max-width: 1500px; margin: 0 auto; padding: 28px; }
     .eyebrow { text-transform: uppercase; letter-spacing: .12em; opacity: .65; }
     .metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; margin: 22px 0; }
@@ -19,8 +20,8 @@
     .toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
     .toolbar label { display: grid; gap: 5px; min-width: min(420px,100%); flex: 1; }
     .toolbar input { width: 100%; padding: 9px 11px; }
-    .sorts { display: flex; gap: 8px; }
-    .sorts button, .open-row { padding: 8px 10px; cursor: pointer; }
+    .sorts, .mode-switch, .editor-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .sorts button, .open-row, #edit-request, .mode-switch button, .editor-actions button, .unsaved-warning button { padding: 8px 10px; }
     .pool-status { margin: 0; padding: 9px 0; min-width: 130px; }
     .note { opacity: .72; margin: 0; }
     .table-wrap { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 12px; }
@@ -29,11 +30,27 @@
     th, td { padding: 8px 10px; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); text-align: left; white-space: nowrap; }
     th { position: sticky; top: 0; z-index: 2; background: Canvas; }
     .pool-row:focus-within { outline: 2px solid Highlight; outline-offset: -2px; }
-    .row-detail { display: flex; flex-wrap: wrap; gap: 12px; padding: 14px; border: 1px solid color-mix(in srgb, CanvasText 22%, transparent); border-radius: 12px; }
+    .row-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px; border: 1px solid color-mix(in srgb, CanvasText 22%, transparent); border-radius: 12px; }
+    .editor { display: grid; gap: 16px; padding: 18px; border: 2px solid color-mix(in srgb, Highlight 55%, CanvasText 20%); border-radius: 14px; }
+    .editor-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; align-items: start; }
+    .editor-head h2, .editor-head p { margin: 0; }
+    .editor-origin { display: grid; gap: 4px; min-width: 220px; }
+    #editor-dirty { color: color-mix(in srgb, CanvasText 78%, Highlight); }
+    .editor-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+    .editor-field-wrap { display: grid; gap: 4px; min-width: 0; }
+    .editor-field { width: 100%; min-width: 0; padding: 8px 9px; }
+    .validation-errors, .unsaved-warning { display: grid; gap: 8px; padding: 12px; border: 1px solid color-mix(in srgb, red 55%, CanvasText 20%); border-radius: 10px; }
+    .validation-errors ul { margin: 0; padding-left: 22px; }
+    .unsaved-warning div { display: flex; gap: 8px; flex-wrap: wrap; }
+    .saved-message { padding: 10px 12px; border: 1px solid color-mix(in srgb, green 50%, CanvasText 20%); border-radius: 10px; margin: 0; }
+    @media (max-width: 1100px) {
+      .editor-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    }
     @media (max-width: 800px) {
       .shell { padding: 16px; }
       .metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
       .pool-scroll { height: 70vh; }
+      .editor-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
