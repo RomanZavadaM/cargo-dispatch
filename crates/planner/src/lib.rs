@@ -655,6 +655,91 @@ pub fn manual_working_route(
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkingRouteTransitionError {
+    InvalidTransition {
+        from: WorkingRouteState,
+        to: WorkingRouteState,
+    },
+    RevisionOverflow,
+}
+
+#[must_use]
+pub const fn working_route_transition_allowed(
+    from: WorkingRouteState,
+    to: WorkingRouteState,
+) -> bool {
+    matches!(
+        (from, to),
+        (WorkingRouteState::Draft, WorkingRouteState::Selected)
+            | (WorkingRouteState::Draft, WorkingRouteState::Cancelled)
+            | (WorkingRouteState::Selected, WorkingRouteState::Negotiating)
+            | (WorkingRouteState::Selected, WorkingRouteState::Ready)
+            | (WorkingRouteState::Selected, WorkingRouteState::Replanning)
+            | (WorkingRouteState::Selected, WorkingRouteState::Cancelled)
+            | (
+                WorkingRouteState::Negotiating,
+                WorkingRouteState::PartiallyConfirmed
+            )
+            | (WorkingRouteState::Negotiating, WorkingRouteState::Ready)
+            | (WorkingRouteState::Negotiating, WorkingRouteState::Replanning)
+            | (WorkingRouteState::Negotiating, WorkingRouteState::Cancelled)
+            | (
+                WorkingRouteState::PartiallyConfirmed,
+                WorkingRouteState::Negotiating
+            )
+            | (WorkingRouteState::PartiallyConfirmed, WorkingRouteState::Ready)
+            | (
+                WorkingRouteState::PartiallyConfirmed,
+                WorkingRouteState::Replanning
+            )
+            | (
+                WorkingRouteState::PartiallyConfirmed,
+                WorkingRouteState::Cancelled
+            )
+            | (
+                WorkingRouteState::Ready,
+                WorkingRouteState::TransferredToControl
+            )
+            | (WorkingRouteState::Ready, WorkingRouteState::Replanning)
+            | (WorkingRouteState::Ready, WorkingRouteState::Cancelled)
+            | (
+                WorkingRouteState::TransferredToControl,
+                WorkingRouteState::Replanning
+            )
+            | (WorkingRouteState::Replanning, WorkingRouteState::Selected)
+            | (WorkingRouteState::Replanning, WorkingRouteState::Negotiating)
+            | (
+                WorkingRouteState::Replanning,
+                WorkingRouteState::PartiallyConfirmed
+            )
+            | (WorkingRouteState::Replanning, WorkingRouteState::Ready)
+            | (WorkingRouteState::Replanning, WorkingRouteState::Cancelled)
+    )
+}
+
+pub fn transition_working_route(
+    route: &WorkingRoute,
+    to: WorkingRouteState,
+) -> Result<WorkingRoute, WorkingRouteTransitionError> {
+    if !working_route_transition_allowed(route.state, to) {
+        return Err(WorkingRouteTransitionError::InvalidTransition {
+            from: route.state,
+            to,
+        });
+    }
+
+    let current_revision = route
+        .current_revision
+        .checked_add(1)
+        .ok_or(WorkingRouteTransitionError::RevisionOverflow)?;
+
+    let mut transitioned = route.clone();
+    transitioned.current_revision = current_revision;
+    transitioned.state = to;
+    Ok(transitioned)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkingRouteUpdateError {
     RecalculationRejected(Vec<RecalculationHardRejectReason>),
@@ -2886,6 +2971,110 @@ mod tests {
         assert_eq!(
             recalculate_working_route(&route, &[point_id(42), point_id(43)]),
             Err(WorkingRouteUpdateError::RevisionOverflow)
+        );
+    }
+
+    #[test]
+    fn working_route_lifecycle_accepts_operator_flow_as_new_revisions() {
+        let route = manual_working_route(
+            working_route_id(17),
+            &[point_id(44), point_id(45)],
+        )
+        .expect("route");
+
+        let selected =
+            transition_working_route(&route, WorkingRouteState::Selected).expect("selected");
+        let negotiating = transition_working_route(
+            &selected,
+            WorkingRouteState::Negotiating,
+        )
+        .expect("negotiating");
+        let partial = transition_working_route(
+            &negotiating,
+            WorkingRouteState::PartiallyConfirmed,
+        )
+        .expect("partial");
+        let ready =
+            transition_working_route(&partial, WorkingRouteState::Ready).expect("ready");
+        let transferred = transition_working_route(
+            &ready,
+            WorkingRouteState::TransferredToControl,
+        )
+        .expect("transferred");
+
+        assert_eq!(route.current_revision, 1);
+        assert_eq!(transferred.current_revision, 5);
+        assert_eq!(
+            transferred.state,
+            WorkingRouteState::TransferredToControl
+        );
+        assert_eq!(route.state, WorkingRouteState::Draft);
+    }
+
+    #[test]
+    fn transferred_route_may_enter_replanning_but_cancelled_is_terminal() {
+        let mut transferred = manual_working_route(
+            working_route_id(18),
+            &[point_id(46), point_id(47)],
+        )
+        .expect("route");
+        transferred.state = WorkingRouteState::TransferredToControl;
+
+        let replanning = transition_working_route(
+            &transferred,
+            WorkingRouteState::Replanning,
+        )
+        .expect("replanning");
+        assert_eq!(replanning.state, WorkingRouteState::Replanning);
+
+        let mut cancelled = transferred;
+        cancelled.state = WorkingRouteState::Cancelled;
+        assert_eq!(
+            transition_working_route(
+                &cancelled,
+                WorkingRouteState::Replanning,
+            ),
+            Err(WorkingRouteTransitionError::InvalidTransition {
+                from: WorkingRouteState::Cancelled,
+                to: WorkingRouteState::Replanning,
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_lifecycle_jump_does_not_change_original_route() {
+        let route = manual_working_route(
+            working_route_id(19),
+            &[point_id(48), point_id(49)],
+        )
+        .expect("route");
+        let before = route.clone();
+
+        assert_eq!(
+            transition_working_route(
+                &route,
+                WorkingRouteState::TransferredToControl,
+            ),
+            Err(WorkingRouteTransitionError::InvalidTransition {
+                from: WorkingRouteState::Draft,
+                to: WorkingRouteState::TransferredToControl,
+            })
+        );
+        assert_eq!(route, before);
+    }
+
+    #[test]
+    fn lifecycle_transition_revision_overflow_is_explicit() {
+        let mut route = manual_working_route(
+            working_route_id(20),
+            &[point_id(50), point_id(51)],
+        )
+        .expect("route");
+        route.current_revision = u64::MAX;
+
+        assert_eq!(
+            transition_working_route(&route, WorkingRouteState::Selected),
+            Err(WorkingRouteTransitionError::RevisionOverflow)
         );
     }
 
