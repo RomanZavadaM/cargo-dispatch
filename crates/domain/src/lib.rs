@@ -238,8 +238,7 @@ mod tests {
             planning_assignment: PlanningAssignment::Free,
             origin: Place::new("UA", "Lviv", None).expect("origin"),
             destination: Place::new("DE", "Nuremberg", None).expect("destination"),
-            cargo: CargoSummary::new("palletized cargo", Some(2_500), Some(6))
-                .expect("cargo"),
+            cargo: CargoSummary::new("palletized cargo", Some(2_500), Some(6)).expect("cargo"),
         };
 
         assert_eq!(request.source.kind, SourceKind::Phone);
