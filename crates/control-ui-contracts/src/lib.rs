@@ -39,3 +39,85 @@ pub struct ControlUiStatus {
     pub listener: Option<ListenerStatus>,
     pub sessions: Vec<SessionStatus>,
 }
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DashboardNavigation {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub address: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DashboardPoint {
+    pub point_id: String,
+    pub sequence: u32,
+    pub title: String,
+    pub completed: bool,
+    pub navigation: Option<DashboardNavigation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DashboardLocation {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub accuracy_m: Option<f64>,
+    pub observed_at_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DashboardDocumentDirection {
+    FromOperator,
+    FromDriver,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DashboardDocument {
+    pub document_id: String,
+    pub direction: DashboardDocumentDirection,
+    pub original_name: String,
+    pub mime_type: String,
+    pub size: u64,
+    pub point_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TripDashboard {
+    pub trip_id: String,
+    pub trip_version: u64,
+    pub local_route_revision: u64,
+    pub points: Vec<DashboardPoint>,
+    pub documents: Vec<DashboardDocument>,
+    pub latest_location: Option<DashboardLocation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SessionInput {
+    pub token: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReorderRouteInput {
+    pub token: String,
+    pub based_on_revision: u64,
+    pub open_point_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OperatorDocumentInput {
+    pub token: String,
+    pub document_id: String,
+    pub source_path: String,
+    pub original_name: String,
+    pub mime_type: String,
+    pub point_id: Option<String>,
+    pub created_at_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PickedFile {
+    pub path: String,
+    pub original_name: String,
+    pub mime_type: String,
+}
