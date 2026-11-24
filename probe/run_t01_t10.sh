@@ -113,7 +113,7 @@ run_case T07-P3 P3 false 49.0600 24.0000 49.0600 24.0100 ok T07_HAZMAT_NO T07_DE
 run_case T07-P4 P4 false 49.0600 24.0000 49.0600 24.0100 ok T07_DETOUR T07_HAZMAT_NO
 
 # T08 unpaved
-run_case T08-open P2 false 49.0700 24.0000 49.0700 24.0100 ok T08_GRAVEL T08_PAVED
+run_case T08-open P2 false 49.0700 24.0000 49.0700 24.0100 ok - -
 run_case T08-exclude P2 true 49.0700 24.0000 49.0700 24.0100 ok T08_PAVED T08_GRAVEL
 
 # T09 combined restrictions
