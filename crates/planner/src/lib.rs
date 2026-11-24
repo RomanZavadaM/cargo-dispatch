@@ -660,6 +660,52 @@ pub fn validate_recalculation(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FreshnessLevel {
+    Fresh,
+    Warning,
+    High,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FreshnessError {
+    InvalidThresholds,
+    ObservationInFuture,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RequestFreshness {
+    pub age_ms: u64,
+    pub level: FreshnessLevel,
+}
+
+pub fn evaluate_request_freshness(
+    request: &PlanningRequest,
+    now_unix_ms: u64,
+    warning_after_ms: u64,
+    high_after_ms: u64,
+) -> Result<RequestFreshness, FreshnessError> {
+    if warning_after_ms > high_after_ms {
+        return Err(FreshnessError::InvalidThresholds);
+    }
+
+    let observed_at_unix_ms = request.request.source.observed_at_unix_ms;
+    if observed_at_unix_ms > now_unix_ms {
+        return Err(FreshnessError::ObservationInFuture);
+    }
+
+    let age_ms = now_unix_ms - observed_at_unix_ms;
+    let level = if age_ms >= high_after_ms {
+        FreshnessLevel::High
+    } else if age_ms >= warning_after_ms {
+        FreshnessLevel::Warning
+    } else {
+        FreshnessLevel::Fresh
+    };
+
+    Ok(RequestFreshness { age_ms, level })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     DuplicateRequest,
     RequestNotFound,
@@ -1662,6 +1708,96 @@ mod tests {
             vec![RecalculationHardRejectReason::DuplicateProposedPoint(
                 point_id(13)
             )]
+        );
+    }
+
+    #[test]
+    fn request_freshness_uses_organization_thresholds_without_changing_availability() {
+        let mut item = request(
+            request_id(14),
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Active,
+            true,
+        );
+        item.request.source.observed_at_unix_ms = 1_800_000_000_000;
+
+        let freshness = evaluate_request_freshness(
+            &item,
+            1_800_000_030_000,
+            20_000,
+            60_000,
+        )
+        .expect("freshness");
+
+        assert_eq!(freshness.age_ms, 30_000);
+        assert_eq!(freshness.level, FreshnessLevel::Warning);
+        assert_eq!(item.request.availability, AvailabilityState::Active);
+    }
+
+    #[test]
+    fn stale_request_becomes_high_risk_but_is_not_auto_removed() {
+        let mut item = request(
+            request_id(15),
+            "Kyiv",
+            "Berlin",
+            AvailabilityState::NeedsCheck,
+            true,
+        );
+        item.request.source.observed_at_unix_ms = 1_800_000_000_000;
+
+        let freshness = evaluate_request_freshness(
+            &item,
+            1_800_000_120_000,
+            30_000,
+            90_000,
+        )
+        .expect("freshness");
+
+        assert_eq!(freshness.level, FreshnessLevel::High);
+        assert_eq!(item.request.availability, AvailabilityState::NeedsCheck);
+    }
+
+    #[test]
+    fn request_freshness_rejects_invalid_threshold_order() {
+        let item = request(
+            request_id(16),
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Active,
+            true,
+        );
+
+        assert_eq!(
+            evaluate_request_freshness(
+                &item,
+                item.request.source.observed_at_unix_ms,
+                60_000,
+                30_000,
+            ),
+            Err(FreshnessError::InvalidThresholds)
+        );
+    }
+
+    #[test]
+    fn request_freshness_rejects_future_observation_time() {
+        let mut item = request(
+            request_id(17),
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Active,
+            true,
+        );
+        item.request.source.observed_at_unix_ms = 1_800_000_100_000;
+
+        assert_eq!(
+            evaluate_request_freshness(
+                &item,
+                1_800_000_000_000,
+                30_000,
+                60_000,
+            ),
+            Err(FreshnessError::ObservationInFuture)
         );
     }
 
