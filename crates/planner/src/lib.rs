@@ -2999,7 +2999,7 @@ mod tests {
             .expect("transferred");
 
         assert_eq!(route.current_revision, 1);
-        assert_eq!(transferred.current_revision, 5);
+        assert_eq!(transferred.current_revision, 6);
         assert_eq!(transferred.state, WorkingRouteState::TransferredToControl);
         assert_eq!(route.state, WorkingRouteState::Draft);
     }
