@@ -606,7 +606,9 @@ pub enum WorkingRouteError {
     DuplicatePoint,
 }
 
-fn working_route_points(point_ids: &[PointId]) -> Result<Vec<WorkingRoutePoint>, WorkingRouteError> {
+fn working_route_points(
+    point_ids: &[PointId],
+) -> Result<Vec<WorkingRoutePoint>, WorkingRouteError> {
     let mut seen = std::collections::BTreeSet::new();
     if point_ids.iter().any(|point_id| !seen.insert(*point_id)) {
         return Err(WorkingRouteError::DuplicatePoint);
@@ -2735,19 +2737,13 @@ mod tests {
             })
             .expect("candidate");
 
-        let mut route = working_route_from_candidate(
-            working_route_id(10),
-            candidate_id(7),
-            &candidates,
-        )
-        .expect("working route");
+        let mut route =
+            working_route_from_candidate(working_route_id(10), candidate_id(7), &candidates)
+                .expect("working route");
         route.points[0].locked = true;
 
         let candidate = candidates.get(candidate_id(7)).expect("candidate");
-        assert_eq!(
-            route.origin,
-            WorkingRouteOrigin::Candidate(candidate_id(7))
-        );
+        assert_eq!(route.origin, WorkingRouteOrigin::Candidate(candidate_id(7)));
         assert_eq!(route.current_revision, 1);
         assert_eq!(route.state, WorkingRouteState::Selected);
         assert!(route.points[0].locked);
@@ -2759,17 +2755,15 @@ mod tests {
 
     #[test]
     fn manual_working_route_needs_no_candidate_and_starts_as_draft() {
-        let route = manual_working_route(
-            working_route_id(11),
-            &[point_id(32), point_id(33)],
-        )
-        .expect("manual route");
+        let route = manual_working_route(working_route_id(11), &[point_id(32), point_id(33)])
+            .expect("manual route");
 
         assert_eq!(route.origin, WorkingRouteOrigin::Manual);
         assert_eq!(route.current_revision, 1);
         assert_eq!(route.state, WorkingRouteState::Draft);
         assert_eq!(
-            route.points
+            route
+                .points
                 .iter()
                 .map(|point| point.point_id)
                 .collect::<Vec<_>>(),
@@ -2781,18 +2775,11 @@ mod tests {
     fn working_route_creation_rejects_missing_candidate_or_duplicate_points() {
         let candidates = InMemoryCandidateStore::default();
         assert_eq!(
-            working_route_from_candidate(
-                working_route_id(12),
-                candidate_id(8),
-                &candidates,
-            ),
+            working_route_from_candidate(working_route_id(12), candidate_id(8), &candidates,),
             Err(WorkingRouteError::CandidateNotFound)
         );
         assert_eq!(
-            manual_working_route(
-                working_route_id(13),
-                &[point_id(34), point_id(34)],
-            ),
+            manual_working_route(working_route_id(13), &[point_id(34), point_id(34)],),
             Err(WorkingRouteError::DuplicatePoint)
         );
     }
