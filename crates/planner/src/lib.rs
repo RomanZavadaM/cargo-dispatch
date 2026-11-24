@@ -169,9 +169,7 @@ mod tests {
     use cargo_dispatch_domain::{
         CargoSummary, PlanningAssignment, Place, RequestRevision, SourceKind, SourceMetadata,
     };
-    use cargo_dispatch_geo::{
-        NormalizedStatus, RoutingIdentity, TollPreference,
-    };
+    use cargo_dispatch_geo::{NormalizedStatus, RoutingIdentity, TollPreference};
 
     fn request_id(byte: u8) -> RequestId {
         RequestId::from_bytes([byte; 16]).expect("fixture id")
