@@ -3625,9 +3625,12 @@ mod tests {
             affected_point_ids: vec![point_id(70), point_id(71)],
         };
 
-        let replanned =
-            apply_planner_replan(&route, &context, &[point_id(71), point_id(72), point_id(70)])
-                .expect("replan application");
+        let replanned = apply_planner_replan(
+            &route,
+            &context,
+            &[point_id(71), point_id(72), point_id(70)],
+        )
+        .expect("replan application");
 
         assert_eq!(route, before);
         assert_eq!(replanned.current_revision, 10);
