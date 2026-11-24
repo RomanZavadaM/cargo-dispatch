@@ -118,7 +118,6 @@ impl ValidationIssue {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RoutePointStatus {
@@ -370,7 +369,6 @@ impl ApplicationService {
         Ok(saved)
     }
 
-
     pub fn route_snapshot(&self) -> WorkingRoute {
         self.route.clone()
     }
@@ -443,11 +441,7 @@ impl ApplicationService {
         )
     }
 
-    pub fn exclude_route_cargo(
-        &self,
-        draft: &mut RouteDraft,
-        cargo_id: u64,
-    ) -> RouteActionResult {
+    pub fn exclude_route_cargo(&self, draft: &mut RouteDraft, cargo_id: u64) -> RouteActionResult {
         let matching: Vec<&RoutePoint> = draft
             .points
             .iter()
@@ -499,10 +493,7 @@ impl ApplicationService {
         }
     }
 
-    pub fn accept_route_preview(
-        &mut self,
-        preview: &RoutePreview,
-    ) -> Result<WorkingRoute, String> {
+    pub fn accept_route_preview(&mut self, preview: &RoutePreview) -> Result<WorkingRoute, String> {
         if preview.base_revision != self.route.revision {
             return Err("Saved route changed; recalculate from the current version".to_owned());
         }
@@ -794,10 +785,17 @@ fn build_editor_draft(row: &LoadRequest) -> RequestDraft {
     }
 }
 
-
 fn synthetic_route() -> WorkingRoute {
     let mut points = vec![
-        route_point(1, "Base", RoutePointStatus::Confirmed, true, None, &[], None),
+        route_point(
+            1,
+            "Base",
+            RoutePointStatus::Confirmed,
+            true,
+            None,
+            &[],
+            None,
+        ),
         route_point(
             2,
             "Pickup A",
@@ -1069,7 +1067,14 @@ mod tests {
 
         let unlock_result = service.set_route_lock(&mut draft, 2, false);
         assert!(!unlock_result.applied);
-        assert!(draft.points.iter().find(|point| point.id == 2).unwrap().locked);
+        assert!(
+            draft
+                .points
+                .iter()
+                .find(|point| point.id == 2)
+                .unwrap()
+                .locked
+        );
     }
 
     #[test]
@@ -1109,5 +1114,4 @@ mod tests {
         assert_ne!(changed, original);
         assert_eq!(service.route_draft(), original);
     }
-
 }
