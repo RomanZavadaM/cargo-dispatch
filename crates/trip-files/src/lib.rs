@@ -69,7 +69,11 @@ impl DocumentEntry {
             size: self.size,
             sha256: self.sha256,
             created_at_unix_ms: self.created_at_unix_ms,
-            point_id: self.point_id.map(PointId::from_bytes).transpose().map_err(invalid)?,
+            point_id: self
+                .point_id
+                .map(PointId::from_bytes)
+                .transpose()
+                .map_err(invalid)?,
         })
     }
 }
@@ -456,12 +460,7 @@ impl TripFolder {
         }
         let mut updated = self.registry.clone();
         let mut updated_documents = self.documents.clone();
-        apply(
-            &mut updated,
-            &mut updated_documents,
-            self.trip,
-            &event,
-        )?;
+        apply(&mut updated, &mut updated_documents, self.trip, &event)?;
         if updated.get(self.trip) == self.registry.get(self.trip)
             && updated_documents == self.documents
         {
@@ -529,10 +528,7 @@ impl TripFolder {
             return Err(invalid("document point does not belong to trip"));
         }
 
-        let directory = self
-            .path
-            .join("documents")
-            .join(document_subdir(direction));
+        let directory = self.path.join("documents").join(document_subdir(direction));
         fs::create_dir_all(&directory)?;
 
         let extension = safe_extension(original_name);
@@ -593,7 +589,9 @@ impl TripFolder {
         if destination.try_exists()? {
             let (existing_size, existing_hash) = hash_file(&destination)?;
             if existing_size != size || existing_hash != sha256 {
-                return Err(invalid("unindexed document file conflicts with incoming content"));
+                return Err(invalid(
+                    "unindexed document file conflicts with incoming content",
+                ));
             }
         } else {
             publish(temporary, &destination)?;
@@ -885,30 +883,34 @@ mod tests {
             &source_b,
         )?;
         assert_eq!(control_b.documents(), vec![stored_b.clone()]);
-        assert!(control_b
-            .store_document(
-                DocumentDirection::FromDriver,
-                DocumentId::from_bytes([82; 16]).unwrap(),
-                "wrong-point.png",
-                "image/png",
-                Some(route_a[0].point_id),
-                21,
-                &source_b,
-            )
-            .is_err());
+        assert!(
+            control_b
+                .store_document(
+                    DocumentDirection::FromDriver,
+                    DocumentId::from_bytes([82; 16]).unwrap(),
+                    "wrong-point.png",
+                    "image/png",
+                    Some(route_a[0].point_id),
+                    21,
+                    &source_b,
+                )
+                .is_err()
+        );
 
         fs::write(&source_a, b"different bytes for the same logical document")?;
-        assert!(control_a
-            .store_document(
-                DocumentDirection::FromOperator,
-                document_a,
-                "TTN-test.pdf",
-                "application/pdf",
-                Some(route_a[0].point_id),
-                12,
-                &source_a,
-            )
-            .is_err());
+        assert!(
+            control_a
+                .store_document(
+                    DocumentDirection::FromOperator,
+                    document_a,
+                    "TTN-test.pdf",
+                    "application/pdf",
+                    Some(route_a[0].point_id),
+                    12,
+                    &source_a,
+                )
+                .is_err()
+        );
 
         drop(control_a);
         drop(control_b);
@@ -935,5 +937,4 @@ mod tests {
 
         Ok(())
     }
-
 }
