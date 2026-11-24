@@ -160,7 +160,7 @@ assert via["distance_m"] > direct["distance_m"]
 PY
 
 # T16 invalid snap: a far-away point with a 100 m search cutoff cannot be silently moved to this graph.
-invalid_result="$(route_case T16-invalid P2 direct 0.0000 0.0000 49.1000 24.0000)"
+invalid_result="$(route_case T16-invalid P2 direct 49.2000 24.0000 49.1000 24.0000)"
 jq -e '(.status == "invalid_point" or .status == "no_route") and .distance_m == null' "$invalid_result" >/dev/null
 
 # T17 unknown critical vehicle dimensions are explicit even if the engine can compute a route with defaults.

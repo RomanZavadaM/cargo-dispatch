@@ -299,9 +299,9 @@ fn point_json(lat: f64, lon: f64) -> Value {
     json!({
         "lat": lat,
         "lon": lon,
+        "search_cutoff": 100.0,
         "search_filter": {
-            "exclude_restricted": true,
-            "search_cutoff": 100.0
+            "exclude_restricted": true
         }
     })
 }
@@ -383,7 +383,7 @@ mod tests {
             true
         );
         assert_eq!(
-            payload["locations"][0]["search_filter"]["search_cutoff"],
+            payload["locations"][0]["search_cutoff"],
             100.0
         );
     }
