@@ -79,9 +79,7 @@ impl VehicleRoutingProfile {
             ));
         }
         if self.width_m.is_none() {
-            warnings.push(GeoWarning::MissingVehicleDimension(
-                VehicleDimension::Width,
-            ));
+            warnings.push(GeoWarning::MissingVehicleDimension(VehicleDimension::Width));
         }
         if self.length_m.is_none() {
             warnings.push(GeoWarning::MissingVehicleDimension(
@@ -328,17 +326,25 @@ pub enum GeoContractError {
 impl fmt::Display for GeoContractError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidLatitude => formatter.write_str("latitude must be finite and within -90..=90"),
+            Self::InvalidLatitude => {
+                formatter.write_str("latitude must be finite and within -90..=90")
+            }
             Self::InvalidLongitude => {
                 formatter.write_str("longitude must be finite and within -180..=180")
             }
-            Self::InvalidVehicleValue(field) => write!(formatter, "{field} must be positive and finite"),
+            Self::InvalidVehicleValue(field) => {
+                write!(formatter, "{field} must be positive and finite")
+            }
             Self::EmptyIdentity(field) => write!(formatter, "{field} must not be empty"),
             Self::RouteNeedsAtLeastTwoPoints => {
                 formatter.write_str("route request needs at least two ordered points")
             }
-            Self::MatrixNeedsSource => formatter.write_str("matrix request needs at least one source"),
-            Self::MatrixNeedsTarget => formatter.write_str("matrix request needs at least one target"),
+            Self::MatrixNeedsSource => {
+                formatter.write_str("matrix request needs at least one source")
+            }
+            Self::MatrixNeedsTarget => {
+                formatter.write_str("matrix request needs at least one target")
+            }
         }
     }
 }

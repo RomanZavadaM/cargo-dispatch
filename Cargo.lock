@@ -17,7 +17,3 @@ version = "0.1.0"
 [[package]]
 name = "cargo-dispatch-geo"
 version = "0.1.0"
-
-[[package]]
-name = "cargo-dispatch-geo"
-version = "0.1.0"

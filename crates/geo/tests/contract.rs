@@ -1,6 +1,6 @@
 use cargo_dispatch_geo::{
-    GeoPoint, MatrixRequest, NormalizedStatus, RouteRequest, RoutingIdentity, TollPreference,
-    VehicleDimension, VehicleRoutingProfile, GeoWarning,
+    GeoPoint, GeoWarning, MatrixRequest, NormalizedStatus, RouteRequest, RoutingIdentity,
+    TollPreference, VehicleDimension, VehicleRoutingProfile,
 };
 
 fn truck_profile() -> VehicleRoutingProfile {
@@ -47,6 +47,8 @@ fn missing_dimensions_are_explicit_warnings_not_hidden_defaults() {
 
     assert_eq!(
         profile.warnings(),
-        vec![GeoWarning::MissingVehicleDimension(VehicleDimension::Height)]
+        vec![GeoWarning::MissingVehicleDimension(
+            VehicleDimension::Height
+        )]
     );
 }
