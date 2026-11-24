@@ -8,3 +8,13 @@ cargo-dispatch може містити або розповсюджуватися
 ## Дані
 - Дорожні дані OpenStreetMap, якщо будуть використані, поширюються за ліцензією ODbL; потрібна атрибуція «© OpenStreetMap contributors».
 - Реальні дані користувачів (авто, водії, заявки, координати) у репозиторії не зберігаються.
+
+
+## CI / build-only tools
+Ці компоненти використовуються лише під час збірки й перевірок та не входять до runtime-продукту.
+
+- `actions/checkout` — MIT; workflow зафіксовано на commit `11d5960a326750d5838078e36cf38b85af677262` (лінія v4).
+- `dtolnay/rust-toolchain` — MIT; workflow зафіксовано на commit `df2a88e9fe4098bad09cb42c3dec7187f15861fc`.
+- `cargo-deny` — CI-only dependency/license/advisory checker, версія `0.21.0`; встановлюється з crates.io з `--locked`.
+
+Зміна pin-ів є окремою чутливою зміною build supply chain і повинна проходити звичайний CI перед подальшим використанням.
