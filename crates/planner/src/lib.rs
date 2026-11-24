@@ -1,9 +1,10 @@
 #![forbid(unsafe_code)]
 
+use cargo_dispatch_contracts::{ContractError, TripPackageHeader, TripVersion};
 use cargo_dispatch_domain::{
     AvailabilityState, CalculationId, CallTaskId, CandidateId, CargoId, CargoSummary, LoadRequest,
     NegotiatedTermsId, OperatorId, PlanningAssignment, PointId, RequestId, RequestRevision,
-    ReservationId, WorkingRouteId,
+    ReservationId, TripId, WorkingRouteId,
 };
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
@@ -747,6 +748,55 @@ pub fn transition_working_route(
     transitioned.current_revision = current_revision;
     transitioned.state = to;
     Ok(transitioned)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannerTripExportDraft {
+    pub header: TripPackageHeader,
+    pub working_route_id: WorkingRouteId,
+    pub working_route_revision: u64,
+    pub created_at_unix_ms: u64,
+    pub created_by: OperatorId,
+    pub ordered_point_ids: Vec<PointId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlannerExportError {
+    RouteNotReady(WorkingRouteState),
+    DuplicatePoint(PointId),
+    Contract(ContractError),
+}
+
+pub fn build_trip_export_draft(
+    route: &WorkingRoute,
+    trip_id: TripId,
+    trip_version: TripVersion,
+    base_version: Option<TripVersion>,
+    created_at_unix_ms: u64,
+    created_by: OperatorId,
+) -> Result<PlannerTripExportDraft, PlannerExportError> {
+    if route.state != WorkingRouteState::Ready {
+        return Err(PlannerExportError::RouteNotReady(route.state));
+    }
+
+    let mut seen = std::collections::BTreeSet::new();
+    for point in &route.points {
+        if !seen.insert(point.point_id) {
+            return Err(PlannerExportError::DuplicatePoint(point.point_id));
+        }
+    }
+
+    let header = TripPackageHeader::new(trip_id, trip_version, base_version)
+        .map_err(PlannerExportError::Contract)?;
+
+    Ok(PlannerTripExportDraft {
+        header,
+        working_route_id: route.working_route_id,
+        working_route_revision: route.current_revision,
+        created_at_unix_ms,
+        created_by,
+        ordered_point_ids: route.points.iter().map(|point| point.point_id).collect(),
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1537,6 +1587,10 @@ mod tests {
 
     fn calculation_id(byte: u8) -> CalculationId {
         CalculationId::from_bytes([byte; 16]).expect("fixture calculation id")
+    }
+
+    fn trip_id(byte: u8) -> TripId {
+        TripId::from_bytes([byte; 16]).expect("fixture trip id")
     }
 
     fn request(
@@ -3051,6 +3105,100 @@ mod tests {
         assert_eq!(
             transition_working_route(&route, WorkingRouteState::Selected),
             Err(WorkingRouteTransitionError::RevisionOverflow)
+        );
+    }
+
+    #[test]
+    fn ready_working_route_builds_frozen_first_trip_export_draft() {
+        let mut route = manual_working_route(
+            working_route_id(21),
+            &[point_id(52), point_id(53)],
+        )
+        .expect("route");
+        route.state = WorkingRouteState::Ready;
+        route.current_revision = 4;
+
+        let draft = build_trip_export_draft(
+            &route,
+            trip_id(1),
+            TripVersion::new(1).expect("trip version"),
+            None,
+            1_800_000_000_000,
+            operator_id(10),
+        )
+        .expect("export draft");
+
+        route.points[0].locked = true;
+
+        assert_eq!(draft.header.trip_id, trip_id(1));
+        assert_eq!(draft.header.trip_version.get(), 1);
+        assert_eq!(draft.header.base_version, None);
+        assert_eq!(draft.working_route_revision, 4);
+        assert_eq!(
+            draft.ordered_point_ids,
+            vec![point_id(52), point_id(53)]
+        );
+    }
+
+    #[test]
+    fn trip_export_version_is_separate_from_working_route_revision() {
+        let mut route = manual_working_route(
+            working_route_id(22),
+            &[point_id(54), point_id(55)],
+        )
+        .expect("route");
+        route.state = WorkingRouteState::Ready;
+        route.current_revision = 9;
+
+        let draft = build_trip_export_draft(
+            &route,
+            trip_id(2),
+            TripVersion::new(3).expect("trip version"),
+            Some(TripVersion::new(2).expect("base version")),
+            1_800_000_010_000,
+            operator_id(11),
+        )
+        .expect("export draft");
+
+        assert_eq!(draft.working_route_revision, 9);
+        assert_eq!(draft.header.trip_version.get(), 3);
+        assert_eq!(draft.header.base_version.map(TripVersion::get), Some(2));
+    }
+
+    #[test]
+    fn export_draft_rejects_non_ready_route_and_bad_trip_version_chain() {
+        let route = manual_working_route(
+            working_route_id(23),
+            &[point_id(56), point_id(57)],
+        )
+        .expect("route");
+
+        assert_eq!(
+            build_trip_export_draft(
+                &route,
+                trip_id(3),
+                TripVersion::new(1).expect("trip version"),
+                None,
+                1_800_000_020_000,
+                operator_id(12),
+            ),
+            Err(PlannerExportError::RouteNotReady(WorkingRouteState::Draft))
+        );
+
+        let mut ready = route;
+        ready.state = WorkingRouteState::Ready;
+        assert_eq!(
+            build_trip_export_draft(
+                &ready,
+                trip_id(3),
+                TripVersion::new(2).expect("trip version"),
+                None,
+                1_800_000_020_000,
+                operator_id(12),
+            ),
+            Err(PlannerExportError::Contract(
+                ContractError::LaterVersionRequiresBase
+            ))
         );
     }
 

@@ -7,5 +7,6 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+cargo-dispatch-contracts = { path = "../contracts" }
 cargo-dispatch-domain = { path = "../domain" }
 cargo-dispatch-geo = { path = "../geo" }

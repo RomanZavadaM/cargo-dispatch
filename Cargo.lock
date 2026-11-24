@@ -22,6 +22,7 @@ version = "0.1.0"
 name = "cargo-dispatch-planner"
 version = "0.1.0"
 dependencies = [
+ "cargo-dispatch-contracts",
  "cargo-dispatch-domain",
  "cargo-dispatch-geo",
 ]
