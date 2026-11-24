@@ -604,7 +604,9 @@ pub fn validate_recalculation(
 
     for point_id in proposed_point_ids {
         if !seen.insert(*point_id) {
-            hard_reasons.push(RecalculationHardRejectReason::DuplicateProposedPoint(*point_id));
+            hard_reasons.push(RecalculationHardRejectReason::DuplicateProposedPoint(
+                *point_id,
+            ));
         }
     }
 
@@ -1598,8 +1600,7 @@ mod tests {
             },
         ];
 
-        let result =
-            validate_recalculation(&current, &[point_id(6), point_id(5), point_id(4)]);
+        let result = validate_recalculation(&current, &[point_id(6), point_id(5), point_id(4)]);
 
         assert_eq!(result.level, FeasibilityLevel::Impossible);
         assert_eq!(
@@ -1653,10 +1654,7 @@ mod tests {
             confirmed: false,
         }];
 
-        let result = validate_recalculation(
-            &current,
-            &[point_id(12), point_id(13), point_id(13)],
-        );
+        let result = validate_recalculation(&current, &[point_id(12), point_id(13), point_id(13)]);
 
         assert_eq!(result.level, FeasibilityLevel::Impossible);
         assert_eq!(
