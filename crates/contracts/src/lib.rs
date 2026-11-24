@@ -295,7 +295,10 @@ mod tests {
         .expect("replan request");
 
         assert_eq!(request.schema_name, REPLAN_REQUEST_SCHEMA_NAME);
-        assert_eq!(request.schema_version, CURRENT_REPLAN_REQUEST_SCHEMA_VERSION);
+        assert_eq!(
+            request.schema_version,
+            CURRENT_REPLAN_REQUEST_SCHEMA_VERSION
+        );
         assert_eq!(request.based_on_trip_version.get(), 3);
         assert_eq!(request.completed_point_ids, vec![point_id(1), point_id(2)]);
         assert_eq!(request.current_point_id, Some(point_id(3)));
