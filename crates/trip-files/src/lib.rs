@@ -54,6 +54,45 @@ pub struct DocumentStoreDraft {
     pub point_id: Option<PointId>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DriverLocationSample {
+    pub latitude_e7: i32,
+    pub longitude_e7: i32,
+    pub accuracy_cm: Option<u32>,
+    pub observed_at_unix_ms: u64,
+}
+
+impl DriverLocationSample {
+    pub fn validate(self) -> io::Result<Self> {
+        if !(-900_000_000..=900_000_000).contains(&self.latitude_e7) {
+            return Err(invalid("latitude out of range"));
+        }
+        if !(-1_800_000_000..=1_800_000_000).contains(&self.longitude_e7) {
+            return Err(invalid("longitude out of range"));
+        }
+        if self.observed_at_unix_ms == 0 {
+            return Err(invalid("location timestamp is required"));
+        }
+        Ok(self)
+    }
+
+    #[must_use]
+    pub fn latitude(self) -> f64 {
+        f64::from(self.latitude_e7) / 10_000_000.0
+    }
+
+    #[must_use]
+    pub fn longitude(self) -> f64 {
+        f64::from(self.longitude_e7) / 10_000_000.0
+    }
+
+    #[must_use]
+    pub fn accuracy_m(self) -> Option<f64> {
+        self.accuracy_cm.map(|value| f64::from(value) / 100.0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutionSummary {
     pub trip_id: TripId,
@@ -517,11 +556,13 @@ enum Change {
     OperatorEdit(Vec<Point>),
     DriverOrder(Vec<[u8; 16]>),
     DocumentStored(DocumentEntry),
+    DriverLocation(DriverLocationSample),
 }
 
 fn apply(
     reg: &mut InMemoryTripRegistry,
     documents: &mut std::collections::BTreeMap<DocumentId, StoredDocument>,
+    locations: &mut Vec<DriverLocationSample>,
     trip: TripId,
     event: &Change,
 ) -> io::Result<()> {
@@ -577,6 +618,12 @@ fn apply(
                 }
             }
         }
+        Change::DriverLocation(sample) => {
+            let sample = sample.validate()?;
+            if locations.last().copied() != Some(sample) {
+                locations.push(sample);
+            }
+        }
     }
     Ok(())
 }
@@ -588,6 +635,7 @@ pub struct TripFolder {
     plan_version_count: u64,
     registry: InMemoryTripRegistry,
     documents: std::collections::BTreeMap<DocumentId, StoredDocument>,
+    locations: Vec<DriverLocationSample>,
 }
 
 impl TripFolder {
@@ -607,6 +655,7 @@ impl TripFolder {
             plan_version_count: 0,
             registry: InMemoryTripRegistry::default(),
             documents: std::collections::BTreeMap::new(),
+            locations: Vec::new(),
         };
         for entry in entries {
             if entry != this.next_path()? {
@@ -615,7 +664,13 @@ impl TripFolder {
             let event: Change = serde_json::from_slice(&bounded(File::open(entry)?)?)?;
             let before = this.registry.get(trip);
             let is_import = matches!(&event, Change::Import(_));
-            apply(&mut this.registry, &mut this.documents, trip, &event)?;
+            apply(
+                &mut this.registry,
+                &mut this.documents,
+                &mut this.locations,
+                trip,
+                &event,
+            )?;
             if is_import && this.registry.get(trip) != before {
                 this.plan_version_count = this
                     .plan_version_count
@@ -664,6 +719,33 @@ impl TripFolder {
     #[must_use]
     pub fn document(&self, document_id: DocumentId) -> Option<StoredDocument> {
         self.documents.get(&document_id).cloned()
+    }
+
+    pub fn verified_document_path(
+        &self,
+        document_id: DocumentId,
+    ) -> io::Result<(StoredDocument, PathBuf)> {
+        let document = self
+            .documents
+            .get(&document_id)
+            .cloned()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "document not found"))?;
+        let path = stored_document_path(&self.path, &document);
+        let (size, sha256) = hash_file(&path)?;
+        if size != document.size || sha256 != document.sha256 {
+            return Err(invalid("stored document integrity mismatch"));
+        }
+        Ok((document, path))
+    }
+
+    #[must_use]
+    pub fn locations(&self) -> &[DriverLocationSample] {
+        &self.locations
+    }
+
+    #[must_use]
+    pub fn latest_location(&self) -> Option<DriverLocationSample> {
+        self.locations.last().copied()
     }
 
     fn execution_summary(&self, completed_at_unix_ms: u64) -> io::Result<ExecutionSummary> {
@@ -717,10 +799,20 @@ impl TripFolder {
         }
         let mut updated = self.registry.clone();
         let mut updated_documents = self.documents.clone();
+        let mut updated_locations = self.locations.clone();
         let is_import = matches!(&event, Change::Import(_));
-        apply(&mut updated, &mut updated_documents, self.trip, &event)?;
+        apply(
+            &mut updated,
+            &mut updated_documents,
+            &mut updated_locations,
+            self.trip,
+            &event,
+        )?;
         let registry_changed = updated.get(self.trip) != self.registry.get(self.trip);
-        if !registry_changed && updated_documents == self.documents {
+        if !registry_changed
+            && updated_documents == self.documents
+            && updated_locations == self.locations
+        {
             return Ok(());
         }
         let bytes = serde_json::to_vec(&event)?;
@@ -732,6 +824,7 @@ impl TripFolder {
         publish(file, &path)?;
         self.registry = updated;
         self.documents = updated_documents;
+        self.locations = updated_locations;
         if is_import && registry_changed {
             self.plan_version_count = self
                 .plan_version_count
@@ -763,6 +856,10 @@ impl TripFolder {
         self.record(Change::DriverOrder(
             order.iter().map(|p| p.as_bytes()).collect(),
         ))
+    }
+
+    pub fn record_location(&mut self, sample: DriverLocationSample) -> io::Result<()> {
+        self.record(Change::DriverLocation(sample.validate()?))
     }
 
     pub fn store_document(
