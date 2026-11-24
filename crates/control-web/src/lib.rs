@@ -21,6 +21,7 @@ use std::{
     collections::BTreeMap,
     io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::{Path as FsPath, PathBuf},
     sync::{Arc, Mutex, RwLock},
 };
 use tempfile::NamedTempFile;
@@ -474,6 +475,74 @@ impl ControlBrowserState {
             .read()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         Ok(sessions.get(token).cloned())
+    }
+
+
+    fn shared_trip(&self, token: &str) -> io::Result<SharedTrip> {
+        let sessions = self
+            .sessions
+            .read()
+            .map_err(|_| io::Error::other("browser session registry unavailable"))?;
+        sessions
+            .get(token)
+            .cloned()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "trip session not found"))
+    }
+
+    pub fn session_snapshot(&self, token: &str) -> io::Result<DriverTripSnapshot> {
+        let trip = self.shared_trip(token)?;
+        let trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        Ok(snapshot(&trip))
+    }
+
+    pub fn reorder_session_route(
+        &self,
+        token: &str,
+        based_on_revision: u64,
+        order: &[PointId],
+    ) -> io::Result<DriverTripSnapshot> {
+        let trip = self.shared_trip(token)?;
+        let mut trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        let shown = trip.state();
+        if shown.local_route_revision != based_on_revision {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "stale route revision",
+            ));
+        }
+        trip.driver_order(&shown, order)?;
+        Ok(snapshot(&trip))
+    }
+
+    pub fn store_operator_document(
+        &self,
+        token: &str,
+        mut draft: DocumentStoreDraft,
+        source: &FsPath,
+    ) -> io::Result<DriverTripSnapshot> {
+        draft.direction = DocumentDirection::FromOperator;
+        let trip = self.shared_trip(token)?;
+        let mut trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.store_document(draft, source)?;
+        Ok(snapshot(&trip))
+    }
+
+    pub fn verified_session_document_path(
+        &self,
+        token: &str,
+        document_id: DocumentId,
+    ) -> io::Result<(StoredDocument, PathBuf)> {
+        let trip = self.shared_trip(token)?;
+        let trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.verified_document_path(document_id)
     }
 }
 
