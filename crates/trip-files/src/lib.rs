@@ -1263,4 +1263,104 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn completing_one_trip_verifies_and_archives_it_without_stopping_another() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package_a = tmp.path().join("archive-a.zip");
+        let package_b = tmp.path().join("archive-b.zip");
+        let folder_a = tmp.path().join("active-a");
+        let folder_b = tmp.path().join("active-b");
+        let completed_root = tmp.path().join("completed").join("2026").join("11");
+        let archive_name = "2026-11-24_trip-001_2828";
+
+        let (trip_a, route_a) = create_test_package(&package_a, 90, 100)?;
+        let (trip_b, route_b) = create_test_package(&package_b, 110, 120)?;
+        let mut control_a = TripFolder::import(&folder_a, &package_a)?;
+        let mut control_b = TripFolder::import(&folder_b, &package_b)?;
+
+        control_a.complete(route_a[1].point_id)?;
+        let source_a = tmp.path().join("archive-ttn.pdf");
+        let source_b = tmp.path().join("still-active-photo.jpg");
+        fs::write(&source_a, b"archive document bytes")?;
+        fs::write(&source_b, b"second trip keeps working")?;
+
+        let stored_a = control_a.store_document(
+            DocumentStoreDraft {
+                document_id: DocumentId::from_bytes([130; 16]).unwrap(),
+                direction: DocumentDirection::FromOperator,
+                original_name: "archive-ttn.pdf".to_owned(),
+                mime_type: "application/pdf".to_owned(),
+                created_at_unix_ms: 30,
+                point_id: Some(route_a[1].point_id),
+            },
+            &source_a,
+        )?;
+        control_b.store_document(
+            DocumentStoreDraft {
+                document_id: DocumentId::from_bytes([131; 16]).unwrap(),
+                direction: DocumentDirection::FromDriver,
+                original_name: "still-active-photo.jpg".to_owned(),
+                mime_type: "image/jpeg".to_owned(),
+                created_at_unix_ms: 31,
+                point_id: Some(route_b[0].point_id),
+            },
+            &source_b,
+        )?;
+
+        let stored_a_path = stored_document_path(&folder_a, &stored_a);
+        fs::write(&stored_a_path, b"corrupted before completion")?;
+        assert!(
+            control_a
+                .archive(&completed_root, archive_name, 100)
+                .is_err()
+        );
+        assert!(folder_a.is_dir());
+        assert!(!completed_root.join(archive_name).exists());
+
+        fs::write(&stored_a_path, b"archive document bytes")?;
+        let control_a = TripFolder::open(&folder_a, trip_a)?;
+        let archived = control_a.archive(&completed_root, archive_name, 100)?;
+        assert!(!folder_a.exists());
+        assert!(archived.is_dir());
+
+        let summary = verify_archive(&archived, trip_a)?;
+        assert_eq!(summary.trip_id, trip_a);
+        assert_eq!(summary.final_plan_version, TripVersion::new(1).unwrap());
+        assert_eq!(summary.completed_point_ids, vec![route_a[1].point_id]);
+        assert_eq!(summary.documents_from_operator, 1);
+        assert_eq!(summary.documents_from_driver, 0);
+        assert_eq!(summary.plan_version_count, 1);
+        assert_eq!(summary.replan_count, 0);
+
+        assert!(
+            TripFolder::open(&archived, trip_a)?
+                .archive(&completed_root, archive_name, 101)
+                .is_err()
+        );
+        assert_eq!(
+            fs::read_dir(&completed_root)?
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+                .count(),
+            1
+        );
+
+        control_b.complete(route_b[0].point_id)?;
+        let active_b = control_b.state();
+        assert!(active_b.completed_point_ids.contains(&route_b[0].point_id));
+        assert_eq!(control_b.documents().len(), 1);
+        drop(control_b);
+        assert_eq!(TripFolder::open(&folder_b, trip_b)?.state(), active_b);
+
+        fs::write(
+            stored_document_path(&archived, &stored_a),
+            b"tampered after archive",
+        )?;
+        assert!(verify_archive(&archived, trip_a).is_err());
+        assert!(TripFolder::open(&folder_b, trip_b).is_ok());
+
+        Ok(())
+    }
+
 }
