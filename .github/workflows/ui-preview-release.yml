@@ -3,7 +3,7 @@ name: Publish UI preview
 on:
   push:
     branches:
-      - "prototype/ui-r1"
+      - "preview/ui-0.1"
     paths:
       - ".github/workflows/ui-preview-release.yml"
 
@@ -74,7 +74,17 @@ jobs:
           "$winHash  Cargo-Dispatch-UI-Preview-0.1-Windows-x64.zip" | Set-Content -Encoding ASCII SHA256SUMS.txt
           "$webHash  Cargo-Dispatch-UI-Preview-0.1-Browser.zip" | Add-Content -Encoding ASCII SHA256SUMS.txt
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cargo-dispatch-ui-preview-0.1
+          path: |
+            Cargo-Dispatch-UI-Preview-0.1-Windows-x64.zip
+            Cargo-Dispatch-UI-Preview-0.1-Browser.zip
+            SHA256SUMS.txt
+          if-no-files-found: error
+
       - name: Publish GitHub prerelease
+        continue-on-error: true
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -108,11 +118,3 @@ jobs:
           }
           gh release upload $env:PREVIEW_TAG Cargo-Dispatch-UI-Preview-0.1-Windows-x64.zip Cargo-Dispatch-UI-Preview-0.1-Browser.zip SHA256SUMS.txt --repo "${{ github.repository }}" --clobber
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cargo-dispatch-ui-preview-0.1
-          path: |
-            Cargo-Dispatch-UI-Preview-0.1-Windows-x64.zip
-            Cargo-Dispatch-UI-Preview-0.1-Browser.zip
-            SHA256SUMS.txt
-          if-no-files-found: error
