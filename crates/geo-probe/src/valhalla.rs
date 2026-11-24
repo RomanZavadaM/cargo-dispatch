@@ -382,10 +382,7 @@ mod tests {
             payload["locations"][0]["search_filter"]["exclude_restricted"],
             true
         );
-        assert_eq!(
-            payload["locations"][0]["search_cutoff"],
-            100.0
-        );
+        assert_eq!(payload["locations"][0]["search_cutoff"], 100.0);
     }
 
     #[test]
