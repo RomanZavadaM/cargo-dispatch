@@ -391,11 +391,7 @@ pub fn ui_text(language: UiLanguage, key: UiTextKey) -> &'static str {
     }
 }
 
-pub fn localized_field_label(
-    language: UiLanguage,
-    key: &str,
-    english_fallback: &str,
-) -> String {
+pub fn localized_field_label(language: UiLanguage, key: &str, english_fallback: &str) -> String {
     if language == UiLanguage::En {
         return english_fallback.to_owned();
     }
@@ -1548,14 +1544,8 @@ mod tests {
         assert_eq!(format_ui_integer(UiLanguage::Uk, 12_345), "12 345");
         assert_eq!(format_ui_integer(UiLanguage::En, 12_345), "12,345");
         assert_eq!(format_ui_integer(UiLanguage::De, 12_345), "12.345");
-        assert_eq!(
-            format_ui_date(UiLanguage::En, 2026, 11, 24),
-            "11/24/2026"
-        );
-        assert_eq!(
-            format_ui_date(UiLanguage::De, 2026, 11, 24),
-            "24.11.2026"
-        );
+        assert_eq!(format_ui_date(UiLanguage::En, 2026, 11, 24), "11/24/2026");
+        assert_eq!(format_ui_date(UiLanguage::De, 2026, 11, 24), "24.11.2026");
     }
 
     #[test]
