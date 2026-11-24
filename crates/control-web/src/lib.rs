@@ -1327,8 +1327,7 @@ mod tests {
 
         let photo_document = DocumentId::from_bytes([82; 16]).unwrap();
         let photo_document_hex = id_hex(photo_document.as_bytes());
-        let photo_path =
-            format!("/api/trip/trip-a-token-0001/documents/{photo_document_hex}");
+        let photo_path = format!("/api/trip/trip-a-token-0001/documents/{photo_document_hex}");
         let photo_bytes = b"synthetic-driver-photo-bytes";
         let photo_headers = [
             ("Content-Type", "image/jpeg".to_owned()),
