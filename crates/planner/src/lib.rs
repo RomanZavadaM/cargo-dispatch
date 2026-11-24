@@ -1722,13 +1722,8 @@ mod tests {
         );
         item.request.source.observed_at_unix_ms = 1_800_000_000_000;
 
-        let freshness = evaluate_request_freshness(
-            &item,
-            1_800_000_030_000,
-            20_000,
-            60_000,
-        )
-        .expect("freshness");
+        let freshness = evaluate_request_freshness(&item, 1_800_000_030_000, 20_000, 60_000)
+            .expect("freshness");
 
         assert_eq!(freshness.age_ms, 30_000);
         assert_eq!(freshness.level, FreshnessLevel::Warning);
@@ -1746,13 +1741,8 @@ mod tests {
         );
         item.request.source.observed_at_unix_ms = 1_800_000_000_000;
 
-        let freshness = evaluate_request_freshness(
-            &item,
-            1_800_000_120_000,
-            30_000,
-            90_000,
-        )
-        .expect("freshness");
+        let freshness = evaluate_request_freshness(&item, 1_800_000_120_000, 30_000, 90_000)
+            .expect("freshness");
 
         assert_eq!(freshness.level, FreshnessLevel::High);
         assert_eq!(item.request.availability, AvailabilityState::NeedsCheck);
@@ -1791,12 +1781,7 @@ mod tests {
         item.request.source.observed_at_unix_ms = 1_800_000_100_000;
 
         assert_eq!(
-            evaluate_request_freshness(
-                &item,
-                1_800_000_000_000,
-                30_000,
-                60_000,
-            ),
+            evaluate_request_freshness(&item, 1_800_000_000_000, 30_000, 60_000,),
             Err(FreshnessError::ObservationInFuture)
         );
     }
