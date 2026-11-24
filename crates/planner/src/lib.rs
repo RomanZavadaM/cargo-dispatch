@@ -43,6 +43,7 @@ pub enum FeasibilityLevel {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HardRejectReason {
     RequestUnavailable(AvailabilityState),
+    AlreadyConfirmedToTrip,
     PayloadExceeded {
         cargo_kg: u32,
         available_kg: u32,
@@ -57,6 +58,8 @@ pub enum HardRejectReason {
 pub enum NeedsCheckReason {
     RequestAvailabilityNeedsCheck,
     RequestAvailabilityUnknown,
+    SoftReserved,
+    Calling,
     CargoWeightUnknown,
     AvailablePayloadUnknown,
     CargoPalletsUnknown,
@@ -90,6 +93,19 @@ pub fn evaluate_request_candidate(
         | AvailabilityState::Rejected
         | AvailabilityState::Removed) => {
             hard_reasons.push(HardRejectReason::RequestUnavailable(unavailable));
+        }
+    }
+
+    match request.request.planning_assignment {
+        PlanningAssignment::Free | PlanningAssignment::Released => {}
+        PlanningAssignment::SoftReserved => {
+            check_reasons.push(NeedsCheckReason::SoftReserved);
+        }
+        PlanningAssignment::Calling => {
+            check_reasons.push(NeedsCheckReason::Calling);
+        }
+        PlanningAssignment::ConfirmedToTrip => {
+            hard_reasons.push(HardRejectReason::AlreadyConfirmedToTrip);
         }
     }
 
@@ -597,6 +613,65 @@ mod tests {
                 .check_reasons
                 .contains(&NeedsCheckReason::AvailablePalletsUnknown)
         );
+    }
+
+    #[test]
+    fn confirmed_request_is_not_offered_as_a_fresh_candidate() {
+        let mut item = request(
+            request_id(12),
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::Active,
+            true,
+        );
+        item.request.planning_assignment = PlanningAssignment::ConfirmedToTrip;
+
+        let result = evaluate_request_candidate(
+            &item,
+            AvailableCapacity {
+                payload_kg: Some(3_000),
+                pallets: Some(8),
+            },
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Impossible);
+        assert!(result
+            .hard_reasons
+            .contains(&HardRejectReason::AlreadyConfirmedToTrip));
+    }
+
+    #[test]
+    fn soft_reserved_and_calling_requests_stay_visible_as_needs_check() {
+        for assignment in [
+            PlanningAssignment::SoftReserved,
+            PlanningAssignment::Calling,
+        ] {
+            let mut item = request(
+                request_id(13),
+                "Lviv",
+                "Nuremberg",
+                AvailabilityState::Active,
+                true,
+            );
+            item.request.planning_assignment = assignment;
+
+            let result = evaluate_request_candidate(
+                &item,
+                AvailableCapacity {
+                    payload_kg: Some(3_000),
+                    pallets: Some(8),
+                },
+            );
+
+            assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
+            assert!(result.hard_reasons.is_empty());
+            let expected = match assignment {
+                PlanningAssignment::SoftReserved => NeedsCheckReason::SoftReserved,
+                PlanningAssignment::Calling => NeedsCheckReason::Calling,
+                _ => unreachable!("fixture covers only active planner use"),
+            };
+            assert!(result.check_reasons.contains(&expected));
+        }
     }
 
     #[test]
