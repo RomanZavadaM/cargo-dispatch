@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cargo Dispatch UI Probe",
+  "version": "0.1.0",
+  "identifier": "ua.cargodispatch.uiprobe",
+  "build": {
+    "frontendDist": "../../leptos-web/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "overview",
+        "title": "Cargo Dispatch UI Probe",
+        "width": 1280,
+        "height": 820,
+        "resizable": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": false
+  }
+}

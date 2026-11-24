@@ -1,0 +1,14 @@
+[package]
+name = "ui-probe-tauri"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[build-dependencies]
+tauri-build = "=2.7.6"
+
+[dependencies]
+serde.workspace = true
+tauri = "=2.12.7"
+ui-probe-core = { path = "../../../crates/ui-probe-core" }

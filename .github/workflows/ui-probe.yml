@@ -1,0 +1,165 @@
+name: UI prototype
+
+on:
+  push:
+    branches:
+      - "prototype/ui-r1"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/ui-probe-core/**"
+      - "apps/leptos-web/**"
+      - "apps/tauri-shell/**"
+      - "probe/ui/**"
+      - ".github/workflows/ui-probe.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TRUNK_VERSION: "0.22.2"
+
+jobs:
+  core:
+    name: Shared application boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91"
+          components: rustfmt, clippy
+
+      - name: Generate dependency lock
+        run: cargo generate-lockfile
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Core check
+        run: cargo check -p ui-probe-core --all-targets
+
+      - name: Core clippy
+        run: cargo clippy -p ui-probe-core --all-targets -- -D warnings
+
+      - name: Core tests
+        run: cargo test -p ui-probe-core --all-targets
+
+      - name: Upload generated lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-bootstrap-lock
+          path: Cargo.lock
+          if-no-files-found: error
+
+  browser:
+    name: Leptos CSR browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk@0.22.2
+
+      - name: Build browser harness
+        working-directory: apps/leptos-web
+        run: trunk build --release index.html
+
+      - name: Record browser artifact
+        run: |
+          set -euo pipefail
+          mkdir -p probe/ui/out
+          du -sb apps/leptos-web/dist | awk '{print $1}' > probe/ui/out/leptos-dist-bytes.txt
+          printf '%s\n' "leptos=0.8.23" "trunk=$TRUNK_VERSION" > probe/ui/out/browser-versions.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-browser-foundation
+          path: |
+            apps/leptos-web/dist/
+            probe/ui/out/
+          if-no-files-found: error
+
+  desktop:
+    name: Tauri check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - windows-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91"
+
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Check Tauri shell
+        run: cargo check -p ui-probe-tauri
+
+  report:
+    name: Foundation report
+    if: always()
+    needs:
+      - core
+      - browser
+      - desktop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write machine-readable foundation result
+        env:
+          CORE: ${{ needs.core.result }}
+          BROWSER: ${{ needs.browser.result }}
+          DESKTOP: ${{ needs.desktop.result }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json, os
+          report = {
+              "probe": "ui-r1",
+              "phase": "foundation",
+              "commit_sha": os.environ["GIT_SHA"],
+              "versions": {
+                  "rust_msrv": "1.91",
+                  "leptos": "0.8.23",
+                  "trunk": "0.22.2",
+                  "tauri": "2.12.7",
+              },
+              "checks": {
+                  "shared_application_boundary": os.environ["CORE"],
+                  "leptos_csr_browser_build": os.environ["BROWSER"],
+                  "tauri_cross_platform_check": os.environ["DESKTOP"],
+              },
+          }
+          report["pass"] = all(value == "success" for value in report["checks"].values())
+          with open("ui-foundation-report.json", "w", encoding="utf-8") as handle:
+              json.dump(report, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          print(json.dumps(report, indent=2, sort_keys=True))
+          if not report["pass"]:
+              raise SystemExit(1)
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-foundation-report
+          path: ui-foundation-report.json
+          if-no-files-found: error
