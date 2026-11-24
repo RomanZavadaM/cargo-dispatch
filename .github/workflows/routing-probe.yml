@@ -21,33 +21,57 @@ concurrency:
 
 env:
   VALHALLA_VERSION: "3.9.3"
-  VALHALLA_IMAGE: "ghcr.io/valhalla/valhalla:3.9.3"
+  VALHALLA_IMAGE: "ghcr.io/valhalla/valhalla@sha256:cf618ccafdead96829282acc81a70aa00947c2f28ddcf118f0194acf2fbc7e9d"
 
 jobs:
-  bootstrap:
-    name: Bootstrap contract + fixture
+  quality:
+    name: Rust quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
-      - name: Generate dependency lock
-        run: cargo generate-lockfile
-
-      - name: Rust format
+      - name: Format
         run: cargo fmt --all -- --check
+      - name: Check
+        run: cargo check --locked --workspace --all-targets
+      - name: Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --locked --workspace --all-targets
 
-      - name: Rust check
-        run: cargo check --workspace --all-targets
+  msrv:
+    name: MSRV 1.91
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91"
+      - name: Check declared minimum Rust
+        run: cargo check --locked --workspace --all-targets
 
-      - name: Rust clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+  cross-platform:
+    name: Cross-platform check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check workspace
+        run: cargo check --locked --workspace --all-targets
 
-      - name: Rust tests
-        run: cargo test --workspace --all-targets
+  fixture:
+    name: Synthetic fixture + pinned Valhalla
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install fixture tools
         run: |
@@ -63,13 +87,14 @@ jobs:
           sha256sum probe/fixture/routing.osm | tee probe/out/fixture.sha256
           osmium --version | head -n 1 | tee probe/out/osmium-version.txt
 
-      - name: Pull pinned Valhalla version and capture exact digest
+      - name: Pull exact Valhalla image
         run: |
           set -euo pipefail
           docker pull "$VALHALLA_IMAGE"
           docker image inspect --format='{{index .RepoDigests 0}}' "$VALHALLA_IMAGE" | tee probe/out/valhalla-image.txt
+          grep -Fq "sha256:cf618ccafdead96829282acc81a70aa00947c2f28ddcf118f0194acf2fbc7e9d" probe/out/valhalla-image.txt
 
-      - name: Write machine-readable bootstrap report
+      - name: Write machine-readable foundation report
         env:
           GIT_SHA: ${{ github.sha }}
         run: |
@@ -80,7 +105,7 @@ jobs:
           osmium = pathlib.Path("probe/out/osmium-version.txt").read_text().strip()
           report = {
               "probe_version": "routing-probe-v1",
-              "phase": "bootstrap",
+              "phase": "foundation",
               "commit_sha": os.environ["GIT_SHA"],
               "valhalla_version": os.environ["VALHALLA_VERSION"],
               "valhalla_image": os.environ["VALHALLA_IMAGE"],
@@ -90,18 +115,16 @@ jobs:
               "test_cases": {f"T{i:02d}": "pending-engine-run" for i in range(1, 21)},
               "pass": True,
           }
-          pathlib.Path("probe/out/bootstrap-report.json").write_text(
+          pathlib.Path("probe/out/foundation-report.json").write_text(
               json.dumps(report, indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
           PY
-          cat probe/out/bootstrap-report.json
+          cat probe/out/foundation-report.json
 
-      - name: Upload bootstrap artifacts
+      - name: Upload foundation artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: routing-bootstrap
-          path: |
-            Cargo.lock
-            probe/out/
+          name: routing-foundation
+          path: probe/out/
           if-no-files-found: error
