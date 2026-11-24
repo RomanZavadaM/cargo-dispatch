@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Cargo Dispatch Driver Preview</title>
+  <link data-trunk rel="rust" data-bin="driver-web-probe" />
+  <style>
+    :root { font-family: Inter, system-ui, sans-serif; color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: Canvas; color: CanvasText; }
+    button, input { font: inherit; }
+    .driver-shell { max-width: 760px; margin: 0 auto; padding: 18px; display: grid; gap: 14px; }
+    .card { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
+    .trip-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+    .trip-head h1, .trip-head p { margin: 0; }
+    .eyebrow { text-transform: uppercase; letter-spacing: .1em; opacity: .65; font-size: .78rem; }
+    .primary { width: 100%; min-height: 52px; font-weight: 700; }
+    .docs { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+    .docs li { display: flex; justify-content: space-between; gap: 12px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .actions a, .actions button, .file-label { min-height: 48px; display: flex; align-items: center; justify-content: center; text-align: center; border: 1px solid color-mix(in srgb, CanvasText 25%, transparent); border-radius: 10px; padding: 10px; color: inherit; text-decoration: none; background: ButtonFace; }
+    #driver-file { width: 100%; min-height: 44px; }
+    #geo-status { overflow-wrap: anywhere; }
+    @media (max-width: 520px) { .actions { grid-template-columns: 1fr; } .driver-shell { padding: 12px; } }
+  </style>
+  <script>
+    window.cargoDriverRequestLocation = function () {
+      const target = document.getElementById("geo-status");
+      if (!target) return;
+      if (!navigator.geolocation) {
+        target.textContent = "Геолокація недоступна в цьому браузері";
+        return;
+      }
+      target.textContent = "Отримую координати…";
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          target.textContent =
+            position.coords.latitude.toFixed(5) + ", " +
+            position.coords.longitude.toFixed(5);
+        },
+        (error) => {
+          target.textContent = "Не вдалося отримати координати: " + error.message;
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
+    };
+  </script>
+</head>
+<body></body>
+</html>

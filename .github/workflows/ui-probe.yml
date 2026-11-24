@@ -10,6 +10,7 @@ on:
       - "Cargo.lock"
       - "crates/ui-probe-core/**"
       - "apps/leptos-web/**"
+      - "apps/driver-web/**"
       - "apps/tauri-shell/**"
       - "probe/ui/**"
       - "deny.toml"
@@ -75,6 +76,10 @@ jobs:
         working-directory: apps/leptos-web
         run: trunk build --release=true
 
+      - name: Build standalone driver browser
+        working-directory: apps/driver-web
+        run: trunk build --release=true
+
       - name: Install browser contract runner
         run: |
           npm install --no-save --package-lock=false @playwright/test@1.65.1
@@ -94,23 +99,40 @@ jobs:
           done
           npx playwright test probe/ui/browser/p01.spec.mjs probe/ui/browser/p02.spec.mjs probe/ui/browser/p03.spec.mjs probe/ui/browser/p04.spec.mjs probe/ui/browser/p05.spec.mjs --reporter=line --workers=1
 
+      - name: Run standalone driver browser contract
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4174 --bind 127.0.0.1 --directory apps/driver-web/dist > /tmp/driver-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" >/dev/null 2>&1 || true; cat /tmp/driver-http.log || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4174/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          npx playwright test probe/ui/browser/p07.spec.mjs --reporter=line --workers=1
+
       - name: Record browser artifact
         run: |
           set -euo pipefail
           mkdir -p probe/ui/out
           du -sb apps/leptos-web/dist | awk '{print $1}' > probe/ui/out/leptos-dist-bytes.txt
+          du -sb apps/driver-web/dist | awk '{print $1}' > probe/ui/out/driver-dist-bytes.txt
           printf '%s\n' "leptos=0.8.23" "trunk=$TRUNK_VERSION" "playwright=1.65.1" > probe/ui/out/browser-versions.txt
           test -s probe/ui/out/p01-browser.json
           test -s probe/ui/out/p02-browser.json
           test -s probe/ui/out/p03-browser.json
           test -s probe/ui/out/p04-browser.json
           test -s probe/ui/out/p05-browser.json
+          test -s probe/ui/out/p07-driver-browser.json
 
       - uses: actions/upload-artifact@v4
         with:
           name: ui-browser-command-boundary
           path: |
             apps/leptos-web/dist/
+            apps/driver-web/dist/
             probe/ui/out/
           if-no-files-found: error
 
@@ -150,7 +172,7 @@ jobs:
         run: cargo test --locked -p ui-probe-tauri --all-targets
 
   report:
-    name: Multi-window control report
+    name: Driver browser report
     if: always()
     needs:
       - core
@@ -169,7 +191,7 @@ jobs:
           import json, os
           report = {
               "probe": "ui-r1",
-              "phase": "multi-window-control",
+              "phase": "driver-browser",
               "commit_sha": os.environ["GIT_SHA"],
               "versions": {
                   "rust_msrv": "1.91",
@@ -187,11 +209,12 @@ jobs:
                   "standalone_browser_boundary": os.environ["BROWSER"],
                   "desktop_command_boundary": os.environ["DESKTOP"],
                   "multi_window_control": os.environ["DESKTOP"],
+                  "driver_browser_contract": os.environ["BROWSER"],
                   "tauri_cross_platform_check": os.environ["DESKTOP"],
               },
           }
           report["pass"] = all(value == "success" for value in report["checks"].values())
-          with open("ui-multi-window-report.json", "w", encoding="utf-8") as handle:
+          with open("ui-driver-browser-report.json", "w", encoding="utf-8") as handle:
               json.dump(report, handle, indent=2, sort_keys=True)
               handle.write("\n")
           print(json.dumps(report, indent=2, sort_keys=True))
@@ -202,6 +225,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-multi-window-report
-          path: ui-multi-window-report.json
+          name: ui-driver-browser-report
+          path: ui-driver-browser-report.json
           if-no-files-found: error
