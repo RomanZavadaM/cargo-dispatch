@@ -1,0 +1,29 @@
+name: Session backup 2026-11-24
+
+on:
+  push:
+    branches:
+      - "backup/session-2026-11-24"
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Fetch all refs
+        run: git fetch --all --tags --prune
+      - name: Create bundle
+        run: |
+          git bundle create cargo-dispatch-2026-11-24.bundle --all
+          git bundle verify cargo-dispatch-2026-11-24.bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cargo-dispatch-public-backup-2026-11-24
+          path: cargo-dispatch-2026-11-24.bundle
+          if-no-files-found: error
+          retention-days: 7
