@@ -55,7 +55,9 @@
   <way id="9102"><nd ref="9002"/><nd ref="9003"/><tag k="highway" v="primary"/><tag k="name" v="T09_WEIGHT"/><tag k="maxweight" v="12"/></way>
   <way id="9103"><nd ref="9001"/><nd ref="9004"/><nd ref="9005"/><nd ref="9003"/><tag k="highway" v="primary"/><tag k="name" v="T09_DETOUR"/></way>
 
-  <!-- T10 unreachable for tall/heavy profile -->
-  <node id="10001" lat="49.0900" lon="24.0000"/><node id="10002" lat="49.0900" lon="24.0050"/><node id="10003" lat="49.0900" lon="24.0100"/>
-  <way id="10101"><nd ref="10001"/><nd ref="10002"/><nd ref="10003"/><tag k="highway" v="primary"/><tag k="name" v="T10_ONLY"/><tag k="maxheight" v="3.2"/><tag k="maxweight" v="12"/></way>
+  <!-- T10 unreachable: valid open endpoints separated by one restricted middle corridor -->
+  <node id="10000" lat="49.0900" lon="23.9970"/><node id="10001" lat="49.0900" lon="24.0000"/><node id="10002" lat="49.0900" lon="24.0050"/><node id="10003" lat="49.0900" lon="24.0100"/><node id="10004" lat="49.0900" lon="24.0130"/>
+  <way id="10100"><nd ref="10000"/><nd ref="10001"/><tag k="highway" v="primary"/><tag k="name" v="T10_START"/></way>
+  <way id="10101"><nd ref="10001"/><nd ref="10002"/><nd ref="10003"/><tag k="highway" v="primary"/><tag k="name" v="T10_RESTRICTED"/><tag k="maxheight" v="3.2"/><tag k="maxweight" v="12"/></way>
+  <way id="10102"><nd ref="10003"/><nd ref="10004"/><tag k="highway" v="primary"/><tag k="name" v="T10_FINISH"/></way>
 </osm>

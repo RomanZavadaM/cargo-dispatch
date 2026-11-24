@@ -72,6 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
 
       - name: Install fixture tools
         run: |
@@ -116,55 +117,11 @@ jobs:
           test -s probe/out/valhalla_tiles.tar
           sha256sum probe/out/valhalla_tiles.tar | tee probe/out/tiles.sha256
 
-      - name: Start Valhalla and run first real truck route
-        run: |
-          set -euo pipefail
-          cat > probe/out/t01-small.json <<'JSON'
-          {
-            "locations": [
-              {"lat": 49.0000, "lon": 24.0000},
-              {"lat": 49.0000, "lon": 24.0100}
-            ],
-            "costing": "truck",
-            "costing_options": {
-              "truck": {
-                "height": 3.0,
-                "width": 2.2,
-                "length": 7.0,
-                "weight": 7.5,
-                "axle_load": 4.0,
-                "axle_count": 2,
-                "hazmat": false,
-                "exclude_unpaved": false,
-                "use_truck_route": 0.0
-              }
-            },
-            "directions_options": {"units": "kilometers"}
-          }
-          JSON
-          docker run -d --rm \
-            --name cargo-routing-valhalla \
-            -p 127.0.0.1:18002:8002 \
-            -v "$PWD/probe/out:/data" \
-            "$VALHALLA_IMAGE" \
-            valhalla_service /data/valhalla.json 1
-          trap 'docker logs cargo-routing-valhalla || true; docker rm -f cargo-routing-valhalla >/dev/null 2>&1 || true' EXIT
+      - name: Build normalized Rust route contract runner
+        run: cargo build --locked -p cargo-geo-probe --bin route-contract
 
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:18002/route \
-              --data-binary @probe/out/t01-small.json \
-              > probe/out/t01-small-response.json; then
-              break
-            fi
-            sleep 1
-          done
-
-          jq -e '.trip.summary.length > 0 and .trip.summary.time >= 0' probe/out/t01-small-response.json
-          jq -r '[.trip.legs[].maneuvers[]?.street_names[]?] | unique | join(",")' \
-            probe/out/t01-small-response.json | tee probe/out/t01-small-streets.txt
-          grep -Fq "T01_HEIGHT" probe/out/t01-small-streets.txt
-          docker stop cargo-routing-valhalla >/dev/null
-          trap - EXIT
+      - name: Run real Valhalla T01-T10 contract
+        run: bash probe/run_t01_t10.sh
 
       - name: Write machine-readable foundation report
         env:
@@ -200,3 +157,4 @@ jobs:
           name: routing-foundation
           path: probe/out/
           if-no-files-found: error
+        if: always()
