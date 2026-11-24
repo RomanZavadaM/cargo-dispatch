@@ -53,7 +53,7 @@ jobs:
         run: cargo test --locked -p ui-probe-core --all-targets
 
       - name: Install dependency checker
-        run: cargo install cargo-deny --locked --version 0.22.0
+        run: cargo install cargo-deny --locked --version 0.21.0
 
       - name: Check dependency licenses and advisories
         run: cargo deny check licenses advisories bans sources
