@@ -56,13 +56,6 @@ jobs:
           toolchain: "1.91"
           components: rustfmt, clippy
 
-      - name: Prepare native dialog dependency lock evidence
-        run: |
-          CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo generate-lockfile
-          echo STARTLOCK
-          cat Cargo.lock
-          echo ENDLOCK
-
       - name: Verify committed lockfile
         run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
 
