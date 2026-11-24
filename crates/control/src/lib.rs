@@ -4,14 +4,15 @@ use cargo_dispatch_contracts::{
     PackageContentFingerprint, RouteContractError, TripPackageHeader, TripRoutePoint, TripVersion,
     validate_route_points,
 };
-use cargo_dispatch_domain::TripId;
-use std::collections::BTreeMap;
+use cargo_dispatch_domain::{PointId, TripId};
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TripImportCandidate {
     pub header: TripPackageHeader,
     pub content_fingerprint: PackageContentFingerprint,
     pub route_points: Vec<TripRoutePoint>,
+    pub completed_point_ids: BTreeSet<PointId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +44,20 @@ pub enum ImportError {
     SameVersionContentConflict {
         version: TripVersion,
     },
+    CompletedPointRemoved(PointId),
+    CompletedPointChanged(PointId),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionResult {
+    Marked,
+    AlreadyCompleted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionError {
+    TripNotFound,
+    PointNotFound,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -69,6 +84,7 @@ impl InMemoryTripRegistry {
                     current_version: incoming_version,
                     content_fingerprint: candidate.content_fingerprint,
                     route_points: candidate.route_points,
+                    completed_point_ids: BTreeSet::new(),
                 },
             );
             return Ok(ImportResult::AppliedFirstVersion);
@@ -96,6 +112,26 @@ impl InMemoryTripRegistry {
             });
         }
 
+        for completed_point_id in &current.completed_point_ids {
+            let current_point = current
+                .route_points
+                .iter()
+                .find(|point| point.point_id == *completed_point_id)
+                .expect("completed point must belong to stored route");
+            let Some(incoming_point) = candidate
+                .route_points
+                .iter()
+                .find(|point| point.point_id == *completed_point_id)
+            else {
+                return Err(ImportError::CompletedPointRemoved(*completed_point_id));
+            };
+
+            if incoming_point != current_point {
+                return Err(ImportError::CompletedPointChanged(*completed_point_id));
+            }
+        }
+
+        let completed_point_ids = current.completed_point_ids.clone();
         let previous_version = current.current_version;
         self.trips.insert(
             trip_id,
@@ -104,10 +140,32 @@ impl InMemoryTripRegistry {
                 current_version: incoming_version,
                 content_fingerprint: candidate.content_fingerprint,
                 route_points: candidate.route_points,
+                completed_point_ids,
             },
         );
 
         Ok(ImportResult::AppliedNewerVersion { previous_version })
+    }
+
+    pub fn mark_point_completed(
+        &mut self,
+        trip_id: TripId,
+        point_id: PointId,
+    ) -> Result<CompletionResult, CompletionError> {
+        let trip = self
+            .trips
+            .get_mut(&trip_id)
+            .ok_or(CompletionError::TripNotFound)?;
+
+        if !trip.route_points.iter().any(|point| point.point_id == point_id) {
+            return Err(CompletionError::PointNotFound);
+        }
+
+        if !trip.completed_point_ids.insert(point_id) {
+            return Ok(CompletionResult::AlreadyCompleted);
+        }
+
+        Ok(CompletionResult::Marked)
     }
 
     #[must_use]
@@ -120,7 +178,6 @@ impl InMemoryTripRegistry {
 mod tests {
     use super::*;
     use cargo_dispatch_contracts::{TripPointKind, TripRoutePoint};
-    use cargo_dispatch_domain::PointId;
 
     fn trip_id(byte: u8) -> TripId {
         TripId::from_bytes([byte; 16]).expect("fixture trip id")
@@ -301,6 +358,126 @@ mod tests {
             })
         );
         assert_eq!(registry.get(id), None);
+    }
+
+    #[test]
+    fn completion_is_control_owned_and_idempotent() {
+        let id = trip_id(9);
+        let completed = point_id(28);
+        let mut registry = InMemoryTripRegistry::default();
+        registry
+            .import(candidate(id, 1, None, 16, points(28, 29)))
+            .expect("first import");
+
+        assert_eq!(
+            registry.mark_point_completed(id, completed),
+            Ok(CompletionResult::Marked)
+        );
+        assert_eq!(
+            registry.mark_point_completed(id, completed),
+            Ok(CompletionResult::AlreadyCompleted)
+        );
+        assert!(
+            registry
+                .get(id)
+                .expect("stored trip")
+                .completed_point_ids
+                .contains(&completed)
+        );
+    }
+
+    #[test]
+    fn completed_point_survives_newer_plan_while_future_point_may_change() {
+        let id = trip_id(10);
+        let completed = point_id(30);
+        let mut registry = InMemoryTripRegistry::default();
+        registry
+            .import(candidate(id, 1, None, 17, points(30, 31)))
+            .expect("first import");
+        registry
+            .mark_point_completed(id, completed)
+            .expect("completion");
+
+        assert_eq!(
+            registry.import(candidate(id, 2, Some(1), 18, points(30, 32))),
+            Ok(ImportResult::AppliedNewerVersion {
+                previous_version: TripVersion::new(1).expect("version"),
+            })
+        );
+
+        let stored = registry.get(id).expect("stored trip");
+        assert_eq!(stored.current_version.get(), 2);
+        assert!(stored.completed_point_ids.contains(&completed));
+        assert_eq!(stored.route_points, points(30, 32));
+    }
+
+    #[test]
+    fn newer_plan_cannot_change_completed_point() {
+        let id = trip_id(11);
+        let completed = point_id(33);
+        let mut registry = InMemoryTripRegistry::default();
+        registry
+            .import(candidate(id, 1, None, 19, points(33, 34)))
+            .expect("first import");
+        registry
+            .mark_point_completed(id, completed)
+            .expect("completion");
+
+        let mut changed = points(33, 35);
+        changed[0].title = "Changed completed stop".to_owned();
+
+        assert_eq!(
+            registry.import(candidate(id, 2, Some(1), 20, changed)),
+            Err(ImportError::CompletedPointChanged(completed))
+        );
+        assert_eq!(
+            registry.get(id).expect("stored trip").current_version.get(),
+            1
+        );
+    }
+
+    #[test]
+    fn newer_plan_cannot_remove_completed_point() {
+        let id = trip_id(12);
+        let completed = point_id(36);
+        let mut registry = InMemoryTripRegistry::default();
+        registry
+            .import(candidate(id, 1, None, 21, points(36, 37)))
+            .expect("first import");
+        registry
+            .mark_point_completed(id, completed)
+            .expect("completion");
+
+        assert_eq!(
+            registry.import(candidate(id, 2, Some(1), 22, points(38, 37))),
+            Err(ImportError::CompletedPointRemoved(completed))
+        );
+        assert!(
+            registry
+                .get(id)
+                .expect("stored trip")
+                .completed_point_ids
+                .contains(&completed)
+        );
+    }
+
+    #[test]
+    fn completion_rejects_unknown_trip_or_point() {
+        let id = trip_id(13);
+        let mut registry = InMemoryTripRegistry::default();
+
+        assert_eq!(
+            registry.mark_point_completed(id, point_id(39)),
+            Err(CompletionError::TripNotFound)
+        );
+
+        registry
+            .import(candidate(id, 1, None, 23, points(40, 41)))
+            .expect("first import");
+        assert_eq!(
+            registry.mark_point_completed(id, point_id(42)),
+            Err(CompletionError::PointNotFound)
+        );
     }
 
     #[test]
