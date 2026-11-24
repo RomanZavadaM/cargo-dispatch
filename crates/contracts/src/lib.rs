@@ -4,7 +4,7 @@ use cargo_dispatch_domain::{PointId, ReplanRequestId, TripId};
 use core::fmt;
 
 pub const TRIP_PACKAGE_SCHEMA_NAME: &str = "cargo-dispatch.trip-package";
-pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion::new(1, 0);
+pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion::new(1, 1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SchemaVersion {
@@ -554,7 +554,7 @@ mod tests {
         .expect("valid trip header");
 
         assert_eq!(header.schema_name, TRIP_PACKAGE_SCHEMA_NAME);
-        assert_eq!(header.schema_version, SchemaVersion::new(1, 0));
+        assert_eq!(header.schema_version, SchemaVersion::new(1, 1));
         assert_eq!(header.trip_version.get(), 7);
         assert_eq!(header.base_version.map(TripVersion::get), Some(6));
     }
