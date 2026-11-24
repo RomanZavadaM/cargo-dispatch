@@ -1104,7 +1104,8 @@ pub fn apply_planner_replan(
         else {
             return Err(PlannerReplanApplyError::CompletedPointMissing(*point_id));
         };
-        last_completed_index = Some(last_completed_index.map_or(index, |last: usize| last.max(index)));
+        last_completed_index =
+            Some(last_completed_index.map_or(index, |last: usize| last.max(index)));
     }
 
     let mut future_seen = std::collections::BTreeSet::new();
@@ -3809,12 +3810,7 @@ mod tests {
     fn planner_replan_application_preserves_completed_points_in_their_actual_slots() {
         let mut route = manual_working_route(
             working_route_id(31),
-            &[
-                point_id(76),
-                point_id(77),
-                point_id(78),
-                point_id(79),
-            ],
+            &[point_id(76), point_id(77), point_id(78), point_id(79)],
         )
         .expect("route");
         route.current_revision = 5;
@@ -3878,12 +3874,8 @@ mod tests {
             affected_point_ids: vec![point_id(82), point_id(84)],
         };
 
-        let replanned = apply_planner_replan(
-            &route,
-            &context,
-            &[point_id(85), point_id(84)],
-        )
-        .expect("completed slots stay fixed");
+        let replanned = apply_planner_replan(&route, &context, &[point_id(85), point_id(84)])
+            .expect("completed slots stay fixed");
         assert_eq!(
             replanned
                 .points
@@ -3896,12 +3888,12 @@ mod tests {
         assert_eq!(replanned.points[2], route.points[2]);
 
         assert_eq!(
-            apply_planner_replan(&route, &context, &[point_id(84)]),
+            apply_planner_replan(&route, &context, &[]),
             Err(
                 PlannerReplanApplyError::InsufficientFuturePointsToPreserveCompletedPosition {
                     completed_index: 2,
                     required_open_points: 1,
-                    provided_open_points: 1,
+                    provided_open_points: 0,
                 }
             )
         );
