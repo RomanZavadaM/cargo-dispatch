@@ -16,7 +16,7 @@ cargo-dispatch-domain = { path = "../../../crates/domain" }
 cargo-dispatch-trip-files = { path = "../../../crates/trip-files" }
 serde = { version = "1", features = ["derive"] }
 tauri = "=2.12.7"
-tokio = { version = "=1.54.1", features = ["rt-multi-thread", "sync"] }
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "sync"] }
 
 [dev-dependencies]
 cargo-dispatch-contracts = { path = "../../../crates/contracts" }
