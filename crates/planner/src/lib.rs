@@ -167,7 +167,7 @@ impl<R: RequestRepository> PlannerService<R> {
 mod tests {
     use super::*;
     use cargo_dispatch_domain::{
-        CargoSummary, PlanningAssignment, Place, RequestRevision, SourceKind, SourceMetadata,
+        CargoSummary, Place, PlanningAssignment, RequestRevision, SourceKind, SourceMetadata,
     };
     use cargo_dispatch_geo::{NormalizedStatus, RoutingIdentity, TollPreference};
 
@@ -196,8 +196,7 @@ mod tests {
                 planning_assignment: PlanningAssignment::Free,
                 origin: Place::new("UA", origin, None).expect("origin"),
                 destination: Place::new("DE", destination, None).expect("destination"),
-                cargo: CargoSummary::new("palletized cargo", Some(2_500), Some(6))
-                    .expect("cargo"),
+                cargo: CargoSummary::new("palletized cargo", Some(2_500), Some(6)).expect("cargo"),
             },
             pickup_coordinates: coordinates
                 .then(|| GeoPoint::new(49.8397, 24.0297).expect("pickup")),
