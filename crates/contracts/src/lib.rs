@@ -99,11 +99,31 @@ pub enum TripPointKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TripNavigationTarget {
+    pub latitude_e7: i32,
+    pub longitude_e7: i32,
+    pub address: Option<String>,
+}
+
+impl TripNavigationTarget {
+    #[must_use]
+    pub fn latitude(&self) -> f64 {
+        f64::from(self.latitude_e7) / 10_000_000.0
+    }
+
+    #[must_use]
+    pub fn longitude(&self) -> f64 {
+        f64::from(self.longitude_e7) / 10_000_000.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TripRoutePoint {
     pub point_id: PointId,
     pub sequence: u32,
     pub kind: TripPointKind,
     pub title: String,
+    pub navigation: Option<TripNavigationTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -112,6 +132,9 @@ pub enum RouteContractError {
     SequenceMismatch { expected: u32, actual: u32 },
     TitleRequired(PointId),
     CustomKindRequired(PointId),
+    InvalidNavigationLatitude(PointId),
+    InvalidNavigationLongitude(PointId),
+    NavigationAddressRequired(PointId),
     SequenceOverflow,
 }
 
@@ -140,6 +163,28 @@ pub fn validate_route_points(points: &[TripRoutePoint]) -> Result<(), RouteContr
 
         if matches!(&point.kind, TripPointKind::Custom(value) if value.trim().is_empty()) {
             return Err(RouteContractError::CustomKindRequired(point.point_id));
+        }
+
+        if let Some(navigation) = &point.navigation {
+            if !(-900_000_000..=900_000_000).contains(&navigation.latitude_e7) {
+                return Err(RouteContractError::InvalidNavigationLatitude(
+                    point.point_id,
+                ));
+            }
+            if !(-1_800_000_000..=1_800_000_000).contains(&navigation.longitude_e7) {
+                return Err(RouteContractError::InvalidNavigationLongitude(
+                    point.point_id,
+                ));
+            }
+            if navigation
+                .address
+                .as_ref()
+                .is_some_and(|address| address.trim().is_empty())
+            {
+                return Err(RouteContractError::NavigationAddressRequired(
+                    point.point_id,
+                ));
+            }
         }
     }
 
@@ -367,18 +412,25 @@ mod tests {
                 sequence: 1,
                 kind: TripPointKind::Load,
                 title: "Warehouse A".to_owned(),
+                navigation: Some(TripNavigationTarget {
+                    latitude_e7: 498_393_000,
+                    longitude_e7: 240_296_000,
+                    address: Some("Synthetic street 1".to_owned()),
+                }),
             },
             TripRoutePoint {
                 point_id: point_id(2),
                 sequence: 2,
                 kind: TripPointKind::Custom("ferry".to_owned()),
                 title: "Ferry terminal".to_owned(),
+                navigation: None,
             },
             TripRoutePoint {
                 point_id: point_id(3),
                 sequence: 3,
                 kind: TripPointKind::Unload,
                 title: "Receiver".to_owned(),
+                navigation: None,
             },
         ];
 
@@ -393,12 +445,14 @@ mod tests {
                 sequence: 1,
                 kind: TripPointKind::Load,
                 title: "Load".to_owned(),
+                navigation: None,
             },
             TripRoutePoint {
                 point_id: point_id(4),
                 sequence: 2,
                 kind: TripPointKind::Unload,
                 title: "Unload".to_owned(),
+                navigation: None,
             },
         ];
         assert_eq!(
@@ -411,6 +465,7 @@ mod tests {
             sequence: 2,
             kind: TripPointKind::Service,
             title: "Service".to_owned(),
+            navigation: None,
         }];
         assert_eq!(
             validate_route_points(&wrong_sequence),
@@ -428,6 +483,7 @@ mod tests {
             sequence: 1,
             kind: TripPointKind::Rest,
             title: "   ".to_owned(),
+            navigation: None,
         }];
         assert_eq!(
             validate_route_points(&no_title),
@@ -439,10 +495,46 @@ mod tests {
             sequence: 1,
             kind: TripPointKind::Custom(" ".to_owned()),
             title: "Special stop".to_owned(),
+            navigation: None,
         }];
         assert_eq!(
             validate_route_points(&empty_custom),
             Err(RouteContractError::CustomKindRequired(point_id(7)))
+        );
+    }
+
+    #[test]
+    fn route_navigation_target_validates_coordinates_and_address() {
+        let invalid_latitude = vec![TripRoutePoint {
+            point_id: point_id(8),
+            sequence: 1,
+            kind: TripPointKind::Unload,
+            title: "Receiver".to_owned(),
+            navigation: Some(TripNavigationTarget {
+                latitude_e7: 901_000_000,
+                longitude_e7: 240_296_000,
+                address: Some("Synthetic receiver".to_owned()),
+            }),
+        }];
+        assert_eq!(
+            validate_route_points(&invalid_latitude),
+            Err(RouteContractError::InvalidNavigationLatitude(point_id(8)))
+        );
+
+        let blank_address = vec![TripRoutePoint {
+            point_id: point_id(9),
+            sequence: 1,
+            kind: TripPointKind::Unload,
+            title: "Receiver".to_owned(),
+            navigation: Some(TripNavigationTarget {
+                latitude_e7: 498_393_000,
+                longitude_e7: 240_296_000,
+                address: Some("   ".to_owned()),
+            }),
+        }];
+        assert_eq!(
+            validate_route_points(&blank_address),
+            Err(RouteContractError::NavigationAddressRequired(point_id(9)))
         );
     }
 
