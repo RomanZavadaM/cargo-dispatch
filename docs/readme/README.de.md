@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · **🇩🇪 Deutsch** · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** in Entwicklung. Es gibt noch keine Anwendung.
+> **Status:** aktive Entwicklung. Eine testweise UI-Vorschau ist verfügbar; ein stabiles fertiges Produkt gibt es noch nicht.
 
 ## Über das Produkt
 
