@@ -201,14 +201,13 @@ impl InMemoryTripRegistry {
             .get(&trip_id)
             .ok_or(ReplanBuildError::TripNotFound)?;
 
-        if let Some(current_point_id) = draft.current_point_id {
-            if !trip
+        if let Some(current_point_id) = draft.current_point_id
+            && !trip
                 .route_points
                 .iter()
                 .any(|point| point.point_id == current_point_id)
-            {
-                return Err(ReplanBuildError::CurrentPointNotFound(current_point_id));
-            }
+        {
+            return Err(ReplanBuildError::CurrentPointNotFound(current_point_id));
         }
 
         ReplanRequest::new(ReplanRequestData {
