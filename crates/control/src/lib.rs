@@ -22,6 +22,7 @@ pub struct StoredTripPlan {
     pub content_fingerprint: PackageContentFingerprint,
     pub route_points: Vec<TripRoutePoint>,
     pub completed_point_ids: BTreeSet<PointId>,
+    pub local_route_revision: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,6 +46,7 @@ pub enum ImportError {
     SameVersionContentConflict {
         version: TripVersion,
     },
+    LocalEditsRequireReview,
     CompletedPointRemoved(PointId),
     CompletedPointChanged(PointId),
 }
@@ -84,7 +86,68 @@ pub struct InMemoryTripRegistry {
     trips: BTreeMap<TripId, StoredTripPlan>,
 }
 
+fn validate_completed_points(
+    current: &StoredTripPlan,
+    proposed: &[TripRoutePoint],
+) -> Result<(), ImportError> {
+    for completed_point_id in &current.completed_point_ids {
+        let current_point = current
+            .route_points
+            .iter()
+            .find(|point| point.point_id == *completed_point_id)
+            .expect("completed point must belong to stored route");
+        let Some(incoming_point) = proposed
+            .iter()
+            .find(|point| point.point_id == *completed_point_id)
+        else {
+            return Err(ImportError::CompletedPointRemoved(*completed_point_id));
+        };
+
+        if incoming_point != current_point {
+            return Err(ImportError::CompletedPointChanged(*completed_point_id));
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LocalRouteEditError {
+    TripNotFound,
+    StaleView,
+    InvalidRoute(ImportError),
+    RevisionOverflow,
+}
+
 impl InMemoryTripRegistry {
+    /// Apply an operator edit only while the displayed plan and execution facts are current.
+    pub fn edit_active_route(
+        &mut self,
+        displayed: &StoredTripPlan,
+        proposed: Vec<TripRoutePoint>,
+    ) -> Result<u64, LocalRouteEditError> {
+        let current = self
+            .trips
+            .get_mut(&displayed.trip_id)
+            .ok_or(LocalRouteEditError::TripNotFound)?;
+        if current != displayed {
+            return Err(LocalRouteEditError::StaleView);
+        }
+        validate_route_points(&proposed)
+            .map_err(ImportError::InvalidRoute)
+            .map_err(LocalRouteEditError::InvalidRoute)?;
+        validate_completed_points(current, &proposed).map_err(LocalRouteEditError::InvalidRoute)?;
+        if current.route_points == proposed {
+            return Ok(current.local_route_revision);
+        }
+        let revision = current
+            .local_route_revision
+            .checked_add(1)
+            .ok_or(LocalRouteEditError::RevisionOverflow)?;
+        current.route_points = proposed;
+        current.local_route_revision = revision;
+        Ok(revision)
+    }
+
     pub fn import(&mut self, candidate: TripImportCandidate) -> Result<ImportResult, ImportError> {
         validate_route_points(&candidate.route_points).map_err(ImportError::InvalidRoute)?;
 
@@ -104,6 +167,7 @@ impl InMemoryTripRegistry {
                     content_fingerprint: candidate.content_fingerprint,
                     route_points: candidate.route_points,
                     completed_point_ids: BTreeSet::new(),
+                    local_route_revision: 0,
                 },
             );
             return Ok(ImportResult::AppliedFirstVersion);
@@ -131,23 +195,9 @@ impl InMemoryTripRegistry {
             });
         }
 
-        for completed_point_id in &current.completed_point_ids {
-            let current_point = current
-                .route_points
-                .iter()
-                .find(|point| point.point_id == *completed_point_id)
-                .expect("completed point must belong to stored route");
-            let Some(incoming_point) = candidate
-                .route_points
-                .iter()
-                .find(|point| point.point_id == *completed_point_id)
-            else {
-                return Err(ImportError::CompletedPointRemoved(*completed_point_id));
-            };
-
-            if incoming_point != current_point {
-                return Err(ImportError::CompletedPointChanged(*completed_point_id));
-            }
+        validate_completed_points(current, &candidate.route_points)?;
+        if current.local_route_revision != 0 && current.route_points != candidate.route_points {
+            return Err(ImportError::LocalEditsRequireReview);
         }
 
         let completed_point_ids = current.completed_point_ids.clone();
@@ -160,6 +210,7 @@ impl InMemoryTripRegistry {
                 content_fingerprint: candidate.content_fingerprint,
                 route_points: candidate.route_points,
                 completed_point_ids,
+                local_route_revision: 0,
             },
         );
 
@@ -286,6 +337,40 @@ mod tests {
             content_fingerprint: fingerprint(fingerprint_byte),
             route_points,
         }
+    }
+
+    #[test]
+    fn operator_edits_open_stop_after_second_stop_is_completed() {
+        let id = trip_id(1);
+        let mut registry = InMemoryTripRegistry::default();
+        let original = candidate(id, 1, None, 1, points(1, 2));
+        registry.import(original.clone()).unwrap();
+        let earlier = registry.get(id).unwrap();
+        registry.mark_point_completed(id, point_id(2)).unwrap();
+        let changed = points(3, 2);
+        assert_eq!(
+            registry.edit_active_route(&earlier, changed.clone()),
+            Err(LocalRouteEditError::StaleView)
+        );
+        let displayed = registry.get(id).unwrap();
+        assert_eq!(
+            registry.edit_active_route(&displayed, changed.clone()),
+            Ok(1)
+        );
+        assert_eq!(
+            registry.import(original),
+            Ok(ImportResult::IdempotentSameVersion)
+        );
+        let edited = registry.get(id).unwrap();
+        assert_eq!(edited.route_points, changed);
+        assert_eq!(edited.completed_point_ids, displayed.completed_point_ids);
+        assert_eq!(edited.current_version, displayed.current_version);
+        assert_eq!(
+            registry.import(candidate(id, 2, Some(1), 2, points(4, 2))),
+            Err(ImportError::LocalEditsRequireReview)
+        );
+        assert!(registry.edit_active_route(&edited, points(3, 4)).is_err());
+        assert_eq!(registry.get(id).unwrap(), edited);
     }
 
     #[test]
