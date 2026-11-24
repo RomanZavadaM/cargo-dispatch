@@ -129,19 +129,23 @@ impl<R: RequestRepository> PlannerService<R> {
     }
 
     pub fn add_request(&mut self, request: PlanningRequest) -> Result<(), PlannerError> {
-        self.repository.insert(request).map_err(|error| match error {
-            RepositoryError::DuplicateRequest => PlannerError::DuplicateRequest,
-            RepositoryError::RequestNotFound => PlannerError::RequestNotFound,
-            RepositoryError::StaleRevision => PlannerError::StaleRequestRevision,
-        })
+        self.repository
+            .insert(request)
+            .map_err(|error| match error {
+                RepositoryError::DuplicateRequest => PlannerError::DuplicateRequest,
+                RepositoryError::RequestNotFound => PlannerError::RequestNotFound,
+                RepositoryError::StaleRevision => PlannerError::StaleRequestRevision,
+            })
     }
 
     pub fn refresh_request(&mut self, request: PlanningRequest) -> Result<(), PlannerError> {
-        self.repository.refresh(request).map_err(|error| match error {
-            RepositoryError::DuplicateRequest => PlannerError::DuplicateRequest,
-            RepositoryError::RequestNotFound => PlannerError::RequestNotFound,
-            RepositoryError::StaleRevision => PlannerError::StaleRequestRevision,
-        })
+        self.repository
+            .refresh(request)
+            .map_err(|error| match error {
+                RepositoryError::DuplicateRequest => PlannerError::DuplicateRequest,
+                RepositoryError::RequestNotFound => PlannerError::RequestNotFound,
+                RepositoryError::StaleRevision => PlannerError::StaleRequestRevision,
+            })
     }
 
     pub fn set_planning_assignment(
@@ -378,13 +382,7 @@ mod tests {
             .set_planning_assignment(id, PlanningAssignment::Calling)
             .expect("assignment");
 
-        let mut refreshed = request(
-            id,
-            "Lviv",
-            "Nuremberg",
-            AvailabilityState::NeedsCheck,
-            true,
-        );
+        let mut refreshed = request(id, "Lviv", "Nuremberg", AvailabilityState::NeedsCheck, true);
         refreshed.request.revision = RequestRevision::new(2).expect("revision");
         refreshed.request.source.observed_at_unix_ms = 1_800_000_060_000;
         refreshed.request.cargo =
@@ -421,13 +419,7 @@ mod tests {
             ))
             .expect("request");
 
-        let stale = request(
-            id,
-            "Kyiv",
-            "Hamburg",
-            AvailabilityState::Taken,
-            true,
-        );
+        let stale = request(id, "Kyiv", "Hamburg", AvailabilityState::Taken, true);
         assert_eq!(
             service.refresh_request(stale),
             Err(PlannerError::StaleRequestRevision)
