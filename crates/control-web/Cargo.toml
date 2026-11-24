@@ -11,6 +11,7 @@ axum = { version = "=0.8.9", default-features = false, features = ["http1", "jso
 cargo-dispatch-domain = { path = "../domain" }
 cargo-dispatch-trip-files = { path = "../trip-files" }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tokio = { version = "=1.54.1", features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
 
 [dev-dependencies]
