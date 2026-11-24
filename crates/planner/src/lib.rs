@@ -635,9 +635,11 @@ mod tests {
         );
 
         assert_eq!(result.level, FeasibilityLevel::Impossible);
-        assert!(result
-            .hard_reasons
-            .contains(&HardRejectReason::AlreadyConfirmedToTrip));
+        assert!(
+            result
+                .hard_reasons
+                .contains(&HardRejectReason::AlreadyConfirmedToTrip)
+        );
     }
 
     #[test]
