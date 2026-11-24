@@ -53,6 +53,7 @@ define_uuid_id!(CallTaskId);
 define_uuid_id!(NegotiatedTermsId);
 define_uuid_id!(CandidateId);
 define_uuid_id!(CalculationId);
+define_uuid_id!(ReplanRequestId);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceKind {
@@ -280,5 +281,6 @@ mod tests {
         );
         assert_eq!(CandidateId::from_bytes([0; 16]), Err(IdError::NilUuid));
         assert_eq!(CalculationId::from_bytes([0; 16]), Err(IdError::NilUuid));
+        assert_eq!(ReplanRequestId::from_bytes([0; 16]), Err(IdError::NilUuid));
     }
 }
