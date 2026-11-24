@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
-use cargo_dispatch_domain::{AvailabilityState, CargoId, LoadRequest, PlanningAssignment, RequestId};
+use cargo_dispatch_domain::{
+    AvailabilityState, CargoId, LoadRequest, PlanningAssignment, RequestId,
+};
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
 
@@ -886,13 +888,15 @@ mod tests {
         );
 
         assert_eq!(result.level, FeasibilityLevel::Impossible);
-        assert!(result.hard_reasons.contains(
-            &RouteHardRejectReason::PayloadExceededOnSegment {
-                segment_index: 1,
-                load_kg: 4_500,
-                capacity_kg: 4_000,
-            }
-        ));
+        assert!(
+            result
+                .hard_reasons
+                .contains(&RouteHardRejectReason::PayloadExceededOnSegment {
+                    segment_index: 1,
+                    load_kg: 4_500,
+                    capacity_kg: 4_000,
+                })
+        );
         assert!(result.hard_reasons.contains(
             &RouteHardRejectReason::PalletCapacityExceededOnSegment {
                 segment_index: 1,
@@ -952,18 +956,26 @@ mod tests {
 
         assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
         assert!(result.hard_reasons.is_empty());
-        assert!(result
-            .check_reasons
-            .contains(&RouteNeedsCheckReason::CargoWeightUnknown(cargo_id(6))));
-        assert!(result
-            .check_reasons
-            .contains(&RouteNeedsCheckReason::CargoPalletsUnknown(cargo_id(6))));
-        assert!(result
-            .check_reasons
-            .contains(&RouteNeedsCheckReason::AvailablePayloadUnknown));
-        assert!(result
-            .check_reasons
-            .contains(&RouteNeedsCheckReason::AvailablePalletsUnknown));
+        assert!(
+            result
+                .check_reasons
+                .contains(&RouteNeedsCheckReason::CargoWeightUnknown(cargo_id(6)))
+        );
+        assert!(
+            result
+                .check_reasons
+                .contains(&RouteNeedsCheckReason::CargoPalletsUnknown(cargo_id(6)))
+        );
+        assert!(
+            result
+                .check_reasons
+                .contains(&RouteNeedsCheckReason::AvailablePayloadUnknown)
+        );
+        assert!(
+            result
+                .check_reasons
+                .contains(&RouteNeedsCheckReason::AvailablePalletsUnknown)
+        );
     }
 
     #[test]
