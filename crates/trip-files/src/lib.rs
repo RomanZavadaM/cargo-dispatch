@@ -100,6 +100,26 @@ impl ExecutionSummaryFile {
     }
 }
 
+impl From<&ExecutionSummary> for ExecutionSummaryFile {
+    fn from(summary: &ExecutionSummary) -> Self {
+        Self {
+            trip_id: summary.trip_id.as_bytes(),
+            final_plan_version: summary.final_plan_version.get(),
+            completed_at_unix_ms: summary.completed_at_unix_ms,
+            completed_point_ids: summary
+                .completed_point_ids
+                .iter()
+                .copied()
+                .map(PointId::as_bytes)
+                .collect(),
+            documents_from_operator: summary.documents_from_operator,
+            documents_from_driver: summary.documents_from_driver,
+            plan_version_count: summary.plan_version_count,
+            replan_count: summary.replan_count,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DocumentEntry {
@@ -243,13 +263,32 @@ fn write_checksums(root: &Path) -> io::Result<()> {
     fs::create_dir_all(&directory)?;
     let destination = directory.join("sha256.txt");
     if destination.try_exists()? {
-        return Err(invalid("checksum index already exists"));
+        return verify_checksums(root);
     }
     let mut temporary = NamedTempFile::new_in(&directory)?;
     for (relative, path) in files {
         let (_, hash) = hash_file(&path)?;
         writeln!(temporary, "{}  {}", hash_hex(hash), relative)?;
     }
+    publish(temporary, &destination)
+}
+
+fn write_execution_summary(root: &Path, summary: &ExecutionSummary) -> io::Result<()> {
+    let directory = root.join("reports");
+    fs::create_dir_all(&directory)?;
+    let destination = directory.join("execution_summary.json");
+    let expected = ExecutionSummaryFile::from(summary);
+    if destination.try_exists()? {
+        let existing: ExecutionSummaryFile =
+            serde_json::from_slice(&bounded(File::open(&destination)?)?)?;
+        if existing == expected {
+            return Ok(());
+        }
+        return Err(invalid("execution summary already exists with different content"));
+    }
+    let bytes = serde_json::to_vec_pretty(&expected)?;
+    let mut temporary = NamedTempFile::new_in(&directory)?;
+    temporary.write_all(&bytes)?;
     publish(temporary, &destination)
 }
 
@@ -623,6 +662,35 @@ impl TripFolder {
         self.documents.get(&document_id).cloned()
     }
 
+    fn execution_summary(&self, completed_at_unix_ms: u64) -> io::Result<ExecutionSummary> {
+        let state = self.state();
+        let documents_from_operator = u64::try_from(
+            self.documents
+                .values()
+                .filter(|document| document.direction == DocumentDirection::FromOperator)
+                .count(),
+        )
+        .map_err(invalid)?;
+        let documents_from_driver = u64::try_from(
+            self.documents
+                .values()
+                .filter(|document| document.direction == DocumentDirection::FromDriver)
+                .count(),
+        )
+        .map_err(invalid)?;
+
+        Ok(ExecutionSummary {
+            trip_id: self.trip,
+            final_plan_version: state.current_version,
+            completed_at_unix_ms,
+            completed_point_ids: state.completed_point_ids.iter().copied().collect(),
+            documents_from_operator,
+            documents_from_driver,
+            plan_version_count: self.plan_version_count,
+            replan_count: self.plan_version_count.saturating_sub(1),
+        })
+    }
+
     pub fn build_replan_request(
         &self,
         draft: ReplanRequestDraft,
@@ -801,6 +869,65 @@ impl TripFolder {
         self.document(draft.document_id)
             .ok_or_else(|| invalid("document record was not stored"))
     }
+
+
+    pub fn archive(
+        self,
+        completed_root: &Path,
+        archive_name: &str,
+        completed_at_unix_ms: u64,
+    ) -> io::Result<PathBuf> {
+        safe_archive_name(archive_name)?;
+        fs::create_dir_all(completed_root)?;
+        let destination = completed_root.join(archive_name);
+        if destination.try_exists()? {
+            return Err(invalid("completed trip destination already exists"));
+        }
+
+        let fresh = Self::open(&self.path, self.trip)?;
+        if fresh.cursor != self.cursor
+            || fresh.plan_version_count != self.plan_version_count
+            || fresh.state() != self.state()
+            || fresh.documents != self.documents
+        {
+            return Err(invalid("trip changed; reopen before completion"));
+        }
+
+        let summary = fresh.execution_summary(completed_at_unix_ms)?;
+        write_execution_summary(&fresh.path, &summary)?;
+        write_checksums(&fresh.path)?;
+        verify_checksums(&fresh.path)?;
+
+        fs::rename(&fresh.path, &destination)?;
+        let verified = verify_archive(&destination, self.trip)?;
+        if verified != summary {
+            return Err(invalid("completed trip summary changed during archive"));
+        }
+        Ok(destination)
+    }
+}
+
+
+pub fn verify_archive(path: &Path, trip: TripId) -> io::Result<ExecutionSummary> {
+    verify_checksums(path)?;
+    let recovered = TripFolder::open(path, trip)?;
+    let summary_file: ExecutionSummaryFile = serde_json::from_slice(&bounded(File::open(
+        path.join("reports").join("execution_summary.json"),
+    )?)?)?;
+    let summary = summary_file.typed()?;
+    if summary.trip_id != trip {
+        return Err(invalid("execution summary trip id mismatch"));
+    }
+
+    let state = recovered.state();
+    let expected = recovered.execution_summary(summary.completed_at_unix_ms)?;
+    if expected != summary {
+        return Err(invalid("execution summary does not match recovered trip"));
+    }
+    if state.current_version != summary.final_plan_version {
+        return Err(invalid("execution summary final version mismatch"));
+    }
+    Ok(summary)
 }
 
 #[cfg(test)]
