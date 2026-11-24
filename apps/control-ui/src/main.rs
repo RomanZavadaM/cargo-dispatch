@@ -1,8 +1,9 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_control_ui_contracts::{
-    ControlUiStatus, DashboardDocumentDirection, ListenerMode, OperatorDocumentInput, PickedFile,
-    RegisterTripInput, ReorderRouteInput, SessionInput, StartLanInput, TripDashboard,
+    ControlUiStatus, DashboardDocumentDirection, DashboardPoint, ListenerMode,
+    OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput, SessionInput,
+    StartLanInput, TripDashboard,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -75,6 +76,49 @@ async fn load_dashboard(token: String) -> Result<TripDashboard, String> {
         &serde_json::json!({ "input": SessionInput { token } }),
     )
     .await
+}
+
+fn reordered_open_point_ids(
+    points: &[DashboardPoint],
+    point_id: &str,
+    delta: isize,
+) -> Option<Vec<String>> {
+    let index = points.iter().position(|item| item.point_id == point_id)?;
+    let target = index.checked_add_signed(delta)?;
+    if target >= points.len() {
+        return None;
+    }
+    let mut ids = points
+        .iter()
+        .map(|item| item.point_id.clone())
+        .collect::<Vec<_>>();
+    ids.swap(index, target);
+    Some(ids)
+}
+
+fn submit_reorder(
+    input: ReorderRouteInput,
+    dashboard: RwSignal<Option<TripDashboard>>,
+    message: RwSignal<String>,
+    error: RwSignal<bool>,
+) {
+    spawn_local(async move {
+        match invoke::<TripDashboard, _>(
+            "reorder_trip_route",
+            &serde_json::json!({ "input": input }),
+        )
+        .await
+        {
+            Ok(current) => {
+                dashboard.set(Some(current));
+                error.set(false);
+            }
+            Err(problem) => {
+                message.set(problem);
+                error.set(true);
+            }
+        }
+    });
 }
 
 fn main() {
@@ -496,45 +540,10 @@ fn ControlApp() -> impl IntoView {
                                     each=move || route_rows.clone()
                                     key=|point| point.point_id.clone()
                                     children=move |point| {
-                                        let point_id = point.point_id.clone();
-                                        let open_for_buttons = open_points.clone();
-                                        let current_index = open_for_buttons
-                                            .iter()
-                                            .position(|item| item.point_id == point_id);
-                                        let move_point = move |delta: isize| {
-                                            let Some(index) = current_index else { return; };
-                                            let target = index as isize + delta;
-                                            if target < 0 || target >= open_for_buttons.len() as isize {
-                                                return;
-                                            }
-                                            let mut ids = open_for_buttons
-                                                .iter()
-                                                .map(|item| item.point_id.clone())
-                                                .collect::<Vec<_>>();
-                                            ids.swap(index, target as usize);
-                                            let input = ReorderRouteInput {
-                                                token: selected_token.get_untracked(),
-                                                based_on_revision: revision,
-                                                open_point_ids: ids,
-                                            };
-                                            spawn_local(async move {
-                                                match invoke::<TripDashboard, _>(
-                                                    "reorder_trip_route",
-                                                    &serde_json::json!({ "input": input }),
-                                                )
-                                                .await
-                                                {
-                                                    Ok(current) => {
-                                                        dashboard.set(Some(current));
-                                                        error.set(false);
-                                                    }
-                                                    Err(problem) => {
-                                                        message.set(problem);
-                                                        error.set(true);
-                                                    }
-                                                }
-                                            });
-                                        };
+                                        let point_id_up = point.point_id.clone();
+                                        let point_id_down = point.point_id.clone();
+                                        let open_up = open_points.clone();
+                                        let open_down = open_points.clone();
                                         let navigation = point.navigation.clone();
                                         view! {
                                             <div class="point">
@@ -549,8 +558,52 @@ fn ControlApp() -> impl IntoView {
                                                 })}
                                                 {(!point.completed).then(|| view! {
                                                     <span class="actions">
-                                                        <button type="button" on:click=move |_| move_point(-1)>"↑"</button>
-                                                        <button type="button" on:click=move |_| move_point(1)>"↓"</button>
+                                                        <button
+                                                            type="button"
+                                                            on:click=move |_| {
+                                                                if let Some(ids) = reordered_open_point_ids(
+                                                                    &open_up,
+                                                                    &point_id_up,
+                                                                    -1,
+                                                                ) {
+                                                                    submit_reorder(
+                                                                        ReorderRouteInput {
+                                                                            token: selected_token.get_untracked(),
+                                                                            based_on_revision: revision,
+                                                                            open_point_ids: ids,
+                                                                        },
+                                                                        dashboard,
+                                                                        message,
+                                                                        error,
+                                                                    );
+                                                                }
+                                                            }
+                                                        >
+                                                            "↑"
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            on:click=move |_| {
+                                                                if let Some(ids) = reordered_open_point_ids(
+                                                                    &open_down,
+                                                                    &point_id_down,
+                                                                    1,
+                                                                ) {
+                                                                    submit_reorder(
+                                                                        ReorderRouteInput {
+                                                                            token: selected_token.get_untracked(),
+                                                                            based_on_revision: revision,
+                                                                            open_point_ids: ids,
+                                                                        },
+                                                                        dashboard,
+                                                                        message,
+                                                                        error,
+                                                                    );
+                                                                }
+                                                            }
+                                                        >
+                                                            "↓"
+                                                        </button>
                                                     </span>
                                                 })}
                                             </div>
