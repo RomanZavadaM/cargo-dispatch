@@ -2,8 +2,8 @@
 
 use cargo_dispatch_control_ui_contracts::{
     ControlUiStatus, DashboardDocumentDirection, DashboardPoint, ListenerMode,
-    OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput, SessionInput,
-    StartLanInput, TripDashboard,
+    OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput, SaveDocumentInput,
+    SessionInput, StartLanInput, TripDashboard,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
