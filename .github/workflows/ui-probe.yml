@@ -12,6 +12,8 @@ on:
       - "apps/leptos-web/**"
       - "apps/tauri-shell/**"
       - "probe/ui/**"
+      - "deny.toml"
+      - "THIRD_PARTY_NOTICES.md"
       - ".github/workflows/ui-probe.yml"
 
 permissions:
@@ -49,6 +51,12 @@ jobs:
 
       - name: Core tests
         run: cargo test --locked -p ui-probe-core --all-targets
+
+      - name: Install dependency checker
+        run: cargo install cargo-deny --locked --version 0.22.0
+
+      - name: Check dependency licenses and advisories
+        run: cargo deny check licenses advisories bans sources
 
   browser:
     name: Leptos CSR browser
