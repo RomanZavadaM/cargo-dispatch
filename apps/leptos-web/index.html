@@ -4,6 +4,33 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cargo dispatch UI probe</title>
+  <script>
+    window.cargoDesktopBridge = (() => {
+      const invoke = (command, args = {}) => {
+        const core = window.__TAURI__ && window.__TAURI__.core;
+        if (!core || typeof core.invoke !== "function") {
+          return Promise.reject(new Error("Desktop bridge is not available in this browser"));
+        }
+        return core.invoke(command, args);
+      };
+
+      return {
+        available: () => Boolean(window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke),
+        loadRequestPage: (input) => invoke("load_request_page", { input }),
+        updateRequest: (input) => invoke("update_request", { input }),
+        saveSettings: (settings) =>
+          invoke("save_local_settings", { rawJson: JSON.stringify(settings) }),
+        prepareFileChoice: (input) => invoke("prepare_local_file_choice", { input }),
+        exportTripPackage: (input) => invoke("export_synthetic_trip_package", { input }),
+        startCandidateCalculation: (input) =>
+          invoke("start_candidate_calculation", { input }),
+        cancelCandidateCalculation: (calculationId) =>
+          invoke("cancel_candidate_calculation", {
+            input: { calculation_id: calculationId },
+          }),
+      };
+    })();
+  </script>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.19.0/dist/maplibre-gl.css" />
   <script>
     window.cargoMapBridge = (() => {
