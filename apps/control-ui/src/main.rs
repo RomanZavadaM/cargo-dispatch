@@ -631,6 +631,7 @@ fn ControlApp() -> impl IntoView {
                                     each=move || documents.clone()
                                     key=|document| document.document_id.clone()
                                     children=move |document| {
+                                        let document_id = document.document_id.clone();
                                         let direction = match document.direction {
                                             DashboardDocumentDirection::FromOperator => "Control → водій",
                                             DashboardDocumentDirection::FromDriver => "водій → Control",
@@ -644,6 +645,40 @@ fn ControlApp() -> impl IntoView {
                                                 {document.point_id.map(|point| view! {
                                                     <span>" · point " <code>{point}</code></span>
                                                 })}
+                                                <button
+                                                    type="button"
+                                                    disabled=move || busy.get()
+                                                    on:click=move |_| {
+                                                        let input = SaveDocumentInput {
+                                                            token: selected_token.get_untracked(),
+                                                            document_id: document_id.clone(),
+                                                        };
+                                                        busy.set(true);
+                                                        spawn_local(async move {
+                                                            match invoke::<Option<String>, _>(
+                                                                "save_session_document",
+                                                                &serde_json::json!({ "input": input }),
+                                                            )
+                                                            .await
+                                                            {
+                                                                Ok(Some(path)) => {
+                                                                    message.set(format!(
+                                                                        "Файл збережено: {path}"
+                                                                    ));
+                                                                    error.set(false);
+                                                                }
+                                                                Ok(None) => {}
+                                                                Err(problem) => {
+                                                                    message.set(problem);
+                                                                    error.set(true);
+                                                                }
+                                                            }
+                                                            busy.set(false);
+                                                        });
+                                                    }
+                                                >
+                                                    "Зберегти…"
+                                                </button>
                                             </li>
                                         }
                                     }
