@@ -1700,11 +1700,10 @@ mod tests {
             assert!(!failure.title.contains("panicked at"));
         }
 
-        assert!(!synthetic_ui_failure(
-            UiLanguage::Uk,
-            SyntheticFailureKind::InvalidTripPackage
-        )
-        .retryable);
+        assert!(
+            !synthetic_ui_failure(UiLanguage::Uk, SyntheticFailureKind::InvalidTripPackage)
+                .retryable
+        );
     }
 
     #[test]
