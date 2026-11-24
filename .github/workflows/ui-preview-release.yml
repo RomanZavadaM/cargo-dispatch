@@ -1,0 +1,118 @@
+name: Publish UI preview
+
+on:
+  push:
+    branches:
+      - "prototype/ui-r1"
+    paths:
+      - ".github/workflows/ui-preview-release.yml"
+
+permissions:
+  contents: write
+
+env:
+  PREVIEW_TAG: "v0.1.0-preview.1"
+  PREVIEW_NAME: "Cargo Dispatch UI Preview 0.1"
+
+jobs:
+  windows-preview:
+    name: Build Windows preview
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk@0.22.2
+
+      - name: Build browser UI
+        working-directory: apps/leptos-web
+        run: trunk build --release=true
+
+      - name: Build Windows portable preview
+        run: cargo build --locked --release -p ui-probe-tauri
+
+      - name: Prepare preview packages
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force preview/windows | Out-Null
+          New-Item -ItemType Directory -Force preview/browser | Out-Null
+          Copy-Item target/release/ui-probe-tauri.exe preview/windows/Cargo-Dispatch-UI-Preview.exe
+          Copy-Item LICENSE preview/windows/LICENSE.txt
+          Copy-Item THIRD_PARTY_NOTICES.md preview/windows/THIRD_PARTY_NOTICES.md
+          Copy-Item README.md preview/windows/README.md
+          Copy-Item apps/leptos-web/dist/* preview/browser/ -Recurse
+          Copy-Item LICENSE preview/browser/LICENSE.txt
+          Copy-Item THIRD_PARTY_NOTICES.md preview/browser/THIRD_PARTY_NOTICES.md
+          @"
+          Cargo Dispatch UI Preview 0.1
+
+          Це тестовий попередній перегляд інтерфейсу, а не стабільний реліз.
+
+          Уже можна подивитися:
+          - пул із 5 000 синтетичних заявок;
+          - пошук, сортування, вибір і відкриття заявки;
+          - велику форму заявки;
+          - телефонний/ручний режим;
+          - попередження про незбережені зміни;
+          - робочий маршрут;
+          - карту з варіантами маршруту та ручною точкою;
+          - тестові межі команд desktop-програми.
+
+          Дані синтетичні. Реальної бази, реальних замовлень і польового мобільного зв'язку у цьому preview немає.
+          "@ | Set-Content -Encoding UTF8 preview/windows/START_HERE.txt
+          Compress-Archive -Path preview/windows/* -DestinationPath Cargo-Dispatch-UI-Preview-0.1-Windows-x64.zip -Force
+          Compress-Archive -Path preview/browser/* -DestinationPath Cargo-Dispatch-UI-Preview-0.1-Browser.zip -Force
+          $winHash = (Get-FileHash Cargo-Dispatch-UI-Preview-0.1-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          $webHash = (Get-FileHash Cargo-Dispatch-UI-Preview-0.1-Browser.zip -Algorithm SHA256).Hash.ToLower()
+          "$winHash  Cargo-Dispatch-UI-Preview-0.1-Windows-x64.zip" | Set-Content -Encoding ASCII SHA256SUMS.txt
+          "$webHash  Cargo-Dispatch-UI-Preview-0.1-Browser.zip" | Add-Content -Encoding ASCII SHA256SUMS.txt
+
+      - name: Publish GitHub prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = @"
+          ## Що це
+
+          Перший тестовий перегляд інтерфейсу Cargo Dispatch. Це не стабільна версія і не готова диспетчерська система.
+
+          ### Уже є
+          - пул 5 000 синтетичних заявок;
+          - пошук, сортування, вибір і відкриття;
+          - велика форма заявки з ручним і телефонним режимами;
+          - перевірка введених даних, збереження/скасування та захист незбережених змін;
+          - робочий маршрут із захищеними точками;
+          - карта з трьома варіантами маршруту і ручною точкою;
+          - підготовлена межа між екраном та внутрішньою логікою desktop-програми.
+
+          ### Що ще не є готовим продуктом
+          - немає справжньої робочої бази заявок;
+          - немає бойового planner/control;
+          - немає польового тесту телефона через реальний VPS/NAT/CGNAT;
+          - вигляд ще тестовий і буде змінюватися.
+
+          Windows: розпакувати ZIP і запустити Cargo-Dispatch-UI-Preview.exe.
+          "@
+          if (gh release view $env:PREVIEW_TAG --repo "${{ github.repository }}" *> $null) {
+            gh release edit $env:PREVIEW_TAG --repo "${{ github.repository }}" --title $env:PREVIEW_NAME --notes $notes --prerelease
+          } else {
+            gh release create $env:PREVIEW_TAG --repo "${{ github.repository }}" --target "${{ github.sha }}" --title $env:PREVIEW_NAME --notes $notes --prerelease
+          }
+          gh release upload $env:PREVIEW_TAG Cargo-Dispatch-UI-Preview-0.1-Windows-x64.zip Cargo-Dispatch-UI-Preview-0.1-Browser.zip SHA256SUMS.txt --repo "${{ github.repository }}" --clobber
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cargo-dispatch-ui-preview-0.1
+          path: |
+            Cargo-Dispatch-UI-Preview-0.1-Windows-x64.zip
+            Cargo-Dispatch-UI-Preview-0.1-Browser.zip
+            SHA256SUMS.txt
+          if-no-files-found: error
