@@ -340,6 +340,36 @@ mod tests {
     }
 
     #[test]
+    fn reordering_open_stops_is_local_to_one_active_trip() {
+        let first = trip_id(1);
+        let second = trip_id(2);
+        let mut registry = InMemoryTripRegistry::default();
+        let mut route = points(1, 2);
+        let mut last = route[1].clone();
+        last.point_id = point_id(3);
+        last.sequence = 3;
+        route.push(last);
+        for id in [first, second] {
+            registry
+                .import(candidate(id, 1, None, 1, route.clone()))
+                .unwrap();
+        }
+        let other = registry.get(second).unwrap();
+        registry.mark_point_completed(first, point_id(3)).unwrap();
+        let before = registry.get(first).unwrap();
+        route.swap(0, 1);
+        route[0].sequence = 1;
+        route[1].sequence = 2;
+        assert_eq!(registry.edit_active_route(&before, route.clone()), Ok(1));
+        let after = registry.get(first).unwrap();
+        assert_eq!(after.route_points, route);
+        assert_eq!(after.route_points[2], before.route_points[2]);
+        assert_eq!(after.completed_point_ids, before.completed_point_ids);
+        assert_eq!(registry.edit_active_route(&after, route), Ok(1));
+        assert_eq!(registry.get(second).unwrap(), other);
+    }
+
+    #[test]
     fn operator_edits_open_stop_after_second_stop_is_completed() {
         let id = trip_id(1);
         let mut registry = InMemoryTripRegistry::default();
