@@ -150,7 +150,7 @@ jobs:
         run: cargo test --locked -p ui-probe-tauri --all-targets
 
   report:
-    name: Desktop command boundary report
+    name: Multi-window control report
     if: always()
     needs:
       - core
@@ -169,7 +169,7 @@ jobs:
           import json, os
           report = {
               "probe": "ui-r1",
-              "phase": "desktop-command-boundary",
+              "phase": "multi-window-control",
               "commit_sha": os.environ["GIT_SHA"],
               "versions": {
                   "rust_msrv": "1.91",
@@ -186,11 +186,12 @@ jobs:
                   "map_bridge_contract": os.environ["BROWSER"],
                   "standalone_browser_boundary": os.environ["BROWSER"],
                   "desktop_command_boundary": os.environ["DESKTOP"],
+                  "multi_window_control": os.environ["DESKTOP"],
                   "tauri_cross_platform_check": os.environ["DESKTOP"],
               },
           }
           report["pass"] = all(value == "success" for value in report["checks"].values())
-          with open("ui-command-boundary-report.json", "w", encoding="utf-8") as handle:
+          with open("ui-multi-window-report.json", "w", encoding="utf-8") as handle:
               json.dump(report, handle, indent=2, sort_keys=True)
               handle.write("\n")
           print(json.dumps(report, indent=2, sort_keys=True))
@@ -201,6 +202,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-command-boundary-report
-          path: ui-command-boundary-report.json
+          name: ui-multi-window-report
+          path: ui-multi-window-report.json
           if-no-files-found: error
