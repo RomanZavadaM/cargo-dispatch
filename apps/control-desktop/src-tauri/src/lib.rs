@@ -51,7 +51,8 @@ fn parse_id_bytes(value: &str) -> Result<[u8; 16], String> {
 }
 
 fn parse_trip_id(value: &str) -> Result<TripId, String> {
-    TripId::from_bytes(parse_id_bytes(value)?).map_err(|error| format!("Некоректний Trip ID: {error:?}"))
+    TripId::from_bytes(parse_id_bytes(value)?)
+        .map_err(|error| format!("Некоректний Trip ID: {error:?}"))
 }
 
 fn driver_url(address: SocketAddr, token: &str) -> String {
@@ -76,7 +77,10 @@ impl DesktopControlService {
             if sessions.contains_key(&token) {
                 return Err("Цей token уже зареєстрований".to_owned());
             }
-            if sessions.values().any(|session| session.trip_id == trip_id_text) {
+            if sessions
+                .values()
+                .any(|session| session.trip_id == trip_id_text)
+            {
                 return Err("Цей рейс уже зареєстрований у Control".to_owned());
             }
         }
@@ -160,7 +164,12 @@ impl DesktopControlService {
             }
         });
 
-        let address = self.server.lock().await.as_ref().map(LoopbackControlServer::address);
+        let address = self
+            .server
+            .lock()
+            .await
+            .as_ref()
+            .map(LoopbackControlServer::address);
         let sessions = self
             .sessions
             .lock()
@@ -178,7 +187,9 @@ impl DesktopControlService {
 }
 
 #[tauri::command]
-async fn control_status(state: State<'_, DesktopControlService>) -> Result<ControlUiStatus, String> {
+async fn control_status(
+    state: State<'_, DesktopControlService>,
+) -> Result<ControlUiStatus, String> {
     state.status().await
 }
 
@@ -229,9 +240,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cargo_dispatch_contracts::{
-        TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion,
-    };
+    use cargo_dispatch_contracts::{TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion};
     use cargo_dispatch_domain::{OperatorId, PointId, WorkingRouteId};
     use cargo_dispatch_planner::PlannerTripExportDraft;
     use cargo_dispatch_trip_files::export_package;
@@ -295,10 +304,12 @@ mod tests {
         let listener = running.listener.expect("listener status");
         assert_eq!(listener.mode, ListenerMode::Loopback);
         assert!(listener.address.starts_with("127.0.0.1:"));
-        assert!(running.sessions[0]
-            .driver_url
-            .as_deref()
-            .is_some_and(|url| url.contains(token)));
+        assert!(
+            running.sessions[0]
+                .driver_url
+                .as_deref()
+                .is_some_and(|url| url.contains(token))
+        );
 
         assert!(service.start_loopback().await.is_err());
         let stopped = service.stop().await.expect("listener stops");
@@ -312,26 +323,32 @@ mod tests {
     #[tokio::test]
     async fn desktop_service_does_not_bypass_lan_validation() {
         let service = DesktopControlService::default();
-        assert!(service
-            .start_lan(StartLanInput {
-                ip: "0.0.0.0".to_owned(),
-                port: 8080,
-            })
-            .await
-            .is_err());
-        assert!(service
-            .start_lan(StartLanInput {
-                ip: "127.0.0.1".to_owned(),
-                port: 8080,
-            })
-            .await
-            .is_err());
-        assert!(service
-            .start_lan(StartLanInput {
-                ip: "8.8.8.8".to_owned(),
-                port: 8080,
-            })
-            .await
-            .is_err());
+        assert!(
+            service
+                .start_lan(StartLanInput {
+                    ip: "0.0.0.0".to_owned(),
+                    port: 8080,
+                })
+                .await
+                .is_err()
+        );
+        assert!(
+            service
+                .start_lan(StartLanInput {
+                    ip: "127.0.0.1".to_owned(),
+                    port: 8080,
+                })
+                .await
+                .is_err()
+        );
+        assert!(
+            service
+                .start_lan(StartLanInput {
+                    ip: "8.8.8.8".to_owned(),
+                    port: 8080,
+                })
+                .await
+                .is_err()
+        );
     }
 }
