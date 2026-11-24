@@ -40,7 +40,6 @@ pub struct ControlUiStatus {
     pub sessions: Vec<SessionStatus>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DashboardNavigation {
     pub latitude: f64,
