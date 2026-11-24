@@ -28,17 +28,12 @@ extern "C" {
 }
 
 fn js_error(value: JsValue) -> String {
-    value
-        .as_string()
-        .unwrap_or_else(|| format!("{value:?}"))
+    value.as_string().unwrap_or_else(|| format!("{value:?}"))
 }
 
-async fn invoke<T: DeserializeOwned, A: Serialize>(
-    command: &str,
-    args: &A,
-) -> Result<T, String> {
-    let args_json =
-        serde_json::to_string(args).map_err(|error| format!("Не вдалося підготувати команду: {error}"))?;
+async fn invoke<T: DeserializeOwned, A: Serialize>(command: &str, args: &A) -> Result<T, String> {
+    let args_json = serde_json::to_string(args)
+        .map_err(|error| format!("Не вдалося підготувати команду: {error}"))?;
     let value = JsFuture::from(cargo_control_invoke(command, &args_json))
         .await
         .map_err(js_error)?;
@@ -106,11 +101,7 @@ fn ControlApp() -> impl IntoView {
             token: token.get_untracked(),
         };
         spawn_local(async move {
-            let result = invoke(
-                "register_trip",
-                &serde_json::json!({ "input": input }),
-            )
-            .await;
+            let result = invoke("register_trip", &serde_json::json!({ "input": input })).await;
             set_result(result, "Рейс зареєстрований у Control.");
         });
     };
@@ -144,11 +135,7 @@ fn ControlApp() -> impl IntoView {
             port,
         };
         spawn_local(async move {
-            let result = invoke(
-                "start_lan",
-                &serde_json::json!({ "input": input }),
-            )
-            .await;
+            let result = invoke("start_lan", &serde_json::json!({ "input": input })).await;
             set_result(result, "LAN test mode запущено.");
         });
     };
