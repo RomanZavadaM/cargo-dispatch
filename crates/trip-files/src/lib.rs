@@ -44,6 +44,16 @@ pub struct StoredDocument {
     pub point_id: Option<PointId>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentStoreDraft {
+    pub document_id: DocumentId,
+    pub direction: DocumentDirection,
+    pub original_name: String,
+    pub mime_type: String,
+    pub created_at_unix_ms: u64,
+    pub point_id: Option<PointId>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DocumentEntry {
@@ -504,21 +514,16 @@ impl TripFolder {
 
     pub fn store_document(
         &mut self,
-        direction: DocumentDirection,
-        document_id: DocumentId,
-        original_name: &str,
-        mime_type: &str,
-        point_id: Option<PointId>,
-        created_at_unix_ms: u64,
+        draft: DocumentStoreDraft,
         source: &Path,
     ) -> io::Result<StoredDocument> {
-        if original_name.trim().is_empty() {
+        if draft.original_name.trim().is_empty() {
             return Err(invalid("document original name is required"));
         }
-        if mime_type.trim().is_empty() {
+        if draft.mime_type.trim().is_empty() {
             return Err(invalid("document mime type is required"));
         }
-        if let Some(point_id) = point_id
+        if let Some(point_id) = draft.point_id
             && !self
                 .state()
                 .route_points
@@ -528,13 +533,16 @@ impl TripFolder {
             return Err(invalid("document point does not belong to trip"));
         }
 
-        let directory = self.path.join("documents").join(document_subdir(direction));
+        let directory = self
+            .path
+            .join("documents")
+            .join(document_subdir(draft.direction));
         fs::create_dir_all(&directory)?;
 
-        let extension = safe_extension(original_name);
+        let extension = safe_extension(&draft.original_name);
         let stored_name = match extension {
-            Some(extension) => format!("{}.{}", id_hex(document_id.as_bytes()), extension),
-            None => id_hex(document_id.as_bytes()),
+            Some(extension) => format!("{}.{}", id_hex(draft.document_id.as_bytes()), extension),
+            None => id_hex(draft.document_id.as_bytes()),
         };
         let destination = directory.join(&stored_name);
 
@@ -562,18 +570,18 @@ impl TripFolder {
         let sha256: [u8; 32] = hasher.finalize().into();
 
         let candidate = StoredDocument {
-            document_id,
-            direction,
-            original_name: original_name.to_owned(),
+            document_id: draft.document_id,
+            direction: draft.direction,
+            original_name: draft.original_name.clone(),
             stored_name: stored_name.clone(),
-            mime_type: mime_type.to_owned(),
+            mime_type: draft.mime_type.clone(),
             size,
             sha256,
-            created_at_unix_ms,
-            point_id,
+            created_at_unix_ms: draft.created_at_unix_ms,
+            point_id: draft.point_id,
         };
 
-        if let Some(existing) = self.documents.get(&document_id) {
+        if let Some(existing) = self.documents.get(&draft.document_id) {
             if existing.direction == candidate.direction
                 && existing.original_name == candidate.original_name
                 && existing.mime_type == candidate.mime_type
@@ -598,18 +606,18 @@ impl TripFolder {
         }
 
         self.record(Change::DocumentStored(DocumentEntry {
-            document_id: document_id.as_bytes(),
-            direction,
-            original_name: original_name.to_owned(),
+            document_id: draft.document_id.as_bytes(),
+            direction: draft.direction,
+            original_name: draft.original_name,
             stored_name,
-            mime_type: mime_type.to_owned(),
+            mime_type: draft.mime_type,
             size,
             sha256,
-            created_at_unix_ms,
-            point_id: point_id.map(PointId::as_bytes),
+            created_at_unix_ms: draft.created_at_unix_ms,
+            point_id: draft.point_id.map(PointId::as_bytes),
         }))?;
 
-        self.document(document_id)
+        self.document(draft.document_id)
             .ok_or_else(|| invalid("document record was not stored"))
     }
 }
@@ -853,45 +861,53 @@ mod tests {
         let document_b = DocumentId::from_bytes([81; 16]).unwrap();
 
         let stored_a = control_a.store_document(
-            DocumentDirection::FromOperator,
-            document_a,
-            "TTN-test.pdf",
-            "application/pdf",
-            Some(route_a[0].point_id),
-            10,
-            &source_a,
+DocumentStoreDraft {
+                    document_id: document_a,
+                    direction: DocumentDirection::FromOperator,
+                    original_name: "TTN-test.pdf".to_owned(),
+                    mime_type: "application/pdf".to_owned(),
+                    created_at_unix_ms: 10,
+                    point_id: Some(route_a[0].point_id),
+                },
+                &source_a,
         )?;
         let retry_a = control_a.store_document(
-            DocumentDirection::FromOperator,
-            document_a,
-            "TTN-test.pdf",
-            "application/pdf",
-            Some(route_a[0].point_id),
-            11,
-            &source_a,
+DocumentStoreDraft {
+                    document_id: document_a,
+                    direction: DocumentDirection::FromOperator,
+                    original_name: "TTN-test.pdf".to_owned(),
+                    mime_type: "application/pdf".to_owned(),
+                    created_at_unix_ms: 11,
+                    point_id: Some(route_a[0].point_id),
+                },
+                &source_a,
         )?;
         assert_eq!(retry_a, stored_a);
         assert_eq!(control_a.documents().len(), 1);
 
         let stored_b = control_b.store_document(
-            DocumentDirection::FromDriver,
-            document_b,
-            "photo.PNG",
-            "image/png",
-            Some(route_b[1].point_id),
-            20,
-            &source_b,
+DocumentStoreDraft {
+                    document_id: document_b,
+                    direction: DocumentDirection::FromDriver,
+                    original_name: "photo.PNG".to_owned(),
+                    mime_type: "image/png".to_owned(),
+                    created_at_unix_ms: 20,
+                    point_id: Some(route_b[1].point_id),
+                },
+                &source_b,
         )?;
         assert_eq!(control_b.documents(), vec![stored_b.clone()]);
         assert!(
             control_b
                 .store_document(
-                    DocumentDirection::FromDriver,
-                    DocumentId::from_bytes([82; 16]).unwrap(),
-                    "wrong-point.png",
-                    "image/png",
-                    Some(route_a[0].point_id),
-                    21,
+                    DocumentStoreDraft {
+                        document_id: DocumentId::from_bytes([82; 16]).unwrap(),
+                        direction: DocumentDirection::FromDriver,
+                        original_name: "wrong-point.png".to_owned(),
+                        mime_type: "image/png".to_owned(),
+                        created_at_unix_ms: 21,
+                        point_id: Some(route_a[0].point_id),
+                    },
                     &source_b,
                 )
                 .is_err()
@@ -901,12 +917,14 @@ mod tests {
         assert!(
             control_a
                 .store_document(
-                    DocumentDirection::FromOperator,
-                    document_a,
-                    "TTN-test.pdf",
-                    "application/pdf",
-                    Some(route_a[0].point_id),
-                    12,
+                    DocumentStoreDraft {
+                        document_id: document_a,
+                        direction: DocumentDirection::FromOperator,
+                        original_name: "TTN-test.pdf".to_owned(),
+                        mime_type: "application/pdf".to_owned(),
+                        created_at_unix_ms: 12,
+                        point_id: Some(route_a[0].point_id),
+                    },
                     &source_a,
                 )
                 .is_err()
