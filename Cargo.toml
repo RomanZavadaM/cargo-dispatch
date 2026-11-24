@@ -8,6 +8,9 @@ members = [
   "crates/control",
   "crates/trip-files",
   "crates/control-web",
+  "crates/control-ui-contracts",
+  "apps/control-ui",
+  "apps/control-desktop/src-tauri",
 ]
 
 [workspace.package]
