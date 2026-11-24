@@ -54,6 +54,52 @@ pub struct DocumentStoreDraft {
     pub point_id: Option<PointId>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionSummary {
+    pub trip_id: TripId,
+    pub final_plan_version: TripVersion,
+    pub completed_at_unix_ms: u64,
+    pub completed_point_ids: Vec<PointId>,
+    pub documents_from_operator: u64,
+    pub documents_from_driver: u64,
+    pub plan_version_count: u64,
+    pub replan_count: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExecutionSummaryFile {
+    trip_id: [u8; 16],
+    final_plan_version: u64,
+    completed_at_unix_ms: u64,
+    completed_point_ids: Vec<[u8; 16]>,
+    documents_from_operator: u64,
+    documents_from_driver: u64,
+    plan_version_count: u64,
+    replan_count: u64,
+}
+
+impl ExecutionSummaryFile {
+    fn typed(&self) -> io::Result<ExecutionSummary> {
+        Ok(ExecutionSummary {
+            trip_id: TripId::from_bytes(self.trip_id).map_err(invalid)?,
+            final_plan_version: TripVersion::new(self.final_plan_version).map_err(invalid)?,
+            completed_at_unix_ms: self.completed_at_unix_ms,
+            completed_point_ids: self
+                .completed_point_ids
+                .iter()
+                .copied()
+                .map(PointId::from_bytes)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(invalid)?,
+            documents_from_operator: self.documents_from_operator,
+            documents_from_driver: self.documents_from_driver,
+            plan_version_count: self.plan_version_count,
+            replan_count: self.replan_count,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DocumentEntry {
@@ -132,6 +178,125 @@ fn hash_file(path: &Path) -> io::Result<(u64, [u8; 32])> {
             .ok_or_else(|| invalid("document size overflow"))?;
     }
     Ok((size, hasher.finalize().into()))
+}
+
+fn hash_hex(hash: [u8; 32]) -> String {
+    hash.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn safe_archive_name(name: &str) -> io::Result<()> {
+    let path = Path::new(name);
+    let mut components = path.components();
+    match (components.next(), components.next()) {
+        (Some(std::path::Component::Normal(_)), None) if !name.trim().is_empty() => Ok(()),
+        _ => Err(invalid("archive name must be one safe path component")),
+    }
+}
+
+fn collect_checksum_files(root: &Path) -> io::Result<Vec<(String, PathBuf)>> {
+    fn walk(root: &Path, current: &Path, out: &mut Vec<(String, PathBuf)>) -> io::Result<()> {
+        for entry in fs::read_dir(current)? {
+            let entry = entry?;
+            let file_type = entry.file_type()?;
+            let path = entry.path();
+            if file_type.is_symlink() {
+                return Err(invalid("symlinks are not allowed in completed trip package"));
+            }
+            if file_type.is_dir() {
+                if path == root.join("checksums") {
+                    continue;
+                }
+                walk(root, &path, out)?;
+                continue;
+            }
+            if !file_type.is_file() {
+                return Err(invalid("unsupported filesystem entry in trip package"));
+            }
+            let relative = path.strip_prefix(root).map_err(invalid)?;
+            let mut logical = String::new();
+            for component in relative.components() {
+                let std::path::Component::Normal(component) = component else {
+                    return Err(invalid("invalid trip package path"));
+                };
+                let text = component
+                    .to_str()
+                    .ok_or_else(|| invalid("trip package filename must be UTF-8"))?;
+                if !logical.is_empty() {
+                    logical.push('/');
+                }
+                logical.push_str(text);
+            }
+            out.push((logical, path));
+        }
+        Ok(())
+    }
+
+    let mut files = Vec::new();
+    walk(root, root, &mut files)?;
+    files.sort_by(|left, right| left.0.cmp(&right.0));
+    Ok(files)
+}
+
+fn write_checksums(root: &Path) -> io::Result<()> {
+    let files = collect_checksum_files(root)?;
+    let directory = root.join("checksums");
+    fs::create_dir_all(&directory)?;
+    let destination = directory.join("sha256.txt");
+    if destination.try_exists()? {
+        return Err(invalid("checksum index already exists"));
+    }
+    let mut temporary = NamedTempFile::new_in(&directory)?;
+    for (relative, path) in files {
+        let (_, hash) = hash_file(&path)?;
+        writeln!(temporary, "{}  {}", hash_hex(hash), relative)?;
+    }
+    publish(temporary, &destination)
+}
+
+fn parse_hash_hex(value: &str) -> io::Result<[u8; 32]> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(invalid("invalid SHA-256 in checksum index"));
+    }
+    let mut hash = [0_u8; 32];
+    for (index, byte) in hash.iter_mut().enumerate() {
+        let start = index * 2;
+        *byte = u8::from_str_radix(&value[start..start + 2], 16).map_err(invalid)?;
+    }
+    Ok(hash)
+}
+
+fn verify_checksums(root: &Path) -> io::Result<()> {
+    let index = fs::read_to_string(root.join("checksums").join("sha256.txt"))?;
+    let mut expected = std::collections::BTreeMap::new();
+    for line in index.lines() {
+        let Some((hash, relative)) = line.split_once("  ") else {
+            return Err(invalid("invalid checksum index line"));
+        };
+        if expected
+            .insert(relative.to_owned(), parse_hash_hex(hash)?)
+            .is_some()
+        {
+            return Err(invalid("duplicate checksum path"));
+        }
+    }
+
+    let files = collect_checksum_files(root)?;
+    if expected.len() != files.len() {
+        return Err(invalid("checksum index file count mismatch"));
+    }
+    for (relative, path) in files {
+        let Some(expected_hash) = expected.remove(&relative) else {
+            return Err(invalid("file missing from checksum index"));
+        };
+        let (_, actual_hash) = hash_file(&path)?;
+        if actual_hash != expected_hash {
+            return Err(invalid("completed trip checksum mismatch"));
+        }
+    }
+    if !expected.is_empty() {
+        return Err(invalid("checksum index references missing file"));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -377,6 +542,7 @@ pub struct TripFolder {
     path: PathBuf,
     trip: TripId,
     cursor: u64,
+    plan_version_count: u64,
     registry: InMemoryTripRegistry,
     documents: std::collections::BTreeMap<DocumentId, StoredDocument>,
 }
@@ -395,6 +561,7 @@ impl TripFolder {
             path: path.to_owned(),
             trip,
             cursor: 0,
+            plan_version_count: 0,
             registry: InMemoryTripRegistry::default(),
             documents: std::collections::BTreeMap::new(),
         };
@@ -403,7 +570,15 @@ impl TripFolder {
                 return Err(invalid("incomplete trip history"));
             }
             let event: Change = serde_json::from_slice(&bounded(File::open(entry)?)?)?;
+            let before = this.registry.get(trip);
+            let is_import = matches!(&event, Change::Import(_));
             apply(&mut this.registry, &mut this.documents, trip, &event)?;
+            if is_import && this.registry.get(trip) != before {
+                this.plan_version_count = this
+                    .plan_version_count
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("plan version count overflow"))?;
+            }
             this.cursor += 1;
         }
         for document in this.documents.values() {
@@ -470,10 +645,10 @@ impl TripFolder {
         }
         let mut updated = self.registry.clone();
         let mut updated_documents = self.documents.clone();
+        let is_import = matches!(&event, Change::Import(_));
         apply(&mut updated, &mut updated_documents, self.trip, &event)?;
-        if updated.get(self.trip) == self.registry.get(self.trip)
-            && updated_documents == self.documents
-        {
+        let registry_changed = updated.get(self.trip) != self.registry.get(self.trip);
+        if !registry_changed && updated_documents == self.documents {
             return Ok(());
         }
         let bytes = serde_json::to_vec(&event)?;
@@ -485,6 +660,12 @@ impl TripFolder {
         publish(file, &path)?;
         self.registry = updated;
         self.documents = updated_documents;
+        if is_import && registry_changed {
+            self.plan_version_count = self
+                .plan_version_count
+                .checked_add(1)
+                .ok_or_else(|| invalid("plan version count overflow"))?;
+        }
         self.cursor += 1;
         Ok(())
     }
