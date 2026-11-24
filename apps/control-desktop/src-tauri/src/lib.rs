@@ -37,24 +37,6 @@ impl Default for DesktopControlService {
     }
 }
 
-fn parse_id_bytes(value: &str) -> Result<[u8; 16], String> {
-    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err("Trip ID має містити рівно 32 hex-символи".to_owned());
-    }
-    let mut bytes = [0_u8; 16];
-    for (index, byte) in bytes.iter_mut().enumerate() {
-        let start = index * 2;
-        *byte = u8::from_str_radix(&value[start..start + 2], 16)
-            .map_err(|_| "Некоректний Trip ID".to_owned())?;
-    }
-    Ok(bytes)
-}
-
-fn parse_trip_id(value: &str) -> Result<TripId, String> {
-    TripId::from_bytes(parse_id_bytes(value)?)
-        .map_err(|error| format!("Некоректний Trip ID: {error:?}"))
-}
-
 fn driver_url(address: SocketAddr, token: &str) -> String {
     format!("http://{address}/driver/{token}")
 }
@@ -62,8 +44,6 @@ fn driver_url(address: SocketAddr, token: &str) -> String {
 impl DesktopControlService {
     async fn register_trip(&self, input: RegisterTripInput) -> Result<ControlUiStatus, String> {
         let token = input.token.trim().to_owned();
-        let trip_id_text = input.trip_id.trim().to_ascii_lowercase();
-        let trip_id = parse_trip_id(&trip_id_text)?;
         let folder_path = PathBuf::from(input.folder_path.trim());
         if folder_path.as_os_str().is_empty() {
             return Err("Потрібно вказати папку рейсу".to_owned());
@@ -77,18 +57,28 @@ impl DesktopControlService {
             if sessions.contains_key(&token) {
                 return Err("Цей token уже зареєстрований".to_owned());
             }
-            if sessions
-                .values()
-                .any(|session| session.trip_id == trip_id_text)
-            {
-                return Err("Цей рейс уже зареєстрований у Control".to_owned());
-            }
         }
 
-        let folder = tokio::task::spawn_blocking(move || TripFolder::open(&folder_path, trip_id))
+        let folder = tokio::task::spawn_blocking(move || TripFolder::open_detected(&folder_path))
             .await
             .map_err(|error| format!("Не вдалося відкрити задачу читання рейсу: {error}"))?
             .map_err(|error| format!("Не вдалося відкрити папку рейсу: {error}"))?;
+        let trip_id_text = folder
+            .trip_id()
+            .as_bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+
+        {
+            let sessions = self
+                .sessions
+                .lock()
+                .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
+            if sessions.values().any(|session| session.trip_id == trip_id_text) {
+                return Err("Цей рейс уже зареєстрований у Control".to_owned());
+            }
+        }
 
         self.browser
             .register_trip(token.clone(), folder)
@@ -245,10 +235,6 @@ mod tests {
     use cargo_dispatch_planner::PlannerTripExportDraft;
     use cargo_dispatch_trip_files::export_package;
 
-    fn hex(bytes: [u8; 16]) -> String {
-        bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-    }
-
     fn create_trip(root: &std::path::Path) -> std::io::Result<(TripId, PathBuf)> {
         let trip = TripId::from_bytes([21; 16]).expect("trip");
         let point = PointId::from_bytes([22; 16]).expect("point");
@@ -275,13 +261,6 @@ mod tests {
         Ok((trip, folder))
     }
 
-    #[test]
-    fn trip_id_parser_requires_exact_hex() {
-        assert!(parse_trip_id("abc").is_err());
-        assert!(parse_trip_id("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz").is_err());
-        assert!(parse_trip_id("15151515151515151515151515151515").is_ok());
-    }
-
     #[tokio::test]
     async fn desktop_service_keeps_trip_registered_when_listener_stops() -> std::io::Result<()> {
         let tmp = tempfile::tempdir()?;
@@ -292,7 +271,6 @@ mod tests {
         let registered = service
             .register_trip(RegisterTripInput {
                 folder_path: folder.to_string_lossy().into_owned(),
-                trip_id: hex(trip.as_bytes()),
                 token: token.to_owned(),
             })
             .await
