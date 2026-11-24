@@ -398,9 +398,12 @@ fn mime_type_for_path(path: &Path) -> &'static str {
     }
 }
 
-fn read_local_document_impl(input: &LocalDocumentPathInput) -> Result<LocalDocumentPayload, String> {
+fn read_local_document_impl(
+    input: &LocalDocumentPathInput,
+) -> Result<LocalDocumentPayload, String> {
     let path = Path::new(&input.path);
-    let bytes = fs::read(path).map_err(|error| format!("Could not read local document: {error}"))?;
+    let bytes =
+        fs::read(path).map_err(|error| format!("Could not read local document: {error}"))?;
     let name = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -421,9 +424,7 @@ fn read_local_document_impl(input: &LocalDocumentPathInput) -> Result<LocalDocum
     })
 }
 
-fn write_local_document_impl(
-    input: &LocalDocumentWriteInput,
-) -> Result<DocumentMetadata, String> {
+fn write_local_document_impl(input: &LocalDocumentWriteInput) -> Result<DocumentMetadata, String> {
     let path = Path::new(&input.path);
     if let Some(parent) = path.parent()
         && !parent.as_os_str().is_empty()
@@ -934,12 +935,13 @@ mod tests {
         assert_eq!(opened.bytes, pdf_bytes);
         assert_eq!(opened.metadata.mime_type, "application/pdf");
         assert_eq!(opened.metadata.size_bytes, opened.bytes.len() as u64);
-        assert_eq!(opened.metadata.direction, DocumentDirection::DriverToControl);
+        assert_eq!(
+            opened.metadata.direction,
+            DocumentDirection::DriverToControl
+        );
 
         let image_path = root.join("saved.png");
-        let png_bytes = vec![
-            0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4,
-        ];
+        let png_bytes = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4];
         let saved = write_local_document_impl(&LocalDocumentWriteInput {
             path: image_path.to_string_lossy().into_owned(),
             metadata: DocumentMetadata {
