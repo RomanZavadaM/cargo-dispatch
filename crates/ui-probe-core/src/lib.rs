@@ -1571,7 +1571,8 @@ mod tests {
         unsaved.set_field("origin", "Paris");
         assert_eq!(unsaved.field_value("origin"), Some("Paris"));
 
-        let encoded = serde_json::to_vec(&service.persistent_snapshot()).expect("snapshot serializes");
+        let encoded =
+            serde_json::to_vec(&service.persistent_snapshot()).expect("snapshot serializes");
         let decoded: ApplicationSnapshot =
             serde_json::from_slice(&encoded).expect("snapshot deserializes");
         let restarted = ApplicationService::from_persistent_snapshot(decoded);
