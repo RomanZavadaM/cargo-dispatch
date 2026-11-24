@@ -574,6 +574,86 @@ pub fn evaluate_driving_budget(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkingRouteOrigin {
+    Candidate(CandidateId),
+    Manual,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkingRouteState {
+    Draft,
+    Selected,
+    Negotiating,
+    PartiallyConfirmed,
+    Ready,
+    TransferredToControl,
+    Replanning,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkingRoute {
+    pub working_route_id: WorkingRouteId,
+    pub origin: WorkingRouteOrigin,
+    pub points: Vec<WorkingRoutePoint>,
+    pub current_revision: u64,
+    pub state: WorkingRouteState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkingRouteError {
+    CandidateNotFound,
+    DuplicatePoint,
+}
+
+fn working_route_points(point_ids: &[PointId]) -> Result<Vec<WorkingRoutePoint>, WorkingRouteError> {
+    let mut seen = std::collections::BTreeSet::new();
+    if point_ids.iter().any(|point_id| !seen.insert(*point_id)) {
+        return Err(WorkingRouteError::DuplicatePoint);
+    }
+
+    Ok(point_ids
+        .iter()
+        .map(|point_id| WorkingRoutePoint {
+            point_id: *point_id,
+            locked: false,
+            confirmed: false,
+        })
+        .collect())
+}
+
+pub fn working_route_from_candidate(
+    working_route_id: WorkingRouteId,
+    candidate_id: CandidateId,
+    candidates: &InMemoryCandidateStore,
+) -> Result<WorkingRoute, WorkingRouteError> {
+    let candidate = candidates
+        .get(candidate_id)
+        .ok_or(WorkingRouteError::CandidateNotFound)?;
+
+    Ok(WorkingRoute {
+        working_route_id,
+        origin: WorkingRouteOrigin::Candidate(candidate_id),
+        points: working_route_points(&candidate.ordered_point_ids)?,
+        current_revision: 1,
+        state: WorkingRouteState::Selected,
+    })
+}
+
+pub fn manual_working_route(
+    working_route_id: WorkingRouteId,
+    point_ids: &[PointId],
+) -> Result<WorkingRoute, WorkingRouteError> {
+    Ok(WorkingRoute {
+        working_route_id,
+        origin: WorkingRouteOrigin::Manual,
+        points: working_route_points(point_ids)?,
+        current_revision: 1,
+        state: WorkingRouteState::Draft,
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WorkingRoutePoint {
     pub point_id: PointId,
     pub locked: bool,
@@ -2639,6 +2719,81 @@ mod tests {
                 ],
             }),
             Err(CandidateSnapshotError::DuplicateRequestBasis)
+        );
+    }
+
+    #[test]
+    fn selected_candidate_becomes_independent_working_route_revision_one() {
+        let mut candidates = InMemoryCandidateStore::default();
+        candidates
+            .append(RouteCandidateSnapshot {
+                candidate_id: candidate_id(7),
+                calculation_id: calculation_id(4),
+                generated_at_unix_ms: 1_800_000_000_000,
+                ordered_point_ids: vec![point_id(30), point_id(31)],
+                request_basis: Vec::new(),
+            })
+            .expect("candidate");
+
+        let mut route = working_route_from_candidate(
+            working_route_id(10),
+            candidate_id(7),
+            &candidates,
+        )
+        .expect("working route");
+        route.points[0].locked = true;
+
+        let candidate = candidates.get(candidate_id(7)).expect("candidate");
+        assert_eq!(
+            route.origin,
+            WorkingRouteOrigin::Candidate(candidate_id(7))
+        );
+        assert_eq!(route.current_revision, 1);
+        assert_eq!(route.state, WorkingRouteState::Selected);
+        assert!(route.points[0].locked);
+        assert_eq!(
+            candidate.ordered_point_ids,
+            vec![point_id(30), point_id(31)]
+        );
+    }
+
+    #[test]
+    fn manual_working_route_needs_no_candidate_and_starts_as_draft() {
+        let route = manual_working_route(
+            working_route_id(11),
+            &[point_id(32), point_id(33)],
+        )
+        .expect("manual route");
+
+        assert_eq!(route.origin, WorkingRouteOrigin::Manual);
+        assert_eq!(route.current_revision, 1);
+        assert_eq!(route.state, WorkingRouteState::Draft);
+        assert_eq!(
+            route.points
+                .iter()
+                .map(|point| point.point_id)
+                .collect::<Vec<_>>(),
+            vec![point_id(32), point_id(33)]
+        );
+    }
+
+    #[test]
+    fn working_route_creation_rejects_missing_candidate_or_duplicate_points() {
+        let candidates = InMemoryCandidateStore::default();
+        assert_eq!(
+            working_route_from_candidate(
+                working_route_id(12),
+                candidate_id(8),
+                &candidates,
+            ),
+            Err(WorkingRouteError::CandidateNotFound)
+        );
+        assert_eq!(
+            manual_working_route(
+                working_route_id(13),
+                &[point_id(34), point_id(34)],
+            ),
+            Err(WorkingRouteError::DuplicatePoint)
         );
     }
 
