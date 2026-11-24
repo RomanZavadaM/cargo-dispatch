@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RegisterTripInput {
     pub folder_path: String,
-    pub trip_id: String,
     pub token: String,
 }
 
