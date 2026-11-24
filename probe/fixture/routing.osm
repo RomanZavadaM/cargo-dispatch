@@ -60,4 +60,16 @@
   <way id="10100"><nd ref="10000"/><nd ref="10001"/><tag k="highway" v="primary"/><tag k="name" v="T10_START"/></way>
   <way id="10101"><nd ref="10001"/><nd ref="10002"/><nd ref="10003"/><tag k="highway" v="primary"/><tag k="name" v="T10_RESTRICTED"/><tag k="maxheight" v="3.2"/><tag k="maxweight" v="12"/></way>
   <way id="10102"><nd ref="10003"/><nd ref="10004"/><tag k="highway" v="primary"/><tag k="name" v="T10_FINISH"/></way>
+
+  <!-- T11-T20 matrix/cache/via/dataset component -->
+  <node id="11001" lat="49.1000" lon="24.0000"/>
+  <node id="11002" lat="49.1030" lon="24.0030"/>
+  <node id="11003" lat="49.1030" lon="24.0070"/>
+  <node id="11004" lat="49.1000" lon="24.0100"/>
+  <node id="11005" lat="49.1060" lon="24.0070"/>
+  <node id="11006" lat="49.1090" lon="24.0070"/>
+  <way id="11101"><nd ref="11001"/><nd ref="11002"/><nd ref="11003"/><nd ref="11004"/><tag k="highway" v="primary"/><tag k="name" v="T11_OPEN"/></way>
+  <way id="11102"><nd ref="11001"/><nd ref="11004"/><tag k="highway" v="primary"/><tag k="name" v="T11_SHORT"/><tag k="maxheight" v="3.2"/></way>
+  <way id="11103"><nd ref="11003"/><nd ref="11005"/><tag k="highway" v="primary"/><tag k="name" v="T11_X_RESTRICTED"/><tag k="maxheight" v="3.2"/></way>
+  <way id="11104"><nd ref="11005"/><nd ref="11006"/><tag k="highway" v="primary"/><tag k="name" v="T11_X_OPEN"/></way>
 </osm>

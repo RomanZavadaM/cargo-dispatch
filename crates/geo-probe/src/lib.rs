@@ -25,6 +25,13 @@ pub enum WarningCode {
     ApproximateEstimate,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TransportFailure {
+    Connection,
+    Timeout,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VehicleProfile {
     pub height_m: Option<f64>,
@@ -86,6 +93,34 @@ pub struct RouteResult {
     pub duration_s: Option<f64>,
     #[serde(default)]
     pub path_names: Vec<String>,
+    #[serde(default)]
+    pub warnings: Vec<WarningCode>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MatrixRequest {
+    pub sources: Vec<GeoPoint>,
+    pub targets: Vec<GeoPoint>,
+    pub profile: VehicleProfile,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MatrixCell {
+    pub source_index: usize,
+    pub target_index: usize,
+    pub status: NormalizedStatus,
+    pub distance_m: Option<f64>,
+    pub duration_s: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MatrixResult {
+    pub status: NormalizedStatus,
+    pub profile_hash: String,
+    pub map_dataset_id: String,
+    pub source_count: usize,
+    pub target_count: usize,
+    pub cells: Vec<MatrixCell>,
     #[serde(default)]
     pub warnings: Vec<WarningCode>,
 }
@@ -193,5 +228,6 @@ mod tests {
 
         assert_ne!(key_a.profile_hash, key_b.profile_hash);
         assert_eq!(key_a.coordinates_hash, key_b.coordinates_hash);
+        assert_eq!(key_a.map_dataset_id, key_b.map_dataset_id);
     }
 }
