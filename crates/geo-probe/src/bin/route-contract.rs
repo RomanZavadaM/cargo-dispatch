@@ -64,14 +64,13 @@ fn normalize_command(args: &[String]) -> Result<(), String> {
 }
 
 fn profile(name: &str, exclude_unpaved: bool) -> Result<VehicleProfile, String> {
-    let (height_m, width_m, length_m, weight_t, axle_load_t, axle_count, hazmat) =
-        match name {
-            "P1" => (2.5, 2.0, 6.0, 3.5, 2.0, 2, false),
-            "P2" => (3.1, 2.2, 9.0, 10.0, 4.0, 2, false),
-            "P3" => (4.0, 2.55, 16.5, 24.0, 8.0, 5, false),
-            "P4" => (4.0, 2.55, 16.5, 24.0, 8.0, 5, true),
-            _ => return Err(format!("unknown vehicle profile: {name}")),
-        };
+    let (height_m, width_m, length_m, weight_t, axle_load_t, axle_count, hazmat) = match name {
+        "P1" => (2.5, 2.0, 6.0, 3.5, 2.0, 2, false),
+        "P2" => (3.1, 2.2, 9.0, 10.0, 4.0, 2, false),
+        "P3" => (4.0, 2.55, 16.5, 24.0, 8.0, 5, false),
+        "P4" => (4.0, 2.55, 16.5, 24.0, 8.0, 5, true),
+        _ => return Err(format!("unknown vehicle profile: {name}")),
+    };
     Ok(VehicleProfile {
         height_m: Some(height_m),
         width_m: Some(width_m),

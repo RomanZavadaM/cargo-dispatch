@@ -109,9 +109,7 @@ pub fn normalize_route_response(
     let code = parsed.get("error_code").and_then(Value::as_u64);
     let status = match code {
         Some(170 | 441 | 442) => NormalizedStatus::NoRoute,
-        Some(130 | 131 | 132 | 171 | 420 | 421 | 422 | 423) => {
-            NormalizedStatus::InvalidPoint
-        }
+        Some(130 | 131 | 132 | 171 | 420 | 421 | 422 | 423) => NormalizedStatus::InvalidPoint,
         Some(124 | 125 | 412) => NormalizedStatus::InvalidProfile,
         _ if http_status >= 500 => NormalizedStatus::EngineUnavailable,
         _ => NormalizedStatus::EngineError,
@@ -189,7 +187,10 @@ mod tests {
     #[test]
     fn request_maps_vehicle_dimensions_per_request() {
         let request = RouteRequest {
-            from: GeoPoint { lat: 49.0, lon: 24.0 },
+            from: GeoPoint {
+                lat: 49.0,
+                lon: 24.0,
+            },
             to: GeoPoint {
                 lat: 49.0,
                 lon: 24.01,
