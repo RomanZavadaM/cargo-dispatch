@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use cargo_dispatch_domain::{AvailabilityState, LoadRequest, RequestId};
+use cargo_dispatch_domain::{AvailabilityState, LoadRequest, PlanningAssignment, RequestId};
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
 
@@ -30,10 +30,18 @@ impl PoolFilter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     DuplicateRequest,
+    RequestNotFound,
+    StaleRevision,
 }
 
 pub trait RequestRepository {
     fn insert(&mut self, request: PlanningRequest) -> Result<(), RepositoryError>;
+    fn refresh(&mut self, request: PlanningRequest) -> Result<(), RepositoryError>;
+    fn set_planning_assignment(
+        &mut self,
+        request_id: RequestId,
+        assignment: PlanningAssignment,
+    ) -> Result<(), RepositoryError>;
     fn get(&self, request_id: RequestId) -> Option<PlanningRequest>;
     fn list(&self) -> Vec<PlanningRequest>;
 }
@@ -49,6 +57,34 @@ impl RequestRepository for InMemoryRequestRepository {
             return Err(RepositoryError::DuplicateRequest);
         }
         self.requests.insert(request.request.request_id, request);
+        Ok(())
+    }
+
+    fn refresh(&mut self, mut request: PlanningRequest) -> Result<(), RepositoryError> {
+        let existing = self
+            .requests
+            .get_mut(&request.request.request_id)
+            .ok_or(RepositoryError::RequestNotFound)?;
+
+        if request.request.revision <= existing.request.revision {
+            return Err(RepositoryError::StaleRevision);
+        }
+
+        request.request.planning_assignment = existing.request.planning_assignment;
+        *existing = request;
+        Ok(())
+    }
+
+    fn set_planning_assignment(
+        &mut self,
+        request_id: RequestId,
+        assignment: PlanningAssignment,
+    ) -> Result<(), RepositoryError> {
+        let existing = self
+            .requests
+            .get_mut(&request_id)
+            .ok_or(RepositoryError::RequestNotFound)?;
+        existing.request.planning_assignment = assignment;
         Ok(())
     }
 
@@ -75,6 +111,7 @@ pub trait GeoRouter {
 pub enum PlannerError {
     DuplicateRequest,
     RequestNotFound,
+    StaleRequestRevision,
     MissingConfirmedCoordinates,
     InvalidGeoProfile,
     GeoRouterUnavailable,
@@ -92,9 +129,33 @@ impl<R: RequestRepository> PlannerService<R> {
     }
 
     pub fn add_request(&mut self, request: PlanningRequest) -> Result<(), PlannerError> {
+        self.repository.insert(request).map_err(|error| match error {
+            RepositoryError::DuplicateRequest => PlannerError::DuplicateRequest,
+            RepositoryError::RequestNotFound => PlannerError::RequestNotFound,
+            RepositoryError::StaleRevision => PlannerError::StaleRequestRevision,
+        })
+    }
+
+    pub fn refresh_request(&mut self, request: PlanningRequest) -> Result<(), PlannerError> {
+        self.repository.refresh(request).map_err(|error| match error {
+            RepositoryError::DuplicateRequest => PlannerError::DuplicateRequest,
+            RepositoryError::RequestNotFound => PlannerError::RequestNotFound,
+            RepositoryError::StaleRevision => PlannerError::StaleRequestRevision,
+        })
+    }
+
+    pub fn set_planning_assignment(
+        &mut self,
+        request_id: RequestId,
+        assignment: PlanningAssignment,
+    ) -> Result<(), PlannerError> {
         self.repository
-            .insert(request)
-            .map_err(|_| PlannerError::DuplicateRequest)
+            .set_planning_assignment(request_id, assignment)
+            .map_err(|error| match error {
+                RepositoryError::DuplicateRequest => PlannerError::DuplicateRequest,
+                RepositoryError::RequestNotFound => PlannerError::RequestNotFound,
+                RepositoryError::StaleRevision => PlannerError::StaleRequestRevision,
+            })
     }
 
     #[must_use]
@@ -298,6 +359,85 @@ mod tests {
             service.add_request(item),
             Err(PlannerError::DuplicateRequest)
         );
+    }
+
+    #[test]
+    fn refresh_request_requires_newer_revision_and_preserves_planning_assignment() {
+        let id = request_id(6);
+        let mut service = PlannerService::new(InMemoryRequestRepository::default());
+        service
+            .add_request(request(
+                id,
+                "Lviv",
+                "Nuremberg",
+                AvailabilityState::Active,
+                true,
+            ))
+            .expect("request");
+        service
+            .set_planning_assignment(id, PlanningAssignment::Calling)
+            .expect("assignment");
+
+        let mut refreshed = request(
+            id,
+            "Lviv",
+            "Nuremberg",
+            AvailabilityState::NeedsCheck,
+            true,
+        );
+        refreshed.request.revision = RequestRevision::new(2).expect("revision");
+        refreshed.request.source.observed_at_unix_ms = 1_800_000_060_000;
+        refreshed.request.cargo =
+            CargoSummary::new("updated cargo", Some(2_800), Some(7)).expect("cargo");
+
+        service.refresh_request(refreshed).expect("refresh");
+
+        let pool = service.pool(&PoolFilter::all());
+        assert_eq!(pool.len(), 1);
+        assert_eq!(pool[0].request.revision.get(), 2);
+        assert_eq!(pool[0].request.availability, AvailabilityState::NeedsCheck);
+        assert_eq!(
+            pool[0].request.planning_assignment,
+            PlanningAssignment::Calling
+        );
+        assert_eq!(pool[0].request.cargo.title, "updated cargo");
+        assert_eq!(
+            pool[0].request.source.observed_at_unix_ms,
+            1_800_000_060_000
+        );
+    }
+
+    #[test]
+    fn stale_refresh_is_rejected_without_changing_saved_request() {
+        let id = request_id(7);
+        let mut service = PlannerService::new(InMemoryRequestRepository::default());
+        service
+            .add_request(request(
+                id,
+                "Kyiv",
+                "Berlin",
+                AvailabilityState::Active,
+                true,
+            ))
+            .expect("request");
+
+        let stale = request(
+            id,
+            "Kyiv",
+            "Hamburg",
+            AvailabilityState::Taken,
+            true,
+        );
+        assert_eq!(
+            service.refresh_request(stale),
+            Err(PlannerError::StaleRequestRevision)
+        );
+
+        let pool = service.pool(&PoolFilter::all());
+        assert_eq!(pool.len(), 1);
+        assert_eq!(pool[0].request.revision.get(), 1);
+        assert_eq!(pool[0].request.availability, AvailabilityState::Active);
+        assert_eq!(pool[0].request.destination.locality, "Berlin");
     }
 
     #[test]
