@@ -1,10 +1,12 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_contracts::{
-    CURRENT_SCHEMA_VERSION, PackageContentFingerprint, TRIP_PACKAGE_SCHEMA_NAME, TripPackageHeader,
-    TripPointKind, TripRoutePoint, TripVersion, validate_route_points,
+    CURRENT_SCHEMA_VERSION, PackageContentFingerprint, ReplanRequest, TRIP_PACKAGE_SCHEMA_NAME,
+    TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion, validate_route_points,
 };
-use cargo_dispatch_control::{InMemoryTripRegistry, StoredTripPlan, TripImportCandidate};
+use cargo_dispatch_control::{
+    InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft, StoredTripPlan, TripImportCandidate,
+};
 use cargo_dispatch_domain::{PointId, TripId};
 use cargo_dispatch_planner::PlannerTripExportDraft;
 use serde::{Deserialize, Serialize};
@@ -303,6 +305,13 @@ impl TripFolder {
             .expect("folder contains imported trip")
     }
 
+    pub fn build_replan_request(
+        &self,
+        draft: ReplanRequestDraft,
+    ) -> Result<ReplanRequest, ReplanBuildError> {
+        self.registry.build_replan_request(self.trip, draft)
+    }
+
     fn next_path(&self) -> io::Result<PathBuf> {
         let n = self
             .cursor
@@ -360,7 +369,13 @@ impl TripFolder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cargo_dispatch_domain::{OperatorId, WorkingRouteId};
+    use cargo_dispatch_contracts::{ReplanReasonCode, ReplanRequest};
+    use cargo_dispatch_control::ReplanRequestDraft;
+    use cargo_dispatch_domain::{OperatorId, ReplanRequestId, WorkingRouteId};
+    use cargo_dispatch_planner::{
+        InMemoryTripExportHistory, PlannerTripExportRecord, WorkingRouteState, apply_planner_replan,
+        build_trip_export_draft, manual_working_route, transition_working_route,
+    };
 
     #[test]
     fn independent_control_recovers_driver_changes() -> io::Result<()> {
@@ -406,4 +421,140 @@ mod tests {
         assert_eq!(TripFolder::open(&folder, trip)?.state(), after);
         Ok(())
     }
+
+    #[test]
+    fn out_of_order_completion_survives_planner_round_trip_and_restart() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package_v1 = tmp.path().join("trip-v1.zip");
+        let package_v2 = tmp.path().join("trip-v2.zip");
+        let folder = tmp.path().join("active-trip");
+
+        let trip = TripId::from_bytes([10; 16]).unwrap();
+        let working_route_id = WorkingRouteId::from_bytes([11; 16]).unwrap();
+        let operator = OperatorId::from_bytes([12; 16]).unwrap();
+        let point_ids: Vec<_> = (1..=4u8)
+            .map(|n| PointId::from_bytes([n; 16]).unwrap())
+            .collect();
+
+        let route_v1: Vec<_> = point_ids
+            .iter()
+            .enumerate()
+            .map(|(index, point_id)| TripRoutePoint {
+                point_id: *point_id,
+                sequence: u32::try_from(index + 1).unwrap(),
+                kind: TripPointKind::Load,
+                title: format!("Точка {}", index + 1),
+            })
+            .collect();
+
+        let mut planner_route =
+            manual_working_route(working_route_id, &point_ids).expect("planner route");
+        planner_route.state = WorkingRouteState::Ready;
+
+        let draft_v1 = build_trip_export_draft(
+            &planner_route,
+            trip,
+            TripVersion::new(1).unwrap(),
+            None,
+            1,
+            operator,
+        )
+        .expect("first trip export");
+        let mut history = InMemoryTripExportHistory::default();
+        history
+            .append(PlannerTripExportRecord::from(&draft_v1))
+            .expect("record first export");
+        export_package(&package_v1, &draft_v1, &route_v1)?;
+
+        let mut control = TripFolder::import(&folder, &package_v1)?;
+        control.complete(point_ids[2])?;
+        let completed_v1 = control.state().route_points[2].clone();
+
+        let request: ReplanRequest = control
+            .build_replan_request(ReplanRequestDraft {
+                request_id: ReplanRequestId::from_bytes([13; 16]).unwrap(),
+                created_at_unix_ms: 2,
+                current_time_unix_ms: 3,
+                reason_code: ReplanReasonCode::RoadProblem,
+                operator_note: Some("Об'їзд після зміни ситуації".to_owned()),
+                current_point_id: Some(point_ids[1]),
+                affected_point_ids: vec![point_ids[0], point_ids[1], point_ids[3]],
+            })
+            .expect("control replan request");
+        assert_eq!(request.completed_point_ids, vec![point_ids[2]]);
+
+        let context = history
+            .validate_replan_request(&request)
+            .expect("planner accepts current control facts");
+        let replanned = apply_planner_replan(
+            &planner_route,
+            &context,
+            &[point_ids[1], point_ids[0], point_ids[3]],
+        )
+        .expect("planner preserves completed third point");
+        assert_eq!(
+            replanned
+                .points
+                .iter()
+                .map(|point| point.point_id)
+                .collect::<Vec<_>>(),
+            vec![point_ids[1], point_ids[0], point_ids[2], point_ids[3]]
+        );
+
+        let ready_v2 = transition_working_route(&replanned, WorkingRouteState::Ready)
+            .expect("replanned route becomes ready");
+        let draft_v2 = build_trip_export_draft(
+            &ready_v2,
+            trip,
+            TripVersion::new(2).unwrap(),
+            Some(TripVersion::new(1).unwrap()),
+            4,
+            operator,
+        )
+        .expect("second trip export");
+        history
+            .append(PlannerTripExportRecord::from(&draft_v2))
+            .expect("record second export");
+
+        let order_v2 = [point_ids[1], point_ids[0], point_ids[2], point_ids[3]];
+        let route_v2: Vec<_> = order_v2
+            .iter()
+            .enumerate()
+            .map(|(index, point_id)| {
+                let mut point = route_v1
+                    .iter()
+                    .find(|point| point.point_id == *point_id)
+                    .expect("known point")
+                    .clone();
+                point.sequence = u32::try_from(index + 1).unwrap();
+                point
+            })
+            .collect();
+        assert_eq!(route_v2[2], completed_v1);
+
+        export_package(&package_v2, &draft_v2, &route_v2)?;
+        let updated = TripFolder::import(&folder, &package_v2)?;
+        let state_v2 = updated.state();
+
+        assert_eq!(state_v2.current_version, TripVersion::new(2).unwrap());
+        assert!(state_v2.completed_point_ids.contains(&point_ids[2]));
+        assert_eq!(state_v2.route_points[2], completed_v1);
+        assert_eq!(
+            state_v2
+                .route_points
+                .iter()
+                .map(|point| point.point_id)
+                .collect::<Vec<_>>(),
+            order_v2
+        );
+
+        drop(updated);
+        let recovered = TripFolder::open(&folder, trip)?.state();
+        assert_eq!(recovered, state_v2);
+        assert!(recovered.completed_point_ids.contains(&point_ids[2]));
+        assert_eq!(recovered.route_points[2], completed_v1);
+
+        Ok(())
+    }
+
 }
