@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · **🇨🇳 简体中文**
 
-> **状态:** 开发中。目前还没有应用程序。
+> **状态:** 正在积极开发。已有测试版 UI 预览，但尚无稳定的完整产品。
 
 ## 产品简介
 
