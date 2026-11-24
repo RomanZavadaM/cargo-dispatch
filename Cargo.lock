@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "cargo-dispatch-control"
+version = "0.1.0"
+dependencies = [
+ "cargo-dispatch-contracts",
+ "cargo-dispatch-domain",
+]
+
+[[package]]
 name = "cargo-dispatch-contracts"
 version = "0.1.0"
 dependencies = [
