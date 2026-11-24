@@ -279,7 +279,7 @@ fn ControlApp() -> impl IntoView {
                                         <div>
                                             <strong>"Driver URL: "</strong>
                                             <a href=driver_url.clone() target="_blank" rel="noopener">
-                                                {driver_url}
+                                                {driver_url.clone()}
                                             </a>
                                         </div>
                                     })}
