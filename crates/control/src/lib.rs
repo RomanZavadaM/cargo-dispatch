@@ -2,7 +2,8 @@
 
 use cargo_dispatch_contracts::{
     PackageContentFingerprint, ReplanContractError, ReplanReasonCode, ReplanRequest,
-    RouteContractError, TripPackageHeader, TripRoutePoint, TripVersion, validate_route_points,
+    ReplanRequestData, RouteContractError, TripPackageHeader, TripRoutePoint, TripVersion,
+    validate_route_points,
 };
 use cargo_dispatch_domain::{PointId, ReplanRequestId, TripId};
 use std::collections::{BTreeMap, BTreeSet};
@@ -65,6 +66,17 @@ pub enum ReplanBuildError {
     TripNotFound,
     CurrentPointNotFound(PointId),
     Contract(ReplanContractError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplanRequestDraft {
+    pub request_id: ReplanRequestId,
+    pub created_at_unix_ms: u64,
+    pub current_time_unix_ms: u64,
+    pub reason_code: ReplanReasonCode,
+    pub operator_note: Option<String>,
+    pub current_point_id: Option<PointId>,
+    pub affected_point_ids: Vec<PointId>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -181,21 +193,15 @@ impl InMemoryTripRegistry {
 
     pub fn build_replan_request(
         &self,
-        request_id: ReplanRequestId,
         trip_id: TripId,
-        created_at_unix_ms: u64,
-        current_time_unix_ms: u64,
-        reason_code: ReplanReasonCode,
-        operator_note: Option<String>,
-        current_point_id: Option<PointId>,
-        affected_point_ids: Vec<PointId>,
+        draft: ReplanRequestDraft,
     ) -> Result<ReplanRequest, ReplanBuildError> {
         let trip = self
             .trips
             .get(&trip_id)
             .ok_or(ReplanBuildError::TripNotFound)?;
 
-        if let Some(current_point_id) = current_point_id {
+        if let Some(current_point_id) = draft.current_point_id {
             if !trip
                 .route_points
                 .iter()
@@ -205,18 +211,18 @@ impl InMemoryTripRegistry {
             }
         }
 
-        ReplanRequest::new(
-            request_id,
+        ReplanRequest::new(ReplanRequestData {
+            request_id: draft.request_id,
             trip_id,
-            trip.current_version,
-            created_at_unix_ms,
-            current_time_unix_ms,
-            reason_code,
-            operator_note,
-            trip.completed_point_ids.iter().copied().collect(),
-            current_point_id,
-            affected_point_ids,
-        )
+            based_on_trip_version: trip.current_version,
+            created_at_unix_ms: draft.created_at_unix_ms,
+            current_time_unix_ms: draft.current_time_unix_ms,
+            reason_code: draft.reason_code,
+            operator_note: draft.operator_note,
+            completed_point_ids: trip.completed_point_ids.iter().copied().collect(),
+            current_point_id: draft.current_point_id,
+            affected_point_ids: draft.affected_point_ids,
+        })
         .map_err(ReplanBuildError::Contract)
     }
 
@@ -551,14 +557,16 @@ mod tests {
 
         let request = registry
             .build_replan_request(
-                replan_request_id(1),
                 id,
-                1_800_000_000_000,
-                1_800_000_030_000,
-                ReplanReasonCode::Delay,
-                Some("Late at previous stop".to_owned()),
-                Some(current),
-                vec![current],
+                ReplanRequestDraft {
+                    request_id: replan_request_id(1),
+                    created_at_unix_ms: 1_800_000_000_000,
+                    current_time_unix_ms: 1_800_000_030_000,
+                    reason_code: ReplanReasonCode::Delay,
+                    operator_note: Some("Late at previous stop".to_owned()),
+                    current_point_id: Some(current),
+                    affected_point_ids: vec![current],
+                },
             )
             .expect("replan request");
 
@@ -575,14 +583,16 @@ mod tests {
 
         assert_eq!(
             registry.build_replan_request(
-                replan_request_id(2),
                 id,
-                1,
-                1,
-                ReplanReasonCode::Breakdown,
-                None,
-                None,
-                Vec::new(),
+                ReplanRequestDraft {
+                    request_id: replan_request_id(2),
+                    created_at_unix_ms: 1,
+                    current_time_unix_ms: 1,
+                    reason_code: ReplanReasonCode::Breakdown,
+                    operator_note: None,
+                    current_point_id: None,
+                    affected_point_ids: Vec::new(),
+                },
             ),
             Err(ReplanBuildError::TripNotFound)
         );
@@ -592,14 +602,16 @@ mod tests {
             .expect("first import");
         assert_eq!(
             registry.build_replan_request(
-                replan_request_id(3),
                 id,
-                1,
-                1,
-                ReplanReasonCode::PointUnavailable,
-                None,
-                Some(point_id(47)),
-                Vec::new(),
+                ReplanRequestDraft {
+                    request_id: replan_request_id(3),
+                    created_at_unix_ms: 1,
+                    current_time_unix_ms: 1,
+                    reason_code: ReplanReasonCode::PointUnavailable,
+                    operator_note: None,
+                    current_point_id: Some(point_id(47)),
+                    affected_point_ids: Vec::new(),
+                },
             ),
             Err(ReplanBuildError::CurrentPointNotFound(point_id(47)))
         );

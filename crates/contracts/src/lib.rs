@@ -179,6 +179,20 @@ pub struct ReplanRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplanRequestData {
+    pub request_id: ReplanRequestId,
+    pub trip_id: TripId,
+    pub based_on_trip_version: TripVersion,
+    pub created_at_unix_ms: u64,
+    pub current_time_unix_ms: u64,
+    pub reason_code: ReplanReasonCode,
+    pub operator_note: Option<String>,
+    pub completed_point_ids: Vec<PointId>,
+    pub current_point_id: Option<PointId>,
+    pub affected_point_ids: Vec<PointId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReplanContractError {
     DuplicateCompletedPoint(PointId),
     DuplicateAffectedPoint(PointId),
@@ -186,33 +200,23 @@ pub enum ReplanContractError {
 }
 
 impl ReplanRequest {
-    pub fn new(
-        request_id: ReplanRequestId,
-        trip_id: TripId,
-        based_on_trip_version: TripVersion,
-        created_at_unix_ms: u64,
-        current_time_unix_ms: u64,
-        reason_code: ReplanReasonCode,
-        operator_note: Option<String>,
-        completed_point_ids: Vec<PointId>,
-        current_point_id: Option<PointId>,
-        affected_point_ids: Vec<PointId>,
-    ) -> Result<Self, ReplanContractError> {
+    pub fn new(data: ReplanRequestData) -> Result<Self, ReplanContractError> {
         let mut completed = std::collections::BTreeSet::new();
-        for point_id in &completed_point_ids {
+        for point_id in &data.completed_point_ids {
             if !completed.insert(*point_id) {
                 return Err(ReplanContractError::DuplicateCompletedPoint(*point_id));
             }
         }
 
         let mut affected = std::collections::BTreeSet::new();
-        for point_id in &affected_point_ids {
+        for point_id in &data.affected_point_ids {
             if !affected.insert(*point_id) {
                 return Err(ReplanContractError::DuplicateAffectedPoint(*point_id));
             }
         }
 
-        if operator_note
+        if data
+            .operator_note
             .as_ref()
             .is_some_and(|note| note.trim().is_empty())
         {
@@ -222,16 +226,16 @@ impl ReplanRequest {
         Ok(Self {
             schema_name: REPLAN_REQUEST_SCHEMA_NAME.to_owned(),
             schema_version: CURRENT_REPLAN_REQUEST_SCHEMA_VERSION,
-            request_id,
-            trip_id,
-            based_on_trip_version,
-            created_at_unix_ms,
-            current_time_unix_ms,
-            reason_code,
-            operator_note,
-            completed_point_ids,
-            current_point_id,
-            affected_point_ids,
+            request_id: data.request_id,
+            trip_id: data.trip_id,
+            based_on_trip_version: data.based_on_trip_version,
+            created_at_unix_ms: data.created_at_unix_ms,
+            current_time_unix_ms: data.current_time_unix_ms,
+            reason_code: data.reason_code,
+            operator_note: data.operator_note,
+            completed_point_ids: data.completed_point_ids,
+            current_point_id: data.current_point_id,
+            affected_point_ids: data.affected_point_ids,
         })
     }
 }
@@ -280,18 +284,18 @@ mod tests {
 
     #[test]
     fn replan_request_keeps_plan_version_and_execution_context() {
-        let request = ReplanRequest::new(
-            replan_request_id(1),
-            trip_id(),
-            TripVersion::new(3).expect("trip version"),
-            1_800_000_000_000,
-            1_800_000_030_000,
-            ReplanReasonCode::Delay,
-            Some("Traffic delay".to_owned()),
-            vec![point_id(1), point_id(2)],
-            Some(point_id(3)),
-            vec![point_id(3), point_id(4)],
-        )
+        let request = ReplanRequest::new(ReplanRequestData {
+            request_id: replan_request_id(1),
+            trip_id: trip_id(),
+            based_on_trip_version: TripVersion::new(3).expect("trip version"),
+            created_at_unix_ms: 1_800_000_000_000,
+            current_time_unix_ms: 1_800_000_030_000,
+            reason_code: ReplanReasonCode::Delay,
+            operator_note: Some("Traffic delay".to_owned()),
+            completed_point_ids: vec![point_id(1), point_id(2)],
+            current_point_id: Some(point_id(3)),
+            affected_point_ids: vec![point_id(3), point_id(4)],
+        })
         .expect("replan request");
 
         assert_eq!(request.schema_name, REPLAN_REQUEST_SCHEMA_NAME);
@@ -307,50 +311,50 @@ mod tests {
     #[test]
     fn replan_request_rejects_duplicate_point_lists_and_blank_note() {
         assert_eq!(
-            ReplanRequest::new(
-                replan_request_id(2),
-                trip_id(),
-                TripVersion::new(1).expect("trip version"),
-                1,
-                1,
-                ReplanReasonCode::RoadProblem,
-                None,
-                vec![point_id(5), point_id(5)],
-                None,
-                Vec::new(),
-            ),
+            ReplanRequest::new(ReplanRequestData {
+                request_id: replan_request_id(2),
+                trip_id: trip_id(),
+                based_on_trip_version: TripVersion::new(1).expect("trip version"),
+                created_at_unix_ms: 1,
+                current_time_unix_ms: 1,
+                reason_code: ReplanReasonCode::RoadProblem,
+                operator_note: None,
+                completed_point_ids: vec![point_id(5), point_id(5)],
+                current_point_id: None,
+                affected_point_ids: Vec::new(),
+            }),
             Err(ReplanContractError::DuplicateCompletedPoint(point_id(5)))
         );
 
         assert_eq!(
-            ReplanRequest::new(
-                replan_request_id(3),
-                trip_id(),
-                TripVersion::new(1).expect("trip version"),
-                1,
-                1,
-                ReplanReasonCode::NewPickup,
-                None,
-                Vec::new(),
-                None,
-                vec![point_id(6), point_id(6)],
-            ),
+            ReplanRequest::new(ReplanRequestData {
+                request_id: replan_request_id(3),
+                trip_id: trip_id(),
+                based_on_trip_version: TripVersion::new(1).expect("trip version"),
+                created_at_unix_ms: 1,
+                current_time_unix_ms: 1,
+                reason_code: ReplanReasonCode::NewPickup,
+                operator_note: None,
+                completed_point_ids: Vec::new(),
+                current_point_id: None,
+                affected_point_ids: vec![point_id(6), point_id(6)],
+            }),
             Err(ReplanContractError::DuplicateAffectedPoint(point_id(6)))
         );
 
         assert_eq!(
-            ReplanRequest::new(
-                replan_request_id(4),
-                trip_id(),
-                TripVersion::new(1).expect("trip version"),
-                1,
-                1,
-                ReplanReasonCode::Other,
-                Some("   ".to_owned()),
-                Vec::new(),
-                None,
-                Vec::new(),
-            ),
+            ReplanRequest::new(ReplanRequestData {
+                request_id: replan_request_id(4),
+                trip_id: trip_id(),
+                based_on_trip_version: TripVersion::new(1).expect("trip version"),
+                created_at_unix_ms: 1,
+                current_time_unix_ms: 1,
+                reason_code: ReplanReasonCode::Other,
+                operator_note: Some("   ".to_owned()),
+                completed_point_ids: Vec::new(),
+                current_point_id: None,
+                affected_point_ids: Vec::new(),
+            }),
             Err(ReplanContractError::EmptyOperatorNote)
         );
     }
