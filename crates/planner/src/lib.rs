@@ -837,6 +837,7 @@ pub enum PlannerTripExportHistoryError {
         trip_id: TripId,
         trip_version: TripVersion,
     },
+    StorageUnavailable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -853,15 +854,28 @@ pub enum PlannerReplanIntakeError {
     UnknownCompletedPoint(PointId),
     UnknownCurrentPoint(PointId),
     UnknownAffectedPoint(PointId),
+    StorageUnavailable,
+}
+
+pub trait PlannerTripExportRepository {
+    fn append(
+        &mut self,
+        record: PlannerTripExportRecord,
+    ) -> Result<(), PlannerTripExportHistoryError>;
+
+    fn records_for(
+        &self,
+        trip_id: TripId,
+    ) -> Result<Vec<PlannerTripExportRecord>, PlannerTripExportHistoryError>;
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct InMemoryTripExportHistory {
+pub struct InMemoryTripExportRepository {
     records: std::collections::BTreeMap<TripId, Vec<PlannerTripExportRecord>>,
 }
 
-impl InMemoryTripExportHistory {
-    pub fn append(
+impl PlannerTripExportRepository for InMemoryTripExportRepository {
+    fn append(
         &mut self,
         record: PlannerTripExportRecord,
     ) -> Result<(), PlannerTripExportHistoryError> {
@@ -880,17 +894,49 @@ impl InMemoryTripExportHistory {
         Ok(())
     }
 
+    fn records_for(
+        &self,
+        trip_id: TripId,
+    ) -> Result<Vec<PlannerTripExportRecord>, PlannerTripExportHistoryError> {
+        Ok(self.records.get(&trip_id).cloned().unwrap_or_default())
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct PlannerTripExportHistory<R> {
+    repository: R,
+}
+
+impl<R> PlannerTripExportHistory<R> {
+    pub const fn new(repository: R) -> Self {
+        Self { repository }
+    }
+
+    #[must_use]
+    pub fn into_repository(self) -> R {
+        self.repository
+    }
+}
+
+impl<R: PlannerTripExportRepository> PlannerTripExportHistory<R> {
+    pub fn append(
+        &mut self,
+        record: PlannerTripExportRecord,
+    ) -> Result<(), PlannerTripExportHistoryError> {
+        self.repository.append(record)
+    }
+
     pub fn validate_replan_request(
         &self,
         request: &ReplanRequest,
     ) -> Result<PlannerReplanContext, PlannerReplanIntakeError> {
         let records = self
-            .records
-            .get(&request.trip_id)
-            .ok_or(PlannerReplanIntakeError::UnknownTrip(request.trip_id))?;
-        let latest = records
-            .last()
-            .expect("trip export history entry must contain at least one record");
+            .repository
+            .records_for(request.trip_id)
+            .map_err(|_| PlannerReplanIntakeError::StorageUnavailable)?;
+        let Some(latest) = records.last() else {
+            return Err(PlannerReplanIntakeError::UnknownTrip(request.trip_id));
+        };
 
         let Some(basis) = records
             .iter()
@@ -950,6 +996,8 @@ impl InMemoryTripExportHistory {
         })
     }
 }
+
+pub type InMemoryTripExportHistory = PlannerTripExportHistory<InMemoryTripExportRepository>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkingRouteUpdateError {
@@ -1892,6 +1940,25 @@ mod tests {
             prefer_truck_routes: true,
             toll_preference: TollPreference::Allow,
             max_speed_kmh: None,
+        }
+    }
+
+    #[derive(Debug, Default)]
+    struct UnavailableTripExportRepository;
+
+    impl PlannerTripExportRepository for UnavailableTripExportRepository {
+        fn append(
+            &mut self,
+            _record: PlannerTripExportRecord,
+        ) -> Result<(), PlannerTripExportHistoryError> {
+            Err(PlannerTripExportHistoryError::StorageUnavailable)
+        }
+
+        fn records_for(
+            &self,
+            _trip_id: TripId,
+        ) -> Result<Vec<PlannerTripExportRecord>, PlannerTripExportHistoryError> {
+            Err(PlannerTripExportHistoryError::StorageUnavailable)
         }
     }
 
@@ -3732,6 +3799,44 @@ mod tests {
             Err(PlannerReplanApplyError::DuplicateFuturePoint(point_id(77)))
         );
         assert_eq!(route, before);
+    }
+
+    #[test]
+    fn planner_export_history_surfaces_storage_unavailability() {
+        let id = trip_id(11);
+        let mut history = PlannerTripExportHistory::new(UnavailableTripExportRepository);
+
+        assert_eq!(
+            history.append(PlannerTripExportRecord {
+                trip_id: id,
+                trip_version: TripVersion::new(1).expect("trip version"),
+                working_route_id: working_route_id(32),
+                working_route_revision: 1,
+                ordered_point_ids: vec![point_id(79), point_id(80)],
+            }),
+            Err(PlannerTripExportHistoryError::StorageUnavailable)
+        );
+
+        let request = cargo_dispatch_contracts::ReplanRequest::new(
+            cargo_dispatch_contracts::ReplanRequestData {
+                request_id: replan_request_id(4),
+                trip_id: id,
+                based_on_trip_version: TripVersion::new(1).expect("trip version"),
+                created_at_unix_ms: 1,
+                current_time_unix_ms: 1,
+                reason_code: cargo_dispatch_contracts::ReplanReasonCode::Other,
+                operator_note: None,
+                completed_point_ids: Vec::new(),
+                current_point_id: None,
+                affected_point_ids: Vec::new(),
+            },
+        )
+        .expect("replan request");
+
+        assert_eq!(
+            history.validate_replan_request(&request),
+            Err(PlannerReplanIntakeError::StorageUnavailable)
+        );
     }
 
     #[test]
