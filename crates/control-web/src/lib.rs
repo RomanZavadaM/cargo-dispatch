@@ -545,13 +545,14 @@ fn snapshot(trip: &TripFolder) -> DriverTripSnapshot {
                 sequence: point.sequence,
                 title: point.title.clone(),
                 completed: state.completed_point_ids.contains(&point.point_id),
-                navigation: point.navigation.as_ref().map(|navigation| {
-                    DriverNavigationSnapshot {
+                navigation: point
+                    .navigation
+                    .as_ref()
+                    .map(|navigation| DriverNavigationSnapshot {
                         latitude: navigation.latitude(),
                         longitude: navigation.longitude(),
                         address: navigation.address.clone(),
-                    }
-                }),
+                    }),
             })
             .collect(),
         documents: trip.documents().iter().map(document_snapshot).collect(),
