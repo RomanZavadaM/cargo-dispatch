@@ -92,8 +92,7 @@ impl RequestDraft {
         self.fields
             .iter()
             .filter(|field| {
-                field.section == EditorFieldSection::Common
-                    || self.mode == IntakeMode::Phone
+                field.section == EditorFieldSection::Common || self.mode == IntakeMode::Phone
             })
             .cloned()
             .collect()
@@ -188,7 +187,10 @@ impl ApplicationService {
     }
 
     pub fn editor_snapshot(&self, id: u64) -> Option<RequestDraft> {
-        self.rows.iter().find(|row| row.id == id).map(build_editor_draft)
+        self.rows
+            .iter()
+            .find(|row| row.id == id)
+            .map(build_editor_draft)
     }
 
     pub fn validate_draft(&self, draft: &RequestDraft) -> Vec<ValidationIssue> {
@@ -208,20 +210,16 @@ impl ApplicationService {
             }
         }
 
-        validate_number(
-            draft,
-            "weight_kg",
-            "Weight",
-            1,
-            30_000,
-            &mut issues,
-        );
+        validate_number(draft, "weight_kg", "Weight", 1, 30_000, &mut issues);
         validate_number(draft, "rate_eur", "Rate", 1, 100_000, &mut issues);
         validate_number(draft, "pickup_day", "Pickup day", 1, 31, &mut issues);
         validate_number(draft, "pallets", "Pallets", 0, 80, &mut issues);
 
         if draft.mode == IntakeMode::Phone {
-            let phone = draft.field_value("contact_phone").unwrap_or_default().trim();
+            let phone = draft
+                .field_value("contact_phone")
+                .unwrap_or_default()
+                .trim();
             let digits = phone.chars().filter(|ch| ch.is_ascii_digit()).count();
             if digits < 7 {
                 issues.push(ValidationIssue::new(
@@ -262,7 +260,11 @@ impl ApplicationService {
             )]);
         };
 
-        row.origin = draft.field_value("origin").unwrap_or_default().trim().to_owned();
+        row.origin = draft
+            .field_value("origin")
+            .unwrap_or_default()
+            .trim()
+            .to_owned();
         row.destination = draft
             .field_value("destination")
             .unwrap_or_default()
@@ -422,8 +424,20 @@ fn build_editor_draft(row: &LoadRequest) -> RequestDraft {
         ),
         field("pickup_time_from", "Pickup from", "08:00", false, Common),
         field("pickup_time_to", "Pickup to", "12:00", false, Common),
-        field("delivery_date", "Delivery date", "2026-11-25", false, Common),
-        field("delivery_time_from", "Delivery from", "09:00", false, Common),
+        field(
+            "delivery_date",
+            "Delivery date",
+            "2026-11-25",
+            false,
+            Common,
+        ),
+        field(
+            "delivery_time_from",
+            "Delivery from",
+            "09:00",
+            false,
+            Common,
+        ),
         field("delivery_time_to", "Delivery to", "17:00", false, Common),
         field(
             "weight_kg",
@@ -462,7 +476,13 @@ fn build_editor_draft(row: &LoadRequest) -> RequestDraft {
             false,
             Common,
         ),
-        field("contact_name", "Contact name", "Test contact", false, Common),
+        field(
+            "contact_name",
+            "Contact name",
+            "Test contact",
+            false,
+            Common,
+        ),
         field(
             "contact_email",
             "Contact email",
@@ -509,7 +529,13 @@ fn build_editor_draft(row: &LoadRequest) -> RequestDraft {
         field("priority", "Priority", "normal", false, Common),
         field("language", "Contact language", "uk", false, Common),
         field("invoice_required", "Invoice required", "yes", false, Common),
-        field("ttn_required", "TTN required", "client-policy", false, Common),
+        field(
+            "ttn_required",
+            "TTN required",
+            "client-policy",
+            false,
+            Common,
+        ),
         field("document_note", "Document note", "", false, Common),
         field(
             "confidence_note",
