@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     io,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{Arc, Mutex, RwLock},
 };
 use tempfile::NamedTempFile;
@@ -1019,7 +1019,7 @@ mod tests {
     use cargo_dispatch_domain::{OperatorId, TripId, WorkingRouteId};
     use cargo_dispatch_planner::PlannerTripExportDraft;
     use cargo_dispatch_trip_files::{DocumentStoreDraft, TripFolder, export_package};
-    use std::{fs, path::Path};
+    use std::{fs, net::Ipv6Addr, path::Path};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     fn create_trip(
