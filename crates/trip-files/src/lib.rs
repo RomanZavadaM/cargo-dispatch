@@ -373,8 +373,9 @@ mod tests {
     use cargo_dispatch_control::ReplanRequestDraft;
     use cargo_dispatch_domain::{OperatorId, ReplanRequestId, WorkingRouteId};
     use cargo_dispatch_planner::{
-        InMemoryTripExportHistory, PlannerTripExportRecord, WorkingRouteState, apply_planner_replan,
-        build_trip_export_draft, manual_working_route, transition_working_route,
+        InMemoryTripExportHistory, PlannerTripExportRecord, WorkingRouteState,
+        apply_planner_replan, build_trip_export_draft, manual_working_route,
+        transition_working_route,
     };
 
     #[test]
@@ -556,5 +557,4 @@ mod tests {
 
         Ok(())
     }
-
 }
