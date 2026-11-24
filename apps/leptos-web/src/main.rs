@@ -1,7 +1,8 @@
 use leptos::prelude::*;
 use ui_probe_core::{
     ApplicationService, EditorField, IntakeMode, LoadRequest, RequestDraft, RoutePointStatus,
-    RoutePreview, SortField, ValidationIssue,
+    RoutePreview, SortField, UiLanguage, UiTextKey, ValidationIssue, format_ui_date,
+    format_ui_integer, localized_field_label, localized_validation_issue, ui_text,
 };
 
 fn main() {
@@ -12,6 +13,7 @@ fn main() {
 #[component]
 fn App() -> impl IntoView {
     let service = RwSignal::new(ApplicationService::synthetic());
+    let language = RwSignal::new(UiLanguage::Uk);
     let summary = service.with(ApplicationService::summary);
 
     let filter = RwSignal::new(String::new());
@@ -57,13 +59,40 @@ fn App() -> impl IntoView {
 
     view! {
         <main class="shell" data-probe="leptos">
+            <section class="toolbar" id="language-toolbar">
+                <label>
+                    <span>{move || ui_text(language.get(), UiTextKey::Language)}</span>
+                    <select
+                        id="ui-language"
+                        prop:value=move || language.get().code()
+                        on:change=move |event| {
+                            if let Some(next) = UiLanguage::from_code(&event_target_value(&event)) {
+                                language.set(next);
+                            }
+                        }
+                    >
+                        <option value="uk">"Українська"</option>
+                        <option value="en">"English"</option>
+                        <option value="de">"Deutsch"</option>
+                    </select>
+                </label>
+                <p id="format-sample">
+                    <span>{move || ui_text(language.get(), UiTextKey::FormatSample)}</span>
+                    ": "
+                    <strong id="number-format-sample">{move || format_ui_integer(language.get(), 12_345)}</strong>
+                    " · "
+                    <strong id="date-format-sample">{move || format_ui_date(language.get(), 2026, 11, 24)}</strong>
+                </p>
+            </section>
             <header>
-                <p class="eyebrow">"Cargo dispatch · UI probe"</p>
-                <h1>"Planner pool and request editor"</h1>
+                <p class="eyebrow">{move || ui_text(language.get(), UiTextKey::PlannerEyebrow)}</p>
+                <h1 id="planner-title">{move || ui_text(language.get(), UiTextKey::PlannerTitle)}</h1>
                 <p>
-                    {format!(
-                        "{} synthetic requests · revision {}",
-                        summary.total_requests, summary.revision
+                    {move || format!(
+                        "{} {} · revision {}",
+                        format_ui_integer(language.get(), summary.total_requests as u64),
+                        ui_text(language.get(), UiTextKey::SyntheticRequests),
+                        summary.revision
                     )}
                 </p>
             </header>
@@ -71,26 +100,26 @@ fn App() -> impl IntoView {
             <section class="metrics" aria-label="Probe summary">
                 <article>
                     <strong>{summary.total_requests}</strong>
-                    <span>"requests"</span>
+                    <span>{move || ui_text(language.get(), UiTextKey::Requests)}</span>
                 </article>
                 <article>
                     <strong>{summary.reserved_requests}</strong>
-                    <span>"reserved"</span>
+                    <span>{move || ui_text(language.get(), UiTextKey::Reserved)}</span>
                 </article>
                 <article>
                     <strong>{summary.assigned_requests}</strong>
-                    <span>"assigned"</span>
+                    <span>{move || ui_text(language.get(), UiTextKey::Assigned)}</span>
                 </article>
                 <article>
                     <strong id="selected-count">{move || selected.with(|ids| ids.len())}</strong>
-                    <span>"selected"</span>
+                    <span>{move || ui_text(language.get(), UiTextKey::Selected)}</span>
                 </article>
             </section>
 
             <section class="pool-section">
                 <div class="toolbar">
                     <label>
-                        <span>"Filter"</span>
+                        <span>{move || ui_text(language.get(), UiTextKey::Filter)}</span>
                         <input
                             id="pool-filter"
                             type="search"
@@ -100,15 +129,16 @@ fn App() -> impl IntoView {
                     </label>
                     <div class="sorts" aria-label="Sort controls">
                         <button id="sort-age" type="button" on:click=move |_| set_sort(SortField::AgeMinutes)>
-                            "Sort age"
+                            {move || ui_text(language.get(), UiTextKey::SortAge)}
                         </button>
                         <button id="sort-rate" type="button" on:click=move |_| set_sort(SortField::RateEur)>
-                            "Sort rate"
+                            {move || ui_text(language.get(), UiTextKey::SortRate)}
                         </button>
                     </div>
                     <p class="pool-status">
                         <strong id="pool-count">{move || rows.with(|rows| rows.len())}</strong>
-                        " visible rows"
+                        " "
+                        {move || ui_text(language.get(), UiTextKey::VisibleRows)}
                     </p>
                 </div>
 
@@ -120,16 +150,16 @@ fn App() -> impl IntoView {
                     <table>
                         <thead>
                             <tr>
-                                <th>"Select"</th>
-                                <th>"Open"</th>
+                                <th id="table-select">{move || ui_text(language.get(), UiTextKey::Select)}</th>
+                                <th id="table-open">{move || ui_text(language.get(), UiTextKey::Open)}</th>
                                 <th>"ID"</th>
-                                <th>"Age"</th>
-                                <th>"Source"</th>
-                                <th>"Origin"</th>
-                                <th>"Destination"</th>
+                                <th id="table-age">{move || ui_text(language.get(), UiTextKey::Age)}</th>
+                                <th id="table-source">{move || ui_text(language.get(), UiTextKey::Source)}</th>
+                                <th id="table-origin">{move || ui_text(language.get(), UiTextKey::Origin)}</th>
+                                <th id="table-destination">{move || ui_text(language.get(), UiTextKey::Destination)}</th>
                                 <th>"kg"</th>
-                                <th>"Rate €"</th>
-                                <th>"Confidence"</th>
+                                <th id="table-rate">{move || ui_text(language.get(), UiTextKey::Rate)}</th>
+                                <th id="table-confidence">{move || ui_text(language.get(), UiTextKey::Confidence)}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -185,7 +215,7 @@ fn App() -> impl IntoView {
                                                     aria-label=format!("Open request {id}")
                                                     on:click=move |_| opened.set(Some(id))
                                                 >
-                                                    "Open"
+                                                    {move || ui_text(language.get(), UiTextKey::Open)}
                                                 </button>
                                             </td>
                                             <td>{row.id}</td>
@@ -224,7 +254,7 @@ fn App() -> impl IntoView {
                                     }
                                 }
                             >
-                                "Edit request"
+                                {move || ui_text(language.get(), UiTextKey::EditRequest)}
                             </button>
                         </aside>
                     }
@@ -234,7 +264,7 @@ fn App() -> impl IntoView {
                     <section id="request-editor" class="editor" aria-label="Request editor">
                         <div class="editor-head">
                             <div>
-                                <p class="eyebrow">"Request editor"</p>
+                                <p class="eyebrow">{move || ui_text(language.get(), UiTextKey::RequestEditor)}</p>
                                 <h2>{move || {
                                     editor_draft
                                         .get()
@@ -244,7 +274,8 @@ fn App() -> impl IntoView {
                             </div>
                             <div class="editor-origin">
                                 <span>
-                                    "Source: "
+                                    {move || ui_text(language.get(), UiTextKey::SourceLabel)}
+                                    " "
                                     <strong id="editor-source">{move || {
                                         editor_draft
                                             .get()
@@ -253,7 +284,8 @@ fn App() -> impl IntoView {
                                     }}</strong>
                                 </span>
                                 <span>
-                                    "Confidence: "
+                                    {move || ui_text(language.get(), UiTextKey::ConfidenceLabel)}
+                                    " "
                                     <strong id="editor-confidence">{move || {
                                         editor_draft
                                             .get()
@@ -262,7 +294,11 @@ fn App() -> impl IntoView {
                                     }}</strong>
                                 </span>
                                 <strong id="editor-dirty">
-                                    {move || if editor_dirty.get() { "Unsaved changes" } else { "Saved state" }}
+                                    {move || if editor_dirty.get() {
+                                        ui_text(language.get(), UiTextKey::UnsavedChanges)
+                                    } else {
+                                        ui_text(language.get(), UiTextKey::SavedState)
+                                    }}
                                 </strong>
                             </div>
                         </div>
@@ -286,7 +322,7 @@ fn App() -> impl IntoView {
                                     editor_message.set(None);
                                 }
                             >
-                                "Manual"
+                                {move || ui_text(language.get(), UiTextKey::Manual)}
                             </button>
                             <button
                                 id="mode-phone"
@@ -306,7 +342,7 @@ fn App() -> impl IntoView {
                                     editor_message.set(None);
                                 }
                             >
-                                "Phone order"
+                                {move || ui_text(language.get(), UiTextKey::PhoneOrder)}
                             </button>
                         </div>
 
@@ -321,12 +357,18 @@ fn App() -> impl IntoView {
                                 key=|field| field.key.clone()
                                 children=move |field: EditorField| {
                                     let key = field.key.clone();
+                                    let label_key = field.key.clone();
+                                    let english_label = field.label.clone();
                                     let input_id = format!("editor-{}", field.key);
                                     let required = field.required;
                                     view! {
                                         <label class="editor-field-wrap">
                                             <span>
-                                                {field.label}
+                                                {move || localized_field_label(
+                                                    language.get(),
+                                                    &label_key,
+                                                    &english_label,
+                                                )}
                                                 {if required { " *" } else { "" }}
                                             </span>
                                             <input
@@ -352,13 +394,22 @@ fn App() -> impl IntoView {
 
                         <Show when=move || !editor_issues.get().is_empty()>
                             <div id="validation-errors" class="validation-errors" role="alert">
-                                <strong>"Please correct the form:"</strong>
+                                <strong>{move || ui_text(language.get(), UiTextKey::CorrectForm)}</strong>
                                 <ul>
                                     <For
                                         each=move || editor_issues.get()
                                         key=|issue| format!("{}:{}", issue.field_key, issue.message)
-                                        children=move |issue: ValidationIssue| view! {
-                                            <li data-field=issue.field_key>{issue.message}</li>
+                                        children=move |issue: ValidationIssue| {
+                                            let field_key = issue.field_key.clone();
+                                            let localized_issue = issue.clone();
+                                            view! {
+                                                <li data-field=field_key>
+                                                    {move || localized_validation_issue(
+                                                        language.get(),
+                                                        &localized_issue,
+                                                    )}
+                                                </li>
+                                            }
                                         }
                                     />
                                 </ul>
@@ -373,8 +424,8 @@ fn App() -> impl IntoView {
 
                         <Show when=move || show_unsaved_warning.get()>
                             <div id="unsaved-warning" class="unsaved-warning" role="alertdialog">
-                                <strong>"Changes are not saved."</strong>
-                                <span>"Close without saving, or continue editing."</span>
+                                <strong>{move || ui_text(language.get(), UiTextKey::ChangesNotSaved)}</strong>
+                                <span>{move || ui_text(language.get(), UiTextKey::CloseWithoutSaving)}</span>
                                 <div>
                                     <button
                                         id="discard-close"
@@ -387,14 +438,14 @@ fn App() -> impl IntoView {
                                             show_unsaved_warning.set(false);
                                         }
                                     >
-                                        "Discard and close"
+                                        {move || ui_text(language.get(), UiTextKey::DiscardClose)}
                                     </button>
                                     <button
                                         id="keep-editing"
                                         type="button"
                                         on:click=move |_| show_unsaved_warning.set(false)
                                     >
-                                        "Continue editing"
+                                        {move || ui_text(language.get(), UiTextKey::ContinueEditing)}
                                     </button>
                                 </div>
                             </div>
@@ -424,12 +475,14 @@ fn App() -> impl IntoView {
                                     editor_baseline.set(fresh.clone());
                                     editor_draft.set(fresh);
                                     editor_issues.set(Vec::new());
-                                    editor_message.set(Some("Saved".to_owned()));
+                                    editor_message.set(Some(
+                                        ui_text(language.get_untracked(), UiTextKey::SavedState).to_owned(),
+                                    ));
                                     show_unsaved_warning.set(false);
                                     opened.set(Some(draft.request_id));
                                 }
                             >
-                                "Save"
+                                {move || ui_text(language.get(), UiTextKey::Save)}
                             </button>
                             <button
                                 id="editor-cancel"
@@ -442,7 +495,7 @@ fn App() -> impl IntoView {
                                     show_unsaved_warning.set(false);
                                 }
                             >
-                                "Cancel"
+                                {move || ui_text(language.get(), UiTextKey::Cancel)}
                             </button>
                             <button
                                 id="editor-close"
@@ -459,7 +512,7 @@ fn App() -> impl IntoView {
                                     }
                                 }
                             >
-                                "Close"
+                                {move || ui_text(language.get(), UiTextKey::Close)}
                             </button>
                         </div>
                     </section>
@@ -468,8 +521,8 @@ fn App() -> impl IntoView {
                 <section id="route-panel" class="route-panel" aria-label="Working route">
                     <div class="route-head">
                         <div>
-                            <p class="eyebrow">"Working route"</p>
-                            <h2>"Route draft"</h2>
+                            <p class="eyebrow">{move || ui_text(language.get(), UiTextKey::WorkingRoute)}</p>
+                            <h2>{move || ui_text(language.get(), UiTextKey::RouteDraft)}</h2>
                         </div>
                         <div class="route-state">
                             <span>
