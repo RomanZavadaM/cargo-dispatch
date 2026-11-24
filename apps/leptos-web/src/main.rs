@@ -1,7 +1,7 @@
 use leptos::prelude::*;
 use ui_probe_core::{
-    ApplicationService, EditorField, IntakeMode, LoadRequest, RequestDraft, SortField,
-    ValidationIssue,
+    ApplicationService, EditorField, IntakeMode, LoadRequest, RequestDraft, RoutePointStatus,
+    RoutePreview, SortField, ValidationIssue,
 };
 
 fn main() {
@@ -25,6 +25,10 @@ fn App() -> impl IntoView {
     let editor_issues = RwSignal::new(Vec::<ValidationIssue>::new());
     let editor_message = RwSignal::new(None::<String>);
     let show_unsaved_warning = RwSignal::new(false);
+
+    let route_draft = RwSignal::new(service.with(|service| service.route_draft()));
+    let route_preview = RwSignal::new(None::<RoutePreview>);
+    let route_message = RwSignal::new(String::new());
 
     let rows = Memo::new(move |_| {
         service.with(|service| service.query(&filter.get(), sort.get(), ascending.get(), None))
@@ -456,6 +460,302 @@ fn App() -> impl IntoView {
                         </div>
                     </section>
                 </Show>
+
+                <section id="route-panel" class="route-panel" aria-label="Working route">
+                    <div class="route-head">
+                        <div>
+                            <p class="eyebrow">"Working route"</p>
+                            <h2>"Route draft"</h2>
+                        </div>
+                        <div class="route-state">
+                            <span>
+                                "Saved revision: "
+                                <strong id="saved-route-revision">
+                                    {move || service.with(|service| service.route_snapshot().revision)}
+                                </strong>
+                            </span>
+                            <span>
+                                "Saved points: "
+                                <strong id="saved-route-count">
+                                    {move || service.with(|service| service.route_snapshot().points.len())}
+                                </strong>
+                            </span>
+                            <span>
+                                "Draft points: "
+                                <strong id="draft-route-count">
+                                    {move || route_draft.with(|draft| draft.points.len())}
+                                </strong>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="route-metrics" aria-label="Draft route metrics">
+                        <span>
+                            "Distance "
+                            <strong id="draft-distance">
+                                {move || route_draft.with(|draft| draft.metrics.distance_km)}
+                            </strong>
+                            " km"
+                        </span>
+                        <span>
+                            "Empty "
+                            <strong id="draft-empty-km">
+                                {move || route_draft.with(|draft| draft.metrics.empty_km)}
+                            </strong>
+                            " km"
+                        </span>
+                        <span>
+                            "Revenue €"
+                            <strong id="draft-revenue">
+                                {move || route_draft.with(|draft| draft.metrics.revenue_eur)}
+                            </strong>
+                        </span>
+                        <span>
+                            "Margin €"
+                            <strong id="draft-margin">
+                                {move || route_draft.with(|draft| draft.metrics.margin_eur)}
+                            </strong>
+                        </span>
+                        <span>
+                            "Risks "
+                            <strong id="draft-risk-count">
+                                {move || route_draft.with(|draft| draft.metrics.risk_count)}
+                            </strong>
+                        </span>
+                    </div>
+
+                    <div id="route-points" class="route-points">
+                        <For
+                            each=move || route_draft.with(|draft| draft.points.clone())
+                            key=|point| {
+                                (
+                                    point.id,
+                                    point.position,
+                                    point.locked,
+                                    point.status,
+                                    point.cargo_id,
+                                )
+                            }
+                            children=move |point| {
+                                let id = point.id;
+                                let cargo_id = point.cargo_id;
+                                let locked = point.locked;
+                                let status = match point.status {
+                                    RoutePointStatus::Confirmed => "confirmed",
+                                    RoutePointStatus::Tentative => "tentative",
+                                };
+                                let risks = if point.risk_flags.is_empty() {
+                                    "none".to_owned()
+                                } else {
+                                    point.risk_flags.join(", ")
+                                };
+                                let call_task = point
+                                    .call_task
+                                    .clone()
+                                    .unwrap_or_else(|| "—".to_owned());
+
+                                view! {
+                                    <article
+                                        class="route-point"
+                                        data-point-id=id.to_string()
+                                        data-status=status
+                                        data-locked=locked.to_string()
+                                    >
+                                        <div class="route-point-main">
+                                            <strong class="route-position">{point.position}</strong>
+                                            <div>
+                                                <strong class="route-label">{point.label}</strong>
+                                                <span class="route-point-meta">
+                                                    {format!("{status} · risks: {risks} · call: {call_task}")}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="route-actions">
+                                            <button
+                                                class="move-up"
+                                                type="button"
+                                                on:click=move |_| {
+                                                    let mut next = route_draft.get_untracked();
+                                                    let result = service.with(|service| {
+                                                        service.move_route_point(&mut next, id, -1)
+                                                    });
+                                                    if result.applied {
+                                                        route_draft.set(next);
+                                                    }
+                                                    route_preview.set(None);
+                                                    route_message.set(result.message);
+                                                }
+                                            >
+                                                "Up"
+                                            </button>
+                                            <button
+                                                class="move-down"
+                                                type="button"
+                                                on:click=move |_| {
+                                                    let mut next = route_draft.get_untracked();
+                                                    let result = service.with(|service| {
+                                                        service.move_route_point(&mut next, id, 1)
+                                                    });
+                                                    if result.applied {
+                                                        route_draft.set(next);
+                                                    }
+                                                    route_preview.set(None);
+                                                    route_message.set(result.message);
+                                                }
+                                            >
+                                                "Down"
+                                            </button>
+                                            <button
+                                                class="toggle-lock"
+                                                type="button"
+                                                on:click=move |_| {
+                                                    let mut next = route_draft.get_untracked();
+                                                    let result = service.with(|service| {
+                                                        service.set_route_lock(&mut next, id, !locked)
+                                                    });
+                                                    if result.applied {
+                                                        route_draft.set(next);
+                                                    }
+                                                    route_preview.set(None);
+                                                    route_message.set(result.message);
+                                                }
+                                            >
+                                                {if locked { "Unlock" } else { "Lock" }}
+                                            </button>
+                                            {cargo_id.map(|cargo_id| view! {
+                                                <button
+                                                    class="exclude-cargo"
+                                                    type="button"
+                                                    data-cargo-id=cargo_id.to_string()
+                                                    on:click=move |_| {
+                                                        let mut next = route_draft.get_untracked();
+                                                        let result = service.with(|service| {
+                                                            service.exclude_route_cargo(&mut next, cargo_id)
+                                                        });
+                                                        if result.applied {
+                                                            route_draft.set(next);
+                                                        }
+                                                        route_preview.set(None);
+                                                        route_message.set(result.message);
+                                                    }
+                                                >
+                                                    "Exclude cargo"
+                                                </button>
+                                            })}
+                                        </div>
+                                    </article>
+                                }
+                            }
+                        />
+                    </div>
+
+                    <p id="route-message" class="route-message" aria-live="polite">
+                        {move || route_message.get()}
+                    </p>
+
+                    <div class="route-footer-actions">
+                        <button
+                            id="undo-route"
+                            type="button"
+                            on:click=move |_| {
+                                route_draft.set(service.with(|service| service.route_draft()));
+                                route_preview.set(None);
+                                route_message.set("Unsaved route draft restored".to_owned());
+                            }
+                        >
+                            "Undo draft"
+                        </button>
+                        <button
+                            id="recalculate-route"
+                            type="button"
+                            on:click=move |_| {
+                                let draft = route_draft.get_untracked();
+                                let preview = service.with(|service| service.recalculate_route(&draft));
+                                route_preview.set(Some(preview));
+                                route_message.set("Recalculation ready for review".to_owned());
+                            }
+                        >
+                            "Recalculate"
+                        </button>
+                    </div>
+
+                    <Show when=move || route_preview.get().is_some()>
+                        <aside id="route-preview" class="route-preview">
+                            <h3>"Recalculation preview"</h3>
+                            <div class="route-metrics">
+                                <span>
+                                    "Before €"
+                                    <strong id="preview-before-revenue">
+                                        {move || {
+                                            route_preview
+                                                .get()
+                                                .map(|preview| preview.before_metrics.revenue_eur)
+                                                .unwrap_or_default()
+                                        }}
+                                    </strong>
+                                </span>
+                                <span>
+                                    "After €"
+                                    <strong id="preview-after-revenue">
+                                        {move || {
+                                            route_preview
+                                                .get()
+                                                .map(|preview| preview.after_metrics.revenue_eur)
+                                                .unwrap_or_default()
+                                        }}
+                                    </strong>
+                                </span>
+                                <span>
+                                    "Excluded cargo "
+                                    <strong id="preview-excluded-count">
+                                        {move || {
+                                            route_preview
+                                                .get()
+                                                .map(|preview| preview.excluded_cargo_ids.len())
+                                                .unwrap_or_default()
+                                        }}
+                                    </strong>
+                                </span>
+                                <span>
+                                    "Moved points "
+                                    <strong id="preview-moved-count">
+                                        {move || {
+                                            route_preview
+                                                .get()
+                                                .map(|preview| preview.changed_order.len())
+                                                .unwrap_or_default()
+                                        }}
+                                    </strong>
+                                </span>
+                            </div>
+                            <button
+                                id="accept-route"
+                                type="button"
+                                on:click=move |_| {
+                                    let Some(preview) = route_preview.get_untracked() else {
+                                        return;
+                                    };
+                                    let mut next_service = service.get_untracked();
+                                    match next_service.accept_route_preview(&preview) {
+                                        Ok(_) => {
+                                            let fresh = next_service.route_draft();
+                                            service.set(next_service);
+                                            route_draft.set(fresh);
+                                            route_preview.set(None);
+                                            route_message.set("Recalculation accepted".to_owned());
+                                        }
+                                        Err(message) => {
+                                            route_message.set(message);
+                                        }
+                                    }
+                                }
+                            >
+                                "Accept recalculation"
+                            </button>
+                        </aside>
+                    </Show>
+                </section>
+
             </section>
         </main>
     }

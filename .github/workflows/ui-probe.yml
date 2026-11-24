@@ -80,7 +80,7 @@ jobs:
           npm install --no-save --package-lock=false @playwright/test@1.65.1
           npx playwright install --with-deps chromium
 
-      - name: Run P01-P02 real browser contracts
+      - name: Run browser pool, editor and working route contracts
         run: |
           set -euo pipefail
           python3 -m http.server 4173 --bind 127.0.0.1 --directory apps/leptos-web/dist > /tmp/ui-http.log 2>&1 &
@@ -92,7 +92,7 @@ jobs:
             fi
             sleep 1
           done
-          npx playwright test probe/ui/browser/p01.spec.mjs probe/ui/browser/p02.spec.mjs --reporter=line --workers=1
+          npx playwright test probe/ui/browser/p01.spec.mjs probe/ui/browser/p02.spec.mjs probe/ui/browser/p03.spec.mjs --reporter=line --workers=1
 
       - name: Record browser artifact
         run: |
@@ -102,10 +102,11 @@ jobs:
           printf '%s\n' "leptos=0.8.23" "trunk=$TRUNK_VERSION" "playwright=1.65.1" > probe/ui/out/browser-versions.txt
           test -s probe/ui/out/p01-browser.json
           test -s probe/ui/out/p02-browser.json
+          test -s probe/ui/out/p03-browser.json
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ui-browser-p01-p02
+          name: ui-browser-route
           path: |
             apps/leptos-web/dist/
             probe/ui/out/
@@ -143,7 +144,7 @@ jobs:
         run: cargo check --locked -p ui-probe-tauri
 
   report:
-    name: P02 checkpoint report
+    name: Working route checkpoint report
     if: always()
     needs:
       - core
@@ -162,7 +163,7 @@ jobs:
           import json, os
           report = {
               "probe": "ui-r1",
-              "phase": "p02",
+              "phase": "working-route",
               "commit_sha": os.environ["GIT_SHA"],
               "versions": {
                   "rust_msrv": "1.91",
@@ -175,11 +176,12 @@ jobs:
                   "shared_application_boundary": os.environ["CORE"],
                   "p01_5k_browser_contract": os.environ["BROWSER"],
                   "p02_editor_contract": os.environ["BROWSER"],
+                  "working_route_contract": os.environ["BROWSER"],
                   "tauri_cross_platform_check": os.environ["DESKTOP"],
               },
           }
           report["pass"] = all(value == "success" for value in report["checks"].values())
-          with open("ui-p02-report.json", "w", encoding="utf-8") as handle:
+          with open("ui-route-report.json", "w", encoding="utf-8") as handle:
               json.dump(report, handle, indent=2, sort_keys=True)
               handle.write("\n")
           print(json.dumps(report, indent=2, sort_keys=True))
@@ -190,6 +192,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-p02-report
-          path: ui-p02-report.json
+          name: ui-route-report
+          path: ui-route-report.json
           if-no-files-found: error

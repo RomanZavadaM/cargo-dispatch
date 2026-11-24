@@ -118,6 +118,66 @@ impl ValidationIssue {
     }
 }
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutePointStatus {
+    Confirmed,
+    Tentative,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoutePoint {
+    pub id: u64,
+    pub position: u16,
+    pub label: String,
+    pub status: RoutePointStatus,
+    pub locked: bool,
+    pub cargo_id: Option<u64>,
+    pub risk_flags: Vec<String>,
+    pub call_task: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteMetrics {
+    pub distance_km: u32,
+    pub empty_km: u32,
+    pub revenue_eur: u32,
+    pub margin_eur: i32,
+    pub risk_count: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkingRoute {
+    pub revision: u64,
+    pub points: Vec<RoutePoint>,
+    pub metrics: RouteMetrics,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteDraft {
+    pub base_revision: u64,
+    pub points: Vec<RoutePoint>,
+    pub excluded_cargo_ids: Vec<u64>,
+    pub metrics: RouteMetrics,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteActionResult {
+    pub applied: bool,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoutePreview {
+    pub base_revision: u64,
+    pub proposed_points: Vec<RoutePoint>,
+    pub before_metrics: RouteMetrics,
+    pub after_metrics: RouteMetrics,
+    pub changed_order: Vec<u64>,
+    pub excluded_cargo_ids: Vec<u64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProbeSummary {
     pub total_requests: usize,
@@ -129,6 +189,7 @@ pub struct ProbeSummary {
 #[derive(Debug, Clone)]
 pub struct ApplicationService {
     rows: Vec<LoadRequest>,
+    route: WorkingRoute,
     revision: u64,
 }
 
@@ -166,7 +227,11 @@ impl ApplicationService {
             })
             .collect();
 
-        Self { rows, revision: 1 }
+        Self {
+            rows,
+            route: synthetic_route(),
+            revision: 1,
+        }
     }
 
     pub fn summary(&self) -> ProbeSummary {
@@ -303,6 +368,154 @@ impl ApplicationService {
         let saved = row.clone();
         self.revision += 1;
         Ok(saved)
+    }
+
+
+    pub fn route_snapshot(&self) -> WorkingRoute {
+        self.route.clone()
+    }
+
+    pub fn route_draft(&self) -> RouteDraft {
+        RouteDraft {
+            base_revision: self.route.revision,
+            points: self.route.points.clone(),
+            excluded_cargo_ids: Vec::new(),
+            metrics: self.route.metrics,
+        }
+    }
+
+    pub fn move_route_point(
+        &self,
+        draft: &mut RouteDraft,
+        point_id: u64,
+        direction: i8,
+    ) -> RouteActionResult {
+        let Some(index) = draft.points.iter().position(|point| point.id == point_id) else {
+            return route_action(false, "Point no longer exists");
+        };
+        let point = &draft.points[index];
+        if point.locked || point.status == RoutePointStatus::Confirmed {
+            return route_action(false, "Confirmed or locked point cannot move");
+        }
+
+        let target = if direction < 0 {
+            index.checked_sub(1)
+        } else if direction > 0 && index + 1 < draft.points.len() {
+            Some(index + 1)
+        } else {
+            None
+        };
+        let Some(target) = target else {
+            return route_action(false, "Point is already at the route edge");
+        };
+
+        let neighbour = &draft.points[target];
+        if neighbour.locked || neighbour.status == RoutePointStatus::Confirmed {
+            return route_action(false, "Point cannot cross a confirmed or locked point");
+        }
+
+        draft.points.swap(index, target);
+        normalize_route_positions(&mut draft.points);
+        draft.metrics = route_metrics(&draft.points);
+        route_action(true, "Draft route order updated")
+    }
+
+    pub fn set_route_lock(
+        &self,
+        draft: &mut RouteDraft,
+        point_id: u64,
+        locked: bool,
+    ) -> RouteActionResult {
+        let Some(point) = draft.points.iter_mut().find(|point| point.id == point_id) else {
+            return route_action(false, "Point no longer exists");
+        };
+        if point.status == RoutePointStatus::Confirmed && !locked {
+            return route_action(false, "Confirmed point stays locked");
+        }
+        point.locked = locked;
+        route_action(
+            true,
+            if locked {
+                "Point locked in draft"
+            } else {
+                "Point unlocked in draft"
+            },
+        )
+    }
+
+    pub fn exclude_route_cargo(
+        &self,
+        draft: &mut RouteDraft,
+        cargo_id: u64,
+    ) -> RouteActionResult {
+        let matching: Vec<&RoutePoint> = draft
+            .points
+            .iter()
+            .filter(|point| point.cargo_id == Some(cargo_id))
+            .collect();
+        if matching.is_empty() {
+            return route_action(false, "Cargo is not present in this draft");
+        }
+        if matching
+            .iter()
+            .any(|point| point.locked || point.status == RoutePointStatus::Confirmed)
+        {
+            return route_action(false, "Confirmed or locked cargo cannot be excluded");
+        }
+
+        draft
+            .points
+            .retain(|point| point.cargo_id != Some(cargo_id));
+        if !draft.excluded_cargo_ids.contains(&cargo_id) {
+            draft.excluded_cargo_ids.push(cargo_id);
+            draft.excluded_cargo_ids.sort_unstable();
+        }
+        normalize_route_positions(&mut draft.points);
+        draft.metrics = route_metrics(&draft.points);
+        route_action(true, "Cargo excluded from draft")
+    }
+
+    pub fn recalculate_route(&self, draft: &RouteDraft) -> RoutePreview {
+        let changed_order = draft
+            .points
+            .iter()
+            .filter_map(|point| {
+                self.route
+                    .points
+                    .iter()
+                    .find(|saved| saved.id == point.id)
+                    .filter(|saved| saved.position != point.position)
+                    .map(|_| point.id)
+            })
+            .collect();
+
+        RoutePreview {
+            base_revision: draft.base_revision,
+            proposed_points: draft.points.clone(),
+            before_metrics: self.route.metrics,
+            after_metrics: route_metrics(&draft.points),
+            changed_order,
+            excluded_cargo_ids: draft.excluded_cargo_ids.clone(),
+        }
+    }
+
+    pub fn accept_route_preview(
+        &mut self,
+        preview: &RoutePreview,
+    ) -> Result<WorkingRoute, String> {
+        if preview.base_revision != self.route.revision {
+            return Err("Saved route changed; recalculate from the current version".to_owned());
+        }
+
+        let mut points = preview.proposed_points.clone();
+        normalize_route_positions(&mut points);
+        self.route = WorkingRoute {
+            revision: self.route.revision + 1,
+            metrics: route_metrics(&points),
+            points,
+        };
+        self.revision += 1;
+        Ok(self.route.clone())
     }
 
     pub fn query(
@@ -581,6 +794,134 @@ fn build_editor_draft(row: &LoadRequest) -> RequestDraft {
     }
 }
 
+
+fn synthetic_route() -> WorkingRoute {
+    let mut points = vec![
+        route_point(1, "Base", RoutePointStatus::Confirmed, true, None, &[], None),
+        route_point(
+            2,
+            "Pickup A",
+            RoutePointStatus::Confirmed,
+            true,
+            Some(1001),
+            &[],
+            None,
+        ),
+        route_point(
+            3,
+            "Pickup B",
+            RoutePointStatus::Tentative,
+            false,
+            Some(1002),
+            &["freshness"],
+            Some("Call customer B"),
+        ),
+        route_point(
+            4,
+            "Delivery A",
+            RoutePointStatus::Tentative,
+            false,
+            Some(1001),
+            &["tight_window"],
+            None,
+        ),
+        route_point(
+            5,
+            "Delivery B",
+            RoutePointStatus::Tentative,
+            false,
+            Some(1002),
+            &["address_unconfirmed"],
+            Some("Confirm address"),
+        ),
+        route_point(
+            6,
+            "Target zone",
+            RoutePointStatus::Tentative,
+            false,
+            None,
+            &["estimated_end"],
+            None,
+        ),
+    ];
+    normalize_route_positions(&mut points);
+    WorkingRoute {
+        revision: 1,
+        metrics: route_metrics(&points),
+        points,
+    }
+}
+
+fn route_point(
+    id: u64,
+    label: &str,
+    status: RoutePointStatus,
+    locked: bool,
+    cargo_id: Option<u64>,
+    risk_flags: &[&str],
+    call_task: Option<&str>,
+) -> RoutePoint {
+    RoutePoint {
+        id,
+        position: 0,
+        label: label.to_owned(),
+        status,
+        locked,
+        cargo_id,
+        risk_flags: risk_flags.iter().map(|risk| (*risk).to_owned()).collect(),
+        call_task: call_task.map(str::to_owned),
+    }
+}
+
+fn normalize_route_positions(points: &mut [RoutePoint]) {
+    for (index, point) in points.iter_mut().enumerate() {
+        point.position = index as u16 + 1;
+    }
+}
+
+fn route_metrics(points: &[RoutePoint]) -> RouteMetrics {
+    let mut cargo_ids = Vec::new();
+    for cargo_id in points.iter().filter_map(|point| point.cargo_id) {
+        if !cargo_ids.contains(&cargo_id) {
+            cargo_ids.push(cargo_id);
+        }
+    }
+
+    let revenue_eur = cargo_ids
+        .iter()
+        .map(|cargo_id| match cargo_id {
+            1001 => 900,
+            1002 => 750,
+            _ => 500,
+        })
+        .sum();
+    let distance_km = 240 + points.len() as u32 * 55;
+    let tentative = points
+        .iter()
+        .filter(|point| point.status == RoutePointStatus::Tentative)
+        .count() as u32;
+    let empty_km = 30 + tentative * 12;
+    let risk_count = points
+        .iter()
+        .map(|point| point.risk_flags.len() as u16)
+        .sum();
+
+    RouteMetrics {
+        distance_km,
+        empty_km,
+        revenue_eur,
+        margin_eur: revenue_eur as i32 - distance_km as i32,
+        risk_count,
+    }
+}
+
+fn route_action(applied: bool, message: &str) -> RouteActionResult {
+    RouteActionResult {
+        applied,
+        message: message.to_owned(),
+    }
+}
+
 fn compare_rows(left: &LoadRequest, right: &LoadRequest, sort: SortField) -> Ordering {
     match sort {
         SortField::Id => left.id.cmp(&right.id),
@@ -716,4 +1057,57 @@ mod tests {
         );
         assert_eq!(service.summary().revision, 2);
     }
+    #[test]
+    fn confirmed_route_point_cannot_move_or_unlock() {
+        let service = ApplicationService::synthetic();
+        let mut draft = service.route_draft();
+        let original = draft.points.clone();
+
+        let move_result = service.move_route_point(&mut draft, 2, 1);
+        assert!(!move_result.applied);
+        assert_eq!(draft.points, original);
+
+        let unlock_result = service.set_route_lock(&mut draft, 2, false);
+        assert!(!unlock_result.applied);
+        assert!(draft.points.iter().find(|point| point.id == 2).unwrap().locked);
+    }
+
+    #[test]
+    fn tentative_route_changes_stay_in_draft_until_accept() {
+        let mut service = ApplicationService::synthetic();
+        let saved_before = service.route_snapshot();
+        let mut draft = service.route_draft();
+
+        let moved = service.move_route_point(&mut draft, 3, 1);
+        assert!(moved.applied);
+        assert_ne!(draft.points, saved_before.points);
+        assert_eq!(service.route_snapshot(), saved_before);
+
+        let excluded = service.exclude_route_cargo(&mut draft, 1002);
+        assert!(excluded.applied);
+        assert_eq!(draft.points.len(), 4);
+        assert_eq!(service.route_snapshot().points.len(), 6);
+
+        let preview = service.recalculate_route(&draft);
+        assert!(preview.after_metrics.revenue_eur < preview.before_metrics.revenue_eur);
+        assert_eq!(service.route_snapshot().revision, 1);
+
+        let saved = service
+            .accept_route_preview(&preview)
+            .expect("current preview is accepted");
+        assert_eq!(saved.revision, 2);
+        assert_eq!(saved.points.len(), 4);
+        assert_eq!(service.route_snapshot(), saved);
+    }
+
+    #[test]
+    fn fresh_route_draft_undoes_unsaved_changes() {
+        let service = ApplicationService::synthetic();
+        let original = service.route_draft();
+        let mut changed = original.clone();
+        assert!(service.move_route_point(&mut changed, 3, 1).applied);
+        assert_ne!(changed, original);
+        assert_eq!(service.route_draft(), original);
+    }
+
 }
