@@ -15,7 +15,7 @@ on:
       - ".github/workflows/ui-probe.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ui-${{ github.ref }}
@@ -49,6 +49,19 @@ jobs:
 
       - name: Core tests
         run: cargo test -p ui-probe-core --all-targets
+
+      - name: Pin generated lock on bootstrap
+        if: github.event_name == 'push'
+        run: |
+          if git ls-files --error-unmatch Cargo.lock >/dev/null 2>&1; then
+            echo "Cargo.lock already tracked"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "prototype: pin UI probe dependencies"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Upload generated lock
         uses: actions/upload-artifact@v4
