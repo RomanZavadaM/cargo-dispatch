@@ -41,15 +41,17 @@ jobs:
       - name: Prepare preview packages
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force preview/windows | Out-Null
-          New-Item -ItemType Directory -Force preview/browser | Out-Null
-          Copy-Item target/release/ui-probe-tauri.exe preview/windows/Cargo-Dispatch-UI-Preview.exe
-          Copy-Item LICENSE.md preview/windows/LICENSE.txt
-          Copy-Item THIRD_PARTY_NOTICES.md preview/windows/THIRD_PARTY_NOTICES.md
-          Copy-Item README.md preview/windows/README.md
-          Copy-Item apps/leptos-web/dist/* preview/browser/ -Recurse
-          Copy-Item LICENSE.md preview/browser/LICENSE.txt
-          Copy-Item THIRD_PARTY_NOTICES.md preview/browser/THIRD_PARTY_NOTICES.md
+          $windowsRoot = "preview/Cargo-Dispatch-UI-Preview-0.2-Windows-x64"
+          $browserRoot = "preview/Cargo-Dispatch-UI-Preview-0.2-Browser"
+          New-Item -ItemType Directory -Force $windowsRoot | Out-Null
+          New-Item -ItemType Directory -Force $browserRoot | Out-Null
+          Copy-Item target/release/ui-probe-tauri.exe "$windowsRoot/Cargo-Dispatch-UI-Preview.exe"
+          Copy-Item LICENSE.md "$windowsRoot/LICENSE.txt"
+          Copy-Item THIRD_PARTY_NOTICES.md "$windowsRoot/THIRD_PARTY_NOTICES.md"
+          Copy-Item README.md "$windowsRoot/README.md"
+          Copy-Item apps/leptos-web/dist/* $browserRoot -Recurse
+          Copy-Item LICENSE.md "$browserRoot/LICENSE.txt"
+          Copy-Item THIRD_PARTY_NOTICES.md "$browserRoot/THIRD_PARTY_NOTICES.md"
           @"
           Cargo Dispatch UI Preview 0.2
 
@@ -70,9 +72,9 @@ jobs:
           - обробку типових помилок без втрати робочого стану.
 
           Дані синтетичні. Нове planner/control ядро розробляється окремо і в цей UI preview ще не інтегроване. Реальної бази, реальних замовлень і польового мобільного зв'язку у цьому preview немає.
-          "@ | Set-Content -Encoding UTF8 preview/windows/START_HERE.txt
-          Compress-Archive -Path preview/windows/* -DestinationPath Cargo-Dispatch-UI-Preview-0.2-Windows-x64.zip -Force
-          Compress-Archive -Path preview/browser/* -DestinationPath Cargo-Dispatch-UI-Preview-0.2-Browser.zip -Force
+          "@ | Set-Content -Encoding UTF8 "$windowsRoot/START_HERE.txt"
+          Compress-Archive -Path $windowsRoot -DestinationPath Cargo-Dispatch-UI-Preview-0.2-Windows-x64.zip -Force
+          Compress-Archive -Path $browserRoot -DestinationPath Cargo-Dispatch-UI-Preview-0.2-Browser.zip -Force
           $winHash = (Get-FileHash Cargo-Dispatch-UI-Preview-0.2-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
           $webHash = (Get-FileHash Cargo-Dispatch-UI-Preview-0.2-Browser.zip -Algorithm SHA256).Hash.ToLower()
           "$winHash  Cargo-Dispatch-UI-Preview-0.2-Windows-x64.zip" | Set-Content -Encoding ASCII SHA256SUMS.txt
@@ -108,7 +110,7 @@ jobs:
           - немає польового тесту телефона через реальний VPS/NAT/CGNAT;
           - вигляд ще тестовий і буде змінюватися.
 
-          Windows: розпакувати ZIP і запустити Cargo-Dispatch-UI-Preview.exe.
+          Windows: розпакувати ZIP. Усередині буде окрема папка Cargo-Dispatch-UI-Preview-0.2-Windows-x64; відкрити її і запустити Cargo-Dispatch-UI-Preview.exe.
           "@
           if (gh release view $env:PREVIEW_TAG --repo "${{ github.repository }}" *> $null) {
             gh release edit $env:PREVIEW_TAG --repo "${{ github.repository }}" --title $env:PREVIEW_NAME --notes $notes --prerelease
