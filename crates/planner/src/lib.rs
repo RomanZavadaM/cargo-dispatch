@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use cargo_dispatch_domain::{AvailabilityState, LoadRequest, PlanningAssignment, RequestId};
+use cargo_dispatch_domain::{AvailabilityState, CargoId, LoadRequest, PlanningAssignment, RequestId};
 use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
 use std::collections::BTreeMap;
 
@@ -152,6 +152,157 @@ pub fn evaluate_request_candidate(
     };
 
     CandidateFeasibility {
+        level,
+        hard_reasons,
+        check_reasons,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RouteCargoLeg {
+    pub cargo_id: CargoId,
+    pub pickup_stop: usize,
+    pub unload_stop: usize,
+    pub weight_kg: Option<u32>,
+    pub pallets: Option<u16>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RouteHardRejectReason {
+    InvalidCargoStopOrder {
+        cargo_id: CargoId,
+        pickup_stop: usize,
+        unload_stop: usize,
+    },
+    PayloadExceededOnSegment {
+        segment_index: usize,
+        load_kg: u64,
+        capacity_kg: u32,
+    },
+    PalletCapacityExceededOnSegment {
+        segment_index: usize,
+        load_pallets: u32,
+        capacity_pallets: u16,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RouteNeedsCheckReason {
+    CargoWeightUnknown(CargoId),
+    CargoPalletsUnknown(CargoId),
+    AvailablePayloadUnknown,
+    AvailablePalletsUnknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteSegmentFeasibility {
+    pub level: FeasibilityLevel,
+    pub hard_reasons: Vec<RouteHardRejectReason>,
+    pub check_reasons: Vec<RouteNeedsCheckReason>,
+}
+
+#[must_use]
+pub fn evaluate_route_segments(
+    stop_count: usize,
+    cargo_legs: &[RouteCargoLeg],
+    capacity: AvailableCapacity,
+) -> RouteSegmentFeasibility {
+    let mut hard_reasons = Vec::new();
+    let mut check_reasons = Vec::new();
+    let mut valid_legs = Vec::new();
+
+    for leg in cargo_legs {
+        if leg.pickup_stop >= leg.unload_stop || leg.unload_stop >= stop_count {
+            hard_reasons.push(RouteHardRejectReason::InvalidCargoStopOrder {
+                cargo_id: leg.cargo_id,
+                pickup_stop: leg.pickup_stop,
+                unload_stop: leg.unload_stop,
+            });
+        } else {
+            valid_legs.push(leg);
+        }
+    }
+
+    for segment_index in 0..stop_count.saturating_sub(1) {
+        let active_legs: Vec<_> = valid_legs
+            .iter()
+            .copied()
+            .filter(|leg| leg.pickup_stop <= segment_index && segment_index < leg.unload_stop)
+            .collect();
+
+        if active_legs.is_empty() {
+            continue;
+        }
+
+        let mut known_weight_kg = 0_u64;
+        let mut known_pallets = 0_u32;
+
+        for leg in active_legs {
+            match leg.weight_kg {
+                Some(weight_kg) => known_weight_kg += u64::from(weight_kg),
+                None => {
+                    let reason = RouteNeedsCheckReason::CargoWeightUnknown(leg.cargo_id);
+                    if !check_reasons.contains(&reason) {
+                        check_reasons.push(reason);
+                    }
+                }
+            }
+
+            match leg.pallets {
+                Some(pallets) => known_pallets += u32::from(pallets),
+                None => {
+                    let reason = RouteNeedsCheckReason::CargoPalletsUnknown(leg.cargo_id);
+                    if !check_reasons.contains(&reason) {
+                        check_reasons.push(reason);
+                    }
+                }
+            }
+        }
+
+        match capacity.payload_kg {
+            Some(capacity_kg) if known_weight_kg > u64::from(capacity_kg) => {
+                hard_reasons.push(RouteHardRejectReason::PayloadExceededOnSegment {
+                    segment_index,
+                    load_kg: known_weight_kg,
+                    capacity_kg,
+                });
+            }
+            Some(_) => {}
+            None => {
+                if !check_reasons.contains(&RouteNeedsCheckReason::AvailablePayloadUnknown) {
+                    check_reasons.push(RouteNeedsCheckReason::AvailablePayloadUnknown);
+                }
+            }
+        }
+
+        match capacity.pallets {
+            Some(capacity_pallets) if known_pallets > u32::from(capacity_pallets) => {
+                hard_reasons.push(RouteHardRejectReason::PalletCapacityExceededOnSegment {
+                    segment_index,
+                    load_pallets: known_pallets,
+                    capacity_pallets,
+                });
+            }
+            Some(_) => {}
+            None => {
+                if !check_reasons.contains(&RouteNeedsCheckReason::AvailablePalletsUnknown) {
+                    check_reasons.push(RouteNeedsCheckReason::AvailablePalletsUnknown);
+                }
+            }
+        }
+    }
+
+    let level = if hard_reasons.is_empty() {
+        if check_reasons.is_empty() {
+            FeasibilityLevel::Feasible
+        } else {
+            FeasibilityLevel::NeedsCheck
+        }
+    } else {
+        FeasibilityLevel::Impossible
+    };
+
+    RouteSegmentFeasibility {
         level,
         hard_reasons,
         check_reasons,
@@ -369,6 +520,10 @@ mod tests {
 
     fn request_id(byte: u8) -> RequestId {
         RequestId::from_bytes([byte; 16]).expect("fixture id")
+    }
+
+    fn cargo_id(byte: u8) -> CargoId {
+        CargoId::from_bytes([byte; 16]).expect("fixture cargo id")
     }
 
     fn request(
@@ -674,6 +829,141 @@ mod tests {
             };
             assert!(result.check_reasons.contains(&expected));
         }
+    }
+
+    #[test]
+    fn route_segment_rejects_unload_before_pickup() {
+        let result = evaluate_route_segments(
+            3,
+            &[RouteCargoLeg {
+                cargo_id: cargo_id(1),
+                pickup_stop: 2,
+                unload_stop: 1,
+                weight_kg: Some(1_000),
+                pallets: Some(2),
+            }],
+            AvailableCapacity {
+                payload_kg: Some(3_500),
+                pallets: Some(8),
+            },
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Impossible);
+        assert_eq!(
+            result.hard_reasons,
+            vec![RouteHardRejectReason::InvalidCargoStopOrder {
+                cargo_id: cargo_id(1),
+                pickup_stop: 2,
+                unload_stop: 1,
+            }]
+        );
+    }
+
+    #[test]
+    fn route_capacity_is_checked_on_each_overlapping_segment() {
+        let result = evaluate_route_segments(
+            4,
+            &[
+                RouteCargoLeg {
+                    cargo_id: cargo_id(2),
+                    pickup_stop: 0,
+                    unload_stop: 2,
+                    weight_kg: Some(2_500),
+                    pallets: Some(4),
+                },
+                RouteCargoLeg {
+                    cargo_id: cargo_id(3),
+                    pickup_stop: 1,
+                    unload_stop: 3,
+                    weight_kg: Some(2_000),
+                    pallets: Some(3),
+                },
+            ],
+            AvailableCapacity {
+                payload_kg: Some(4_000),
+                pallets: Some(6),
+            },
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Impossible);
+        assert!(result.hard_reasons.contains(
+            &RouteHardRejectReason::PayloadExceededOnSegment {
+                segment_index: 1,
+                load_kg: 4_500,
+                capacity_kg: 4_000,
+            }
+        ));
+        assert!(result.hard_reasons.contains(
+            &RouteHardRejectReason::PalletCapacityExceededOnSegment {
+                segment_index: 1,
+                load_pallets: 7,
+                capacity_pallets: 6,
+            }
+        ));
+    }
+
+    #[test]
+    fn non_overlapping_cargo_is_not_rejected_by_trip_total() {
+        let result = evaluate_route_segments(
+            3,
+            &[
+                RouteCargoLeg {
+                    cargo_id: cargo_id(4),
+                    pickup_stop: 0,
+                    unload_stop: 1,
+                    weight_kg: Some(3_000),
+                    pallets: Some(5),
+                },
+                RouteCargoLeg {
+                    cargo_id: cargo_id(5),
+                    pickup_stop: 1,
+                    unload_stop: 2,
+                    weight_kg: Some(3_000),
+                    pallets: Some(5),
+                },
+            ],
+            AvailableCapacity {
+                payload_kg: Some(3_500),
+                pallets: Some(6),
+            },
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::Feasible);
+        assert!(result.hard_reasons.is_empty());
+        assert!(result.check_reasons.is_empty());
+    }
+
+    #[test]
+    fn unknown_segment_data_stays_needs_check() {
+        let result = evaluate_route_segments(
+            2,
+            &[RouteCargoLeg {
+                cargo_id: cargo_id(6),
+                pickup_stop: 0,
+                unload_stop: 1,
+                weight_kg: None,
+                pallets: None,
+            }],
+            AvailableCapacity {
+                payload_kg: None,
+                pallets: None,
+            },
+        );
+
+        assert_eq!(result.level, FeasibilityLevel::NeedsCheck);
+        assert!(result.hard_reasons.is_empty());
+        assert!(result
+            .check_reasons
+            .contains(&RouteNeedsCheckReason::CargoWeightUnknown(cargo_id(6))));
+        assert!(result
+            .check_reasons
+            .contains(&RouteNeedsCheckReason::CargoPalletsUnknown(cargo_id(6))));
+        assert!(result
+            .check_reasons
+            .contains(&RouteNeedsCheckReason::AvailablePayloadUnknown));
+        assert!(result
+            .check_reasons
+            .contains(&RouteNeedsCheckReason::AvailablePalletsUnknown));
     }
 
     #[test]
