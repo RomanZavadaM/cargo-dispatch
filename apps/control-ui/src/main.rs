@@ -13,10 +13,18 @@ export function cargoControlInvoke(command, argsJson) {
   const args = JSON.parse(argsJson);
   return window.__TAURI__.core.invoke(command, args).then(result => JSON.stringify(result));
 }
+export function cargoControlRandomToken() {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  return "trip-" + Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+}
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = cargoControlInvoke)]
     fn cargo_control_invoke(command: &str, args_json: &str) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = cargoControlRandomToken)]
+    fn cargo_control_random_token() -> String;
 }
 
 fn js_error(value: JsValue) -> String {
@@ -52,7 +60,6 @@ fn main() {
 #[component]
 fn ControlApp() -> impl IntoView {
     let folder = RwSignal::new(String::new());
-    let trip_id = RwSignal::new(String::new());
     let token = RwSignal::new(String::new());
     let lan_ip = RwSignal::new(String::new());
     let lan_port = RwSignal::new("8080".to_owned());
@@ -62,6 +69,9 @@ fn ControlApp() -> impl IntoView {
     let busy = RwSignal::new(false);
 
     Effect::new(move |_| {
+        if token.get_untracked().is_empty() {
+            token.set(cargo_control_random_token());
+        }
         spawn_local(async move {
             if let Ok(current) = load_status().await {
                 status.set(Some(current));
@@ -93,7 +103,6 @@ fn ControlApp() -> impl IntoView {
         error.set(false);
         let input = RegisterTripInput {
             folder_path: folder.get_untracked(),
-            trip_id: trip_id.get_untracked(),
             token: token.get_untracked(),
         };
         spawn_local(async move {
@@ -179,18 +188,7 @@ fn ControlApp() -> impl IntoView {
                         />
                     </label>
                     <label>
-                        "Trip ID (32 hex)"
-                        <input
-                            id="trip-id"
-                            type="text"
-                            maxlength="32"
-                            placeholder="001122..."
-                            prop:value=move || trip_id.get()
-                            on:input=move |event| trip_id.set(event_target_value(&event))
-                        />
-                    </label>
-                    <label>
-                        "Session token"
+                        "Session token (згенеровано автоматично)"
                         <input
                             id="session-token"
                             type="text"
