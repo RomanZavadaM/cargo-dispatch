@@ -1,0 +1,44 @@
+{
+  "probe": "P14",
+  "framework": "Tauri 2 + Leptos CSR",
+  "source_commit": "31c74e667253f670da6ca27fba3f78f99dfa87e9",
+  "measurement_workflow_run": 45383392225,
+  "runner": "ubuntu-22.04",
+  "versions": {
+    "rust": "1.91",
+    "leptos": "0.8.23",
+    "tauri": "2.12.7",
+    "trunk": "0.22.2",
+    "playwright": "1.65.1"
+  },
+  "build": {
+    "planner_browser_ms": 68766,
+    "driver_browser_ms": 2226,
+    "desktop_release_ms": 130497
+  },
+  "size_bytes": {
+    "planner_browser_dist": 754148,
+    "driver_browser_dist": 242686,
+    "desktop_release_binary": 10441080
+  },
+  "runtime": {
+    "useful_render_ms": 1152,
+    "table_ready_ms": 1240,
+    "map_ready_ms": 1578,
+    "browser_js_heap_used_bytes_after_table_map": 13615956,
+    "browser_js_heap_total_bytes_after_table_map": 28790784,
+    "page_errors": []
+  },
+  "packaging": {
+    "bundle_active": false,
+    "installer_measured": false,
+    "portable_release_binary_files": 1,
+    "system_webview_required": true
+  },
+  "limitations": [
+    "Build durations are CI wall-clock measurements on one GitHub-hosted runner and are comparative, not product SLAs.",
+    "Runtime memory is Chromium JS heap after the 5k table and map are ready; it is a reproducible UI proxy, not total desktop process RSS.",
+    "Desktop GUI cold-start time is not claimed from headless CI; useful-render and map-ready timings are measured in the browser harness.",
+    "Installer complexity is not measured because this probe intentionally uses a portable shell with bundle.active=false."
+  ]
+}
