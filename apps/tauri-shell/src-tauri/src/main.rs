@@ -8,7 +8,10 @@ use std::{
     thread,
     time::Duration,
 };
-use tauri::{AppHandle, Emitter, State};
+use tauri::{
+    AppHandle, Emitter, Manager, State, WebviewUrl,
+    webview::WebviewWindowBuilder,
+};
 use ui_probe_core::{ApplicationService, IntakeMode, LoadRequest, ProbeSummary, SortField};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -94,11 +97,141 @@ struct CandidateProgress {
     candidate_count: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct TripSession {
+    trip_id: String,
+    vehicle: String,
+    status: String,
+    revision: u64,
+    event_count: u64,
+    last_note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct ControlOverview {
+    revision: u64,
+    trips: Vec<TripSession>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct TripWindowInput {
+    trip_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct TripStatusUpdate {
+    trip_id: String,
+    status: String,
+    note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct TripWindowOpened {
+    trip_id: String,
+    label: String,
+    reused_existing: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TripWindowPlan {
+    trip_id: String,
+    label: String,
+    title: String,
+}
+
+#[derive(Debug, Clone)]
+struct ControlService {
+    revision: u64,
+    trips: HashMap<String, TripSession>,
+}
+
+impl ControlService {
+    fn synthetic() -> Self {
+        let trips = [
+            TripSession {
+                trip_id: "TRIP-A".to_owned(),
+                vehicle: "BC 1001 AA".to_owned(),
+                status: "driving".to_owned(),
+                revision: 1,
+                event_count: 4,
+                last_note: "Approaching pickup".to_owned(),
+            },
+            TripSession {
+                trip_id: "TRIP-B".to_owned(),
+                vehicle: "BC 2002 BB".to_owned(),
+                status: "loading".to_owned(),
+                revision: 1,
+                event_count: 7,
+                last_note: "Waiting for documents".to_owned(),
+            },
+        ]
+        .into_iter()
+        .map(|trip| (trip.trip_id.clone(), trip))
+        .collect();
+
+        Self { revision: 1, trips }
+    }
+
+    fn overview(&self) -> ControlOverview {
+        let mut trips: Vec<_> = self.trips.values().cloned().collect();
+        trips.sort_by(|left, right| left.trip_id.cmp(&right.trip_id));
+        ControlOverview {
+            revision: self.revision,
+            trips,
+        }
+    }
+
+    fn snapshot(&self, trip_id: &str) -> Result<TripSession, String> {
+        self.trips
+            .get(trip_id)
+            .cloned()
+            .ok_or_else(|| "Trip no longer exists".to_owned())
+    }
+
+    fn update(&mut self, input: &TripStatusUpdate) -> Result<TripSession, String> {
+        if input.status.trim().is_empty() {
+            return Err("Trip status cannot be empty".to_owned());
+        }
+
+        let trip = self
+            .trips
+            .get_mut(&input.trip_id)
+            .ok_or_else(|| "Trip no longer exists".to_owned())?;
+        trip.status = input.status.trim().to_owned();
+        trip.last_note = input.note.trim().to_owned();
+        trip.revision += 1;
+        trip.event_count += 1;
+        self.revision += 1;
+        Ok(trip.clone())
+    }
+
+    fn window_plan(&self, trip_id: &str) -> Result<TripWindowPlan, String> {
+        let trip = self.snapshot(trip_id)?;
+        let normalized = trip_id
+            .chars()
+            .map(|ch| {
+                if ch.is_ascii_alphanumeric() {
+                    ch.to_ascii_lowercase()
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>();
+
+        Ok(TripWindowPlan {
+            trip_id: trip.trip_id.clone(),
+            label: format!("trip-{normalized}"),
+            title: format!("{} · {}", trip.trip_id, trip.vehicle),
+        })
+    }
+}
+
 struct ProbeState {
     service: Mutex<ApplicationService>,
     settings: Mutex<ProbeSettings>,
     calculations: Arc<Mutex<HashMap<u64, Arc<AtomicBool>>>>,
     next_calculation_id: AtomicU64,
+    control: Mutex<ControlService>,
 }
 
 impl ProbeState {
@@ -112,6 +245,7 @@ impl ProbeState {
             }),
             calculations: Arc::new(Mutex::new(HashMap::new())),
             next_calculation_id: AtomicU64::new(1),
+            control: Mutex::new(ControlService::synthetic()),
         }
     }
 }
@@ -281,6 +415,84 @@ where
 }
 
 #[tauri::command]
+fn control_overview(state: State<'_, ProbeState>) -> Result<ControlOverview, String> {
+    state
+        .control
+        .lock()
+        .map(|control| control.overview())
+        .map_err(|_| state_lock_error("Control state"))
+}
+
+#[tauri::command]
+fn trip_snapshot(
+    input: TripWindowInput,
+    state: State<'_, ProbeState>,
+) -> Result<TripSession, String> {
+    state
+        .control
+        .lock()
+        .map_err(|_| state_lock_error("Control state"))?
+        .snapshot(&input.trip_id)
+}
+
+#[tauri::command]
+fn update_trip_status(
+    input: TripStatusUpdate,
+    state: State<'_, ProbeState>,
+) -> Result<TripSession, String> {
+    state
+        .control
+        .lock()
+        .map_err(|_| state_lock_error("Control state"))?
+        .update(&input)
+}
+
+#[tauri::command]
+async fn open_trip_window(
+    input: TripWindowInput,
+    app: AppHandle,
+    state: State<'_, ProbeState>,
+) -> Result<TripWindowOpened, String> {
+    let plan = state
+        .control
+        .lock()
+        .map_err(|_| state_lock_error("Control state"))?
+        .window_plan(&input.trip_id)?;
+
+    if let Some(window) = app.get_webview_window(&plan.label) {
+        window
+            .show()
+            .map_err(|error| format!("Could not show trip window: {error}"))?;
+        window
+            .set_focus()
+            .map_err(|error| format!("Could not focus trip window: {error}"))?;
+        return Ok(TripWindowOpened {
+            trip_id: plan.trip_id,
+            label: plan.label,
+            reused_existing: true,
+        });
+    }
+
+    let trip_json = serde_json::to_string(&plan.trip_id)
+        .map_err(|error| format!("Could not prepare trip window context: {error}"))?;
+    let init_script = format!("window.__CARGO_DISPATCH_TRIP_ID__ = {trip_json};");
+
+    WebviewWindowBuilder::new(&app, &plan.label, WebviewUrl::App("index.html".into()))
+        .title(&plan.title)
+        .inner_size(1100.0, 760.0)
+        .resizable(true)
+        .initialization_script(init_script)
+        .build()
+        .map_err(|error| format!("Could not open trip window: {error}"))?;
+
+    Ok(TripWindowOpened {
+        trip_id: plan.trip_id,
+        label: plan.label,
+        reused_existing: false,
+    })
+}
+
+#[tauri::command]
 fn probe_summary(state: State<'_, ProbeState>) -> Result<ProbeSummary, String> {
     state
         .service
@@ -422,7 +634,11 @@ fn main() {
             prepare_local_file_choice,
             export_synthetic_trip_package,
             start_candidate_calculation,
-            cancel_candidate_calculation
+            cancel_candidate_calculation,
+            control_overview,
+            trip_snapshot,
+            update_trip_status,
+            open_trip_window
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Cargo dispatch UI probe");
@@ -539,5 +755,59 @@ mod tests {
         assert_eq!(final_state.state, "cancelled");
         assert_eq!(final_state.candidate_count, 0);
         assert_eq!(progress.last(), Some(&final_state));
+    }
+
+    #[test]
+    fn two_trip_windows_share_one_control_state_without_leaking_updates() {
+        let mut control = ControlService::synthetic();
+        let before_b = control.snapshot("TRIP-B").expect("trip B exists");
+
+        let updated_a = control
+            .update(&TripStatusUpdate {
+                trip_id: "TRIP-A".to_owned(),
+                status: "at_pickup".to_owned(),
+                note: "Gate 3".to_owned(),
+            })
+            .expect("trip A updates");
+
+        assert_eq!(updated_a.status, "at_pickup");
+        assert_eq!(updated_a.last_note, "Gate 3");
+        assert_eq!(
+            control.snapshot("TRIP-B").expect("trip B stays present"),
+            before_b
+        );
+
+        let overview = control.overview();
+        assert_eq!(overview.trips.len(), 2);
+        assert!(overview.revision > 1);
+    }
+
+    #[test]
+    fn closing_a_window_does_not_delete_trip_state() {
+        let mut control = ControlService::synthetic();
+        control
+            .update(&TripStatusUpdate {
+                trip_id: "TRIP-A".to_owned(),
+                status: "unloading".to_owned(),
+                note: "Dock 2".to_owned(),
+            })
+            .expect("trip updates before window close");
+
+        let before_close = control.snapshot("TRIP-A").expect("trip exists");
+        let plan = control.window_plan("TRIP-A").expect("window plan exists");
+        assert_eq!(plan.label, "trip-trip-a");
+
+        let after_reopen = control.snapshot("TRIP-A").expect("trip survives reopen");
+        assert_eq!(after_reopen, before_close);
+    }
+
+    #[test]
+    fn each_trip_has_a_stable_distinct_window_label() {
+        let control = ControlService::synthetic();
+        let a = control.window_plan("TRIP-A").expect("trip A plan");
+        let b = control.window_plan("TRIP-B").expect("trip B plan");
+        assert_ne!(a.label, b.label);
+        assert!(a.title.contains("BC 1001 AA"));
+        assert!(b.title.contains("BC 2002 BB"));
     }
 }
