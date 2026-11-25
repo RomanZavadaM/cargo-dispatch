@@ -59,6 +59,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         connect()
     }
 
+    fun reportError(message: String) {
+        mutableState.value = mutableState.value.copy(error = message)
+    }
+
     fun disconnect() {
         api = null
         pendingQueue = null

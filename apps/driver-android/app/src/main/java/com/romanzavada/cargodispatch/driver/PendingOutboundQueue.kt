@@ -6,6 +6,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -167,11 +168,16 @@ class PendingOutboundQueue(
     }
 
     companion object {
+        private val sessionInstances = ConcurrentHashMap<String, PendingOutboundQueue>()
+
         fun forSession(baseRoot: File, baseUrl: String, token: String): PendingOutboundQueue {
             val digest = MessageDigest.getInstance("SHA-256")
                 .digest((baseUrl.trimEnd('/') + "|" + token).toByteArray(Charsets.UTF_8))
                 .joinToString(separator = "") { "%02x".format(it.toInt() and 0xff) }
-            return PendingOutboundQueue(File(baseRoot, digest))
+            val root = File(baseRoot, digest)
+            return sessionInstances.computeIfAbsent(root.absolutePath) {
+                PendingOutboundQueue(root)
+            }
         }
     }
 }

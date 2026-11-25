@@ -37,4 +37,14 @@
     <string name="capture_photo">Tomar foto</string>
     <string name="capture_video">Grabar vídeo</string>
     <string name="pending_outbound">Pendiente de envío cuando vuelva la conexión: %1$d</string>
+    <string name="tracking_start">Iniciar seguimiento</string>
+    <string name="tracking_stop">Detener seguimiento</string>
+    <string name="tracking_status_active">El seguimiento en segundo plano está activo.</string>
+    <string name="tracking_status_stopped">El seguimiento en segundo plano está detenido.</string>
+    <string name="tracking_permission_required">Se necesita acceso a la ubicación para el seguimiento.</string>
+    <string name="tracking_channel_name">Seguimiento del viaje</string>
+    <string name="tracking_channel_description">Notificación permanente mientras Cargo Dispatch envía la posición del conductor.</string>
+    <string name="tracking_notification_title">Cargo Dispatch — seguimiento del viaje</string>
+    <string name="tracking_notification_active">La posición del conductor se envía a Control.</string>
+    <string name="tracking_notification_pending">Posición guardada; pendiente de envío: %1$d</string>
 </resources>

@@ -29,14 +29,29 @@ done
 
 cat "$LOG"
 ANDROID_DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_ANDROID_URL=//p' "$LOG" | tail -n 1)"
-if [ -z "$ANDROID_DRIVER_URL" ]; then
-  echo "Control smoke server did not publish Android Driver URL" >&2
+LOCAL_DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_LOCAL_URL=//p' "$LOG" | tail -n 1)"
+if [ -z "$ANDROID_DRIVER_URL" ] || [ -z "$LOCAL_DRIVER_URL" ]; then
+  echo "Control smoke server did not publish both Android and local Driver URLs" >&2
   exit 1
 fi
 
 adb install -r android-apk/app-debug.apk
 
-adb shell am start -W   -n "$ACTIVITY"   --es cargo_dispatch_driver_url "$ANDROID_DRIVER_URL"   --ez cargo_dispatch_emulator_mode true
+HOST_PORT="$(python3 - "$LOCAL_DRIVER_URL" <<'PY'
+from urllib.parse import urlparse
+import sys
+parsed = urlparse(sys.argv[1])
+if not parsed.port:
+    raise SystemExit("Control smoke URL has no port")
+print(parsed.port)
+PY
+)"
+adb reverse "tcp:$HOST_PORT" "tcp:$HOST_PORT"
+
+# Use the real Control localhost URL through adb reverse. Emulator localhost mapping
+# remains covered by unit/earlier smoke tests; this removes flaky hosted-runner NAT
+# from the background-tracking acceptance path.
+adb shell am start -W   -n "$ACTIVITY"   --es cargo_dispatch_driver_url "$LOCAL_DRIVER_URL"   --ez cargo_dispatch_emulator_mode false
 
 CONNECTED=0
 for _ in $(seq 1 40); do
@@ -55,6 +70,93 @@ if [ "$CONNECTED" -ne 1 ]; then
   adb logcat -d -t 300 || true
   exit 1
 fi
+
+adb shell pm grant "$PACKAGE" android.permission.ACCESS_COARSE_LOCATION
+adb shell pm grant "$PACKAGE" android.permission.ACCESS_FINE_LOCATION
+adb shell pm grant "$PACKAGE" android.permission.POST_NOTIFICATIONS || true
+
+find_and_tap_text() {
+  local needle="$1"
+  for _ in $(seq 1 8); do
+    adb shell uiautomator dump /sdcard/cargo-driver-window.xml >/dev/null 2>&1 || true
+    adb exec-out cat /sdcard/cargo-driver-window.xml >"$WINDOW_XML" 2>/dev/null || true
+    if grep -q "text=\"$needle\"" "$WINDOW_XML"; then
+      python3 - "$WINDOW_XML" "$needle" <<'PY'
+import re, subprocess, sys
+xml_path, needle = sys.argv[1:]
+text = open(xml_path, encoding="utf-8").read()
+match = re.search(
+    r'text="' + re.escape(needle) + r'"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"',
+    text,
+)
+if not match:
+    raise SystemExit(f"Cannot find bounds for {needle}")
+x1, y1, x2, y2 = map(int, match.groups())
+subprocess.run(["adb", "shell", "input", "tap", str((x1+x2)//2), str((y1+y2)//2)], check=True)
+PY
+      return 0
+    fi
+    adb shell input swipe 540 1850 540 500 300
+    sleep 0.5
+  done
+  echo "Could not find UI text: $needle" >&2
+  cat "$WINDOW_XML" || true
+  return 1
+}
+
+find_and_tap_text "Start tracking"
+sleep 2
+
+if ! adb shell dumpsys activity services "$PACKAGE/.DriverTrackingService" | grep -q "DriverTrackingService"; then
+  echo "DriverTrackingService did not start from visible Activity action." >&2
+  adb logcat -d -t 300 || true
+  exit 1
+fi
+
+adb emu geo fix 24.0520 49.8420
+sleep 2
+adb emu geo fix 24.0530 49.8430
+
+API_TRIP_URL="$(python3 - "$LOCAL_DRIVER_URL" <<'PY'
+import sys
+url = sys.argv[1]
+if "/driver/" not in url:
+    raise SystemExit("Unexpected local Driver URL")
+print(url.replace("/driver/", "/api/trip/", 1))
+PY
+)"
+
+LOCATION_ACCEPTED=0
+for _ in $(seq 1 40); do
+  BODY="$(curl --fail --silent --show-error "$API_TRIP_URL" || true)"
+  if python3 - "$BODY" <<'PY'
+import json, sys
+try:
+    payload = json.loads(sys.argv[1])
+except Exception:
+    raise SystemExit(1)
+location = payload.get("latest_location")
+if not location:
+    raise SystemExit(1)
+lat = float(location["latitude"])
+lon = float(location["longitude"])
+raise SystemExit(0 if abs(lat - 49.8430) < 0.01 and abs(lon - 24.0530) < 0.01 else 1)
+PY
+  then
+    LOCATION_ACCEPTED=1
+    break
+  fi
+  sleep 0.5
+done
+
+if [ "$LOCATION_ACCEPTED" -ne 1 ]; then
+  echo "Background tracking did not update Control latest_location." >&2
+  curl --silent "$API_TRIP_URL" || true
+  adb logcat -d -t 400 || true
+  exit 1
+fi
+
+find_and_tap_text "Stop tracking" || true
 
 adb exec-out screencap -p > android-driver-smoke.png
 test -s android-driver-smoke.png

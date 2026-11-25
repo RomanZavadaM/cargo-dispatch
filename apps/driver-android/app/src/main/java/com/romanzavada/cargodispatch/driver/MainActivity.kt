@@ -1,6 +1,9 @@
 package com.romanzavada.cargodispatch.driver
 
 import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -77,6 +81,7 @@ private fun DriverScreen(
     viewModel: DriverViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val trackingActive by DriverTrackingState.active.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val sessionPreferences = remember { SessionPreferences(context.applicationContext) }
@@ -150,6 +155,62 @@ private fun DriverScreen(
                 result.onSuccess(viewModel::sendLocation)
             }
         }
+    }
+
+    val startTrackingService = {
+        ContextCompat.startForegroundService(
+            context,
+            Intent(context, DriverTrackingService::class.java),
+        )
+    }
+
+    val trackingLocationPermissions = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        val allowed =
+            grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (allowed) {
+            startTrackingService()
+        } else {
+            viewModel.reportError(context.getString(R.string.tracking_permission_required))
+        }
+    }
+
+    val trackingNotificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        trackingLocationPermissions.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+            ),
+        )
+    }
+
+    val requestTrackingStart = {
+        val needsNotificationPermission =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) != PackageManager.PERMISSION_GRANTED
+
+        if (needsNotificationPermission) {
+            trackingNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            trackingLocationPermissions.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                ),
+            )
+        }
+    }
+
+    val stopTracking: () -> Unit = {
+        context.stopService(Intent(context, DriverTrackingService::class.java))
+        Unit
     }
 
     LaunchedEffect(Unit) {
@@ -241,9 +302,12 @@ private fun DriverScreen(
                 item {
                     LocationCard(
                         state = state,
+                        trackingActive = trackingActive,
                         requestLocation = {
                             locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                         },
+                        startTracking = requestTrackingStart,
+                        stopTracking = stopTracking,
                     )
                 }
 
@@ -357,7 +421,10 @@ private fun ConnectionCard(
 @Composable
 private fun LocationCard(
     state: DriverUiState,
+    trackingActive: Boolean,
     requestLocation: () -> Unit,
+    startTracking: () -> Unit,
+    stopTracking: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -381,6 +448,26 @@ private fun LocationCard(
             }
             Button(onClick = requestLocation, enabled = !state.busy) {
                 Text(stringResource(R.string.send_location))
+            }
+            Text(
+                if (trackingActive) {
+                    stringResource(R.string.tracking_status_active)
+                } else {
+                    stringResource(R.string.tracking_status_stopped)
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (trackingActive) {
+                Button(onClick = stopTracking) {
+                    Text(stringResource(R.string.tracking_stop))
+                }
+            } else {
+                Button(
+                    onClick = startTracking,
+                    enabled = !state.busy && state.connectedBaseUrl != null,
+                ) {
+                    Text(stringResource(R.string.tracking_start))
+                }
             }
         }
     }

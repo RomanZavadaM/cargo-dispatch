@@ -37,4 +37,14 @@
     <string name="capture_photo">Take photo</string>
     <string name="capture_video">Record video</string>
     <string name="pending_outbound">Waiting to send after connection returns: %1$d</string>
+    <string name="tracking_start">Start tracking</string>
+    <string name="tracking_stop">Stop tracking</string>
+    <string name="tracking_status_active">Background tracking is active.</string>
+    <string name="tracking_status_stopped">Background tracking is stopped.</string>
+    <string name="tracking_permission_required">Location access is required for tracking.</string>
+    <string name="tracking_channel_name">Trip tracking</string>
+    <string name="tracking_channel_description">Persistent notification while Cargo Dispatch sends the driver position.</string>
+    <string name="tracking_notification_title">Cargo Dispatch — trip tracking</string>
+    <string name="tracking_notification_active">Driver position is being sent to Control.</string>
+    <string name="tracking_notification_pending">Position saved; pending to send: %1$d</string>
 </resources>
