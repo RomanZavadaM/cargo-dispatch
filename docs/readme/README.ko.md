@@ -79,8 +79,6 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 - HTTPS를 통한 브라우저 GPS 전체 검수;
 - 서로 다른 네트워크/NAT/CGNAT 현장 테스트;
 - 실제 Valhalla HTTP transport 및 순서 변경 후 geometry 재계산;
-- Android Keystore + Apple Keychain을 이용한 안전한 Driver session 저장과 기존 raw URL 마이그레이션;
-- 안정판 릴리스.
 
 
 ## 인터페이스 언어

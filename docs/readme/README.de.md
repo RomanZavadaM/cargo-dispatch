@@ -79,8 +79,6 @@ Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/Te
 - vollständige Browser-GPS-Abnahme über HTTPS;
 - Feldtests über verschiedene Netze/NAT/CGNAT;
 - Live-Valhalla-HTTP-Transport und Neuberechnung der Geometrie nach Reorder;
-- sichere Driver-Session-Speicherung mit Android Keystore + Apple Keychain einschließlich Migration der alten Raw-URL;
-- Stable Release.
 
 
 ## Sprachen der Benutzeroberfläche
