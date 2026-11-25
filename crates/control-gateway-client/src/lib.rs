@@ -5,12 +5,7 @@ use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue},
     redirect::Policy,
 };
-use std::{
-    error::Error,
-    fmt,
-    net::IpAddr,
-    time::Duration,
-};
+use std::{error::Error, fmt, net::IpAddr, time::Duration};
 use tokio::{sync::watch, time::sleep};
 
 pub const CONTROL_GATEWAY_CLIENT_PROTOCOL_VERSION: u32 = 1;
@@ -250,8 +245,9 @@ impl ControlGatewayClient {
         let request_id = required_header(response.headers(), REQUEST_ID_HEADER)?
             .parse::<u64>()
             .map_err(|_| GatewayClientError::InvalidRelayRequest("request id is not an integer"))?;
-        let method = Method::from_bytes(required_header(response.headers(), METHOD_HEADER)?.as_bytes())
-            .map_err(|_| GatewayClientError::InvalidRelayRequest("invalid HTTP method"))?;
+        let method =
+            Method::from_bytes(required_header(response.headers(), METHOD_HEADER)?.as_bytes())
+                .map_err(|_| GatewayClientError::InvalidRelayRequest("invalid HTTP method"))?;
         let path_and_query = required_header(response.headers(), PATH_HEADER)?.to_owned();
 
         if !relay_path_matches_session(&path_and_query, &self.config.session_token) {
@@ -420,8 +416,8 @@ impl ControlGatewayClient {
 }
 
 fn normalized_base_url(value: &str, require_loopback: bool) -> Result<Url, GatewayClientError> {
-    let mut url = Url::parse(value)
-        .map_err(|_| GatewayClientError::InvalidConfig("base URL is invalid"))?;
+    let mut url =
+        Url::parse(value).map_err(|_| GatewayClientError::InvalidConfig("base URL is invalid"))?;
 
     if !matches!(url.scheme(), "http" | "https") {
         return Err(GatewayClientError::InvalidConfig(
@@ -450,11 +446,9 @@ fn normalized_base_url(value: &str, require_loopback: bool) -> Result<Url, Gatew
                 "local Control base URL must use http",
             ));
         }
-        let host = url
-            .host_str()
-            .ok_or(GatewayClientError::InvalidConfig(
-                "local Control base URL has no host",
-            ))?;
+        let host = url.host_str().ok_or(GatewayClientError::InvalidConfig(
+            "local Control base URL has no host",
+        ))?;
         let loopback = host == "localhost"
             || host
                 .parse::<IpAddr>()
@@ -545,12 +539,7 @@ fn checked_empty_response(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{
-        Router,
-        body::Body,
-        extract::Request,
-        response::Response,
-    };
+    use axum::{Router, body::Body, extract::Request, response::Response};
     use cargo_dispatch_addressing_gateway::{GatewayState, router as gateway_router};
     use tokio::net::TcpListener;
 
@@ -685,10 +674,7 @@ mod tests {
         );
 
         assert_eq!(
-            relay_task
-                .await
-                .expect("relay task")
-                .expect("relay result"),
+            relay_task.await.expect("relay task").expect("relay result"),
             RelayOnceOutcome::Relayed
         );
         relay.unregister().await.expect("unregister relay");
