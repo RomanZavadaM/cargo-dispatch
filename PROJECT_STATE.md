@@ -1,18 +1,19 @@
 # Актуальний стан — cargo-dispatch
 
-Оновлено: 2026-11-24 23:18, Europe/Kyiv.
+Оновлено: 2026-11-25, Europe/Kyiv.
 
 Це короткий публічний стан. Деталі, рішення й журнал — у private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
 
 - Product foundation інтегровано в `main`.
-- Integration commit: `018c89c3ea85e56b5d533fb760ee26384abc9bac`.
-- PR CI: Product foundation `45486110804` — **SUCCESS**; Control desktop UI `45486111221` — **SUCCESS**.
-- Planner і Control — окремі desktop-програми.
-- Driver Browser — один адаптивний browser client для телефона, планшета, ноутбука й desktop browser; layout змінюється за шириною, функції та backend спільні.
-- Уже перевірено автоматично: trip package, durable recovery, out-of-order replan, loopback/LAN session boundary, route/location, двосторонні PDF/file/photo/video, Tauri/Leptos Control dashboard та native Save.
-- **Поточне ручне приймання:** локально через loopback перевірити wide desktop/laptop, tablet і narrow phone layouts без втрати або спотворення mobile UI.
-- Після local responsive PASS — реальний телефон у LAN; повний GPS acceptance — через HTTPS.
-- Ще не готові: повноцінна карта в Control і Driver Browser, HTTPS/public gateway product path, field NAT/CGNAT test, real Valhalla route geometry, native Driver App, stable release.
-- `v0.1.0-preview.2` — test UI preview, не stable product.
+- Responsive Control + Driver Browser slice з PR #2 також інтегровано в `main`; merge commit: `f41d32044f8ac0eb3290c9638a58f4c7f8046d77`.
+- Exact-head PR CI перед merge: Product foundation `45571225967` — **SUCCESS**; Control desktop UI `45571226378` — **SUCCESS**.
+- Planner і Control — окремі desktop-компоненти; після передачі активного trip фактом володіє Control.
+- Driver Browser — один адаптивний browser client для телефона, планшета, ноутбука й desktop browser; backend та дані спільні.
+- У Control і Driver Browser є інтерактивна OpenStreetMap-карта з точками рейсу та останньою прийнятою позицією водія.
+- Уже перевірено автоматично: trip package, durable recovery, route reorder, loopback/LAN session boundary, route/location, двосторонні PDF/file/photo/video, два browser clients, reconnect, Tauri/Leptos Control dashboard та native Save.
+- Поточний test/prerelease: **v0.1.0-preview.3**; stable product release ще немає.
+- Ручне local browser acceptance ще не завершене; після нього — реальний телефон у LAN.
+- Повний browser GPS acceptance — через HTTPS.
+- Ще не готові: production HTTPS/public gateway path, field NAT/CGNAT acceptance, real Valhalla road geometry, native Driver App, stable release.
 
-Для продовження роботи — `START_HERE.md` → private HANDOFF/PROJECT_STATE → active module logs → live GitHub.
+Для продовження роботи: `START_HERE.md` → private HANDOFF/PROJECT_STATE → active module logs → live GitHub.
