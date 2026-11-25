@@ -3,7 +3,7 @@
 mod i18n;
 
 // UI language is selected at runtime and persisted in the desktop webview.
-use crate::i18n::{UiLocale, strings};
+use crate::i18n::{UiLocale, localize_problem, strings};
 use cargo_dispatch_control_ui_contracts::{
     ControlUiStatus, DashboardDocumentDirection, DashboardPoint, ListenerMode,
     OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput, SaveDocumentInput,
@@ -406,6 +406,7 @@ fn submit_reorder(
     dashboard: RwSignal<Option<TripDashboard>>,
     message: RwSignal<String>,
     error: RwSignal<bool>,
+    locale: RwSignal<UiLocale>,
 ) {
     spawn_local(async move {
         match invoke::<TripDashboard, _>(
@@ -419,7 +420,7 @@ fn submit_reorder(
                 error.set(false);
             }
             Err(problem) => {
-                message.set(problem);
+                message.set(localize_problem(locale.get_untracked(), &problem));
                 error.set(true);
             }
         }
@@ -513,7 +514,7 @@ fn ControlApp() -> impl IntoView {
                 error.set(false);
             }
             Err(problem) => {
-                message.set(problem);
+                message.set(localize_problem(locale.get_untracked(), &problem));
                 error.set(true);
             }
         }
@@ -537,7 +538,7 @@ fn ControlApp() -> impl IntoView {
                     error.set(false);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked(), &problem));
                     error.set(true);
                 }
             }
@@ -553,7 +554,7 @@ fn ControlApp() -> impl IntoView {
                 }
                 Ok(None) => {}
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked(), &problem));
                     error.set(true);
                 }
             }
@@ -675,7 +676,7 @@ fn ControlApp() -> impl IntoView {
                     error.set(false);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked(), &problem));
                     error.set(true);
                 }
             }
@@ -726,7 +727,7 @@ fn ControlApp() -> impl IntoView {
                     error.set(false);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked(), &problem));
                     error.set(true);
                 }
             }
@@ -1085,6 +1086,7 @@ fn ControlApp() -> impl IntoView {
                                                                         dashboard,
                                                                         message,
                                                                         error,
+                                                                        locale,
                                                                     );
                                                                 }
                                                             }
@@ -1108,6 +1110,7 @@ fn ControlApp() -> impl IntoView {
                                                                         dashboard,
                                                                         message,
                                                                         error,
+                                                                        locale,
                                                                     );
                                                                 }
                                                             }
@@ -1180,7 +1183,7 @@ fn ControlApp() -> impl IntoView {
                                                                 }
                                                                 Ok(None) => {}
                                                                 Err(problem) => {
-                                                                    message.set(problem);
+                                                                    message.set(localize_problem(locale.get_untracked(), &problem));
                                                                     error.set(true);
                                                                 }
                                                             }
