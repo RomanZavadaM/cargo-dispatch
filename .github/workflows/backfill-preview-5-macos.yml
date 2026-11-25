@@ -113,7 +113,7 @@ jobs:
           set -euo pipefail
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt
           grep -v 'macOS-universal' SHA256SUMS.txt > SHA256SUMS.new
-          sha256sum "Cargo-Dispatch-Control-$TAG-macOS-universal.zip" >> SHA256SUMS.new
+          shasum -a 256 "Cargo-Dispatch-Control-$TAG-macOS-universal.zip" >> SHA256SUMS.new
           mv SHA256SUMS.new SHA256SUMS.txt
 
       - name: Upload macOS Control and refresh release notes
