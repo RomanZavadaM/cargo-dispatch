@@ -68,10 +68,8 @@ Es una **compilación de prueba/prerelease**, no estable. Preview.5 fija el esta
 - validación completa del GPS del navegador mediante HTTPS;
 - pruebas de campo en distintas redes/NAT/CGNAT;
 - transporte HTTP real de Valhalla y recálculo de geometría tras reorder;
-- smoke conectado en dispositivos virtuales mediante una sesión Control headless real;
-- GPS en segundo plano, cola offline y almacenamiento seguro de sesión para las apps nativas;
-- versión estable.
 - almacenamiento seguro de la sesión Driver con Android Keystore + Apple Keychain y migración de la antigua URL sin cifrar;
+- versión estable.
 
 
 ## Idiomas de la interfaz
