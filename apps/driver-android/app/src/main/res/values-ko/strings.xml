@@ -32,4 +32,8 @@
     <string name="save_document">저장</string>
     <string name="upload_file">파일 전송</string>
     <string name="upload_media">사진 / 동영상 전송</string>
+    <string name="map_title">운행 지도</string>
+    <string name="map_provider_note">OpenStreetMap · 현재 경로 형상이 있을 때만 도로 선을 표시합니다.</string>
+    <string name="capture_photo">사진 촬영</string>
+    <string name="capture_video">동영상 촬영</string>
 </resources>

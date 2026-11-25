@@ -32,4 +32,8 @@
     <string name="save_document">Guardar</string>
     <string name="upload_file">Enviar archivo</string>
     <string name="upload_media">Enviar foto / vídeo</string>
+    <string name="map_title">Mapa del viaje</string>
+    <string name="map_provider_note">OpenStreetMap · la línea vial se muestra solo para la geometría actual.</string>
+    <string name="capture_photo">Tomar foto</string>
+    <string name="capture_video">Grabar vídeo</string>
 </resources>

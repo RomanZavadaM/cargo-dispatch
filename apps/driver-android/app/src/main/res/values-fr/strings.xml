@@ -32,4 +32,8 @@
     <string name="save_document">Enregistrer</string>
     <string name="upload_file">Envoyer un fichier</string>
     <string name="upload_media">Envoyer photo / vidéo</string>
+    <string name="map_title">Carte du trajet</string>
+    <string name="map_provider_note">OpenStreetMap · la ligne routière n’est affichée que pour la géométrie actuelle.</string>
+    <string name="capture_photo">Prendre une photo</string>
+    <string name="capture_video">Enregistrer une vidéo</string>
 </resources>

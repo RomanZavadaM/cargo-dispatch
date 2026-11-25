@@ -32,4 +32,8 @@
     <string name="save_document">Speichern</string>
     <string name="upload_file">Datei senden</string>
     <string name="upload_media">Foto / Video senden</string>
+    <string name="map_title">Tourkarte</string>
+    <string name="map_provider_note">OpenStreetMap · die Straßenlinie wird nur für aktuelle Geometrie angezeigt.</string>
+    <string name="capture_photo">Foto aufnehmen</string>
+    <string name="capture_video">Video aufnehmen</string>
 </resources>

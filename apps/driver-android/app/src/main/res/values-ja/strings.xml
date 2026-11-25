@@ -32,4 +32,8 @@
     <string name="save_document">保存</string>
     <string name="upload_file">ファイルを送信</string>
     <string name="upload_media">写真 / 動画を送信</string>
+    <string name="map_title">運行マップ</string>
+    <string name="map_provider_note">OpenStreetMap · 道路ラインは現在の geometry がある場合だけ表示します。</string>
+    <string name="capture_photo">写真を撮る</string>
+    <string name="capture_video">動画を撮る</string>
 </resources>
