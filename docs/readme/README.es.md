@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · **🇪🇸 Español** · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Estado:** desarrollo activo. La versión preliminar de prueba actual es **v0.1.0-preview.3**. Todavía no existe un producto estable y terminado.
+> **Estado:** desarrollo activo. La versión preliminar de prueba actual es **v0.1.0-preview.4**. Todavía no existe un producto estable y terminado.
 
 ## Acerca del producto
 
@@ -43,11 +43,11 @@ Todavía falta el **transporte HTTP real hacia Valhalla y el recálculo automát
 
 ## Versión de prueba
 
-Prerelease actual: [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.3).
+Prerelease actual: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
 
 El ZIP de Windows contiene Control, un viaje activo sintético y un PDF de prueba para la validación local por loopback.
 
-Es una **compilación de prueba/prerelease**, no estable. `main` ya está por delante de preview.3: el adaptador Valhalla y la canalización de geometría schema 1.2 se integraron después de publicar ese prerelease.
+Es una **compilación de prueba/prerelease**, no estable. Preview.4 ya contiene el adaptador Valhalla y la canalización de geometría schema 1.2. `main` vuelve a estar por delante: Driver r2 nativo para Android e iOS/iPadOS se integró después de preview.4.
 
 ## Qué falta
 
@@ -57,7 +57,7 @@ Es una **compilación de prueba/prerelease**, no estable. `main` ya está por de
 - validación completa del GPS del navegador mediante HTTPS;
 - pruebas de campo en distintas redes/NAT/CGNAT;
 - transporte HTTP real de Valhalla y recálculo de geometría tras reorder;
-- Driver Apps nativas para Android e iOS/iPadOS, ya desarrolladas en paralelo en ramas draft separadas;
+- mapas nativos: MapLibre en Android y MapKit en iOS/iPadOS;\n- captura de cámara, GPS en segundo plano, smoke conectado en dispositivos virtuales, cola offline y almacenamiento seguro de sesión;
 - versión estable.
 
 ## Idiomas de la interfaz
