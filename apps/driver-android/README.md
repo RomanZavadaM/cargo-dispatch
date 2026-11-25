@@ -15,19 +15,20 @@
 - foreground one-shot GPS → Control;
 - PDF/звичайні файли Control → Android з нативним збереженням;
 - файл/фото/відео Android → Control через системні pickers;
-- відновлення останнього Driver URL та emulator mode після перезапуску;
+- native MapLibre карта, current road geometry, точки та latest position;
+- системна фото/відео камера;
+- durable retry queue для newest location/media;
+- explicit Start/Stop background tracking через foreground location service, 15 с / 25 м;
+- захищене відновлення сесії: base URL/emulator mode у private preferences, token — AES/GCM через Android Keystore;
+- автоматична міграція старого raw Driver URL після успішного reconnect;
 - локалізації uk/en/de/fr/es/ko/ja/zh-CN;
-- protocol/unit tests + Android Emulator install/launch/screenshot CI.
+- protocol/unit tests + connected Android Emulator smoke проти реального synthetic Control trip.
 
 Debug build дозволяє cleartext HTTP лише для локального тесту. Публічний/production path має бути HTTPS.
 
 ## Ще попереду
 
-- native map;
-- camera capture;
-- background GPS;
-- connected Emulator smoke проти реального synthetic Control trip;
-- offline queue/retry;
-- secure Keystore hardening;
+- real-device LAN/background tracking acceptance;
+- HTTPS/public/NAT/CGNAT field path;
 - push/notifications;
 - production signing/release.

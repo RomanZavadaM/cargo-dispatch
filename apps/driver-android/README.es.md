@@ -4,8 +4,8 @@
 
 Cliente nativo Android para el conductor. **No sustituye Driver Browser** ni crea un protocolo de servidor separado: utiliza la misma API de Control y las mismas reglas del viaje.
 
-Alcance actual: Kotlin + Jetpack Compose; Android 16/API 36, minSdk 26; Driver URL; loopback del Emulator mediante `10.0.2.2`; snapshot del viaje; complete/reorder; geometría de ruta opcional; ubicación puntual en primer plano hacia Control; descarga Control→Android con guardado nativo; envío de archivo/foto/vídeo Android→Control mediante selectores del sistema; recuperación de la última Driver URL/modo Emulator; localización uk/en/de/fr/es/ko/ja/zh-CN; pruebas de protocolo/unitarias y CI de instalación/arranque/captura en Emulator.
+Alcance actual: Kotlin + Jetpack Compose; Android 16/API 36, minSdk 26; Driver URL; snapshot del viaje; complete/reorder; mapa nativo MapLibre con geometría vial, puntos y última posición; ubicación puntual en primer plano; transferencia de archivos/fotos/vídeos y cámara del sistema; cola persistente de reintentos para la última ubicación/multimedia; seguimiento Start/Stop explícito en segundo plano mediante un servicio de ubicación en primer plano con política de 15 s / 25 m; recuperación segura de sesión, con el token cifrado AES/GCM mediante Android Keystore y solo base URL/modo Emulator no secretos en preferencias privadas; migración automática de la antigua Driver URL sin cifrar tras una reconexión correcta; localización uk/en/de/fr/es/ko/ja/zh-CN; pruebas de protocolo/unitarias y smoke conectado en Emulator contra un viaje sintético real de Control.
 
 HTTP sin cifrar solo en debug local; el camino público es HTTPS-first.
 
-Pendiente: mapa nativo, captura de cámara, GPS en segundo plano, smoke conectado a un viaje sintético real de Control, cola offline/reintentos, endurecimiento de Keystore, push y firma de producción.
+Pendiente: aceptación LAN/seguimiento en segundo plano en dispositivo real, ruta HTTPS/public/NAT/CGNAT, push/notificaciones y firma de producción.
