@@ -112,6 +112,7 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("screen.title")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
