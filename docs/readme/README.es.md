@@ -79,8 +79,6 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 - validación completa del GPS del navegador mediante HTTPS;
 - pruebas de campo en distintas redes/NAT/CGNAT;
 - transporte HTTP real de Valhalla y recálculo de geometría tras reorder;
-- almacenamiento seguro de la sesión Driver con Android Keystore + Apple Keychain y migración de la antigua URL sin cifrar;
-- versión estable.
 
 
 ## Idiomas de la interfaz
