@@ -154,28 +154,79 @@ jobs:
           PY
 
           APP="apps/driver-ios/build/DerivedData/Build/Products/Debug-iphonesimulator/CargoDispatchDriver.app"
+          BUNDLE="com.romanzavada.cargodispatch.driver"
           xcrun simctl install "$DEVICE" "$APP"
-          xcrun simctl launch "$DEVICE" com.romanzavada.cargodispatch.driver             -cargo_dispatch_driver_url "$IOS_DRIVER_URL"
 
-          DATA_CONTAINER="$(xcrun simctl get_app_container "$DEVICE" com.romanzavada.cargodispatch.driver data)"
-          PREFS="$DATA_CONTAINER/Library/Preferences/com.romanzavada.cargodispatch.driver.plist"
-          CONNECTED=0
-          for _ in $(seq 1 40); do
-            if [ -f "$PREFS" ]               && plutil -p "$PREFS" | grep -q 'native-smoke-session-00000001'; then
-              CONNECTED=1
-              break
+          # Seed the r1-r5 legacy raw URL on disk. r6 must use it only for one
+          # successful reconnect, migrate the token to Keychain, then remove the
+          # raw URL from UserDefaults.
+          xcrun simctl spawn "$DEVICE" defaults write "$BUNDLE" cargo_dispatch_driver_url "$IOS_DRIVER_URL"
+          xcrun simctl launch "$DEVICE" "$BUNDLE"
+
+          DATA_CONTAINER="$(xcrun simctl get_app_container "$DEVICE" "$BUNDLE" data)"
+          PREFS="$DATA_CONTAINER/Library/Preferences/$BUNDLE.plist"
+
+          MIGRATED=0
+          for _ in $(seq 1 60); do
+            if [ -f "$PREFS" ]; then
+              if python3 - "$PREFS" <<'PY'
+          import plistlib, sys
+          with open(sys.argv[1], "rb") as handle:
+              prefs = plistlib.load(handle)
+          raw = prefs.get("cargo_dispatch_driver_url")
+          base = prefs.get("cargo_dispatch_driver_base_url")
+          count = int(prefs.get("cargo_dispatch_debug_connect_count", 0))
+          raise SystemExit(0 if raw is None and base and count >= 1 else 1)
+          PY
+              then
+                MIGRATED=1
+                break
+              fi
             fi
             sleep 0.5
           done
-          if [ "$CONNECTED" -ne 1 ]; then
+          if [ "$MIGRATED" -ne 1 ]; then
+            echo "Apple Driver did not migrate legacy raw session into Keychain-backed storage." >&2
+            [ -f "$PREFS" ] && plutil -p "$PREFS" || true
+            exit 1
+          fi
+          if plutil -p "$PREFS" | grep -q 'native-smoke-session-00000001'; then
+            echo "Raw Apple Driver session token remained in UserDefaults after migration." >&2
+            plutil -p "$PREFS" >&2
+            exit 1
+          fi
+
+          # Relaunch with no Driver URL. The second successful connection must
+          # come only from base URL + Keychain token.
+          xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
+          xcrun simctl launch "$DEVICE" "$BUNDLE"
+
+          RECONNECTED=0
+          for _ in $(seq 1 60); do
             if [ -f "$PREFS" ]; then
-              plutil -p "$PREFS" || true
+              if python3 - "$PREFS" <<'PY'
+          import plistlib, sys
+          with open(sys.argv[1], "rb") as handle:
+              prefs = plistlib.load(handle)
+          count = int(prefs.get("cargo_dispatch_debug_connect_count", 0))
+          raw = prefs.get("cargo_dispatch_driver_url")
+          raise SystemExit(0 if count >= 2 and raw is None else 1)
+          PY
+              then
+                RECONNECTED=1
+                break
+              fi
             fi
+            sleep 0.5
+          done
+          if [ "$RECONNECTED" -ne 1 ]; then
+            echo "Apple Driver did not reconnect from Keychain after relaunch." >&2
+            [ -f "$PREFS" ] && plutil -p "$PREFS" || true
             exit 1
           fi
 
           xcrun simctl io "$DEVICE" screenshot apps/driver-ios/driver-ios-smoke.png
-          xcrun simctl terminate "$DEVICE" com.romanzavada.cargodispatch.driver || true
+          xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
 
       - name: Upload Simulator smoke screenshot
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
