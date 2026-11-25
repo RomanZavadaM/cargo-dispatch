@@ -11,16 +11,16 @@ final class DriverStore: ObservableObject {
 
     private var api: ControlAPI?
     private var pendingQueue: PendingOutboundQueue?
-    private let defaults: UserDefaults
+    private let sessionStore: SecureSessionStore
     private let queueBaseRoot: URL
-    private let savedDriverURLKey = "cargo_dispatch_driver_url"
 
     init(
         defaults: UserDefaults = .standard,
         queueBaseRoot: URL? = nil
     ) {
-        self.defaults = defaults
-        self.driverURL = defaults.string(forKey: savedDriverURLKey) ?? ""
+        let secureSessionStore = SecureSessionStore(defaults: defaults)
+        self.sessionStore = secureSessionStore
+        self.driverURL = secureSessionStore.loadDriverURL() ?? ""
 
         if let queueBaseRoot {
             self.queueBaseRoot = queueBaseRoot
@@ -62,7 +62,13 @@ final class DriverStore: ObservableObject {
                     await flushPending(client: client, queue: queue)
                     trip = try await client.trip()
                     pendingOutbound = await queue.pendingCount()
-                    defaults.set(driverURL, forKey: savedDriverURLKey)
+                    do {
+                        try sessionStore.save(driverURL: driverURL)
+                    } catch {
+                        // Keep the live in-memory session, but never fall back
+                        // to persisting a raw token if Keychain storage fails.
+                        sessionStore.clear()
+                    }
                 } catch {
                     pendingOutbound = await queue.pendingCount()
                     errorKey = "error.connection"
@@ -79,7 +85,7 @@ final class DriverStore: ObservableObject {
         pendingQueue = nil
         trip = nil
         pendingOutbound = 0
-        defaults.removeObject(forKey: savedDriverURLKey)
+        sessionStore.clear()
     }
 
     func refresh() {
