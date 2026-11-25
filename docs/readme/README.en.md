@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · **🇬🇧 English** · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** active development. The current stable version is **v0.1.0**. After localization is completed, the next major focus is the route Planner.
+> **Status:** active development. The current stable version is **v0.1.0**. Full 8-language localization is integrated; the next major focus is the route Planner.
 
 ## About
 
@@ -83,7 +83,7 @@ Android and Apple packages are not yet store-signed. App Store/TestFlight/Google
 
 ## Interface languages
 
-The integrated desktop/browser UI currently implements and verifies **Ukrainian, English, and German**. The new native Android and iOS/iPadOS clients start with localization packs for **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** from the first screen, and their documentation follows the same language set.
+Control, Driver Browser, Android Driver, and iOS/iPadOS Driver are implemented and verified with the same **8-language set: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control and Driver Browser use system-language selection plus a persisted manual choice, and CI verifies complete coverage for all 8 locales.
 
 ## Documentation
 
