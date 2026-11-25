@@ -1,0 +1,71 @@
+name: Addressing Gateway
+
+on:
+  push:
+    branches:
+      - "product/addressing-gateway-r*"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/addressing-gateway/**"
+      - "deploy/addressing-gateway/**"
+      - ".github/workflows/addressing-gateway.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/addressing-gateway/**"
+      - "deploy/addressing-gateway/**"
+      - ".github/workflows/addressing-gateway.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: addressing-gateway-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-build:
+    name: Gateway tests + Linux build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          components: rustfmt, clippy
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Test gateway
+        run: cargo test --locked -p cargo-dispatch-addressing-gateway --all-targets
+
+      - name: Clippy gateway
+        run: cargo clippy --locked -p cargo-dispatch-addressing-gateway --all-targets -- -D warnings
+
+      - name: Build release server
+        run: cargo build --locked -p cargo-dispatch-addressing-gateway --release
+
+      - name: Upload Linux server artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: Cargo-Dispatch-Addressing-Gateway-Linux-x64
+          path: target/release/cargo-dispatch-addressing-gateway
+          if-no-files-found: error
+
+  docker:
+    name: Gateway container build
+    runs-on: ubuntu-latest
+    needs:
+      - test-build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build deployment image
+        run: docker build -f deploy/addressing-gateway/Dockerfile -t cargo-dispatch-addressing-gateway:test .
