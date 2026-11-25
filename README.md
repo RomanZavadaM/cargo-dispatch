@@ -81,8 +81,6 @@ Android та Apple пакети поки не підписані для мага
 - повний browser GPS acceptance через HTTPS;
 - польова перевірка через різні мережі/NAT/CGNAT;
 - живий Valhalla HTTP transport і перерахунок geometry після reorder;
-- захищене збереження Driver session: Android Keystore + Apple Keychain і міграція старого raw URL;
-- stable release.
 
 ## Мови інтерфейсу
 
