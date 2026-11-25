@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · **🇬🇧 English** · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** active development. The current test prerelease is **v0.1.0-preview.4**. There is no stable finished product yet.
+> **Status:** active development. The current test prerelease is **v0.1.0-preview.5**. There is no stable finished product yet.
 
 ## About
 
@@ -32,6 +32,8 @@ Both native clients are already integrated in `main`:
 
 Both use the same Control API and do not create a separate trip database.
 
+After r4/r5, both native clients also have a durable retry queue for location and media. Android r5 adds explicit Start/Stop background trip tracking through a foreground location service, a persistent Stop notification, and a 15 s / 25 m policy. Apple r5 adds explicit Start/Stop CoreLocation background tracking, `UIBackgroundModes=location`, a 25 m distance filter, and does not request `Always` permission without a separate need.
+
 ## Driver Browser
 
 Driver Browser is **one product**, not separate phone and desktop versions. It has three normal layouts:
@@ -52,11 +54,11 @@ What is still missing is the **live HTTP transport to Valhalla and automatic geo
 
 ## Test build
 
-Current prerelease: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
+Current prerelease: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
 
 The Windows ZIP contains Control, a synthetic active trip, and a sample PDF for local loopback acceptance.
 
-This is a **test/prerelease build**, not stable. Preview.4 already contains the Valhalla adapter and schema 1.2 road-geometry pipeline. `main` is ahead again: Android and iOS/iPadOS native Driver r2+r3, including native maps and system camera capture, plus improved Control-to-Driver URL handoff, were integrated after preview.4 was published.
+This is a **test/prerelease build**, not stable. Preview.5 captures the current Control/Driver Browser, the Valhalla schema 1.2 road-geometry pipeline, and source for both native Driver Apps through r5: maps, camera/files, durable retry queues, and explicit background trip tracking. The published binary asset is still the Windows Control preview; production mobile signing/TestFlight is still ahead.
 
 ## What is still ahead
 
@@ -66,9 +68,9 @@ This is a **test/prerelease build**, not stable. Preview.4 already contains the 
 - full browser GPS acceptance over HTTPS;
 - field testing across different networks/NAT/CGNAT;
 - live Valhalla HTTP transport and geometry recalculation after reorder;
-- connected virtual-device smoke through a real headless Control session;
-- background GPS, offline queue, and secure session storage for native apps;
 - a stable release.
+- secure Driver session storage with Android Keystore + Apple Keychain, including migration away from the legacy raw URL;
+
 
 ## Interface languages
 
