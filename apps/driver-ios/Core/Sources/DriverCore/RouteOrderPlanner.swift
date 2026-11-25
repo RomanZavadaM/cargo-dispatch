@@ -14,7 +14,7 @@ public enum RouteOrderPlanner {
         let target = index + delta
         guard open.indices.contains(target) else { return nil }
 
-        var ids = open.map(.pointId)
+        var ids = open.map(\.pointId)
         ids.swapAt(index, target)
         return ids
     }
