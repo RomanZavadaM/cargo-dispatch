@@ -1,0 +1,71 @@
+name: Native connected smoke harness
+
+on:
+  pull_request:
+    paths:
+      - "crates/control-web/**"
+      - "crates/trip-files/**"
+      - ".github/workflows/native-smoke-harness.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-smoke-harness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  headless-control:
+    name: Headless Control synthetic trip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
+
+      - name: Create synthetic trip package
+        run: cargo run --locked -p cargo-dispatch-trip-files --example local_browser_fixture -- native-smoke-data
+
+      - name: Start real Control session and verify snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p cargo-dispatch-control-web --example native_smoke_server --             native-smoke-data/synthetic-trip-package.zip             native-smoke-session-00000001             > native-smoke.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 120); do
+            if grep -q '^CARGO_DISPATCH_SMOKE_LOCAL_URL=' native-smoke.log; then
+              break
+            fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              cat native-smoke.log
+              exit 1
+            fi
+            sleep 0.25
+          done
+
+          cat native-smoke.log
+          DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_LOCAL_URL=//p' native-smoke.log | tail -n 1)"
+          test -n "$DRIVER_URL"
+
+          BASE="${DRIVER_URL%/driver/*}"
+          TOKEN="${DRIVER_URL##*/driver/}"
+          curl --fail --silent --show-error "$BASE/api/trip/$TOKEN" > native-trip.json
+
+          python3 - <<'PY'
+          import json
+          with open("native-trip.json", encoding="utf-8") as source:
+              trip = json.load(source)
+          assert trip["trip_version"] == 1
+          assert trip["local_route_revision"] == 0
+          assert len(trip["points"]) == 4
+          assert len(trip["road_geometry"]["points"]) >= 2
+          assert trip["road_geometry"]["routing"]["engine"] == "synthetic-test"
+          print("native smoke trip:", trip["trip_id"], "points=", len(trip["points"]))
+          PY
