@@ -44,6 +44,7 @@ jobs:
           - product Valhalla adapter;
           - trip-package schema 1.2 з optional auditable road geometry;
           - stale road geometry автоматично інвалідовується після reorder;
+          - у source tag інтегровані Android та iOS/iPadOS Driver через r5: native maps, camera/files, durable retry queue та explicit Start/Stop background tracking;
           - Windows GUI build без зайвого console window;
           - synthetic active-trip, road geometry і sample PDF у Windows ZIP.
 
@@ -51,9 +52,10 @@ jobs:
           - формальний local browser acceptance ще не закритий;
           - live HTTP transport до Valhalla та automatic geometry recalculation ще не інтегровані;
           - real phone LAN acceptance ще попереду;
-          - browser/native GPS product acceptance має пройти через HTTPS;
+          - real-device LAN/background GPS acceptance ще попереду;
           - public addressing/NAT/CGNAT field path ще попереду;
-          - Android та iOS/iPadOS Driver Apps розробляються окремо й не входять у цей Windows preview.
+          - mobile production signing/TestFlight/production APK ще не завершені; release asset цього preview поки Windows-only.
+          - secure Driver session storage через Android Keystore / Apple Keychain ще наступний крок.
 
           Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
           EOF
