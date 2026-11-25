@@ -2,8 +2,9 @@
 
 use cargo_dispatch_contracts::{
     CURRENT_SCHEMA_VERSION, PackageContentFingerprint, ReplanRequest, TRIP_PACKAGE_SCHEMA_NAME,
-    TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion,
-    validate_route_points,
+    TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoadGeometry,
+    TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity, TripVersion,
+    validate_route_points, validate_trip_road_geometry,
 };
 use cargo_dispatch_control::{
     InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft, StoredTripPlan, TripImportCandidate,
@@ -424,6 +425,91 @@ impl From<&Navigation> for TripNavigationTarget {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GeometryPoint {
+    latitude_e7: i32,
+    longitude_e7: i32,
+}
+
+impl From<&TripRoadGeometryPoint> for GeometryPoint {
+    fn from(point: &TripRoadGeometryPoint) -> Self {
+        Self {
+            latitude_e7: point.latitude_e7,
+            longitude_e7: point.longitude_e7,
+        }
+    }
+}
+
+impl From<&GeometryPoint> for TripRoadGeometryPoint {
+    fn from(point: &GeometryPoint) -> Self {
+        Self {
+            latitude_e7: point.latitude_e7,
+            longitude_e7: point.longitude_e7,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RoutingIdentityFile {
+    engine: String,
+    engine_version: String,
+    map_dataset_id: String,
+    profile_fingerprint: String,
+}
+
+impl From<&TripRoutingIdentity> for RoutingIdentityFile {
+    fn from(identity: &TripRoutingIdentity) -> Self {
+        Self {
+            engine: identity.engine.clone(),
+            engine_version: identity.engine_version.clone(),
+            map_dataset_id: identity.map_dataset_id.clone(),
+            profile_fingerprint: identity.profile_fingerprint.clone(),
+        }
+    }
+}
+
+impl From<&RoutingIdentityFile> for TripRoutingIdentity {
+    fn from(identity: &RoutingIdentityFile) -> Self {
+        Self {
+            engine: identity.engine.clone(),
+            engine_version: identity.engine_version.clone(),
+            map_dataset_id: identity.map_dataset_id.clone(),
+            profile_fingerprint: identity.profile_fingerprint.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RoadGeometryFile {
+    routing: RoutingIdentityFile,
+    points: Vec<GeometryPoint>,
+}
+
+impl From<&TripRoadGeometry> for RoadGeometryFile {
+    fn from(geometry: &TripRoadGeometry) -> Self {
+        Self {
+            routing: RoutingIdentityFile::from(&geometry.routing),
+            points: geometry.points.iter().map(GeometryPoint::from).collect(),
+        }
+    }
+}
+
+impl From<&RoadGeometryFile> for TripRoadGeometry {
+    fn from(geometry: &RoadGeometryFile) -> Self {
+        Self {
+            routing: TripRoutingIdentity::from(&geometry.routing),
+            points: geometry
+                .points
+                .iter()
+                .map(TripRoadGeometryPoint::from)
+                .collect(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Point {
@@ -473,6 +559,8 @@ struct Manifest {
     created_at_unix_ms: u64,
     operator: [u8; 16],
     points: Vec<Point>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    road_geometry: Option<RoadGeometryFile>,
 }
 
 impl Manifest {
@@ -498,10 +586,15 @@ impl Manifest {
         );
         let route_points = points(&self.points)?;
         validate_route_points(&route_points).map_err(invalid)?;
+        let route_geometry = self.road_geometry.as_ref().map(TripRoadGeometry::from);
+        if let Some(geometry) = &route_geometry {
+            validate_trip_road_geometry(geometry).map_err(invalid)?;
+        }
         let hash = Sha256::digest(serde_json::to_vec(self)?);
         Ok(TripImportCandidate {
             header,
             route_points,
+            route_geometry,
             content_fingerprint: PackageContentFingerprint::from_bytes(hash.into()),
         })
     }
@@ -548,6 +641,10 @@ pub fn export_package(
         created_at_unix_ms: draft.created_at_unix_ms,
         operator: draft.created_by.as_bytes(),
         points: route.iter().map(Point::from).collect(),
+        road_geometry: draft
+            .route_geometry
+            .as_ref()
+            .map(RoadGeometryFile::from),
     };
     manifest.candidate()?;
     let data = serde_json::to_vec(&manifest)?;
