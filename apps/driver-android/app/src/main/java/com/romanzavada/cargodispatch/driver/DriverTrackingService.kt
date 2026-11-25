@@ -117,8 +117,8 @@ class DriverTrackingService : Service() {
         listener = created
         locationManager.requestLocationUpdates(
             provider,
-            MIN_TIME_MS,
-            MIN_DISTANCE_M,
+            DriverTrackingPolicy.MIN_TIME_MS,
+            DriverTrackingPolicy.MIN_DISTANCE_M,
             created,
             Looper.getMainLooper(),
         )
@@ -235,7 +235,5 @@ class DriverTrackingService : Service() {
         const val ACTION_STOP = "com.romanzavada.cargodispatch.driver.STOP_TRACKING"
         private const val CHANNEL_ID = "driver-tracking"
         private const val NOTIFICATION_ID = 4107
-        private const val MIN_TIME_MS = 15_000L
-        private const val MIN_DISTANCE_M = 25f
     }
 }
