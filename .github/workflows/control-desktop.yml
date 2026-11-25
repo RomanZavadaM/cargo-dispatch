@@ -150,7 +150,9 @@ jobs:
           5. Test the same URL at wide desktop/laptop, tablet and narrow phone viewport widths.
           6. Check route reorder, Control -> Browser files/PDF, Browser -> Control file/photo/video,
              two browser clients, and refresh/reconnect.
-          7. Full map is still a separate open requirement and is not accepted by this artifact.
+          7. Check the real OpenStreetMap view in both Control and Driver Browser: pan/zoom/fit,
+             route-point markers and the latest accepted driver position.
+          8. The map currently shows points/position, not Valhalla road geometry.
 
           This is a CI test artifact, not a release.
           "@ | Set-Content -Encoding UTF8 LOCAL_BROWSER_TEST.txt
@@ -162,5 +164,6 @@ jobs:
           path: |
             target/release/cargo-dispatch-control-desktop.exe
             LOCAL_BROWSER_TEST.txt
+            THIRD_PARTY_NOTICES.md
           if-no-files-found: error
           retention-days: 7
