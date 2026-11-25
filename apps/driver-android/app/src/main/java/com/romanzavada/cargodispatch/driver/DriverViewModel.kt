@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.romanzavada.cargodispatch.driver.core.RouteOrderPlanner
 import com.romanzavada.cargodispatch.driver.core.SessionLink
 import com.romanzavada.cargodispatch.driver.model.DriverTrip
+import com.romanzavada.cargodispatch.driver.model.LocationUpdate
 import com.romanzavada.cargodispatch.driver.net.ControlApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,23 @@ class DriverViewModel : ViewModel() {
 
     fun setEmulatorMode(value: Boolean) {
         mutableState.value = mutableState.value.copy(emulatorMode = value, error = null)
+    }
+
+    fun restoreSession(saved: SavedDriverSession) {
+        mutableState.value = mutableState.value.copy(
+            driverUrl = saved.driverUrl,
+            emulatorMode = saved.emulatorMode,
+            error = null,
+        )
+        connect()
+    }
+
+    fun disconnect() {
+        api = null
+        mutableState.value = DriverUiState(
+            driverUrl = mutableState.value.driverUrl,
+            emulatorMode = mutableState.value.emulatorMode,
+        )
     }
 
     fun connect() {
@@ -76,6 +94,48 @@ class DriverViewModel : ViewModel() {
                 trip = client.reorder(trip.localRouteRevision, order),
                 error = null,
             )
+        }
+    }
+
+    fun sendLocation(update: LocationUpdate) {
+        val client = api ?: return
+        launchRequest {
+            val accepted = client.sendLocation(update)
+            val current = mutableState.value
+            current.copy(
+                trip = current.trip?.copy(latestLocation = accepted),
+                error = null,
+            )
+        }
+    }
+
+    fun upload(upload: PickedUpload, pointId: String? = null) {
+        val client = api ?: return
+        launchRequest {
+            mutableState.value.copy(
+                trip = client.uploadDocument(
+                    originalName = upload.name,
+                    mimeType = upload.mimeType,
+                    bytes = upload.bytes,
+                    pointId = pointId,
+                ),
+                error = null,
+            )
+        }
+    }
+
+    fun download(documentId: String, onResult: (Result<ByteArray>) -> Unit) {
+        val client = api ?: return
+        mutableState.value = mutableState.value.copy(busy = true, error = null)
+        viewModelScope.launch {
+            val result = runCatching { client.downloadDocument(documentId) }
+            result.exceptionOrNull()?.let { problem ->
+                mutableState.value = mutableState.value.copy(
+                    error = problem.message ?: problem::class.java.simpleName,
+                )
+            }
+            mutableState.value = mutableState.value.copy(busy = false)
+            onResult(result)
         }
     }
 
