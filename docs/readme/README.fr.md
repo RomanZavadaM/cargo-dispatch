@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · **🇫🇷 Français** · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Statut :** développement actif. La préversion de test actuelle est **v0.1.0-preview.3**. Il n’existe pas encore de produit stable et finalisé.
+> **Statut :** développement actif. La préversion de test actuelle est **v0.1.0-preview.4**. Il n’existe pas encore de produit stable et finalisé.
 
 ## À propos
 
@@ -43,11 +43,11 @@ Il reste à connecter le **transport HTTP réel vers Valhalla et le recalcul aut
 
 ## Version de test
 
-Préversion actuelle : [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.3).
+Préversion actuelle : [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
 
 Le ZIP Windows contient Control, un trajet actif synthétique et un PDF de test pour la validation locale en loopback.
 
-Il s’agit d’une **version de test/préversion**, pas d’une version stable. `main` est déjà en avance sur preview.3 : l’adaptateur Valhalla et la chaîne de géométrie du schéma 1.2 ont été intégrés après cette préversion.
+Il s’agit d’une **version de test/préversion**, pas d’une version stable. Preview.4 contient déjà l’adaptateur Valhalla et la chaîne de géométrie du schéma 1.2. `main` est de nouveau en avance : les clients Driver natifs Android et iOS/iPadOS r2 ont été intégrés après preview.4.
 
 ## Étapes restantes
 
@@ -57,7 +57,7 @@ Il s’agit d’une **version de test/préversion**, pas d’une version stable.
 - validation GPS complète du navigateur via HTTPS ;
 - tests terrain sur différents réseaux/NAT/CGNAT ;
 - transport HTTP Valhalla réel et recalcul de la géométrie après changement d’ordre ;
-- applications Driver natives Android et iOS/iPadOS, déjà développées en parallèle dans des branches draft séparées ;
+- cartes natives : MapLibre sur Android et MapKit sur iOS/iPadOS ;\n- capture caméra, GPS en arrière-plan, smoke connecté sur appareils virtuels, file offline et stockage de session sécurisé ;
 - version stable.
 
 ## Langues de l’interface
