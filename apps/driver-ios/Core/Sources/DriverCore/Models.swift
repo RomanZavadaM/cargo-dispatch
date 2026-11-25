@@ -116,3 +116,30 @@ public struct RouteOrderRequest: Codable, Equatable, Sendable {
         case openPointIds = "open_point_ids"
     }
 }
+
+
+public struct LocationUpdate: Codable, Equatable, Sendable {
+    public let latitude: Double
+    public let longitude: Double
+    public let accuracyM: Double?
+    public let observedAtUnixMs: UInt64
+
+    public init(
+        latitude: Double,
+        longitude: Double,
+        accuracyM: Double?,
+        observedAtUnixMs: UInt64
+    ) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.accuracyM = accuracyM
+        self.observedAtUnixMs = observedAtUnixMs
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case latitude
+        case longitude
+        case accuracyM = "accuracy_m"
+        case observedAtUnixMs = "observed_at_unix_ms"
+    }
+}

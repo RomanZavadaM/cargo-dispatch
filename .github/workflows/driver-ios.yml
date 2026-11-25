@@ -3,7 +3,7 @@ name: Driver iOS
 on:
   push:
     branches:
-      - "product/driver-ios-r1"
+      - "product/driver-ios-r*"
     paths:
       - "apps/driver-ios/**"
       - ".github/workflows/driver-ios.yml"

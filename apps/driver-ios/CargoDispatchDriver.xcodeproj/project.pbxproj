@@ -15,6 +15,9 @@
 		B00000000000000000000006 /* RouteOrderPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000006 /* RouteOrderPlanner.swift */; };
 		B00000000000000000000007 /* ControlAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000007 /* ControlAPI.swift */; };
 		B00000000000000000000008 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000008 /* Localizable.xcstrings */; };
+		B00000000000000000000009 /* ForegroundLocationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000A /* ForegroundLocationController.swift */; };
+		B0000000000000000000000A /* DriverFileDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000B /* DriverFileDocument.swift */; };
+		B0000000000000000000000B /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000C /* InfoPlist.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +30,9 @@
 		A00000000000000000000007 /* ControlAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlAPI.swift; sourceTree = "<group>"; };
 		A00000000000000000000008 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A00000000000000000000009 /* CargoDispatchDriver.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CargoDispatchDriver.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0000000000000000000000A /* ForegroundLocationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForegroundLocationController.swift; sourceTree = "<group>"; };
+		A0000000000000000000000B /* DriverFileDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverFileDocument.swift; sourceTree = "<group>"; };
+		A0000000000000000000000C /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,7 +69,10 @@
 				A00000000000000000000001 /* CargoDispatchDriverApp.swift */,
 				A00000000000000000000002 /* ContentView.swift */,
 				A00000000000000000000003 /* DriverStore.swift */,
+				A0000000000000000000000A /* ForegroundLocationController.swift */,
+				A0000000000000000000000B /* DriverFileDocument.swift */,
 				A00000000000000000000008 /* Localizable.xcstrings */,
+				A0000000000000000000000C /* InfoPlist.xcstrings */,
 			);
 			path = CargoDispatchDriver;
 			sourceTree = "<group>";
@@ -145,6 +154,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B00000000000000000000008 /* Localizable.xcstrings in Resources */,
+				B0000000000000000000000B /* InfoPlist.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -158,6 +168,8 @@
 				B00000000000000000000001 /* CargoDispatchDriverApp.swift in Sources */,
 				B00000000000000000000002 /* ContentView.swift in Sources */,
 				B00000000000000000000003 /* DriverStore.swift in Sources */,
+				B00000000000000000000009 /* ForegroundLocationController.swift in Sources */,
+				B0000000000000000000000A /* DriverFileDocument.swift in Sources */,
 				B00000000000000000000004 /* Models.swift in Sources */,
 				B00000000000000000000005 /* SessionLink.swift in Sources */,
 				B00000000000000000000006 /* RouteOrderPlanner.swift in Sources */,
@@ -199,6 +211,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Cargo Dispatch Driver";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Cargo Dispatch uses location to send the current driver position to Control.";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -221,6 +234,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Cargo Dispatch Driver";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Cargo Dispatch uses location to send the current driver position to Control.";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

@@ -1,11 +1,11 @@
-# Cargo Dispatch Driver — iOS/iPadOS 기본 구조
+# Cargo Dispatch Driver — iOS/iPadOS
 
 [🇺🇦 Українська](README.md) · [🇬🇧 English](README.en.md) · [🇩🇪 Deutsch](README.de.md) · [🇫🇷 Français](README.fr.md) · [🇪🇸 Español](README.es.md) · **🇰🇷 한국어** · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-첫 네이티브 Apple 단계입니다. 하나의 SwiftUI 앱 타깃이 iPhone과 iPad를 지원하며 Driver Browser 및 Android 앱과 **동일한 Control API**를 사용합니다.
+네이티브 Apple 운전자 클라이언트입니다. 하나의 SwiftUI target이 iPhone과 iPad를 지원하며 Driver Browser/Android 앱과 **동일한 Control API**를 사용합니다.
 
-현재 범위: Swift 6 + SwiftUI + URLSession, iOS/iPadOS 17+, Driver URL, trip snapshot, complete/reorder, 영구 point ID + local revision, optional route geometry, 순수 Swift core test, uk/en/de/fr/es/ko/ja/zh-Hans 현지화.
+현재 범위: Swift 6 + SwiftUI + URLSession, iOS/iPadOS 17+, Driver URL, trip snapshot, complete/reorder, permanent point ID + local revision, optional road geometry, CoreLocation foreground one-shot 위치 전송, Control→iPhone/iPad 문서 다운로드/fileExporter 저장, fileImporter + PhotosPicker를 통한 iPhone/iPad→Control 파일/사진/동영상 업로드, 마지막 Driver URL 복구, 위치 권한 문구 현지화, uk/en/de/fr/es/ko/ja/zh-Hans, Swift protocol test 및 Simulator build/install/launch/screenshot CI.
 
-로컬 HTTP는 Simulator/LAN debug에서만 허용하며 Release는 HTTPS-first입니다.
+로컬 HTTP는 Simulator/LAN Debug에서만 허용하며 Release는 HTTPS-first입니다.
 
-아직 미구현: 네이티브 지도, 카메라/사진/동영상, 문서 열기/공유, 백그라운드 GPS, 오프라인 큐, 안전한 세션 저장, push, production signing/TestFlight.
+다음 작업: native MapKit map, 카메라 촬영, background GPS, 실제 synthetic Control trip 연결 smoke, offline queue/retry, Keychain 보안 강화, push, production signing/TestFlight.
