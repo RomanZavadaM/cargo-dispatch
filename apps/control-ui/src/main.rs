@@ -224,7 +224,7 @@ function render() {
     });
     polyline.setAttribute("points", shownPoints.join(" "));
     polyline.setAttribute("fill", "none");
-    polyline.setAttribute("stroke", "#1769aa");
+    polyline.setAttribute("stroke", "rgb(23, 105, 170)");
     polyline.setAttribute("stroke-width", "5");
     polyline.setAttribute("stroke-linecap", "round");
     polyline.setAttribute("stroke-linejoin", "round");
