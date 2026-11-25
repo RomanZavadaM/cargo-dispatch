@@ -208,8 +208,9 @@ private fun DriverScreen(
         }
     }
 
-    val stopTracking = {
+    val stopTracking: () -> Unit = {
         context.stopService(Intent(context, DriverTrackingService::class.java))
+        Unit
     }
 
     LaunchedEffect(Unit) {
