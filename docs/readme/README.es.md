@@ -71,6 +71,8 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 
 ## Qué falta
 
+- UI desktop de Planner/editor y builds de release para Windows, macOS y Linux;
+
 - validación manual local en navegador;
 - prueba del mismo Driver Browser en un teléfono real dentro de la misma LAN;
 - ruta HTTPS/direccionamiento público;
