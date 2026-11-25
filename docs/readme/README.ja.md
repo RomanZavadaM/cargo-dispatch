@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · **🇯🇵 日本語** · [🇨🇳 简体中文](README.zh.md)
 
-> **ステータス:** 開発中です。現在のテスト用プレリリースは **v0.1.0-preview.3** です。安定版の完成製品はまだありません。
+> **ステータス:** 開発中です。現在のテスト用プレリリースは **v0.1.0-preview.4** です。安定版の完成製品はまだありません。
 
 ## 製品について
 
@@ -43,11 +43,11 @@ Control と Driver Browser には、運行地点と最後に受理されたド�
 
 ## テストビルド
 
-現在のプレリリース: [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.3).
+現在のプレリリース: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
 
 Windows ZIP には Control、合成されたアクティブ運行、ローカル loopback 検証用のサンプル PDF が含まれます。
 
-これは **test/prerelease build** であり、stable ではありません。`main` はすでに preview.3 より先に進んでおり、Valhalla adapter と schema 1.2 road-geometry pipeline はこの prerelease 公開後に統合されました。
+これは **test/prerelease build** であり、stable ではありません。Preview.4 には Valhalla adapter と schema 1.2 road-geometry pipeline が含まれています。その後 Android と iOS/iPadOS の native Driver r2 が統合され、`main` は再び preview.4 より先に進んでいます。
 
 ## 今後の作業
 
@@ -57,7 +57,7 @@ Windows ZIP には Control、合成されたアクティブ運行、ローカル
 - HTTPS 経由での browser GPS 完全受け入れ;
 - 異なるネットワーク/NAT/CGNAT でのフィールドテスト;
 - 実 Valhalla HTTP transport と reorder 後の geometry 再計算;
-- Android と iOS/iPadOS の native Driver App（現在、別々の draft branch で並行開発中）;
+- native map：Android は MapLibre、iOS/iPadOS は MapKit;\n- カメラ撮影、background GPS、接続済み virtual-device smoke、offline queue、安全な session storage;
 - stable release.
 
 ## インターフェース言語
