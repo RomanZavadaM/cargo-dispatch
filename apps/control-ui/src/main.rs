@@ -64,7 +64,8 @@ let controlMapState = {
   dragCenterY: 0,
   points: [],
   location: null,
-  tripId: null
+  tripId: null,
+  dataKey: ""
 };
 
 function clampLat(latitude) {
@@ -184,7 +185,6 @@ function render() {
       image.alt = "";
       image.draggable = false;
       image.loading = "lazy";
-      image.referrerPolicy = "no-referrer";
       image.src = "https://tile.openstreetmap.org/" + zoom + "/" + wrappedX + "/" + tileY + ".png";
       image.style.left = (tileX * 256 - left) + "px";
       image.style.top = (tileY * 256 - top) + "px";
@@ -241,12 +241,15 @@ function fit() {
 }
 
 export function cargoControlMapRender(tripId, pointsJson, locationJson) {
+  const dataKey = tripId + "|" + pointsJson + "|" + locationJson;
+  if (controlMapState.initialized && controlMapState.dataKey === dataKey) return;
   controlMapState.points = JSON.parse(pointsJson);
   controlMapState.location = JSON.parse(locationJson);
   if (controlMapState.tripId !== tripId) {
     controlMapState.tripId = tripId;
     controlMapState.initialized = false;
   }
+  controlMapState.dataKey = dataKey;
   if (!controlMapState.initialized) fit();
   else render();
 }
