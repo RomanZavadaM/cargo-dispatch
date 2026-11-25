@@ -2,50 +2,31 @@
 
 Оновлено: 2026-11-25, Europe/Kyiv.
 
-Цей файл — короткий публічний якір. Повний поточний стан, правила й журнал ведуться приватно в `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
+Це короткий public anchor. Повний стан і журнали — private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
 
-## Live public state
+## Live checkpoints
+- Android Driver r2 merged: `41b3dcdbfbfa8ae0897291e4fb736e244649f1e3`.
+- iOS/iPadOS Driver r2 merged: `b37c21e68b25fbaf8a4373be3c169204acca16d9`.
+- Android exact-head CI перед merge: build/unit tests + Emulator install/launch/screenshot **SUCCESS**.
+- Apple exact-head code/docs `15f403a70ba12fee06bc0b2fa1bd3916518735da`: core tests + Simulator build/install/launch/screenshot **SUCCESS**.
+- Published prerelease: `v0.1.0-preview.4`.
+- Stable release ще немає.
 
-- PR #2 `Prepare responsive local Driver Browser acceptance` — merged.
-- Integration merge commit: `f41d32044f8ac0eb3290c9638a58f4c7f8046d77`.
-- Exact product head перед merge: `2d10f0db81346311525861d948104caf8a8fc1ac`.
-- PR Product foundation run `45571225967`: **SUCCESS**.
-- PR Control desktop UI run `45571226378`: **SUCCESS**.
-- Поточний test/prerelease: `v0.1.0-preview.3`.
-- Stable готового продукту ще немає.
+## Native clients у main
+Android та iPhone/iPad використовують той самий Control API, що Driver Browser:
+- snapshot, complete, reorder;
+- foreground location;
+- Control→device document download/save;
+- device→Control file/photo/video upload;
+- restart recovery останньої Driver connection;
+- 8 мов UI.
 
-## Control + Driver Browser
+## Next
+- Android native map через MapLibre;
+- Apple native map через MapKit;
+- connected virtual-device smoke проти synthetic real Control trip;
+- camera capture, background GPS, offline/security;
+- live Valhalla HTTP transport;
+- HTTPS/public/NAT/CGNAT acceptance.
 
-Control уже працює з durable active-trip, loopback/LAN session, route actions, location і двосторонніми файлами/media.
-
-Driver Browser — один адаптивний продукт:
-- phone layout;
-- tablet layout;
-- wide desktop/laptop layout.
-
-У Control і Driver Browser є інтерактивна OpenStreetMap-карта з route points та останньою прийнятою позицією водія.
-
-## Поточна межа приймання
-
-Manual local browser acceptance ще потрібен для:
-- wide/tablet/narrow;
-- route reorder в обидва боки;
-- PDF/file Control → Driver Browser;
-- file/photo/video Driver Browser → Control + native Save;
-- два browser clients;
-- refresh/reconnect;
-- карти в Control і Driver Browser.
-
-Після local PASS — той самий Driver Browser на реальному телефоні в LAN. Повний GPS acceptance — через HTTPS.
-
-## Ще попереду
-
-- real Valhalla road geometry;
-- HTTPS/public addressing path;
-- різні мережі/NAT/CGNAT;
-- native Driver App;
-- stable release.
-
-## Як продовжити
-
-`START_HERE.md` → private `HANDOFF_CURRENT.md` / `PROJECT_STATE.md` → active module STATE/WORKLOG → live GitHub.
+Продовження: `START_HERE.md` → private HANDOFF/PROJECT_STATE → active module STATE/WORKLOG → live GitHub.
