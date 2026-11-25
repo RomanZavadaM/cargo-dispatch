@@ -68,8 +68,8 @@ Il s’agit d’une **version de test/préversion**, pas d’une version stable.
 - validation GPS complète du navigateur via HTTPS ;
 - tests terrain sur différents réseaux/NAT/CGNAT ;
 - transport HTTP Valhalla réel et recalcul de la géométrie après changement d’ordre ;
-- version stable.
 - stockage sécurisé de la session Driver avec Android Keystore + Apple Keychain et migration de l’ancienne URL brute ;
+- version stable.
 
 
 ## Langues de l’interface
