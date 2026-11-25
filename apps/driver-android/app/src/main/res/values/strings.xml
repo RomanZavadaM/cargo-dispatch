@@ -37,4 +37,14 @@
     <string name="capture_photo">Зняти фото</string>
     <string name="capture_video">Зняти відео</string>
     <string name="pending_outbound">Очікує передачі після відновлення зв’язку: %1$d</string>
+    <string name="tracking_start">Почати відстеження</string>
+    <string name="tracking_stop">Зупинити відстеження</string>
+    <string name="tracking_status_active">Фонове відстеження активне.</string>
+    <string name="tracking_status_stopped">Фонове відстеження зупинене.</string>
+    <string name="tracking_permission_required">Для відстеження потрібен доступ до геолокації.</string>
+    <string name="tracking_channel_name">Відстеження рейсу</string>
+    <string name="tracking_channel_description">Постійне повідомлення, поки Cargo Dispatch передає позицію водія.</string>
+    <string name="tracking_notification_title">Cargo Dispatch — відстеження рейсу</string>
+    <string name="tracking_notification_active">Позиція водія передається у Control.</string>
+    <string name="tracking_notification_pending">Позиція записана; очікує передачі: %1$d</string>
 </resources>
