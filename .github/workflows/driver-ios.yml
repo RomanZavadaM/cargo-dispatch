@@ -46,29 +46,87 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Launch app in iPhone Simulator
+      - name: Launch app in clean iPhone Simulator
         shell: bash
         run: |
-          DEVICE="$(
-            python3 - <<'PY'
-          import json, subprocess
-          data = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"]))
-          for runtime_devices in data.get("devices", {}).values():
-              for device in runtime_devices:
-                  if device.get("isAvailable") and device.get("name", "").startswith("iPhone"):
-                      print(device["udid"])
-                      raise SystemExit(0)
-          raise SystemExit("No available iPhone Simulator device")
-          PY
-          )"
-          xcrun simctl boot "$DEVICE" || true
-          xcrun simctl bootstatus "$DEVICE" -b
+          set -euo pipefail
           APP="apps/driver-ios/build/DerivedData/Build/Products/Debug-iphonesimulator/CargoDispatchDriver.app"
-          xcrun simctl install "$DEVICE" "$APP"
-          xcrun simctl launch "$DEVICE" com.romanzavada.cargodispatch.driver
-          sleep 3
-          xcrun simctl io "$DEVICE" screenshot apps/driver-ios/driver-ios-smoke.png
-          xcrun simctl terminate "$DEVICE" com.romanzavada.cargodispatch.driver || true
+          read -r RUNTIME DEVICE_TYPE <<EOF
+          $(python3 - <<'PY'
+          import json, subprocess
+
+          runtimes = json.loads(
+              subprocess.check_output(["xcrun", "simctl", "list", "runtimes", "-j"])
+          ).get("runtimes", [])
+          ios = [
+              runtime for runtime in runtimes
+              if runtime.get("isAvailable") and runtime.get("identifier", "").startswith("com.apple.CoreSimulator.SimRuntime.iOS-")
+          ]
+          if not ios:
+              raise SystemExit("No available iOS Simulator runtime")
+          runtime = max(ios, key=lambda item: tuple(int(part) for part in item["version"].split(".")))
+
+          device_types = json.loads(
+              subprocess.check_output(["xcrun", "simctl", "list", "devicetypes", "-j"])
+          ).get("devicetypes", [])
+          iphones = [item for item in device_types if item.get("name", "").startswith("iPhone")]
+          if not iphones:
+              raise SystemExit("No iPhone Simulator device type")
+          device_type = iphones[-1]["identifier"]
+          print(runtime["identifier"], device_type)
+          PY
+          )
+          EOF
+
+          xcrun simctl shutdown all || true
+
+          python3 - "$RUNTIME" "$DEVICE_TYPE" "$APP" <<'PY'
+          import subprocess, sys, time
+
+          runtime, device_type, app = sys.argv[1:]
+          last_error = None
+          for attempt in range(2):
+              name = f"CargoDispatchDriverCI-{attempt + 1}"
+              udid = subprocess.check_output(
+                  ["xcrun", "simctl", "create", name, device_type, runtime],
+                  text=True,
+              ).strip()
+              try:
+                  subprocess.run(["xcrun", "simctl", "boot", udid], check=False)
+                  subprocess.run(
+                      ["xcrun", "simctl", "bootstatus", udid, "-b"],
+                      check=True,
+                      timeout=180,
+                  )
+                  subprocess.run(["xcrun", "simctl", "install", udid, app], check=True)
+                  subprocess.run(
+                      ["xcrun", "simctl", "launch", udid, "com.romanzavada.cargodispatch.driver"],
+                      check=True,
+                  )
+                  time.sleep(3)
+                  subprocess.run(
+                      [
+                          "xcrun", "simctl", "io", udid, "screenshot",
+                          "apps/driver-ios/driver-ios-smoke.png",
+                      ],
+                      check=True,
+                  )
+                  subprocess.run(
+                      [
+                          "xcrun", "simctl", "terminate", udid,
+                          "com.romanzavada.cargodispatch.driver",
+                      ],
+                      check=False,
+                  )
+                  subprocess.run(["xcrun", "simctl", "delete", udid], check=False)
+                  raise SystemExit(0)
+              except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+                  last_error = error
+                  subprocess.run(["xcrun", "simctl", "shutdown", udid], check=False)
+                  subprocess.run(["xcrun", "simctl", "delete", udid], check=False)
+
+          raise SystemExit(f"Fresh iPhone Simulator smoke failed twice: {last_error}")
+          PY
 
       - name: Upload Simulator smoke screenshot
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
