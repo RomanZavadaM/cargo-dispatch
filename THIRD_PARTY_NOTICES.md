@@ -34,6 +34,6 @@ cargo-dispatch може містити або розповсюджуватися
 - `actions/checkout` — MIT; workflow зафіксовано на commit `11d5960a326750d5838078e36cf38b85af677262` (лінія v4).
 - `dtolnay/rust-toolchain` — MIT; workflow зафіксовано на commit `df2a88e9fe4098bad09cb42c3dec7187f15861fc`.
 - `cargo-deny` — CI-only dependency/license/advisory checker, версія `0.21.0`; встановлюється з crates.io з `--locked`.
-- `taiki-e/install-action` — MIT; Control UI workflow зафіксовано на commit `fe3acb53a98b62c772db35de75ce0e4595e7ca8c` і використовує його лише для встановлення exact `trunk@0.22.2` без зміни product MSRV.
+- `taiki-e/install-action` — MIT; Control UI workflow зафіксовано на commit `fe3acb53a98b62c772db35de75ce0e4595e7ca8c` і використовує його лише для встановлення exact `trunk@0.22.2` без зміни product MSRV.\n- `actions/upload-artifact` — MIT; Control UI workflow зафіксовано на commit `cf430e030ddbb5b0abf93d22962f4752f3646cd9` (лінія v7) і використовує його лише для короткоживучого Windows CI-артефакту ручного loopback-тесту; release не створюється.
 
 Зміна pin-ів є окремою чутливою зміною build supply chain і повинна проходити звичайний CI перед подальшим використанням.
