@@ -79,8 +79,8 @@ jobs:
           6. Check route reorder both ways, files/PDF, Browser -> Control photo/video/file + Save,
              two browser clients, refresh/reconnect and maps in Control/Driver Browser.
 
-          Full Valhalla road geometry, HTTPS/public addressing and field NAT/CGNAT acceptance
-          are not finished in this preview.
+          Versioned road geometry is included. Live Valhalla HTTP transport/recalculation,
+          HTTPS/public addressing and field NAT/CGNAT acceptance are not finished in this preview.
           "@ | Set-Content -Encoding UTF8 "$packageName/README-TEST.txt"
 
           $zip = "$packageName.zip"
@@ -105,16 +105,18 @@ jobs:
           - file/photo/video Driver Browser → Control з локальним Save;
           - два одночасні browser clients одного рейсу та reconnect;
           - інтерактивна OpenStreetMap-карта в Control і Driver Browser;
+          - product Valhalla adapter і versioned schema 1.2 road geometry;
+          - stale road geometry автоматично інвалідовується після reorder;
           - Windows GUI build без зайвого console window;
-          - у ZIP є synthetic active-trip і sample PDF для локального тесту.
+          - у ZIP є synthetic active-trip, road geometry і sample PDF для локального тесту.
 
           ### Ще не stable
           - ручний local browser acceptance ще має бути завершений власником;
           - real phone LAN acceptance — наступний етап;
           - browser GPS повністю приймається через HTTPS;
           - public addressing/NAT/CGNAT field path ще попереду;
-          - real Valhalla road geometry ще не інтегрована;
-          - native Driver App ще не розпочатий.
+          - live HTTP transport до Valhalla та автоматичний recalculation geometry ще попереду;
+          - Android та iOS/iPadOS Driver Apps розробляються окремо й не входять у Windows preview.
 
           Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
           "@ | Set-Content -Encoding UTF8 RELEASE_NOTES.md
@@ -127,7 +129,7 @@ jobs:
           gh release create "$env:TAG" `
             --repo "${{ github.repository }}" `
             --target "$env:GITHUB_SHA" `
-            --title "Cargo Dispatch Product Preview 0.3" `
+            --title "Cargo Dispatch $env:TAG" `
             --notes-file RELEASE_NOTES.md `
             --prerelease `
             "Cargo-Dispatch-Control-$env:TAG-Windows-x64.zip" `
