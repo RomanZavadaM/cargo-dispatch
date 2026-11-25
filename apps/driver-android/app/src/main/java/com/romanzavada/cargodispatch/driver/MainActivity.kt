@@ -1,8 +1,12 @@
 package com.romanzavada.cargodispatch.driver
 
+import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,12 +24,18 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.romanzavada.cargodispatch.driver.model.DriverDocument
 import com.romanzavada.cargodispatch.driver.model.DriverPoint
 
 class MainActivity : ComponentActivity() {
@@ -42,6 +52,66 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val sessionPreferences = remember { SessionPreferences(context.applicationContext) }
+    val locationProvider = remember { ForegroundLocationProvider(context.applicationContext) }
+    var pendingSave by remember { mutableStateOf<DriverDocument?>(null) }
+
+    val saveDocument = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*"),
+    ) { uri ->
+        val selected = pendingSave
+        pendingSave = null
+        if (uri != null && selected != null) {
+            viewModel.download(selected.documentId) { result ->
+                result.onSuccess { bytes ->
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                            output.write(bytes)
+                        } ?: error("Cannot open destination")
+                    }
+                }
+            }
+        }
+    }
+
+    val filePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.readUpload(uri) }
+                .onSuccess(viewModel::upload)
+        }
+    }
+
+    val mediaPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.readUpload(uri) }
+                .onSuccess(viewModel::upload)
+        }
+    }
+
+    val locationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            locationProvider.current { result ->
+                result.onSuccess(viewModel::sendLocation)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        sessionPreferences.load()?.let(viewModel::restoreSession)
+    }
+
+    LaunchedEffect(state.connectedBaseUrl) {
+        if (state.connectedBaseUrl != null) {
+            sessionPreferences.save(state.driverUrl, state.emulatorMode)
+        }
+    }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
         LazyColumn(
@@ -66,6 +136,10 @@ private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
                     setEmulatorMode = viewModel::setEmulatorMode,
                     connect = viewModel::connect,
                     refresh = viewModel::refresh,
+                    disconnect = {
+                        sessionPreferences.clear()
+                        viewModel.disconnect()
+                    },
                 )
             }
 
@@ -87,11 +161,42 @@ private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
                             Text(stringResource(R.string.points_documents, trip.points.size, trip.documents.size))
                             Text(
                                 trip.roadGeometry?.let {
-                                    stringResource(R.string.road_geometry_present, it.points.size, it.routing.engine, it.routing.engineVersion)
+                                    stringResource(
+                                        R.string.road_geometry_present,
+                                        it.points.size,
+                                        it.routing.engine,
+                                        it.routing.engineVersion,
+                                    )
                                 } ?: stringResource(R.string.road_geometry_missing)
                             )
                         }
                     }
+                }
+
+                item {
+                    LocationCard(
+                        state = state,
+                        requestLocation = {
+                            locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        },
+                    )
+                }
+
+                item {
+                    DocumentsCard(
+                        documents = trip.documents,
+                        busy = state.busy,
+                        pickFile = { filePicker.launch(arrayOf("*/*")) },
+                        pickMedia = {
+                            mediaPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                            )
+                        },
+                        save = { selected ->
+                            pendingSave = selected
+                            saveDocument.launch(selected.originalName)
+                        },
+                    )
                 }
 
                 item {
@@ -119,6 +224,7 @@ private fun ConnectionCard(
     setEmulatorMode: (Boolean) -> Unit,
     connect: () -> Unit,
     refresh: () -> Unit,
+    disconnect: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -148,17 +254,92 @@ private fun ConnectionCard(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = connect, enabled = !state.busy) {
+                Button(onClick = connect, enabled = !state.busy && state.driverUrl.isNotBlank()) {
                     Text(if (state.busy) stringResource(R.string.connecting) else stringResource(R.string.connect))
                 }
                 if (state.trip != null) {
                     Button(onClick = refresh, enabled = !state.busy) {
                         Text(stringResource(R.string.refresh))
                     }
+                    Button(onClick = disconnect, enabled = !state.busy) {
+                        Text(stringResource(R.string.disconnect))
+                    }
                 }
             }
             state.connectedBaseUrl?.let {
                 Text(stringResource(R.string.control_prefix, it), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationCard(
+    state: DriverUiState,
+    requestLocation: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(stringResource(R.string.location_title), style = MaterialTheme.typography.titleMedium)
+            val location = state.trip?.latestLocation
+            if (location == null) {
+                Text(stringResource(R.string.location_missing))
+            } else {
+                Text(
+                    stringResource(
+                        R.string.location_value,
+                        location.latitude,
+                        location.longitude,
+                        location.accuracyM ?: 0.0,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Button(onClick = requestLocation, enabled = !state.busy) {
+                Text(stringResource(R.string.send_location))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DocumentsCard(
+    documents: List<DriverDocument>,
+    busy: Boolean,
+    pickFile: () -> Unit,
+    pickMedia: () -> Unit,
+    save: (DriverDocument) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(stringResource(R.string.documents_title), style = MaterialTheme.typography.titleMedium)
+            if (documents.isEmpty()) {
+                Text(stringResource(R.string.documents_empty))
+            } else {
+                documents.forEach { selected ->
+                    Text(
+                        "${selected.originalName} · ${selected.size} B",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Button(onClick = { save(selected) }, enabled = !busy) {
+                        Text(stringResource(R.string.save_document))
+                    }
+                    HorizontalDivider()
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = pickFile, enabled = !busy) {
+                    Text(stringResource(R.string.upload_file))
+                }
+                Button(onClick = pickMedia, enabled = !busy) {
+                    Text(stringResource(R.string.upload_media))
+                }
             }
         }
     }
