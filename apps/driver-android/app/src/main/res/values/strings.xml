@@ -21,4 +21,15 @@
     <string name="open_point">Відкрита точка</string>
     <string name="done_button">Виконано</string>
     <string name="control_prefix">Control: %1$s</string>
+
+    <string name="disconnect">Від’єднати</string>
+    <string name="location_title">Геолокація</string>
+    <string name="location_missing">Позиція ще не передавалась.</string>
+    <string name="location_value">%1$.6f, %2$.6f · ±%3$.0f м</string>
+    <string name="send_location">Передати поточну позицію</string>
+    <string name="documents_title">Документи / фото / відео</string>
+    <string name="documents_empty">Документів ще немає.</string>
+    <string name="save_document">Зберегти</string>
+    <string name="upload_file">Передати файл</string>
+    <string name="upload_media">Передати фото / відео</string>
 </resources>

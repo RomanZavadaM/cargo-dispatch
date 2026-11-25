@@ -21,4 +21,15 @@
     <string name="open_point">Arrêt ouvert</string>
     <string name="done_button">Terminer</string>
     <string name="control_prefix">Control : %1$s</string>
+
+    <string name="disconnect">Déconnecter</string>
+    <string name="location_title">Localisation</string>
+    <string name="location_missing">Aucune position n’a encore été transmise.</string>
+    <string name="location_value">%1$.6f, %2$.6f · ±%3$.0f m</string>
+    <string name="send_location">Envoyer la position actuelle</string>
+    <string name="documents_title">Documents / photos / vidéo</string>
+    <string name="documents_empty">Aucun document pour le moment.</string>
+    <string name="save_document">Enregistrer</string>
+    <string name="upload_file">Envoyer un fichier</string>
+    <string name="upload_media">Envoyer photo / vidéo</string>
 </resources>

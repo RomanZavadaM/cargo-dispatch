@@ -3,7 +3,7 @@ name: Driver Android
 on:
   push:
     branches:
-      - "product/driver-android-r1"
+      - "product/driver-android-r*"
     paths:
       - "apps/driver-android/**"
       - ".github/workflows/driver-android.yml"

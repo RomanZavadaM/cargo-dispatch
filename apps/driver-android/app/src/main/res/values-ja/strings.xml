@@ -21,4 +21,15 @@
     <string name="open_point">未完了地点</string>
     <string name="done_button">完了</string>
     <string name="control_prefix">Control: %1$s</string>
+
+    <string name="disconnect">切断</string>
+    <string name="location_title">位置情報</string>
+    <string name="location_missing">まだ位置情報は送信されていません。</string>
+    <string name="location_value">%1$.6f, %2$.6f · ±%3$.0f m</string>
+    <string name="send_location">現在地を送信</string>
+    <string name="documents_title">書類 / 写真 / 動画</string>
+    <string name="documents_empty">まだ書類はありません。</string>
+    <string name="save_document">保存</string>
+    <string name="upload_file">ファイルを送信</string>
+    <string name="upload_media">写真 / 動画を送信</string>
 </resources>

@@ -90,3 +90,14 @@ data class RouteOrderRequest(
     @SerialName("open_point_ids")
     val openPointIds: List<String>,
 )
+
+
+@Serializable
+data class LocationUpdate(
+    val latitude: Double,
+    val longitude: Double,
+    @SerialName("accuracy_m")
+    val accuracyM: Double? = null,
+    @SerialName("observed_at_unix_ms")
+    val observedAtUnixMs: Long,
+)

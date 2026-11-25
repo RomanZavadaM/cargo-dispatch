@@ -21,4 +21,15 @@
     <string name="open_point">열린 지점</string>
     <string name="done_button">완료 처리</string>
     <string name="control_prefix">Control: %1$s</string>
+
+    <string name="disconnect">연결 해제</string>
+    <string name="location_title">위치</string>
+    <string name="location_missing">아직 위치를 전송하지 않았습니다.</string>
+    <string name="location_value">%1$.6f, %2$.6f · ±%3$.0f m</string>
+    <string name="send_location">현재 위치 전송</string>
+    <string name="documents_title">문서 / 사진 / 동영상</string>
+    <string name="documents_empty">아직 문서가 없습니다.</string>
+    <string name="save_document">저장</string>
+    <string name="upload_file">파일 전송</string>
+    <string name="upload_media">사진 / 동영상 전송</string>
 </resources>
