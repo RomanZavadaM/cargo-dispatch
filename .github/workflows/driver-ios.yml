@@ -179,15 +179,15 @@ jobs:
           BUNDLE="com.romanzavada.cargodispatch.driver"
           xcrun simctl install "$DEVICE" "$APP"
 
-          # Seed the r1-r5 legacy raw URL from inside the debug app before
-          # DriverStore is created. This uses the exact same sandbox UserDefaults
-          # domain as the migration code and avoids false results from external
-          # simulator preference domains.
+          # First launch supplies the old raw Driver URL through Apple's
+          # standard UserDefaults launch-argument domain. This is the same key
+          # used by r1-r5. After the authenticated connection succeeds, r6 must
+          # persist only base URL + Keychain token. The second launch has no URL.
           DATA_CONTAINER="$(xcrun simctl get_app_container "$DEVICE" "$BUNDLE" data)"
           PREFS="$DATA_CONTAINER/Library/Preferences/$BUNDLE.plist"
 
           xcrun simctl launch "$DEVICE" "$BUNDLE" \
-            --cargo-dispatch-seed-legacy-driver-url "$IOS_DRIVER_URL"
+            -cargo_dispatch_driver_url "$IOS_DRIVER_URL"
 
           FIRST_CONNECTED=0
           for _ in $(seq 1 160); do
