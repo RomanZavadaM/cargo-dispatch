@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · **🇨🇳 简体中文**
 
-> **状态：** 正在积极开发。当前测试预发布版本为 **v0.1.0-preview.4**，尚无稳定的完整产品。
+> **状态：** 正在积极开发。当前测试预发布版本为 **v0.1.0-preview.5**，尚无稳定的完整产品。
 
 ## 产品简介
 
@@ -32,6 +32,8 @@
 
 两者使用同一个 Control API，不创建独立的行程数据库。
 
+r4/r5 之后，两个原生客户端还具备用于位置和媒体的持久重试队列。Android r5 增加了通过前台定位服务进行的显式 Start/Stop 后台行程跟踪、常驻 Stop 通知以及 15 秒 / 25 米策略。Apple r5 增加显式 Start/Stop CoreLocation 后台跟踪、`UIBackgroundModes=location`、25 米过滤，并且没有独立需求时不会请求 `Always` 权限。
+
 ## Driver Browser
 
 Driver Browser 是**一个产品**，不是分别开发的手机版和桌面版。它有三种标准布局：
@@ -52,11 +54,11 @@ Control 和 Driver Browser 已经包含真正的交互式基础地图，可显�
 
 ## 测试版本
 
-当前预发布版本：[v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4)。
+当前预发布版本：[v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5)。
 
 Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback 验收的示例 PDF。
 
-这是**测试/预发布版本**，不是稳定版。Preview.4 已包含 Valhalla adapter 和 schema 1.2 road-geometry pipeline。此后 Android 与 iOS/iPadOS 原生 Driver r2+r3（包括原生地图和系统相机）以及改进的 Control→Driver URL handoff 已集成，因此 `main` 再次领先于 preview.4。
+这是**测试/预发布版本**，不是稳定版。Preview.5 固化当前 Control/Driver Browser、Valhalla schema 1.2 road-geometry pipeline，以及两个原生 Driver App 到 r5 的源代码：地图、相机/文件、持久重试队列和显式后台行程跟踪。当前公开的二进制 asset 仍是 Windows Control preview；移动端 production signing/TestFlight 仍在后续计划中。
 
 ## 后续工作
 
@@ -66,9 +68,9 @@ Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback �
 - 通过 HTTPS 完成浏览器 GPS 验收；
 - 不同网络/NAT/CGNAT 的现场测试；
 - 真实 Valhalla HTTP transport，以及重新排序后的 geometry 重算；
-- 通过真实 headless Control session 进行 connected virtual-device smoke；
-- 原生应用的后台 GPS、离线队列与安全会话存储；
+- 使用 Android Keystore + Apple Keychain 安全保存 Driver session，并迁移旧的 raw URL；
 - 稳定版本。
+
 
 ## 界面语言
 

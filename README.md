@@ -2,7 +2,7 @@
 
 **🇺🇦 Українська** · [🇬🇧 English](docs/readme/README.en.md) · [🇫🇷 Français](docs/readme/README.fr.md) · [🇩🇪 Deutsch](docs/readme/README.de.md) · [🇪🇸 Español](docs/readme/README.es.md) · [🇰🇷 한국어](docs/readme/README.ko.md) · [🇯🇵 日本語](docs/readme/README.ja.md) · [🇨🇳 简体中文](docs/readme/README.zh.md)
 
-> **Статус:** активна розробка. Поточний тестовий prerelease — **v0.1.0-preview.4**. Стабільного готового продукту ще немає.
+> **Статус:** активна розробка. Поточний тестовий prerelease — **v0.1.0-preview.5**. Стабільного готового продукту ще немає.
 
 ## Про продукт
 
@@ -34,6 +34,8 @@
 
 Обидва працюють через той самий Control API і не мають окремої бази рейсу.
 
+Після r4/r5 обидва native clients також мають надійну чергу повторної відправки координат і медіа. Android r5 має явний Start/Stop фонового відстеження через foreground location service, постійне повідомлення зі Stop і політику 15 с / 25 м. Apple r5 має явний Start/Stop фонового CoreLocation tracking, `UIBackgroundModes=location`, фільтр 25 м і не просить `Always` без окремої потреби.
+
 ## Driver Browser
 
 Driver Browser — **один продукт**, а не окремі телефонна й desktop-версії. Він має три штатні компонування:
@@ -54,11 +56,11 @@ Driver Browser — **один продукт**, а не окремі телеф�
 
 ## Тестова збірка
 
-Поточний prerelease: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
+Поточний prerelease: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
 
 Windows ZIP містить Control, синтетичний активний рейс і тестовий PDF для локального loopback-приймання.
 
-Це **test/prerelease build**, не stable. Preview.4 уже містить Valhalla adapter і schema 1.2 road-geometry pipeline. `main` знову випереджає preview.4: після його публікації інтегровано Android та iOS/iPadOS native Driver r2+r3, включно з native maps і системною камерою, а також покращено передачу Driver URL з Control.
+Це **test/prerelease build**, не stable. Preview.5 фіксує поточний Control/Driver Browser, Valhalla schema 1.2 road-geometry pipeline і вихідний код обох native Driver Apps через r5: карти, камера/файли, durable retry queue та явне фонове відстеження рейсу. Публічний бінарний asset цього preview поки лишається Windows Control; mobile production signing/TestFlight ще попереду.
 
 ## Що ще попереду
 
@@ -68,8 +70,7 @@ Windows ZIP містить Control, синтетичний активний ре
 - повний browser GPS acceptance через HTTPS;
 - польова перевірка через різні мережі/NAT/CGNAT;
 - живий Valhalla HTTP transport і перерахунок geometry після reorder;
-- connected virtual-device smoke через реальний headless Control session;
-- background GPS, offline queue та secure session storage для native apps;
+- захищене збереження Driver session: Android Keystore + Apple Keychain і міграція старого raw URL;
 - stable release.
 
 ## Мови інтерфейсу

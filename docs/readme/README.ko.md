@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · **🇰🇷 한국어** · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **상태:** 현재 개발 중입니다. 현재 테스트 프리릴리스는 **v0.1.0-preview.4**이며, 아직 안정적인 완성 제품은 없습니다.
+> **상태:** 현재 개발 중입니다. 현재 테스트 프리릴리스는 **v0.1.0-preview.5**이며, 아직 안정적인 완성 제품은 없습니다.
 
 ## 제품 소개
 
@@ -32,6 +32,8 @@
 
 두 앱 모두 동일한 Control API를 사용하며 별도 운행 데이터베이스를 만들지 않습니다.
 
+r4/r5 이후 두 native client 모두 위치와 미디어용 durable retry queue를 갖습니다. Android r5는 foreground location service, 지속적인 Stop 알림, 15초 / 25m 정책을 사용하는 명시적 Start/Stop 백그라운드 운행 추적을 추가합니다. Apple r5는 명시적 Start/Stop CoreLocation 백그라운드 추적, `UIBackgroundModes=location`, 25m 필터를 추가하며 별도 필요가 없으면 `Always` 권한을 요청하지 않습니다.
+
 ## Driver Browser
 
 Driver Browser는 전화용과 데스크톱용으로 나뉜 별도 제품이 아니라 **하나의 제품**입니다. 세 가지 기본 레이아웃을 사용합니다.
@@ -52,11 +54,11 @@ Control과 Driver Browser에는 운행 지점과 마지막으로 승인된 운�
 
 ## 테스트 빌드
 
-현재 프리릴리스: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
+현재 프리릴리스: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
 
 Windows ZIP에는 Control, 합성 활성 운행 데이터와 로컬 loopback 검사용 샘플 PDF가 포함됩니다.
 
-이 빌드는 **테스트/프리릴리스**이며 안정판이 아닙니다. Preview.4에는 이미 Valhalla adapter와 schema 1.2 road-geometry pipeline이 포함됩니다. 이후 Android와 iOS/iPadOS native Driver r2+r3(네이티브 지도와 시스템 카메라 포함) 및 개선된 Control→Driver URL handoff가 통합되어 `main`은 다시 preview.4보다 앞서 있습니다.
+이 빌드는 **테스트/프리릴리스**이며 안정판이 아닙니다. Preview.5는 현재 Control/Driver Browser, Valhalla schema 1.2 road-geometry pipeline, 그리고 r5까지의 두 native Driver App 소스(지도, 카메라/파일, durable retry queue, 명시적 백그라운드 운행 추적)를 포함합니다. 공개 바이너리 asset은 아직 Windows Control preview이며, 모바일 production signing/TestFlight는 이후 단계입니다.
 
 ## 앞으로 필요한 작업
 
@@ -66,9 +68,9 @@ Windows ZIP에는 Control, 합성 활성 운행 데이터와 로컬 loopback 검
 - HTTPS를 통한 브라우저 GPS 전체 검수;
 - 서로 다른 네트워크/NAT/CGNAT 현장 테스트;
 - 실제 Valhalla HTTP transport 및 순서 변경 후 geometry 재계산;
-- 실제 headless Control 세션을 사용하는 connected virtual-device smoke;
-- background GPS, offline queue, native app secure session storage;
+- Android Keystore + Apple Keychain을 이용한 안전한 Driver session 저장과 기존 raw URL 마이그레이션;
 - 안정판 릴리스.
+
 
 ## 인터페이스 언어
 

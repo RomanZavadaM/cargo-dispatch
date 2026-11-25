@@ -107,16 +107,18 @@ jobs:
           - інтерактивна OpenStreetMap-карта в Control і Driver Browser;
           - product Valhalla adapter і versioned schema 1.2 road geometry;
           - stale road geometry автоматично інвалідовується після reorder;
+          - у source tag інтегровані Android та iOS/iPadOS Driver через r5: native maps, camera/files, durable retry queue та explicit Start/Stop background tracking;
           - Windows GUI build без зайвого console window;
           - у ZIP є synthetic active-trip, road geometry і sample PDF для локального тесту.
 
           ### Ще не stable
           - ручний local browser acceptance ще має бути завершений власником;
-          - real phone LAN acceptance — наступний етап;
+          - real phone LAN/background GPS acceptance ще попереду;
           - browser GPS повністю приймається через HTTPS;
           - public addressing/NAT/CGNAT field path ще попереду;
           - live HTTP transport до Valhalla та автоматичний recalculation geometry ще попереду;
-          - Android та iOS/iPadOS Driver Apps розробляються окремо й не входять у Windows preview.
+          - secure Driver session storage через Android Keystore / Apple Keychain ще наступний крок;
+          - mobile production signing/TestFlight/production APK ще не завершені; release asset цього preview поки Windows-only.
 
           Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
           "@ | Set-Content -Encoding UTF8 RELEASE_NOTES.md
