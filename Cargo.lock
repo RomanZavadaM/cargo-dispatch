@@ -455,6 +455,8 @@ dependencies = [
 name = "cargo-dispatch-control-gateway-client"
 version = "0.1.0"
 dependencies = [
+ "axum",
+ "cargo-dispatch-addressing-gateway",
  "reqwest",
  "tokio",
 ]
