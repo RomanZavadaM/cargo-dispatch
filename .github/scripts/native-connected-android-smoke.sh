@@ -37,6 +37,23 @@ fi
 
 adb install -r android-apk/app-debug.apk
 
+# Seed the r1-r5 legacy raw Driver URL before first launch. r6 must reconnect
+# from it once, migrate the token into Android Keystore-backed AES/GCM storage,
+# and remove the raw URL from SharedPreferences after the connection succeeds.
+python3 - "$LOCAL_DRIVER_URL" <<'PY' > cargo_session_legacy.xml
+import html, sys
+url = html.escape(sys.argv[1], quote=True)
+print("""<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="driver_url">%s</string>
+    <boolean name="emulator_mode" value="false" />
+</map>""" % url)
+PY
+adb push cargo_session_legacy.xml /data/local/tmp/cargo_session_legacy.xml >/dev/null
+adb shell run-as "$PACKAGE" mkdir -p shared_prefs
+adb shell run-as "$PACKAGE" cp /data/local/tmp/cargo_session_legacy.xml shared_prefs/cargo_dispatch_driver_session.xml
+adb shell run-as "$PACKAGE" chmod 600 shared_prefs/cargo_dispatch_driver_session.xml
+
 HOST_PORT="$(python3 - "$LOCAL_DRIVER_URL" <<'PY'
 from urllib.parse import urlparse
 import sys
@@ -51,7 +68,7 @@ adb reverse "tcp:$HOST_PORT" "tcp:$HOST_PORT"
 # Use the real Control localhost URL through adb reverse. Emulator localhost mapping
 # remains covered by unit/earlier smoke tests; this removes flaky hosted-runner NAT
 # from the background-tracking acceptance path.
-adb shell am start -W   -n "$ACTIVITY"   --es cargo_dispatch_driver_url "$LOCAL_DRIVER_URL"   --ez cargo_dispatch_emulator_mode false
+adb shell am start -W -n "$ACTIVITY"
 
 CONNECTED=0
 for _ in $(seq 1 40); do
@@ -68,6 +85,45 @@ if [ "$CONNECTED" -ne 1 ]; then
   echo "Android Driver did not show the connected synthetic trip." >&2
   cat "$WINDOW_XML" || true
   adb logcat -d -t 300 || true
+  exit 1
+fi
+
+SESSION_PREFS="$(adb shell run-as "$PACKAGE" cat shared_prefs/cargo_dispatch_driver_session.xml)"
+if grep -q 'native-smoke-session-00000001' <<<"$SESSION_PREFS"; then
+  echo "Raw Driver session token remained in SharedPreferences after migration." >&2
+  echo "$SESSION_PREFS" >&2
+  exit 1
+fi
+if ! grep -q 'token_ciphertext' <<<"$SESSION_PREFS" || ! grep -q 'token_iv' <<<"$SESSION_PREFS"; then
+  echo "Encrypted Driver token fields were not persisted." >&2
+  echo "$SESSION_PREFS" >&2
+  exit 1
+fi
+
+# Process restart must reconnect from the encrypted token without an intent URL.
+adb shell am force-stop "$PACKAGE"
+adb shell am start -W -n "$ACTIVITY"
+RECONNECTED=0
+for _ in $(seq 1 40); do
+  adb shell uiautomator dump /sdcard/cargo-driver-window.xml >/dev/null 2>&1 || true
+  adb exec-out cat /sdcard/cargo-driver-window.xml >"$WINDOW_XML" 2>/dev/null || true
+  if grep -q '41414141' "$WINDOW_XML"; then
+    RECONNECTED=1
+    break
+  fi
+  sleep 1
+done
+if [ "$RECONNECTED" -ne 1 ]; then
+  echo "Android Driver did not reconnect from Keystore-protected session after process restart." >&2
+  cat "$WINDOW_XML" || true
+  adb logcat -d -t 300 || true
+  exit 1
+fi
+
+SESSION_PREFS_AFTER_RESTART="$(adb shell run-as "$PACKAGE" cat shared_prefs/cargo_dispatch_driver_session.xml)"
+if grep -q 'native-smoke-session-00000001' <<<"$SESSION_PREFS_AFTER_RESTART"; then
+  echo "Raw Driver session token appeared in SharedPreferences after restart." >&2
+  echo "$SESSION_PREFS_AFTER_RESTART" >&2
   exit 1
 fi
 
