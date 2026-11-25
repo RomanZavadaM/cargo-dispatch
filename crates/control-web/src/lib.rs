@@ -41,6 +41,7 @@ const DRIVER_HTML: &str = r#"<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Cargo Dispatch — рейс</title>
 <style>
 :root{font-family:system-ui,sans-serif;color:#202124;background:#f6f7f8}
@@ -164,7 +165,8 @@ const tripMapState = {
   dragStartX: 0,
   dragStartY: 0,
   dragCenterX: 0,
-  dragCenterY: 0
+  dragCenterY: 0,
+  dataSignature: ""
 };
 
 function mapClampLat(latitude) {
@@ -246,7 +248,6 @@ function renderTripMap() {
       image.alt = "";
       image.draggable = false;
       image.loading = "lazy";
-      image.referrerPolicy = "no-referrer";
       image.src = "https://tile.openstreetmap.org/" + zoom + "/" + wrappedX + "/" + tileY + ".png";
       image.style.left = (tileX * 256 - left) + "px";
       image.style.top = (tileY * 256 - top) + "px";
@@ -303,6 +304,9 @@ function fitTripMap() {
 }
 
 function updateTripMap() {
+  const signature = JSON.stringify(tripMapCoordinates());
+  if (tripMapState.initialized && signature === tripMapState.dataSignature) return;
+  tripMapState.dataSignature = signature;
   if (!tripMapState.initialized) {
     fitTripMap();
   } else {
@@ -1536,6 +1540,8 @@ mod tests {
         assert!(DRIVER_HTML.contains("id=\"tripMap\""));
         assert!(DRIVER_HTML.contains("tile.openstreetmap.org"));
         assert!(DRIVER_HTML.contains("© OpenStreetMap contributors"));
+        assert!(DRIVER_HTML.contains("strict-origin-when-cross-origin"));
+        assert!(!DRIVER_HTML.contains("referrerPolicy = \"no-referrer\""));
         assert!(DRIVER_HTML.contains("id=\"routeSection\""));
         assert!(DRIVER_HTML.contains("id=\"filesSection\""));
         assert!(DRIVER_HTML.contains("id=\"locationSection\""));
