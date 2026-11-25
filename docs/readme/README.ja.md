@@ -79,8 +79,6 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 - HTTPS 経由での browser GPS 完全受け入れ;
 - 異なるネットワーク/NAT/CGNAT でのフィールドテスト;
 - 実 Valhalla HTTP transport と reorder 後の geometry 再計算;
-- Android Keystore + Apple Keychain による安全な Driver session 保存と旧 raw URL の移行;
-- stable release.
 
 
 ## インターフェース言語
