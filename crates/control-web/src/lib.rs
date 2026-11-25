@@ -1470,6 +1470,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).expect("operator"),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+        route_geometry: None,
         };
         export_package(&package, &draft, &route)?;
         let folder = TripFolder::import(&folder, &package)?;
