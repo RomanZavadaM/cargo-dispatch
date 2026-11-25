@@ -317,7 +317,9 @@ impl DesktopControlService {
 
         let internal_server = LoopbackControlServer::start(self.browser.clone())
             .await
-            .map_err(|error| format!("Не вдалося запустити внутрішній Control listener: {error}"))?;
+            .map_err(|error| {
+                format!("Не вдалося запустити внутрішній Control listener: {error}")
+            })?;
         let local_control_base_url = format!("http://{}", internal_server.address());
 
         let mut prepared = Vec::new();
@@ -403,11 +405,9 @@ impl DesktopControlService {
                 let _ = relay.client.unregister().await;
                 relay.task.abort();
             }
-            gateway
-                .internal_server
-                .shutdown()
-                .await
-                .map_err(|error| format!("Не вдалося зупинити внутрішній Gateway listener: {error}"))?;
+            gateway.internal_server.shutdown().await.map_err(|error| {
+                format!("Не вдалося зупинити внутрішній Gateway listener: {error}")
+            })?;
         }
         self.status().await
     }
@@ -692,9 +692,7 @@ async fn start_gateway(
 }
 
 #[tauri::command]
-async fn stop_gateway(
-    state: State<'_, DesktopControlService>,
-) -> Result<ControlUiStatus, String> {
+async fn stop_gateway(state: State<'_, DesktopControlService>) -> Result<ControlUiStatus, String> {
     state.stop_gateway().await
 }
 
@@ -847,9 +845,12 @@ mod tests {
         let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
         let gateway_address = listener.local_addr()?;
         let gateway = tokio::spawn(async move {
-            axum::serve(listener, gateway_router(GatewayState::new(secret, 1024 * 1024)))
-                .await
-                .expect("gateway server");
+            axum::serve(
+                listener,
+                gateway_router(GatewayState::new(secret, 1024 * 1024)),
+            )
+            .await
+            .expect("gateway server");
         });
 
         let running = service
