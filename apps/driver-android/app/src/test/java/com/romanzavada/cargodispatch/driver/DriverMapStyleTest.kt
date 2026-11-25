@@ -74,6 +74,8 @@ class DriverMapStyleTest {
 
         assertTrue(style.contains(DriverMapStyle.OSM_TILE_URL))
         assertTrue(style.contains(DriverMapStyle.OSM_ATTRIBUTION))
+        assertTrue(style.contains(DriverMapStyle.FALLBACK_BACKGROUND))
+        assertTrue(style.contains("\"type\":\"background\""))
         assertTrue(style.contains("LineString"))
         assertTrue(style.contains("49.841"))
         assertTrue(style.contains("24.0311"))
