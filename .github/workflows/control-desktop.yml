@@ -137,6 +137,9 @@ jobs:
       - name: Build Control test executable
         run: cargo build --locked -p cargo-dispatch-control-desktop --release
 
+      - name: Create synthetic local test trip
+        run: cargo run --locked -p cargo-dispatch-trip-files --example local_browser_fixture -- local-browser-test-data
+
       - name: Write local test instructions
         shell: pwsh
         run: |
@@ -144,15 +147,16 @@ jobs:
           Cargo Dispatch Control — local Driver Browser test
 
           1. Run cargo-dispatch-control-desktop.exe.
-          2. Select an active trip folder and connect it.
+          2. Select local-browser-test-data\active-trip and connect it.
           3. Start "Локально 127.0.0.1".
           4. Open the Driver URL shown by Control in a normal browser.
           5. Test the same URL at wide desktop/laptop, tablet and narrow phone viewport widths.
-          6. Check route reorder, Control -> Browser files/PDF, Browser -> Control file/photo/video,
-             two browser clients, and refresh/reconnect.
-          7. Check the real OpenStreetMap view in both Control and Driver Browser: pan/zoom/fit,
+          6. Use local-browser-test-data\sample-control-to-driver.pdf for Control -> Browser PDF.
+             Then send any local file/photo/video from Browser -> Control and save it from Control.
+          7. Check route reorder in both directions, two browser clients, and refresh/reconnect.
+          8. Check the real OpenStreetMap view in both Control and Driver Browser: pan/zoom/fit,
              route-point markers and the latest accepted driver position.
-          8. The map currently shows points/position, not Valhalla road geometry.
+          9. The map currently shows points/position, not Valhalla road geometry.
 
           This is a CI test artifact, not a release.
           "@ | Set-Content -Encoding UTF8 LOCAL_BROWSER_TEST.txt
@@ -165,5 +169,6 @@ jobs:
             target/release/cargo-dispatch-control-desktop.exe
             LOCAL_BROWSER_TEST.txt
             THIRD_PARTY_NOTICES.md
+            local-browser-test-data/**
           if-no-files-found: error
           retention-days: 7
