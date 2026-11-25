@@ -5,13 +5,14 @@
 Це короткий public anchor. Повний стан і журнали — private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
 
 ## Live checkpoints
-- Current product main before preview.5 publication: `99c4654e7183424d28adb72ecbb859c0e3b45bc7`.
+- Preview.5 release/source commit: `3f3e3897cbd003ff709f588c6351ce5a3f7cfe44`.
 - Android Driver r5 merged as `a366f8f8c4ee42dd8202b3dddce7de13948d93d6`.
 - Apple Driver r5 exact head `244cb35321189bcf4a0c77c8d35c5d74a772aa51` passed core/build/Info.plist/connected Simulator smoke and merged as `99c4654e7183424d28adb72ecbb859c0e3b45bc7`.
-- Test prerelease staged here: `v0.1.0-preview.5`.
+- Published test prerelease: `v0.1.0-preview.5`.
+- Windows ZIP SHA-256: `f0365e86db54a0ee3190bbf60ce8e09a08540649110460ebe7776ac819c0ddfc`.
 - Stable release ще немає.
 
-## Native clients у main
+## Native clients у release source
 Android та iPhone/iPad використовують той самий Control API, що Driver Browser:
 - snapshot, complete, reorder;
 - native maps + current road geometry/markers/latest position;
