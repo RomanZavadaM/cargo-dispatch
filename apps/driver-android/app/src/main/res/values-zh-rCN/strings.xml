@@ -36,4 +36,5 @@
     <string name="map_provider_note">OpenStreetMap · 仅在道路几何仍为当前版本时显示路线。</string>
     <string name="capture_photo">拍照</string>
     <string name="capture_video">录制视频</string>
+    <string name="pending_outbound">连接恢复后等待发送：%1$d</string>
 </resources>

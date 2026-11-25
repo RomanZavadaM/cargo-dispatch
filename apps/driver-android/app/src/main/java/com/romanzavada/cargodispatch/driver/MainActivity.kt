@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -74,6 +78,7 @@ private fun DriverScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val sessionPreferences = remember { SessionPreferences(context.applicationContext) }
     val locationProvider = remember { ForegroundLocationProvider(context.applicationContext) }
     var pendingSave by remember { mutableStateOf<DriverDocument?>(null) }
@@ -154,6 +159,18 @@ private fun DriverScreen(
     LaunchedEffect(state.connectedBaseUrl) {
         if (state.connectedBaseUrl != null) {
             sessionPreferences.save(state.driverUrl, state.emulatorMode)
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, state.connectedBaseUrl) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && state.connectedBaseUrl != null) {
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -326,6 +343,12 @@ private fun ConnectionCard(
             }
             state.connectedBaseUrl?.let {
                 Text(stringResource(R.string.control_prefix, it), style = MaterialTheme.typography.bodySmall)
+            }
+            if (state.pendingOutbound > 0) {
+                Text(
+                    stringResource(R.string.pending_outbound, state.pendingOutbound),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

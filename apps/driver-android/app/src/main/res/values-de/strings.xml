@@ -36,4 +36,5 @@
     <string name="map_provider_note">OpenStreetMap · die Straßenlinie wird nur für aktuelle Geometrie angezeigt.</string>
     <string name="capture_photo">Foto aufnehmen</string>
     <string name="capture_video">Video aufnehmen</string>
+    <string name="pending_outbound">Wartet nach Wiederherstellung der Verbindung auf Übertragung: %1$d</string>
 </resources>
