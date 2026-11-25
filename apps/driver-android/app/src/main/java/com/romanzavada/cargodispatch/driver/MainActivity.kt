@@ -327,6 +327,12 @@ private fun ConnectionCard(
             state.connectedBaseUrl?.let {
                 Text(stringResource(R.string.control_prefix, it), style = MaterialTheme.typography.bodySmall)
             }
+            if (state.pendingOutbound > 0) {
+                Text(
+                    stringResource(R.string.pending_outbound, state.pendingOutbound),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
     }
 }
