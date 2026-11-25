@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "crates/addressing-gateway",
+  "crates/control-gateway-client",
   "crates/domain",
   "crates/contracts",
   "crates/geo",
