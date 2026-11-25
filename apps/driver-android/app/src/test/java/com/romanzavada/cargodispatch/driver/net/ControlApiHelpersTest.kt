@@ -1,6 +1,6 @@
 package com.romanzavada.cargodispatch.driver.net
 
-import kotlin.test.Test
+import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
