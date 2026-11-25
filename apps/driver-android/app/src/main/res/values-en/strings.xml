@@ -36,4 +36,5 @@
     <string name="map_provider_note">OpenStreetMap · the road line is shown only for current geometry.</string>
     <string name="capture_photo">Take photo</string>
     <string name="capture_video">Record video</string>
+    <string name="pending_outbound">Waiting to send after connection returns: %1$d</string>
 </resources>
