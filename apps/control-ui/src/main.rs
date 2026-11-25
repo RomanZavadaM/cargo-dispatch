@@ -2,6 +2,7 @@
 
 mod i18n;
 
+// UI language is selected at runtime and persisted in the desktop webview.
 use crate::i18n::{UiLocale, strings};
 use cargo_dispatch_control_ui_contracts::{
     ControlUiStatus, DashboardDocumentDirection, DashboardPoint, ListenerMode,
