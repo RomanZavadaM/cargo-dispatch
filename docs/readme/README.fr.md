@@ -71,6 +71,8 @@ Les packages Android et Apple ne sont pas encore signés pour les stores. App St
 
 ## Étapes restantes
 
+- UI desktop Planner/editor et builds de release pour Windows, macOS et Linux ;
+
 - validation manuelle locale dans le navigateur ;
 - test du même Driver Browser sur un vrai téléphone dans le même LAN ;
 - chemin HTTPS/adressage public ;
