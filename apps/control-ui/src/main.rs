@@ -521,7 +521,7 @@ fn ControlApp() -> impl IntoView {
     let refresh_dashboard = move |_| {
         let active = selected_token.get_untracked();
         if active.is_empty() {
-            message.set("Спочатку виберіть browser session.".to_owned());
+            message.set(strings(locale.get_untracked()).choose_session_first.to_owned());
             error.set(true);
             return;
         }
@@ -560,7 +560,7 @@ fn ControlApp() -> impl IntoView {
             return;
         }
         busy.set(true);
-        message.set("Відкриваю папку рейсу…".to_owned());
+        message.set(strings(locale.get_untracked()).opening_trip.to_owned());
         error.set(false);
         let input = RegisterTripInput {
             folder_path: folder.get_untracked(),
@@ -568,7 +568,7 @@ fn ControlApp() -> impl IntoView {
         };
         spawn_local(async move {
             let result = invoke("register_trip", &serde_json::json!({ "input": input })).await;
-            set_status_result(result, "Рейс зареєстрований у Control.");
+            set_status_result(result, strings(locale.get_untracked()).trip_registered);
         });
     };
 
@@ -579,7 +579,7 @@ fn ControlApp() -> impl IntoView {
         busy.set(true);
         spawn_local(async move {
             let result = invoke("start_loopback", &serde_json::json!({})).await;
-            set_status_result(result, "Loopback-трансляцію запущено.");
+            set_status_result(result, strings(locale.get_untracked()).loopback_started);
         });
     };
 
@@ -590,7 +590,7 @@ fn ControlApp() -> impl IntoView {
         let port = match lan_port.get_untracked().trim().parse::<u16>() {
             Ok(port) if port > 0 => port,
             _ => {
-                message.set("Порт має бути числом 1–65535.".to_owned());
+                message.set(strings(locale.get_untracked()).invalid_port.to_owned());
                 error.set(true);
                 return;
             }
@@ -602,7 +602,7 @@ fn ControlApp() -> impl IntoView {
         };
         spawn_local(async move {
             let result = invoke("start_lan", &serde_json::json!({ "input": input })).await;
-            set_status_result(result, "LAN test mode запущено.");
+            set_status_result(result, strings(locale.get_untracked()).lan_started);
         });
     };
 
@@ -613,12 +613,12 @@ fn ControlApp() -> impl IntoView {
         let base_url = gateway_url.get_untracked().trim().to_owned();
         let secret = gateway_secret.get_untracked();
         if base_url.is_empty() {
-            message.set("Вкажіть публічну HTTPS-адресу Gateway.".to_owned());
+            message.set(strings(locale.get_untracked()).gateway_url_required.to_owned());
             error.set(true);
             return;
         }
         if secret.len() < 32 {
-            message.set("Control secret має містити щонайменше 32 символи.".to_owned());
+            message.set(strings(locale.get_untracked()).secret_too_short.to_owned());
             error.set(true);
             return;
         }
@@ -630,7 +630,7 @@ fn ControlApp() -> impl IntoView {
         };
         spawn_local(async move {
             let result = invoke("start_gateway", &serde_json::json!({ "input": input })).await;
-            set_status_result(result, "Публічну Gateway-трансляцію запущено.");
+            set_status_result(result, strings(locale.get_untracked()).gateway_started);
         });
     };
 
@@ -641,7 +641,7 @@ fn ControlApp() -> impl IntoView {
         busy.set(true);
         spawn_local(async move {
             let result = invoke("stop_gateway", &serde_json::json!({})).await;
-            set_status_result(result, "Публічну Gateway-трансляцію вимкнено.");
+            set_status_result(result, strings(locale.get_untracked()).gateway_stopped);
         });
     };
 
@@ -652,7 +652,7 @@ fn ControlApp() -> impl IntoView {
         busy.set(true);
         spawn_local(async move {
             let result = invoke("stop_browser_server", &serde_json::json!({})).await;
-            set_status_result(result, "Трансляцію вимкнено. Рейс лишився зареєстрованим.");
+            set_status_result(result, strings(locale.get_untracked()).broadcast_stopped);
         });
     };
 
@@ -679,12 +679,12 @@ fn ControlApp() -> impl IntoView {
         }
         let active = selected_token.get_untracked();
         let Some(file) = picked_file.get_untracked() else {
-            message.set("Спочатку виберіть файл.".to_owned());
+            message.set(strings(locale.get_untracked()).choose_file_first.to_owned());
             error.set(true);
             return;
         };
         if active.is_empty() {
-            message.set("Спочатку виберіть browser session.".to_owned());
+            message.set(strings(locale.get_untracked()).choose_session_first.to_owned());
             error.set(true);
             return;
         }
@@ -709,7 +709,7 @@ fn ControlApp() -> impl IntoView {
                 Ok(current) => {
                     dashboard.set(Some(current));
                     picked_file.set(None);
-                    message.set("Файл записаний у рейс і доступний водієві.".to_owned());
+                    message.set(strings(locale.get_untracked()).file_sent.to_owned());
                     error.set(false);
                 }
                 Err(problem) => {
@@ -724,18 +724,38 @@ fn ControlApp() -> impl IntoView {
     view! {
         <main>
             <header>
-                <p>"Cargo Dispatch"</p>
-                <h1>"Control — рейс і трансляція"</h1>
-                <p class="note">
-                    "Control є єдиним джерелом факту рейсу. Desktop UI і Driver Browser працюють з тим самим durable state."
-                </p>
+                <div class="actions">
+                    <p>"Cargo Dispatch"</p>
+                    <label>
+                        {move || strings(locale.get()).language}
+                        <select
+                            id="control-language"
+                            prop:value=move || locale.get().code()
+                            on:change=move |event| {
+                                let next = UiLocale::parse(&event_target_value(&event));
+                                locale.set(next);
+                                cargo_control_set_locale(next.code());
+                            }
+                        >
+                            <For
+                                each=move || UiLocale::ALL
+                                key=|item| item.code()
+                                children=move |item| view! {
+                                    <option value=item.code()>{item.label()}</option>
+                                }
+                            />
+                        </select>
+                    </label>
+                </div>
+                <h1>{move || strings(locale.get()).title}</h1>
+                <p class="note">{move || strings(locale.get()).subtitle}</p>
             </header>
 
             <section>
-                <h2>"1. Підключити рейс"</h2>
+                <h2>{move || strings(locale.get()).connect_trip}</h2>
                 <div class="grid">
                     <label>
-                        "Папка активного рейсу"
+                        {move || strings(locale.get()).trip_folder}
                         <input
                             id="trip-folder"
                             type="text"
@@ -745,7 +765,7 @@ fn ControlApp() -> impl IntoView {
                         />
                     </label>
                     <label>
-                        "Session token (згенеровано автоматично)"
+                        {move || strings(locale.get()).session_token}
                         <input
                             id="session-token"
                             type="text"
@@ -757,24 +777,24 @@ fn ControlApp() -> impl IntoView {
                 </div>
                 <div class="actions">
                     <button type="button" on:click=pick_folder disabled=move || busy.get()>
-                        "Вибрати папку…"
+                        {move || strings(locale.get()).choose_folder}
                     </button>
                     <button class="primary" type="button" on:click=register disabled=move || busy.get()>
-                        "Підключити рейс"
+                        {move || strings(locale.get()).connect}
                     </button>
                 </div>
             </section>
 
             <section>
-                <h2>"2. Трансляція"</h2>
+                <h2>{move || strings(locale.get()).broadcast}</h2>
                 <div class="actions">
                     <button type="button" on:click=start_loopback disabled=move || busy.get()>
-                        "Локально 127.0.0.1"
+                        {move || strings(locale.get()).local_loopback}
                     </button>
                 </div>
                 <div class="grid">
                     <label>
-                        "LAN-адреса цього комп'ютера"
+                        {move || strings(locale.get()).lan_address}
                         <input
                             id="lan-ip"
                             type="text"
@@ -784,7 +804,7 @@ fn ControlApp() -> impl IntoView {
                         />
                     </label>
                     <label>
-                        "Порт"
+                        {move || strings(locale.get()).port}
                         <input
                             id="lan-port"
                             type="number"
@@ -797,19 +817,17 @@ fn ControlApp() -> impl IntoView {
                 </div>
                 <div class="actions">
                     <button class="primary" type="button" on:click=start_lan disabled=move || busy.get()>
-                        "Увімкнути LAN test mode"
+                        {move || strings(locale.get()).enable_lan}
                     </button>
                     <button class="danger" type="button" on:click=stop disabled=move || busy.get()>
-                        "Вимкнути трансляцію"
+                        {move || strings(locale.get()).stop_broadcast}
                     </button>
                 </div>
-                <p class="note">
-                    "LAN не відкриває роутер/NAT автоматично. Route/files/media працюють напряму; GPS у телефонному браузері через HTTP зазвичай потребує HTTPS."
-                </p>
-                <h3>"Публічно через Gateway"</h3>
+                <p class="note">{move || strings(locale.get()).lan_note}</p>
+                <h3>{move || strings(locale.get()).public_gateway}</h3>
                 <div class="grid">
                     <label>
-                        "Публічна адреса Gateway"
+                        {move || strings(locale.get()).gateway_address}
                         <input
                             id="gateway-url"
                             type="url"
@@ -819,7 +837,7 @@ fn ControlApp() -> impl IntoView {
                         />
                     </label>
                     <label>
-                        "Control secret"
+                        {move || strings(locale.get()).control_secret}
                         <input
                             id="gateway-secret"
                             type="password"
@@ -832,19 +850,17 @@ fn ControlApp() -> impl IntoView {
                 </div>
                 <div class="actions">
                     <button class="primary" type="button" on:click=start_gateway disabled=move || busy.get()>
-                        "Увімкнути публічну трансляцію"
+                        {move || strings(locale.get()).enable_gateway}
                     </button>
                     <button type="button" on:click=stop_gateway disabled=move || busy.get()>
-                        "Вимкнути Gateway"
+                        {move || strings(locale.get()).disable_gateway}
                     </button>
                 </div>
-                <p class="note">
-                    "Control сам виходить на Gateway через HTTPS. Порт на цьому комп'ютері відкривати не треба; Gateway не зберігає рейс, документи чи історію позицій."
-                </p>
+                <p class="note">{move || strings(locale.get()).gateway_note}</p>
             </section>
 
             <section>
-                <h2>"3. Browser sessions"</h2>
+                <h2>{move || strings(locale.get()).browser_sessions}</h2>
                 <div class="status">
                     {move || {
                         status.get().map(|current| {
@@ -854,21 +870,27 @@ fn ControlApp() -> impl IntoView {
                                         ListenerMode::Loopback => "loopback",
                                         ListenerMode::Lan => "LAN",
                                     };
-                                    format!("Listener: {mode} · {}", listener.address)
+                                    format!(
+                                        "{}: {mode} · {}",
+                                        strings(locale.get()).listener,
+                                        listener.address
+                                    )
                                 }
-                                None => "Listener вимкнений".to_owned(),
+                                None => strings(locale.get()).listener_off.to_owned(),
                             };
                             let public = match current.gateway {
                                 Some(gateway) => format!(
-                                    "Gateway: {} · активні {}/{}",
+                                    "{}: {} · {} {}/{}",
+                                    strings(locale.get()).gateway,
                                     gateway.base_url,
+                                    strings(locale.get()).active,
                                     gateway.active_sessions,
                                     gateway.total_sessions
                                 ),
-                                None => "Gateway вимкнений".to_owned(),
+                                None => strings(locale.get()).gateway_off.to_owned(),
                             };
                             format!("{local} · {public}")
-                        }).unwrap_or_else(|| "Читаю стан…".to_owned())
+                        }).unwrap_or_else(|| strings(locale.get()).reading_state.to_owned())
                     }}
                 </div>
                 <ul>
@@ -883,20 +905,23 @@ fn ControlApp() -> impl IntoView {
                             let public_url = session.public_driver_url.clone();
                             view! {
                                 <li>
-                                    <div><strong>"Trip: "</strong><code>{trip}</code></div>
+                                    <div><strong>{move || format!("{}: ", strings(locale.get()).trip)}</strong><code>{trip}</code></div>
                                     {public_url.map(|driver_url| {
                                         let href = driver_url.clone();
                                         let copy_url = driver_url.clone();
                                         view! {
                                             <div>
-                                                <strong>"Публічний Driver URL: "</strong>
+                                                <strong>{move || format!("{}: ", strings(locale.get()).public_driver_url)}</strong>
                                                 <div class="actions">
-                                                    <a href=href target="_blank" rel="noopener">"Відкрити"</a>
+                                                    <a href=href target="_blank" rel="noopener">{move || strings(locale.get()).open}</a>
                                                     <button
                                                         type="button"
-                                                        on:click=move |_| cargo_control_copy_text(&copy_url)
+                                                        on:click=move |_| cargo_control_copy_text(
+                                                            &copy_url,
+                                                            strings(locale.get_untracked()).copy_driver_url,
+                                                        )
                                                     >
-                                                        "Копіювати"
+                                                        {move || strings(locale.get()).copy}
                                                     </button>
                                                 </div>
                                             </div>
@@ -907,22 +932,22 @@ fn ControlApp() -> impl IntoView {
                                         let copy_url = driver_url.clone();
                                         view! {
                                             <div>
-                                                <strong>"Локальний Driver URL: "</strong>
+                                                <strong>{move || format!("{}: ", strings(locale.get()).local_driver_url)}</strong>
                                                 <div class="actions">
-                                                    <a href=href target="_blank" rel="noopener">"Відкрити"</a>
+                                                    <a href=href target="_blank" rel="noopener">{move || strings(locale.get()).open}</a>
                                                     <button
                                                         type="button"
                                                         on:click=move |_| cargo_control_copy_text(&copy_url)
                                                     >
-                                                        "Копіювати"
+                                                        {move || strings(locale.get()).copy}
                                                     </button>
                                                 </div>
                                             </div>
                                         }
                                     })}
                                     <details>
-                                        <summary>"Технічні дані"</summary>
-                                        <div><strong>"Token: "</strong><code>{session_token}</code></div>
+                                        <summary>{move || strings(locale.get()).technical_data}</summary>
+                                        <div><strong>{move || format!("{}: ", strings(locale.get()).token)}</strong><code>{session_token}</code></div>
                                     </details>
                                     <button
                                         type="button"
@@ -938,7 +963,7 @@ fn ControlApp() -> impl IntoView {
                                             });
                                         }
                                     >
-                                        "Відкрити в dashboard"
+                                        {move || strings(locale.get()).open_dashboard}
                                     </button>
                                 </li>
                             }
