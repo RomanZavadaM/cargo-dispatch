@@ -18,8 +18,6 @@ public enum SessionLinkError: Error, Equatable {
 }
 
 public enum SessionLink {
-    private static let tokenPattern = /^[A-Za-z0-9_-]{16,128}$/
-
     public static func parseDriverURL(_ raw: String) throws -> SessionTarget {
         guard let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
               let scheme = url.scheme?.lowercased(),
@@ -35,7 +33,9 @@ public enum SessionLink {
             throw SessionLinkError.invalidPath
         }
         let token = segments[1]
-        guard token.wholeMatch(of: tokenPattern) != nil else {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-"))
+        guard (16...128).contains(token.count),
+              token.unicodeScalars.allSatisfy({ allowed.contains($0) }) else {
             throw SessionLinkError.invalidToken
         }
 
