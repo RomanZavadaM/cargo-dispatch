@@ -724,10 +724,12 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cargo_dispatch_addressing_gateway::{GatewayState, router as gateway_router};
     use cargo_dispatch_contracts::{TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion};
     use cargo_dispatch_domain::{OperatorId, PointId, TripId, WorkingRouteId};
     use cargo_dispatch_planner::PlannerTripExportDraft;
     use cargo_dispatch_trip_files::export_package;
+    use tokio::net::TcpListener;
 
     fn create_trip(root: &std::path::Path) -> std::io::Result<(TripId, PathBuf)> {
         let trip = TripId::from_bytes([21; 16]).expect("trip");
@@ -823,6 +825,61 @@ mod tests {
         assert_eq!(verified.original_name, "operator-note.pdf");
         assert_eq!(std::fs::read(source)?, b"synthetic operator document");
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn desktop_service_relays_real_driver_page_through_gateway() -> std::io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (_trip, folder) = create_trip(tmp.path())?;
+        let service = DesktopControlService::default();
+        let token = "desktop-gateway-session-0001";
+        let secret = "desktop-gateway-control-secret-0001";
+
+        service
+            .register_trip(RegisterTripInput {
+                folder_path: folder.to_string_lossy().into_owned(),
+                token: token.to_owned(),
+            })
+            .await
+            .expect("trip registers");
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+        let gateway_address = listener.local_addr()?;
+        let gateway = tokio::spawn(async move {
+            axum::serve(listener, gateway_router(GatewayState::new(secret, 1024 * 1024)))
+                .await
+                .expect("gateway server");
+        });
+
+        let running = service
+            .start_gateway(StartGatewayInput {
+                gateway_base_url: format!("http://{gateway_address}"),
+                control_secret: secret.to_owned(),
+            })
+            .await
+            .expect("gateway starts");
+
+        let gateway_status = running.gateway.expect("gateway status");
+        assert_eq!(gateway_status.total_sessions, 1);
+        assert_eq!(gateway_status.active_sessions, 1);
+        let public_url = running.sessions[0]
+            .public_driver_url
+            .clone()
+            .expect("public Driver URL");
+        assert!(public_url.contains(token));
+
+        let response = reqwest::get(public_url).await.expect("public Driver page");
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        let page = response.text().await.expect("Driver page body");
+        assert!(page.contains("Cargo Dispatch"));
+        assert!(page.contains("Документи / фото / відео"));
+
+        let stopped = service.stop_gateway().await.expect("gateway stops");
+        assert!(stopped.gateway.is_none());
+        assert!(stopped.sessions[0].public_driver_url.is_none());
+
+        gateway.abort();
         Ok(())
     }
 
