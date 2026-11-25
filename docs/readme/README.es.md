@@ -79,13 +79,11 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 - validación completa del GPS del navegador mediante HTTPS;
 - pruebas de campo en distintas redes/NAT/CGNAT;
 - transporte HTTP real de Valhalla y recálculo de geometría tras reorder;
-- almacenamiento seguro de la sesión Driver con Android Keystore + Apple Keychain y migración de la antigua URL sin cifrar;
-- versión estable.
 
 
 ## Idiomas de la interfaz
 
-La interfaz desktop/browser integrada implementa actualmente **ucraniano, inglés y alemán**. Los nuevos clientes nativos Android e iOS/iPadOS incorporan desde el primer ekran los paquetes **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**, y la documentación usa el mismo conjunto de idiomas.
+Control, Driver Browser, Android Driver e iOS/iPadOS Driver implementan y verifican automáticamente todo el conjunto de idiomas del proyecto: **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control y Driver Browser usan por defecto el idioma del sistema y también permiten una selección manual persistente. La documentación usa el mismo conjunto de idiomas.
 
 ## Documentación
 
