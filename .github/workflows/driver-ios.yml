@@ -208,36 +208,19 @@ jobs:
             exit 1
           fi
 
-          # Let the post-refresh secure save finish, then stop the first process
-          # so UserDefaults is flushed to its real on-disk state.
+          # Stop the first process after the authenticated save. Do not use
+          # immediate plist-file visibility as the persistence oracle: UserDefaults
+          # is mediated by cfprefsd and its on-disk plist may lag behind the value
+          # already committed for the next process.
           sleep 1
           xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
           sleep 1
 
-          if [ ! -f "$PREFS" ]; then
-            echo "Apple Driver preferences were not persisted after first connection." >&2
-            exit 1
-          fi
-
-          plutil -p "$PREFS"
-          python3 - "$PREFS" <<'PY'
-          import plistlib, sys
-          with open(sys.argv[1], "rb") as handle:
-              prefs = plistlib.load(handle)
-          raw = prefs.get("cargo_dispatch_driver_url")
-          base = prefs.get("cargo_dispatch_driver_base_url")
-          if raw is not None:
-              raise SystemExit("legacy raw Driver URL remained in app UserDefaults")
-          if not isinstance(base, str) or not base:
-              raise SystemExit("non-secret Driver base URL was not persisted")
-          if "native-smoke-session-00000001" in repr(prefs):
-              raise SystemExit("raw Driver token remained in app UserDefaults")
-          PY
-
           REQUESTS_BEFORE_RELAUNCH="$(grep -c '^GET /api/trip/native-smoke-session-00000001 ' apps/driver-ios/native-proxy-requests.log || true)"
 
-          # Relaunch with no Driver URL. Any new trip request proves the app
-          # reconstructed the session from UserDefaults base URL + Keychain token.
+          # Relaunch with no Driver URL. A new authenticated trip request is the
+          # decisive end-to-end proof that the second process reconstructed the
+          # session from persisted non-secret base URL + Keychain token.
           xcrun simctl launch "$DEVICE" "$BUNDLE"
 
           RECONNECTED=0
@@ -250,14 +233,39 @@ jobs:
             sleep 0.5
           done
           if [ "$RECONNECTED" -ne 1 ]; then
-            echo "Apple Driver did not reconnect from Keychain after relaunch." >&2
-            plutil -p "$PREFS" || true
+            echo "Apple Driver did not reconnect from persisted Keychain session after relaunch." >&2
+            if [ -f "$PREFS" ]; then
+              plutil -p "$PREFS" || true
+            fi
+            xcrun simctl spawn "$DEVICE" defaults read "$BUNDLE" || true
             cat apps/driver-ios/native-proxy-requests.log || true
             exit 1
           fi
 
           xcrun simctl io "$DEVICE" screenshot apps/driver-ios/driver-ios-smoke.png
           xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
+          sleep 1
+
+          # The raw legacy URL/token must never become persistent preferences.
+          # The reconnect above already proves that base URL + Keychain token are
+          # durable across process restart; this check only guards secret leakage.
+          if [ -f "$PREFS" ]; then
+            plutil -p "$PREFS"
+            python3 - "$PREFS" <<'PY'
+          import plistlib, sys
+          with open(sys.argv[1], "rb") as handle:
+              prefs = plistlib.load(handle)
+          if prefs.get("cargo_dispatch_driver_url") is not None:
+              raise SystemExit("legacy raw Driver URL remained in app UserDefaults")
+          if "native-smoke-session-00000001" in repr(prefs):
+              raise SystemExit("raw Driver token remained in app UserDefaults")
+          PY
+          fi
+
+          if grep -R -a -q 'native-smoke-session-00000001' "$DATA_CONTAINER/Library/Preferences" 2>/dev/null; then
+            echo "Raw Apple Driver session token found in persistent preference files." >&2
+            exit 1
+          fi
 
       - name: Upload Simulator smoke screenshot
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
