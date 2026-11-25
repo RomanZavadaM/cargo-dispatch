@@ -1131,9 +1131,11 @@ fn ControlApp() -> impl IntoView {
                                 Some(location) => view! {
                                     <p>
                                         {format!("{:.6}, {:.6}", location.latitude, location.longitude)}
-                                        {location.accuracy_m.map(|accuracy| format!(" · ±{accuracy:.1} м")).unwrap_or_default()}
+                                        {location.accuracy_m.map(|accuracy| {
+                                            format!(" · ±{accuracy:.1} {}", strings(locale.get()).meter_unit)
+                                        }).unwrap_or_default()}
                                         " · "
-                                        {format!("timestamp {}", location.observed_at_unix_ms)}
+                                        {format!("{} {}", strings(locale.get()).timestamp, location.observed_at_unix_ms)}
                                     </p>
                                 }.into_any(),
                                 None => view! { <p class="note">{move || strings(locale.get()).no_position}</p> }.into_any(),
