@@ -1,5 +1,7 @@
 # Cargo Dispatch Driver — Android scaffold
 
+**🇺🇦 Українська** · [🇬🇧 English](README.en.md) · [🇩🇪 Deutsch](README.de.md) · [🇫🇷 Français](README.fr.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
+
 Перший native Android slice. Він **не замінює Driver Browser** і не створює нову серверну схему: застосунок працює з тим самим Control API.
 
 ## Поточний обсяг
