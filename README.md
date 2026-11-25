@@ -2,11 +2,11 @@
 
 **🇺🇦 Українська** · [🇬🇧 English](docs/readme/README.en.md) · [🇫🇷 Français](docs/readme/README.fr.md) · [🇩🇪 Deutsch](docs/readme/README.de.md) · [🇪🇸 Español](docs/readme/README.es.md) · [🇰🇷 한국어](docs/readme/README.ko.md) · [🇯🇵 日本語](docs/readme/README.ja.md) · [🇨🇳 简体中文](docs/readme/README.zh.md)
 
-> **Статус:** активна розробка. Поточний тестовий prerelease — **v0.1.0-preview.5**. Стабільного готового продукту ще немає.
+> **Статус:** активна розробка. Поточна стабільна версія — **v0.1.0**. Після завершення локалізацій наступний великий напрямок — Planner маршруту.
 
 ## Про продукт
 
-**cargo-dispatch** — система диспетчеризації для малотонажного вантажного парку (повна маса до 7,5 т). Вона має підбирати вантажі, будувати й перебудовувати рейси, передавати їх у роботу та давати диспетчеру контроль фактичного виконання.
+**cargo-dispatch** — система диспетчеризації вантажного парку. Вона має підбирати вантажі, будувати й перебудовувати рейси, передавати їх у роботу та давати диспетчеру контроль фактичного виконання.
 
 Основна мова розробки — **Rust**.
 
@@ -54,13 +54,22 @@ Driver Browser — **один продукт**, а не окремі телеф�
 
 Ще попереду **живий HTTP transport до Valhalla та автоматичний перерахунок geometry**. Тобто структура й відображення дороги вже є, але зовнішній маршрутизатор ще не підключений до product runtime.
 
-## Тестова збірка
+## Stable v0.1.0
 
-Поточний prerelease: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
+[Відкрити Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
 
-Windows ZIP містить Control, синтетичний активний рейс і тестовий PDF для локального loopback-приймання.
+Stable збирається з одного exact source і публікує:
+- Windows Control x64 ZIP;
+- macOS Control universal ZIP — Intel + Apple Silicon;
+- Linux Control x64 tar.gz;
+- Android Driver debug APK для тестового встановлення;
+- iOS/iPadOS Driver Simulator ZIP;
+- Linux Addressing Gateway x64 package з Docker/Compose;
+- SHA256SUMS.
 
-Це **test/prerelease build**, не stable. Preview.5 фіксує поточний Control/Driver Browser, Valhalla schema 1.2 road-geometry pipeline і вихідний код обох native Driver Apps через r5: карти, камера/файли, durable retry queue та явне фонове відстеження рейсу. Публічний бінарний asset цього preview поки лишається Windows Control; mobile production signing/TestFlight ще попереду.
+**Linux Control** — desktop-застосунок оператора. **Linux Addressing Gateway** — окремий серверний relay-модуль; це не один і той самий пакет.
+
+Android та Apple пакети поки не підписані для магазинів. App Store/TestFlight/Google Play і production signing опрацюємо окремо пізніше.
 
 ## Що ще попереду
 
