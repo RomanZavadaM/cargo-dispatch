@@ -36,4 +36,5 @@
     <string name="map_provider_note">OpenStreetMap · la ligne routière n’est affichée que pour la géométrie actuelle.</string>
     <string name="capture_photo">Prendre une photo</string>
     <string name="capture_video">Enregistrer une vidéo</string>
+    <string name="pending_outbound">En attente d’envoi après le rétablissement de la connexion : %1$d</string>
 </resources>
