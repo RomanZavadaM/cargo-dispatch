@@ -37,4 +37,14 @@
     <string name="capture_photo">写真を撮る</string>
     <string name="capture_video">動画を撮る</string>
     <string name="pending_outbound">接続復旧後の送信待ち: %1$d</string>
+    <string name="tracking_start">追跡を開始</string>
+    <string name="tracking_stop">追跡を停止</string>
+    <string name="tracking_status_active">バックグラウンド追跡は有効です。</string>
+    <string name="tracking_status_stopped">バックグラウンド追跡は停止しています。</string>
+    <string name="tracking_permission_required">追跡には位置情報へのアクセスが必要です。</string>
+    <string name="tracking_channel_name">運行追跡</string>
+    <string name="tracking_channel_description">Cargo Dispatch がドライバー位置を送信している間の常駐通知です。</string>
+    <string name="tracking_notification_title">Cargo Dispatch — 運行追跡</string>
+    <string name="tracking_notification_active">ドライバー位置を Control に送信しています。</string>
+    <string name="tracking_notification_pending">位置を保存しました。送信待ち: %1$d</string>
 </resources>
