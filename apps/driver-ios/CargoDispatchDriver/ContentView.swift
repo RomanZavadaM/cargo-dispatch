@@ -1,7 +1,16 @@
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var store = DriverStore()
+    @StateObject private var locationController = ForegroundLocationController()
+
+    @State private var showFileImporter = false
+    @State private var mediaSelection: PhotosPickerItem?
+    @State private var exportDocument = DriverFileDocument()
+    @State private var exportName = "document"
+    @State private var showFileExporter = false
 
     var body: some View {
         NavigationStack {
@@ -25,6 +34,11 @@ struct ContentView: View {
                     if store.trip != nil {
                         Button("refresh") {
                             store.refresh()
+                        }
+                        .disabled(store.busy)
+
+                        Button("disconnect") {
+                            store.disconnect()
                         }
                         .disabled(store.busy)
                     }
@@ -73,6 +87,71 @@ struct ContentView: View {
                         }
                     }
 
+                    Section("location.title") {
+                        if let location = trip.latestLocation {
+                            Text(
+                                String(
+                                    format: NSLocalizedString("location.value.format", comment: ""),
+                                    location.latitude,
+                                    location.longitude,
+                                    location.accuracyM ?? 0
+                                )
+                            )
+                            .font(.caption)
+                        } else {
+                            Text("location.none")
+                        }
+
+                        Button("location.send") {
+                            Task {
+                                do {
+                                    store.sendLocation(try await locationController.current())
+                                } catch {
+                                    store.reportError("error.location")
+                                }
+                            }
+                        }
+                        .disabled(store.busy)
+                    }
+
+                    Section("documents.title") {
+                        if trip.documents.isEmpty {
+                            Text("documents.none")
+                        } else {
+                            ForEach(trip.documents) { document in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(document.originalName)
+                                        .font(.headline)
+                                    Text("\(document.size) B · \(document.mimeType)")
+                                        .font(.caption)
+                                    Button("documents.save") {
+                                        store.download(document: document) { result in
+                                            if case let .success(data) = result {
+                                                exportDocument = DriverFileDocument(data: data)
+                                                exportName = document.originalName
+                                                showFileExporter = true
+                                            }
+                                        }
+                                    }
+                                    .disabled(store.busy)
+                                }
+                            }
+                        }
+
+                        Button("documents.upload_file") {
+                            showFileImporter = true
+                        }
+                        .disabled(store.busy)
+
+                        PhotosPicker(
+                            selection: $mediaSelection,
+                            matching: .any(of: [.images, .videos])
+                        ) {
+                            Text("documents.upload_media")
+                        }
+                        .disabled(store.busy)
+                    }
+
                     Section("route.title") {
                         ForEach(trip.points) { point in
                             VStack(alignment: .leading, spacing: 8) {
@@ -113,6 +192,60 @@ struct ContentView: View {
             }
             .navigationTitle("screen.title")
             .navigationBarTitleDisplayMode(.inline)
+            .fileImporter(
+                isPresented: $showFileImporter,
+                allowedContentTypes: [.data],
+                allowsMultipleSelection: false
+            ) { result in
+                do {
+                    guard let url = try result.get().first else { return }
+                    let scoped = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if scoped {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
+                    let values = try? url.resourceValues(forKeys: [.contentTypeKey])
+                    store.upload(
+                        data: try Data(contentsOf: url),
+                        name: url.lastPathComponent,
+                        mimeType: values?.contentType?.preferredMIMEType ?? "application/octet-stream"
+                    )
+                } catch {
+                    store.reportError("error.file")
+                }
+            }
+            .fileExporter(
+                isPresented: $showFileExporter,
+                document: exportDocument,
+                contentType: .data,
+                defaultFilename: exportName
+            ) { result in
+                if case .failure = result {
+                    store.reportError("error.file")
+                }
+            }
+            .onChange(of: mediaSelection) { _, item in
+                guard let item else { return }
+                Task {
+                    do {
+                        guard let data = try await item.loadTransferable(type: Data.self) else {
+                            store.reportError("error.file")
+                            return
+                        }
+                        let type = item.supportedContentTypes.first
+                        let suffix = type?.preferredFilenameExtension ?? "bin"
+                        store.upload(
+                            data: data,
+                            name: "driver-media.\(suffix)",
+                            mimeType: type?.preferredMIMEType ?? "application/octet-stream"
+                        )
+                        mediaSelection = nil
+                    } catch {
+                        store.reportError("error.file")
+                    }
+                }
+            }
         }
     }
 }
