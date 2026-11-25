@@ -79,11 +79,13 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 - 通过 HTTPS 完成浏览器 GPS 验收；
 - 不同网络/NAT/CGNAT 的现场测试；
 - 真实 Valhalla HTTP transport，以及重新排序后的 geometry 重算；
+- 使用 Android Keystore + Apple Keychain 安全保存 Driver session，并迁移旧的 raw URL；
+- 稳定版本。
 
 
 ## 界面语言
 
-Control、Driver Browser、Android Driver 和 iOS/iPadOS Driver 现已实现并自动验证项目的完整语言集合：**uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**。Control 与 Driver Browser 默认跟随系统语言，也允许手动选择并保存语言设置。文档使用同一组语言。
+当前已集成的 desktop/browser UI 实现并验证 **乌克兰语、英语和德语**。新的 Android 与 iOS/iPadOS 原生客户端从第一个界面起就包含 **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** 语言包，文档也使用同一组语言。
 
 ## 文档
 
