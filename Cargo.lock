@@ -386,6 +386,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-dispatch-addressing-gateway"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "cargo-dispatch-contracts"
 version = "0.1.0"
 dependencies = [
