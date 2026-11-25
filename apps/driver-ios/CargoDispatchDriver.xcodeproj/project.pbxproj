@@ -21,6 +21,7 @@
 		B0000000000000000000000C /* DriverTripMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000D /* DriverTripMap.swift */; };
 		B0000000000000000000000D /* DriverCameraCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000E /* DriverCameraCaptureView.swift */; };
 		B0000000000000000000000E /* DriverMapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000F /* DriverMapContent.swift */; };
+		B0000000000000000000000F /* PendingOutboundQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000010 /* PendingOutboundQueue.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +40,7 @@
 		A0000000000000000000000D /* DriverTripMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverTripMap.swift; sourceTree = "<group>"; };
 		A0000000000000000000000E /* DriverCameraCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverCameraCaptureView.swift; sourceTree = "<group>"; };
 		A0000000000000000000000F /* DriverMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverMapContent.swift; sourceTree = "<group>"; };
+		A00000000000000000000010 /* PendingOutboundQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingOutboundQueue.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,6 +95,7 @@
 				A00000000000000000000006 /* RouteOrderPlanner.swift */,
 				A00000000000000000000007 /* ControlAPI.swift */,
 				A0000000000000000000000F /* DriverMapContent.swift */,
+				A00000000000000000000010 /* PendingOutboundQueue.swift */,
 			);
 			path = Core/Sources/DriverCore;
 			sourceTree = "<group>";
@@ -186,6 +189,7 @@
 				B00000000000000000000006 /* RouteOrderPlanner.swift in Sources */,
 				B00000000000000000000007 /* ControlAPI.swift in Sources */,
 				B0000000000000000000000E /* DriverMapContent.swift in Sources */,
+				B0000000000000000000000F /* PendingOutboundQueue.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
