@@ -63,6 +63,7 @@ let controlMapState = {
   dragCenterX: 0,
   dragCenterY: 0,
   points: [],
+  roadGeometry: null,
   location: null,
   tripId: null,
   dataKey: ""
@@ -115,6 +116,22 @@ function coordinates() {
       type: "location",
       title: "Остання позиція водія"
     });
+  }
+  return result;
+}
+
+function extentCoordinates() {
+  const result = coordinates().map(item => ({
+    latitude: item.latitude,
+    longitude: item.longitude
+  }));
+  if (controlMapState.roadGeometry) {
+    for (const point of controlMapState.roadGeometry.points) {
+      result.push({
+        latitude: point.latitude,
+        longitude: point.longitude
+      });
+    }
   }
   return result;
 }
@@ -193,6 +210,28 @@ function render() {
     }
   }
 
+  if (controlMapState.roadGeometry && controlMapState.roadGeometry.points.length >= 2) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+    svg.setAttribute("width", String(width));
+    svg.setAttribute("height", String(height));
+    svg.style.position = "absolute";
+    svg.style.inset = "0";
+    const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    const shownPoints = controlMapState.roadGeometry.points.map(point => {
+      const shown = project(point.latitude, point.longitude, zoom);
+      return (shown.x - left) + "," + (shown.y - top);
+    });
+    polyline.setAttribute("points", shownPoints.join(" "));
+    polyline.setAttribute("fill", "none");
+    polyline.setAttribute("stroke", "#1769aa");
+    polyline.setAttribute("stroke-width", "5");
+    polyline.setAttribute("stroke-linecap", "round");
+    polyline.setAttribute("stroke-linejoin", "round");
+    svg.append(polyline);
+    overlayLayer.append(svg);
+  }
+
   for (const item of coordinates()) {
     const shown = project(item.latitude, item.longitude, zoom);
     const marker = document.createElement("div");
@@ -209,7 +248,7 @@ function render() {
 
 function fit() {
   const host = ensureHost();
-  const values = coordinates();
+  const values = extentCoordinates();
   if (!host || !values.length) {
     controlMapState.initialized = true;
     render();
@@ -240,10 +279,11 @@ function fit() {
   render();
 }
 
-export function cargoControlMapRender(tripId, pointsJson, locationJson) {
-  const dataKey = tripId + "|" + pointsJson + "|" + locationJson;
+export function cargoControlMapRender(tripId, pointsJson, roadGeometryJson, locationJson) {
+  const dataKey = tripId + "|" + pointsJson + "|" + roadGeometryJson + "|" + locationJson;
   if (controlMapState.initialized && controlMapState.dataKey === dataKey) return;
   controlMapState.points = JSON.parse(pointsJson);
+  controlMapState.roadGeometry = JSON.parse(roadGeometryJson);
   controlMapState.location = JSON.parse(locationJson);
   if (controlMapState.tripId !== tripId) {
     controlMapState.tripId = tripId;
@@ -265,7 +305,12 @@ export function cargoControlMapFit() {
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = cargoControlMapRender)]
-    fn cargo_control_map_render(trip_id: &str, points_json: &str, location_json: &str);
+    fn cargo_control_map_render(
+        trip_id: &str,
+        points_json: &str,
+        road_geometry_json: &str,
+        location_json: &str,
+    );
 
     #[wasm_bindgen(js_name = cargoControlMapZoom)]
     fn cargo_control_map_zoom(delta: i32);
@@ -398,12 +443,18 @@ fn ControlApp() -> impl IntoView {
 
     Effect::new(move |_| {
         if let Some(current) = dashboard.get()
-            && let (Ok(points_json), Ok(location_json)) = (
+            && let (Ok(points_json), Ok(road_geometry_json), Ok(location_json)) = (
                 serde_json::to_string(&current.points),
+                serde_json::to_string(&current.road_geometry),
                 serde_json::to_string(&current.latest_location),
             )
         {
-            cargo_control_map_render(&current.trip_id, &points_json, &location_json);
+            cargo_control_map_render(
+                &current.trip_id,
+                &points_json,
+                &road_geometry_json,
+                &location_json,
+            );
         }
     });
 
@@ -762,7 +813,7 @@ fn ControlApp() -> impl IntoView {
                     </a>
                 </div>
                 <p class="note">
-                    "Показані точки рейсу та остання прийнята позиція водія. Номери — черговість точок; дорожня геометрія маршруту буде додана окремо."
+                    "Показані точки рейсу та остання прийнята позиція водія. Road line показується лише коли Control має актуальну geometry для поточного порядку точок."
                 </p>
             </section>
 
