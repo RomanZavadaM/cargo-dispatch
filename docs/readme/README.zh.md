@@ -2,19 +2,71 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · **🇨🇳 简体中文**
 
-> **状态:** 正在积极开发。已有测试版 UI 预览，但尚无稳定的完整产品。
+> **状态：** 正在积极开发。当前测试预发布版本为 **v0.1.0-preview.3**，尚无稳定的完整产品。
 
 ## 产品简介
 
-**cargo-dispatch** 为小型货车车队(总质量不超过 7.5 吨)从市场中挑选货源,编排包含途中追加装货的行程,并让调度员掌握车辆行驶情况。开发语言:Rust。
+**cargo-dispatch** 是面向小型货车车队（总质量不超过 7.5 吨）的调度系统。目标包括选择货源、创建和重新规划行程、将行程交付执行，并让调度员掌握实际执行进度。
+
+主要开发语言为 **Rust**。
+
+## 当前已实现
+
+- 基于 Tauri/Leptos 的独立桌面 **Control** 应用；
+- 活跃行程的持久本地存储与重启恢复；
+- Planner 与 Control 之间的版本化 trip package；
+- 一个自适应 **Driver Browser**，适用于手机、平板、笔记本和桌面浏览器；
+- 在 Control 和 Driver Browser 中调整未完成站点顺序；
+- PDF 和普通文件 **Control → Driver Browser**；
+- 文件、照片和视频 **Driver Browser → Control**，并可本地保存；
+- 同一行程可同时连接两个浏览器客户端，并在无独立浏览器数据库的情况下重新连接；
+- Control 和 Driver Browser 中的交互式 OpenStreetMap 地图；
+- 用于测试和本地工作的 loopback 与显式 LAN 模式。
+
+## Driver Browser
+
+Driver Browser 是**一个产品**，不是分别开发的手机版和桌面版。它有三种标准布局：
+
+- 窄屏手机；
+- 平板；
+- 宽屏桌面/笔记本。
+
+数据、路线操作、文件和 backend 完全共用，仅根据屏幕大小调整布局。
+
+## 地图
+
+Control 和 Driver Browser 已经包含真正的交互式基础地图，可显示行程站点和最后一次被接受的司机位置。
+
+目前这**还不是完整的道路路线几何**。通过 Valhalla 集成真实道路路线仍是后续工作。
+
+## 测试版本
+
+当前预发布版本：[v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.3)。
+
+Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback 验收的示例 PDF。
+
+这是**测试/预发布版本**，不是稳定版。
+
+## 后续工作
+
+- 本地浏览器手动验收；
+- 在同一 LAN 中用真实手机测试相同的 Driver Browser；
+- HTTPS/公共寻址路径；
+- 通过 HTTPS 完成浏览器 GPS 验收；
+- 不同网络/NAT/CGNAT 的现场测试；
+- 真实 Valhalla 道路路线几何；
+- 未来的原生 Driver App；
+- 稳定版本。
 
 ## 界面语言
 
-当前 UI 原型已实现并验证 **乌克兰语、英语和德语**。其他 README 翻译属于文档语言或后续目标语言，并不表示程序界面目前已经支持这些语言。
+当前 UI 已实现并验证 **乌克兰语、英语和德语**。其他 README 翻译属于文档语言或后续目标语言，并不表示程序界面目前已经支持这些语言。
 
 ## 文档
 
-项目的工作文档以私有方式保存。
+公开状态入口：[START_HERE.md](../../START_HERE.md)、[HANDOFF_CURRENT.md](../../HANDOFF_CURRENT.md)、[PROJECT_STATE.md](../../PROJECT_STATE.md)。
+
+详细工作文档以私有方式保存。
 
 ## 许可证
 
