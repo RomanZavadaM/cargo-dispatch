@@ -22,8 +22,17 @@
 - два одночасні browser clients одного рейсу та reconnect без окремої browser-бази;
 - інтерактивна карта OpenStreetMap у Control і Driver Browser;
 - loopback і явний LAN-режим для тестування та локальної роботи;
-- нативний **Android Driver App**: route/complete/reorder, foreground location, files/photo/video, restart recovery, Emulator smoke;
-- нативний **iOS/iPadOS Driver App**: route/complete/reorder, CoreLocation foreground location, files/photo/video, restart recovery, Simulator smoke.
+- нативний **Android Driver App**: route/complete/reorder, foreground location, files/photo/video, restart recovery, native MapLibre map, system camera, Emulator smoke;
+- нативний **iOS/iPadOS Driver App**: route/complete/reorder, CoreLocation foreground location, files/photo/video, restart recovery, native MapKit, system camera, Simulator smoke.
+
+## Нативні Driver Apps
+
+У `main` уже інтегровані обидва нативні клієнти:
+
+- **Android** — Jetpack Compose, route/complete/reorder, files/photo/video, foreground GPS, restart recovery, native MapLibre + OpenStreetMap, current road geometry, route markers/latest position, системна фото/відео камера; Emulator build/install/launch/screenshot PASS.
+- **iPhone/iPad** — SwiftUI, route/complete/reorder, files/photo/video, foreground CoreLocation, restart recovery, native MapKit, current road geometry, route markers/latest position, системна фото/відео камера; Simulator build/install/launch/screenshot PASS.
+
+Обидва працюють через той самий Control API і не мають окремої бази рейсу.
 
 ## Driver Browser
 
@@ -49,7 +58,7 @@ Driver Browser — **один продукт**, а не окремі телеф�
 
 Windows ZIP містить Control, синтетичний активний рейс і тестовий PDF для локального loopback-приймання.
 
-Це **test/prerelease build**, не stable. Preview.4 уже містить Valhalla adapter і schema 1.2 road-geometry pipeline. `main` знову випереджає preview.4: після його публікації інтегровано Android та iOS/iPadOS native Driver r2.
+Це **test/prerelease build**, не stable. Preview.4 уже містить Valhalla adapter і schema 1.2 road-geometry pipeline. `main` знову випереджає preview.4: після його публікації інтегровано Android та iOS/iPadOS native Driver r2+r3, включно з native maps і системною камерою, а також покращено передачу Driver URL з Control.
 
 ## Що ще попереду
 
@@ -59,8 +68,8 @@ Windows ZIP містить Control, синтетичний активний ре
 - повний browser GPS acceptance через HTTPS;
 - польова перевірка через різні мережі/NAT/CGNAT;
 - живий Valhalla HTTP transport і перерахунок geometry після reorder;
-- native maps: MapLibre на Android і MapKit на iOS/iPadOS;
-- camera capture, background GPS, connected virtual-device smoke, offline queue та secure session storage для native apps;
+- connected virtual-device smoke через реальний headless Control session;
+- background GPS, offline queue та secure session storage для native apps;
 - stable release.
 
 ## Мови інтерфейсу
