@@ -18,6 +18,9 @@
 		B00000000000000000000009 /* ForegroundLocationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000A /* ForegroundLocationController.swift */; };
 		B0000000000000000000000A /* DriverFileDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000B /* DriverFileDocument.swift */; };
 		B0000000000000000000000B /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000C /* InfoPlist.xcstrings */; };
+		B0000000000000000000000C /* DriverTripMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000D /* DriverTripMap.swift */; };
+		B0000000000000000000000D /* DriverCameraCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000E /* DriverCameraCaptureView.swift */; };
+		B0000000000000000000000E /* DriverMapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000F /* DriverMapContent.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +36,9 @@
 		A0000000000000000000000A /* ForegroundLocationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForegroundLocationController.swift; sourceTree = "<group>"; };
 		A0000000000000000000000B /* DriverFileDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverFileDocument.swift; sourceTree = "<group>"; };
 		A0000000000000000000000C /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
+		A0000000000000000000000D /* DriverTripMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverTripMap.swift; sourceTree = "<group>"; };
+		A0000000000000000000000E /* DriverCameraCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverCameraCaptureView.swift; sourceTree = "<group>"; };
+		A0000000000000000000000F /* DriverMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverMapContent.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +77,8 @@
 				A00000000000000000000003 /* DriverStore.swift */,
 				A0000000000000000000000A /* ForegroundLocationController.swift */,
 				A0000000000000000000000B /* DriverFileDocument.swift */,
+				A0000000000000000000000D /* DriverTripMap.swift */,
+				A0000000000000000000000E /* DriverCameraCaptureView.swift */,
 				A00000000000000000000008 /* Localizable.xcstrings */,
 				A0000000000000000000000C /* InfoPlist.xcstrings */,
 			);
@@ -84,6 +92,7 @@
 				A00000000000000000000005 /* SessionLink.swift */,
 				A00000000000000000000006 /* RouteOrderPlanner.swift */,
 				A00000000000000000000007 /* ControlAPI.swift */,
+				A0000000000000000000000F /* DriverMapContent.swift */,
 			);
 			path = Core/Sources/DriverCore;
 			sourceTree = "<group>";
@@ -170,10 +179,13 @@
 				B00000000000000000000003 /* DriverStore.swift in Sources */,
 				B00000000000000000000009 /* ForegroundLocationController.swift in Sources */,
 				B0000000000000000000000A /* DriverFileDocument.swift in Sources */,
+				B0000000000000000000000C /* DriverTripMap.swift in Sources */,
+				B0000000000000000000000D /* DriverCameraCaptureView.swift in Sources */,
 				B00000000000000000000004 /* Models.swift in Sources */,
 				B00000000000000000000005 /* SessionLink.swift in Sources */,
 				B00000000000000000000006 /* RouteOrderPlanner.swift in Sources */,
 				B00000000000000000000007 /* ControlAPI.swift in Sources */,
+				B0000000000000000000000E /* DriverMapContent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -212,6 +224,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Cargo Dispatch Driver";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Cargo Dispatch uses location to send the current driver position to Control.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Cargo Dispatch uses the camera so the driver can send trip photos and videos to Control.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Cargo Dispatch uses the microphone only to record audio with videos the driver sends to Control.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cargo Dispatch uses the local network so the driver's iPhone or iPad can connect directly to Control on the dispatcher's computer.";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -235,6 +250,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Cargo Dispatch Driver";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Cargo Dispatch uses location to send the current driver position to Control.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Cargo Dispatch uses the camera so the driver can send trip photos and videos to Control.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Cargo Dispatch uses the microphone only to record audio with videos the driver sends to Control.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cargo Dispatch uses the local network so the driver's iPhone or iPad can connect directly to Control on the dispatcher's computer.";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
