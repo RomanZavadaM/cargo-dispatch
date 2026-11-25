@@ -330,7 +330,11 @@ function applyLanguage() {
   document.getElementById("locationTitle").textContent = t("location");
   document.getElementById("startLocation").textContent = t("startLocation");
   document.getElementById("stopLocation").textContent = t("stop");
-  if (!currentTrip) document.getElementById("status").textContent = t("loading");
+  if (!currentTrip) {
+    document.getElementById("status").textContent = t("loading");
+    document.getElementById("location").textContent = t("noLocation");
+    return;
+  }
   renderRoute();
   renderDocuments();
   renderLocation();
