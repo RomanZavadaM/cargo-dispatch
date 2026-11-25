@@ -1,0 +1,144 @@
+name: Backfill preview.5 macOS Control
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".release-macos-backfill"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backfill-preview-5-macos-control
+  cancel-in-progress: false
+
+jobs:
+  macos-backfill:
+    name: Build universal macOS Control for preview.5
+    runs-on: macos-latest
+    env:
+      TAG: v0.1.0-preview.5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: v0.1.0-preview.5
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+
+      - name: Add both macOS Rust targets
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+
+      - name: Install pinned Trunk
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: trunk@0.22.2
+          fallback: none
+
+      - name: Build Control frontend
+        working-directory: apps/control-ui
+        run: trunk build --release=true
+
+      - name: Build universal macOS Control executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked -p cargo-dispatch-control-desktop --release --target x86_64-apple-darwin
+          cargo build --locked -p cargo-dispatch-control-desktop --release --target aarch64-apple-darwin
+          lipo -create             target/x86_64-apple-darwin/release/cargo-dispatch-control-desktop             target/aarch64-apple-darwin/release/cargo-dispatch-control-desktop             -output Cargo-Dispatch-Control
+          chmod +x Cargo-Dispatch-Control
+          lipo -info Cargo-Dispatch-Control
+
+      - name: Create synthetic acceptance data
+        run: cargo run --locked -p cargo-dispatch-trip-files --example local_browser_fixture -- local-browser-test-data
+
+      - name: Package macOS Control
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE="Cargo-Dispatch-Control-$TAG-macOS-universal"
+          APP="$PACKAGE/Cargo Dispatch Control.app"
+          mkdir -p "$APP/Contents/MacOS"
+          cp Cargo-Dispatch-Control "$APP/Contents/MacOS/Cargo-Dispatch-Control"
+          cp THIRD_PARTY_NOTICES.md "$PACKAGE/THIRD_PARTY_NOTICES.md"
+          cp -R local-browser-test-data "$PACKAGE/local-browser-test-data"
+
+          python3 - "$APP/Contents/Info.plist" "$TAG" <<'PY'
+          import plistlib, sys
+          path, tag = sys.argv[1:]
+          info = {
+              "CFBundleDevelopmentRegion": "uk",
+              "CFBundleDisplayName": "Cargo Dispatch Control",
+              "CFBundleExecutable": "Cargo-Dispatch-Control",
+              "CFBundleIdentifier": "ua.cargodispatch.control",
+              "CFBundleInfoDictionaryVersion": "6.0",
+              "CFBundleName": "Cargo Dispatch Control",
+              "CFBundlePackageType": "APPL",
+              "CFBundleShortVersionString": tag.removeprefix("v"),
+              "CFBundleVersion": "1",
+              "LSMinimumSystemVersion": "12.0",
+              "NSHighResolutionCapable": True,
+          }
+          with open(path, "wb") as handle:
+              plistlib.dump(info, handle)
+          PY
+
+          cat > "$PACKAGE/README-TEST.txt" <<'EOF'
+          Cargo Dispatch Control — macOS universal test build
+
+          This preview is unsigned and not notarized yet.
+          The app bundle contains a universal Intel + Apple Silicon executable.
+
+          Open Cargo Dispatch Control.app. If macOS blocks the unsigned preview,
+          use Finder -> right click -> Open for this local test build.
+
+          Store signing/notarization will be handled later.
+          EOF
+
+          ditto -c -k --sequesterRsrc --keepParent "$PACKAGE" "$PACKAGE.zip"
+
+      - name: Extend preview.5 checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt
+          grep -v 'macOS-universal' SHA256SUMS.txt > SHA256SUMS.new
+          sha256sum "Cargo-Dispatch-Control-$TAG-macOS-universal.zip" >> SHA256SUMS.new
+          mv SHA256SUMS.new SHA256SUMS.txt
+
+      - name: Upload macOS Control and refresh release notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG"             --repo "$GITHUB_REPOSITORY"             --clobber             "Cargo-Dispatch-Control-$TAG-macOS-universal.zip"             SHA256SUMS.txt
+
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > RELEASE_BODY.md
+          python3 - RELEASE_BODY.md <<'PY'
+          import sys
+          path = sys.argv[1]
+          body = open(path, encoding="utf-8").read()
+          body = body.replace(
+              "- mobile production signing/TestFlight/production APK ще не завершені; release asset цього preview поки Windows-only.\n",
+              "- mobile production signing/TestFlight/Google Play ще не завершені; desktop/mobile test assets публікуються без store signing.\n",
+          )
+          if "### macOS Control" not in body:
+              body += (
+                  "\n### macOS Control\n"
+                  "- Universal Intel + Apple Silicon test ZIP додано до цього prerelease.\n"
+                  "- Це поки unsigned/not-notarized test build; signing/notarization опрацюємо пізніше.\n"
+              )
+          open(path, "w", encoding="utf-8").write(body)
+          PY
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file RELEASE_BODY.md
