@@ -37,7 +37,9 @@ Driver Browser は電話版と desktop 版に分かれた製品ではなく、**
 
 Control と Driver Browser には、運行地点と最後に受理されたドライバー位置を表示する実際のインタラクティブなベースマップがあります。
 
-ただし、これはまだ **完全な道路ルート形状ではありません**。Valhalla による実際のルート形状の統合は今後の作業です。
+`main` には現在、バージョン付き道路形状パイプライン（schema 1.2）が統合されています。Planner は派生 geometry を渡せ、Control が保存し、両方の地図は現在の地点順序と一致する間だけ道路線を表示します。Reorder 後は古い線を直ちに無効化します。
+
+残っているのは **Valhalla への実 HTTP transport と geometry の自動再計算**です。契約と表示は実装済みですが、外部ルーティングエンジンはまだ product runtime に接続されていません。
 
 ## テストビルド
 
@@ -45,7 +47,7 @@ Control と Driver Browser には、運行地点と最後に受理されたド�
 
 Windows ZIP には Control、合成されたアクティブ運行、ローカル loopback 検証用のサンプル PDF が含まれます。
 
-これは **test/prerelease build** であり、stable ではありません。
+これは **test/prerelease build** であり、stable ではありません。`main` はすでに preview.3 より先に進んでおり、Valhalla adapter と schema 1.2 road-geometry pipeline はこの prerelease 公開後に統合されました。
 
 ## 今後の作業
 
@@ -54,13 +56,13 @@ Windows ZIP には Control、合成されたアクティブ運行、ローカル
 - HTTPS/public addressing path;
 - HTTPS 経由での browser GPS 完全受け入れ;
 - 異なるネットワーク/NAT/CGNAT でのフィールドテスト;
-- 実際の Valhalla 道路ルート形状;
-- 将来の native Driver App;
+- 実 Valhalla HTTP transport と reorder 後の geometry 再計算;
+- Android と iOS/iPadOS の native Driver App（現在、別々の draft branch で並行開発中）;
 - stable release.
 
 ## インターフェース言語
 
-現在の UI で実装・検証済みなのは **ウクライナ語、英語、ドイツ語** です。その他の README 翻訳は文書用または将来の対象言語であり、現時点でプログラム UI が対応していることを意味しません。
+現在統合済みの desktop/browser UI は **ウクライナ語、英語、ドイツ語** を実装・検証しています。新しい Android と iOS/iPadOS の native client は最初の画面から **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** の言語パックを持ち、ドキュメントも同じ言語セットで管理します。
 
 ## ドキュメント
 
