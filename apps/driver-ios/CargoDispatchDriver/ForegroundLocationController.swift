@@ -7,7 +7,7 @@ enum DriverLocationError: Error {
 }
 
 @MainActor
-final class ForegroundLocationController: NSObject, ObservableObject, CLLocationManagerDelegate {
+final class ForegroundLocationController: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<LocationUpdate, Error>?
 
