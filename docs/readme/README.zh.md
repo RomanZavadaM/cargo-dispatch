@@ -23,6 +23,15 @@
 - Control 和 Driver Browser 中的交互式 OpenStreetMap 地图；
 - 用于测试和本地工作的 loopback 与显式 LAN 模式。
 
+## 原生 Driver App
+
+两个原生客户端都已经集成到 `main`：
+
+- **Android** — Jetpack Compose、路线/完成/重排、文件/照片/视频、前台 GPS、会话恢复、原生 MapLibre + OpenStreetMap、当前道路 geometry、站点/最新位置和系统照片/视频拍摄；Emulator build/install/launch/screenshot PASS。
+- **iPhone/iPad** — SwiftUI、路线/完成/重排、文件/照片/视频、前台 CoreLocation、会话恢复、原生 MapKit、当前 geometry、站点/最新位置和系统照片/视频拍摄；Simulator build/install/launch/screenshot PASS。
+
+两者使用同一个 Control API，不创建独立的行程数据库。
+
 ## Driver Browser
 
 Driver Browser 是**一个产品**，不是分别开发的手机版和桌面版。它有三种标准布局：
@@ -47,7 +56,7 @@ Control 和 Driver Browser 已经包含真正的交互式基础地图，可显�
 
 Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback 验收的示例 PDF。
 
-这是**测试/预发布版本**，不是稳定版。Preview.4 已包含 Valhalla adapter 和 schema 1.2 road-geometry pipeline。此后 Android 与 iOS/iPadOS 原生 Driver r2 已合并，因此 `main` 再次领先于 preview.4。
+这是**测试/预发布版本**，不是稳定版。Preview.4 已包含 Valhalla adapter 和 schema 1.2 road-geometry pipeline。此后 Android 与 iOS/iPadOS 原生 Driver r2+r3（包括原生地图和系统相机）以及改进的 Control→Driver URL handoff 已集成，因此 `main` 再次领先于 preview.4。
 
 ## 后续工作
 
@@ -57,7 +66,8 @@ Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback �
 - 通过 HTTPS 完成浏览器 GPS 验收；
 - 不同网络/NAT/CGNAT 的现场测试；
 - 真实 Valhalla HTTP transport，以及重新排序后的 geometry 重算；
-- 原生地图：Android 使用 MapLibre，iOS/iPadOS 使用 MapKit；\n- 相机拍摄、后台 GPS、连接真实协议的虚拟设备 smoke、离线队列与安全会话存储；
+- 通过真实 headless Control session 进行 connected virtual-device smoke；
+- 原生应用的后台 GPS、离线队列与安全会话存储；
 - 稳定版本。
 
 ## 界面语言
