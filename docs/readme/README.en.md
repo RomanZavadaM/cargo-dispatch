@@ -79,8 +79,6 @@ Android and Apple packages are not yet store-signed. App Store/TestFlight/Google
 - full browser GPS acceptance over HTTPS;
 - field testing across different networks/NAT/CGNAT;
 - live Valhalla HTTP transport and geometry recalculation after reorder;
-- secure Driver session storage with Android Keystore + Apple Keychain, including migration away from the legacy raw URL;
-- a stable release.
 
 
 ## Interface languages
