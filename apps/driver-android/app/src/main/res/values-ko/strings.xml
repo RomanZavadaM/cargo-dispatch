@@ -37,4 +37,14 @@
     <string name="capture_photo">사진 촬영</string>
     <string name="capture_video">동영상 촬영</string>
     <string name="pending_outbound">연결 복구 후 전송 대기: %1$d</string>
+    <string name="tracking_start">추적 시작</string>
+    <string name="tracking_stop">추적 중지</string>
+    <string name="tracking_status_active">백그라운드 추적이 활성화되었습니다.</string>
+    <string name="tracking_status_stopped">백그라운드 추적이 중지되었습니다.</string>
+    <string name="tracking_permission_required">추적하려면 위치 권한이 필요합니다.</string>
+    <string name="tracking_channel_name">운행 추적</string>
+    <string name="tracking_channel_description">Cargo Dispatch가 운전자 위치를 전송하는 동안 표시되는 지속 알림입니다.</string>
+    <string name="tracking_notification_title">Cargo Dispatch — 운행 추적</string>
+    <string name="tracking_notification_active">운전자 위치를 Control로 전송하고 있습니다.</string>
+    <string name="tracking_notification_pending">위치 저장됨; 전송 대기: %1$d</string>
 </resources>
