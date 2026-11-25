@@ -37,7 +37,9 @@ Driver Browser 是**一个产品**，不是分别开发的手机版和桌面版�
 
 Control 和 Driver Browser 已经包含真正的交互式基础地图，可显示行程站点和最后一次被接受的司机位置。
 
-目前这**还不是完整的道路路线几何**。通过 Valhalla 集成真实道路路线仍是后续工作。
+`main` 现在已经集成版本化的道路几何管线（schema 1.2）：Planner 可以携带派生 geometry，Control 会保存它，两端地图只在 geometry 与当前站点顺序一致时显示道路线。重新排序后，旧线会立即失效。
+
+仍待完成的是**连接 Valhalla 的真实 HTTP transport 和 geometry 自动重算**。数据契约与显示层已经存在，但外部路由引擎尚未接入 product runtime。
 
 ## 测试版本
 
@@ -45,7 +47,7 @@ Control 和 Driver Browser 已经包含真正的交互式基础地图，可显�
 
 Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback 验收的示例 PDF。
 
-这是**测试/预发布版本**，不是稳定版。
+这是**测试/预发布版本**，不是稳定版。请注意，`main` 已经领先于 preview.3：Valhalla adapter 和 schema 1.2 road-geometry pipeline 是在该 prerelease 发布后合并的。
 
 ## 后续工作
 
@@ -54,13 +56,13 @@ Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback �
 - HTTPS/公共寻址路径；
 - 通过 HTTPS 完成浏览器 GPS 验收；
 - 不同网络/NAT/CGNAT 的现场测试；
-- 真实 Valhalla 道路路线几何；
-- 未来的原生 Driver App；
+- 真实 Valhalla HTTP transport，以及重新排序后的 geometry 重算；
+- Android 与 iOS/iPadOS 原生 Driver App，目前已在独立 draft 分支中并行开发；
 - 稳定版本。
 
 ## 界面语言
 
-当前 UI 已实现并验证 **乌克兰语、英语和德语**。其他 README 翻译属于文档语言或后续目标语言，并不表示程序界面目前已经支持这些语言。
+当前已集成的 desktop/browser UI 实现并验证 **乌克兰语、英语和德语**。新的 Android 与 iOS/iPadOS 原生客户端从第一个界面起就包含 **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** 语言包，文档也使用同一组语言。
 
 ## 文档
 
