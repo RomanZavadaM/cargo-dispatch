@@ -1035,11 +1035,12 @@ fn ControlApp() -> impl IntoView {
                                         let open_up = open_points.clone();
                                         let open_down = open_points.clone();
                                         let navigation = point.navigation.clone();
+                                        let completed = point.completed;
                                         view! {
                                             <div class="point">
                                                 <strong>{format!("{}. {}", point.sequence, point.title)}</strong>
                                                 <span>{move || {
-                                                    if point.completed {
+                                                    if completed {
                                                         format!(" — {}", strings(locale.get()).completed)
                                                     } else {
                                                         format!(" — {}", strings(locale.get()).open_status)
@@ -1052,7 +1053,7 @@ fn ControlApp() -> impl IntoView {
                                                         {format!("{:.6}, {:.6}", nav.latitude, nav.longitude)}
                                                     </div>
                                                 })}
-                                                {(!point.completed).then(|| view! {
+                                                {(!completed).then(|| view! {
                                                     <span class="actions">
                                                         <button
                                                             type="button"
