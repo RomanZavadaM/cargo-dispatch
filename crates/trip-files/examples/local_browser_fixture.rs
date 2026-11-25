@@ -12,7 +12,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-fn point(byte: u8, sequence: u32, title: &str, latitude_e7: i32, longitude_e7: i32) -> TripRoutePoint {
+fn point(
+    byte: u8,
+    sequence: u32,
+    title: &str,
+    latitude_e7: i32,
+    longitude_e7: i32,
+) -> TripRoutePoint {
     TripRoutePoint {
         point_id: PointId::from_bytes([byte; 16]).expect("synthetic non-nil point id"),
         sequence,
