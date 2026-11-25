@@ -1,11 +1,12 @@
 #![forbid(unsafe_code)]
 
+use cargo_dispatch_control_gateway_client::{ControlGatewayClient, GatewayRelayConfig};
 use cargo_dispatch_control_ui_contracts::{
     ControlUiStatus, DashboardDocument, DashboardDocumentDirection, DashboardLocation,
     DashboardNavigation, DashboardPoint, DashboardRoadGeometry, DashboardRoadGeometryPoint,
-    DashboardRoutingIdentity, ListenerMode, ListenerStatus, OperatorDocumentInput, PickedFile,
-    RegisterTripInput, ReorderRouteInput, SaveDocumentInput, SessionInput, SessionStatus,
-    StartLanInput, TripDashboard,
+    DashboardRoutingIdentity, GatewayStatus, ListenerMode, ListenerStatus, OperatorDocumentInput,
+    PickedFile, RegisterTripInput, ReorderRouteInput, SaveDocumentInput, SessionInput,
+    SessionStatus, StartGatewayInput, StartLanInput, TripDashboard,
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
@@ -21,7 +22,10 @@ use std::{
 };
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
-use tokio::sync::Mutex as AsyncMutex;
+use tokio::{
+    sync::{Mutex as AsyncMutex, watch},
+    task::JoinHandle,
+};
 
 #[derive(Debug, Clone)]
 struct RegisteredSession {
@@ -29,9 +33,23 @@ struct RegisteredSession {
     token: String,
 }
 
+struct GatewayRelayTask {
+    client: ControlGatewayClient,
+    shutdown: watch::Sender<bool>,
+    task: JoinHandle<()>,
+    public_driver_url: String,
+}
+
+struct GatewayRelayRuntime {
+    base_url: String,
+    internal_server: LoopbackControlServer,
+    relays: BTreeMap<String, GatewayRelayTask>,
+}
+
 struct DesktopControlService {
     browser: ControlBrowserState,
     server: AsyncMutex<Option<LoopbackControlServer>>,
+    gateway: AsyncMutex<Option<GatewayRelayRuntime>>,
     sessions: Mutex<BTreeMap<String, RegisteredSession>>,
 }
 
@@ -40,6 +58,7 @@ impl Default for DesktopControlService {
         Self {
             browser: ControlBrowserState::new(),
             server: AsyncMutex::new(None),
+            gateway: AsyncMutex::new(None),
             sessions: Mutex::new(BTreeMap::new()),
         }
     }
@@ -165,6 +184,13 @@ fn dashboard(snapshot: DriverTripSnapshot) -> Result<TripDashboard, String> {
 
 impl DesktopControlService {
     async fn register_trip(&self, input: RegisterTripInput) -> Result<ControlUiStatus, String> {
+        if self.gateway.lock().await.is_some() {
+            return Err(
+                "Спочатку вимкніть публічну Gateway-трансляцію, потім додайте новий рейс."
+                    .to_owned(),
+            );
+        }
+
         let token = input.token.trim().to_owned();
         let folder_path = PathBuf::from(input.folder_path.trim());
         if folder_path.as_os_str().is_empty() {
@@ -267,6 +293,125 @@ impl DesktopControlService {
         self.status().await
     }
 
+    async fn start_gateway(&self, input: StartGatewayInput) -> Result<ControlUiStatus, String> {
+        let gateway_base_url = input.gateway_base_url.trim().to_owned();
+        if gateway_base_url.is_empty() {
+            return Err("Потрібно вказати HTTPS-адресу Gateway.".to_owned());
+        }
+
+        let session_tokens = self
+            .sessions
+            .lock()
+            .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?
+            .values()
+            .map(|session| session.token.clone())
+            .collect::<Vec<_>>();
+        if session_tokens.is_empty() {
+            return Err("Спочатку підключіть хоча б один рейс.".to_owned());
+        }
+
+        let mut gateway = self.gateway.lock().await;
+        if gateway.is_some() {
+            return Err("Публічна Gateway-трансляція вже запущена.".to_owned());
+        }
+
+        let internal_server = LoopbackControlServer::start(self.browser.clone())
+            .await
+            .map_err(|error| {
+                format!("Не вдалося запустити внутрішній Control listener: {error}")
+            })?;
+        let local_control_base_url = format!("http://{}", internal_server.address());
+
+        let mut prepared: Vec<(String, ControlGatewayClient, String)> = Vec::new();
+        for token in session_tokens {
+            let config = match GatewayRelayConfig::new(
+                &gateway_base_url,
+                &local_control_base_url,
+                input.control_secret.clone(),
+                token.clone(),
+            ) {
+                Ok(config) => config,
+                Err(error) => {
+                    for (_, client, _) in &prepared {
+                        let _ = client.unregister().await;
+                    }
+                    let _ = internal_server.shutdown().await;
+                    return Err(format!("Некоректні налаштування Gateway: {error}"));
+                }
+            };
+            let client = match ControlGatewayClient::new(config) {
+                Ok(client) => client,
+                Err(error) => {
+                    for (_, client, _) in &prepared {
+                        let _ = client.unregister().await;
+                    }
+                    let _ = internal_server.shutdown().await;
+                    return Err(format!("Не вдалося підготувати Gateway-клієнт: {error}"));
+                }
+            };
+            let public_driver_url = client
+                .config()
+                .public_driver_url()
+                .map_err(|error| format!("Не вдалося сформувати публічний Driver URL: {error}"))?
+                .to_string();
+
+            if let Err(error) = client.register().await {
+                for (_, client, _) in &prepared {
+                    let _ = client.unregister().await;
+                }
+                let _ = internal_server.shutdown().await;
+                return Err(format!("Gateway не прийняв Control session: {error}"));
+            }
+            prepared.push((token, client, public_driver_url));
+        }
+
+        let base_url = prepared
+            .first()
+            .map(|(_, client, _)| client.config().gateway_base_url().to_string())
+            .unwrap_or(gateway_base_url);
+
+        let mut relays = BTreeMap::new();
+        for (token, client, public_driver_url) in prepared {
+            let (shutdown, shutdown_rx) = watch::channel(false);
+            let runner = client.clone();
+            let task = tokio::spawn(async move {
+                let _ = runner.run_registered(shutdown_rx).await;
+            });
+            relays.insert(
+                token,
+                GatewayRelayTask {
+                    client,
+                    shutdown,
+                    task,
+                    public_driver_url,
+                },
+            );
+        }
+
+        *gateway = Some(GatewayRelayRuntime {
+            base_url,
+            internal_server,
+            relays,
+        });
+        drop(gateway);
+        self.status().await
+    }
+
+    async fn stop_gateway(&self) -> Result<ControlUiStatus, String> {
+        let current = self.gateway.lock().await.take();
+        if let Some(mut gateway) = current {
+            for relay in gateway.relays.values_mut() {
+                let _ = relay.shutdown.send(true);
+                let _ = relay.client.unregister().await;
+                relay.task.abort();
+            }
+            gateway.internal_server.shutdown().await.map_err(|error| {
+                format!("Не вдалося зупинити внутрішній Gateway listener: {error}")
+            })?;
+        }
+        self.status().await
+    }
+
     async fn status(&self) -> Result<ControlUiStatus, String> {
         let (listener, address) = {
             let server = self.server.lock().await;
@@ -287,6 +432,34 @@ impl DesktopControlService {
                 None => (None, None),
             }
         };
+
+        let (gateway_status, public_driver_urls) = {
+            let gateway = self.gateway.lock().await;
+            match gateway.as_ref() {
+                Some(gateway) => {
+                    let active_sessions = gateway
+                        .relays
+                        .values()
+                        .filter(|relay| !relay.task.is_finished())
+                        .count();
+                    let urls = gateway
+                        .relays
+                        .iter()
+                        .map(|(token, relay)| (token.clone(), relay.public_driver_url.clone()))
+                        .collect::<BTreeMap<_, _>>();
+                    (
+                        Some(GatewayStatus {
+                            base_url: gateway.base_url.clone(),
+                            active_sessions,
+                            total_sessions: gateway.relays.len(),
+                        }),
+                        urls,
+                    )
+                }
+                None => (None, BTreeMap::new()),
+            }
+        };
+
         let sessions = self
             .sessions
             .lock()
@@ -296,10 +469,15 @@ impl DesktopControlService {
                 trip_id: session.trip_id.clone(),
                 token: session.token.clone(),
                 driver_url: address.map(|address| driver_url(address, &session.token)),
+                public_driver_url: public_driver_urls.get(&session.token).cloned(),
             })
             .collect();
 
-        Ok(ControlUiStatus { listener, sessions })
+        Ok(ControlUiStatus {
+            listener,
+            gateway: gateway_status,
+            sessions,
+        })
     }
 
     fn dashboard(&self, token: &str) -> Result<TripDashboard, String> {
@@ -505,6 +683,19 @@ async fn stop_browser_server(
     state.stop().await
 }
 
+#[tauri::command]
+async fn start_gateway(
+    input: StartGatewayInput,
+    state: State<'_, DesktopControlService>,
+) -> Result<ControlUiStatus, String> {
+    state.start_gateway(input).await
+}
+
+#[tauri::command]
+async fn stop_gateway(state: State<'_, DesktopControlService>) -> Result<ControlUiStatus, String> {
+    state.stop_gateway().await
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -515,6 +706,8 @@ pub fn run() {
             start_loopback,
             start_lan,
             stop_browser_server,
+            start_gateway,
+            stop_gateway,
             pick_trip_folder,
             pick_operator_file,
             save_session_document,
@@ -529,10 +722,12 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cargo_dispatch_addressing_gateway::{GatewayState, router as gateway_router};
     use cargo_dispatch_contracts::{TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion};
     use cargo_dispatch_domain::{OperatorId, PointId, TripId, WorkingRouteId};
     use cargo_dispatch_planner::PlannerTripExportDraft;
     use cargo_dispatch_trip_files::export_package;
+    use tokio::net::TcpListener;
 
     fn create_trip(root: &std::path::Path) -> std::io::Result<(TripId, PathBuf)> {
         let trip = TripId::from_bytes([21; 16]).expect("trip");
@@ -628,6 +823,64 @@ mod tests {
         assert_eq!(verified.original_name, "operator-note.pdf");
         assert_eq!(std::fs::read(source)?, b"synthetic operator document");
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn desktop_service_relays_real_driver_page_through_gateway() -> std::io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (_trip, folder) = create_trip(tmp.path())?;
+        let service = DesktopControlService::default();
+        let token = "desktop-gateway-session-0001";
+        let secret = "desktop-gateway-control-secret-0001";
+
+        service
+            .register_trip(RegisterTripInput {
+                folder_path: folder.to_string_lossy().into_owned(),
+                token: token.to_owned(),
+            })
+            .await
+            .expect("trip registers");
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+        let gateway_address = listener.local_addr()?;
+        let gateway = tokio::spawn(async move {
+            axum::serve(
+                listener,
+                gateway_router(GatewayState::new(secret, 1024 * 1024)),
+            )
+            .await
+            .expect("gateway server");
+        });
+
+        let running = service
+            .start_gateway(StartGatewayInput {
+                gateway_base_url: format!("http://{gateway_address}"),
+                control_secret: secret.to_owned(),
+            })
+            .await
+            .expect("gateway starts");
+
+        let gateway_status = running.gateway.expect("gateway status");
+        assert_eq!(gateway_status.total_sessions, 1);
+        assert_eq!(gateway_status.active_sessions, 1);
+        let public_url = running.sessions[0]
+            .public_driver_url
+            .clone()
+            .expect("public Driver URL");
+        assert!(public_url.contains(token));
+
+        let response = reqwest::get(public_url).await.expect("public Driver page");
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        let page = response.text().await.expect("Driver page body");
+        assert!(page.contains("Cargo Dispatch"));
+        assert!(page.contains("Документи / фото / відео"));
+
+        let stopped = service.stop_gateway().await.expect("gateway stops");
+        assert!(stopped.gateway.is_none());
+        assert!(stopped.sessions[0].public_driver_url.is_none());
+
+        gateway.abort();
         Ok(())
     }
 

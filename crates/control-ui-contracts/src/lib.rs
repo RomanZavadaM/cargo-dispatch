@@ -14,6 +14,19 @@ pub struct StartLanInput {
     pub port: u16,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StartGatewayInput {
+    pub gateway_base_url: String,
+    pub control_secret: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GatewayStatus {
+    pub base_url: String,
+    pub active_sessions: usize,
+    pub total_sessions: usize,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ListenerMode {
@@ -32,11 +45,13 @@ pub struct SessionStatus {
     pub trip_id: String,
     pub token: String,
     pub driver_url: Option<String>,
+    pub public_driver_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ControlUiStatus {
     pub listener: Option<ListenerStatus>,
+    pub gateway: Option<GatewayStatus>,
     pub sessions: Vec<SessionStatus>,
 }
 
