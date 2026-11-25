@@ -2,6 +2,7 @@ package com.romanzavada.cargodispatch.driver
 
 import com.romanzavada.cargodispatch.driver.model.LocationUpdate
 import java.io.File
+import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -145,9 +146,22 @@ class PendingOutboundQueue(
         root.mkdirs()
         val temporary = File(root, "queue.json.tmp")
         temporary.writeText(json.encodeToString(state))
+        if (metadata.exists() && !metadata.delete()) {
+            temporary.delete()
+            error("Cannot replace outbound queue metadata")
+        }
         if (!temporary.renameTo(metadata)) {
             temporary.delete()
             error("Cannot persist outbound queue")
+        }
+    }
+
+    companion object {
+        fun forSession(baseRoot: File, baseUrl: String, token: String): PendingOutboundQueue {
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest((baseUrl.trimEnd('/') + "|" + token).toByteArray(Charsets.UTF_8))
+                .joinToString(separator = "") { "%02x".format(it.toInt() and 0xff) }
+            return PendingOutboundQueue(File(baseRoot, digest))
         }
     }
 }
