@@ -823,7 +823,6 @@ static ZH: ControlStrings = ControlStrings {
     operation_failed: "无法完成操作",
 };
 
-
 pub fn localize_problem(locale: UiLocale, problem: &str) -> String {
     if locale == UiLocale::Uk
         || !problem
