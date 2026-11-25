@@ -2,6 +2,9 @@ package com.romanzavada.cargodispatch.driver
 
 import com.romanzavada.cargodispatch.driver.model.LocationUpdate
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -87,10 +90,7 @@ class PendingOutboundQueue(
             val payload = File(mediaDirectory, payloadName)
             val temporary = File(mediaDirectory, "$payloadName.tmp")
             temporary.writeBytes(upload.bytes)
-            if (!temporary.renameTo(payload)) {
-                temporary.delete()
-                error("Cannot persist pending media")
-            }
+            replaceAtomically(temporary, payload)
 
             val entry = PendingMediaMetadata(
                 documentId = documentId,
@@ -146,13 +146,23 @@ class PendingOutboundQueue(
         root.mkdirs()
         val temporary = File(root, "queue.json.tmp")
         temporary.writeText(json.encodeToString(state))
-        if (metadata.exists() && !metadata.delete()) {
-            temporary.delete()
-            error("Cannot replace outbound queue metadata")
-        }
-        if (!temporary.renameTo(metadata)) {
-            temporary.delete()
-            error("Cannot persist outbound queue")
+        replaceAtomically(temporary, metadata)
+    }
+
+    private fun replaceAtomically(source: File, target: File) {
+        try {
+            Files.move(
+                source.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(
+                source.toPath(),
+                target.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+            )
         }
     }
 
