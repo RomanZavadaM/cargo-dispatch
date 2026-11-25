@@ -1,11 +1,11 @@
-# Cargo Dispatch Driver — base Android
+# Cargo Dispatch Driver — Android
 
 [🇺🇦 Українська](README.md) · [🇬🇧 English](README.en.md) · [🇩🇪 Deutsch](README.de.md) · [🇫🇷 Français](README.fr.md) · **🇪🇸 Español** · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-Primer slice Android nativo. **No sustituye a Driver Browser** ni crea un segundo protocolo de servidor: utiliza la misma API de Control.
+Cliente nativo Android para el conductor. **No sustituye Driver Browser** ni crea un protocolo de servidor separado: utiliza la misma API de Control y las mismas reglas del viaje.
 
-Alcance actual: Kotlin + Jetpack Compose, Android 16/API 36, conexión mediante Driver URL, snapshot del viaje activo, complete/reorder, modelo de geometría de ruta, estado de reconexión/error, pruebas de protocolo/unitarias y localizaciones uk/en/de/fr/es/ko/ja/zh-CN.
+Alcance actual: Kotlin + Jetpack Compose; Android 16/API 36, minSdk 26; Driver URL; loopback del Emulator mediante `10.0.2.2`; snapshot del viaje; complete/reorder; geometría de ruta opcional; ubicación puntual en primer plano hacia Control; descarga Control→Android con guardado nativo; envío de archivo/foto/vídeo Android→Control mediante selectores del sistema; recuperación de la última Driver URL/modo Emulator; localización uk/en/de/fr/es/ko/ja/zh-CN; pruebas de protocolo/unitarias y CI de instalación/arranque/captura en Emulator.
 
-En Android Emulator, el `127.0.0.1`/localhost del host se mapea a `10.0.2.2`. HTTP sin cifrar solo se permite en debug local; el camino público debe usar HTTPS.
+HTTP sin cifrar solo en debug local; el camino público es HTTPS-first.
 
-Aún no implementado: cámara/foto/vídeo, abrir/compartir documentos, GPS en segundo plano, cola offline, sesión persistente segura, push y firma de producción.
+Pendiente: mapa nativo, captura de cámara, GPS en segundo plano, smoke conectado a un viaje sintético real de Control, cola offline/reintentos, endurecimiento de Keystore, push y firma de producción.

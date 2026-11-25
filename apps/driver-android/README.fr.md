@@ -1,11 +1,11 @@
-# Cargo Dispatch Driver — squelette Android
+# Cargo Dispatch Driver — Android
 
 [🇺🇦 Українська](README.md) · [🇬🇧 English](README.en.md) · [🇩🇪 Deutsch](README.de.md) · **🇫🇷 Français** · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-Premier slice Android natif. Il **ne remplace pas Driver Browser** et n’introduit pas un second protocole serveur : il utilise la même API Control.
+Client conducteur Android natif. Il **ne remplace pas Driver Browser** et ne crée pas de protocole serveur séparé : il utilise la même API Control et les mêmes règles de trajet.
 
-Portée actuelle : Kotlin + Jetpack Compose, Android 16/API 36, connexion par Driver URL, snapshot du trajet actif, complete/reorder, modèle de géométrie routière, état de reconnexion/erreur, tests de protocole/unitaires et localisations uk/en/de/fr/es/ko/ja/zh-CN.
+Portée actuelle : Kotlin + Jetpack Compose ; Android 16/API 36, minSdk 26 ; Driver URL ; loopback Emulator via `10.0.2.2` ; snapshot du trajet ; complete/reorder ; géométrie routière optionnelle ; position GPS ponctuelle en premier plan vers Control ; téléchargement Control→Android avec sauvegarde native ; envoi fichier/photo/vidéo Android→Control via sélecteurs système ; restauration de la dernière Driver URL/du mode Emulator ; localisations uk/en/de/fr/es/ko/ja/zh-CN ; tests protocole/unitaires et CI Emulator install/launch/screenshot.
 
-Dans Android Emulator, `127.0.0.1`/localhost de l’hôte est mappé vers `10.0.2.2`. Le HTTP non chiffré n’est permis qu’en debug local ; le chemin public doit utiliser HTTPS.
+HTTP non chiffré uniquement en debug local ; le chemin public est HTTPS-first.
 
-Pas encore implémenté : caméra/photo/vidéo, ouverture/partage de documents, GPS en arrière-plan, file offline, session persistante sécurisée, push, signature de production.
+À venir : carte native, capture caméra, GPS en arrière-plan, smoke Emulator connecté à un vrai trajet synthétique Control, file offline/retry, durcissement Keystore, push et signature production.
