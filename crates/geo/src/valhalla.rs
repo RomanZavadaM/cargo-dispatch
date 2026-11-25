@@ -135,7 +135,10 @@ pub fn normalize_route_response(
                 warnings,
             ));
         }
-        if geometry.last().is_some_and(|last| Some(last) == leg_geometry.first()) {
+        if geometry
+            .last()
+            .is_some_and(|last| Some(last) == leg_geometry.first())
+        {
             leg_geometry.remove(0);
         }
         geometry.extend(leg_geometry);
@@ -173,13 +176,14 @@ fn truck_options(request: &RouteRequest) -> Value {
         truck.insert("axle_count".to_owned(), json!(axle_count));
     }
     truck.insert("hazmat".to_owned(), json!(profile.hazmat));
-    truck.insert(
-        "exclude_unpaved".to_owned(),
-        json!(profile.exclude_unpaved),
-    );
+    truck.insert("exclude_unpaved".to_owned(), json!(profile.exclude_unpaved));
     truck.insert(
         "use_truck_route".to_owned(),
-        json!(if profile.prefer_truck_routes { 1.0 } else { 0.0 }),
+        json!(if profile.prefer_truck_routes {
+            1.0
+        } else {
+            0.0
+        }),
     );
 
     Value::Object(truck)
@@ -194,9 +198,7 @@ fn insert_optional_f64(target: &mut Map<String, Value>, key: &str, value: Option
 fn status_for_error(error_code: Option<u64>, http_status: u16) -> NormalizedStatus {
     match error_code {
         Some(170 | 441 | 442 | 443) => NormalizedStatus::NoRoute,
-        Some(130 | 131 | 132 | 171 | 420 | 421 | 422 | 423 | 424) => {
-            NormalizedStatus::InvalidPoint
-        }
+        Some(130 | 131 | 132 | 171 | 420 | 421 | 422 | 423 | 424) => NormalizedStatus::InvalidPoint,
         Some(124 | 125 | 412) => NormalizedStatus::InvalidProfile,
         _ if http_status >= 500 => NormalizedStatus::EngineUnavailable,
         _ => NormalizedStatus::EngineError,
@@ -233,7 +235,9 @@ impl fmt::Display for PolylineDecodeError {
             Self::InvalidByte => formatter.write_str("polyline contains an invalid byte"),
             Self::Truncated => formatter.write_str("polyline is truncated"),
             Self::Overflow => formatter.write_str("polyline delta overflows"),
-            Self::InvalidCoordinate => formatter.write_str("polyline decodes outside coordinate bounds"),
+            Self::InvalidCoordinate => {
+                formatter.write_str("polyline decodes outside coordinate bounds")
+            }
         }
     }
 }
@@ -260,8 +264,11 @@ pub fn decode_polyline6(encoded: &str) -> Result<Vec<GeoPoint>, PolylineDecodeEr
             .checked_add(lon_delta)
             .ok_or(PolylineDecodeError::Overflow)?;
 
-        let point = GeoPoint::new(latitude as f64 / 1_000_000.0, longitude as f64 / 1_000_000.0)
-            .map_err(|_| PolylineDecodeError::InvalidCoordinate)?;
+        let point = GeoPoint::new(
+            latitude as f64 / 1_000_000.0,
+            longitude as f64 / 1_000_000.0,
+        )
+        .map_err(|_| PolylineDecodeError::InvalidCoordinate)?;
         points.push(point);
     }
 
@@ -350,11 +357,8 @@ mod tests {
 
         let mut incomplete = profile();
         incomplete.height_m = None;
-        let incomplete_request = RouteRequest::new(
-            request().points().to_vec(),
-            incomplete,
-        )
-        .expect("missing dimensions warn instead of inventing defaults");
+        let incomplete_request = RouteRequest::new(request().points().to_vec(), incomplete)
+            .expect("missing dimensions warn instead of inventing defaults");
         let incomplete_payload = route_payload(&incomplete_request);
         assert!(
             incomplete_payload["costing_options"]["truck"]
@@ -365,8 +369,7 @@ mod tests {
 
     #[test]
     fn polyline6_decodes_real_precision_route_shape() {
-        let points =
-            decode_polyline6("gk}`~A_ysyl@gfF_oKwvInnT").expect("valid polyline6");
+        let points = decode_polyline6("gk}`~A_ysyl@gfF_oKwvInnT").expect("valid polyline6");
         assert_eq!(points.len(), 3);
         assert!((points[0].lat() - 49.8393).abs() < 0.000_001);
         assert!((points[0].lon() - 24.0296).abs() < 0.000_001);
@@ -438,14 +441,9 @@ mod tests {
         .expect("valid identity");
         assert_eq!(bad_point.status, NormalizedStatus::InvalidPoint);
 
-        let unavailable = normalize_route_response(
-            &request(),
-            "3.9.2",
-            "fixture-2026-11",
-            503,
-            "not json",
-        )
-        .expect("valid identity");
+        let unavailable =
+            normalize_route_response(&request(), "3.9.2", "fixture-2026-11", 503, "not json")
+                .expect("valid identity");
         assert_eq!(unavailable.status, NormalizedStatus::EngineUnavailable);
     }
 }
