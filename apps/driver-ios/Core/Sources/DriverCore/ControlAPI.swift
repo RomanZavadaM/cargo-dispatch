@@ -71,7 +71,7 @@ public actor ControlAPI {
     }
 
     public func uploadDocument(
-        documentId: String = Self.newDocumentId(),
+        documentId: String = ControlAPI.newDocumentId(),
         originalName: String,
         mimeType: String,
         data: Data,
