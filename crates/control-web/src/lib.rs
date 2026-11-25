@@ -117,7 +117,7 @@ small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
   </div>
   <a class="map-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>
 </div>
-<p class="map-note">Показані точки рейсу та остання прийнята позиція водія. Номери показують черговість; дорожня геометрія буде додана окремо з маршрутизатора.</p>
+<p class="map-note">Показані точки рейсу та остання прийнята позиція водія. Дорожня лінія показується лише коли Control має актуальну geometry для поточного порядку точок.</p>
 </section>
 
 <section id="routeSection">
@@ -195,7 +195,7 @@ function mapUnproject(x, y, zoom) {
   return {latitude: mapClampLat(latitude), longitude};
 }
 
-function tripMapCoordinates() {
+function tripMapMarkerCoordinates() {
   if (!currentTrip) return [];
   const coordinates = [];
   for (const point of currentTrip.points) {
@@ -217,6 +217,22 @@ function tripMapCoordinates() {
       type: "location",
       title: "Остання позиція водія"
     });
+  }
+  return coordinates;
+}
+
+function tripMapExtentCoordinates() {
+  const coordinates = tripMapMarkerCoordinates().map(item => ({
+    latitude: item.latitude,
+    longitude: item.longitude
+  }));
+  if (currentTrip && currentTrip.road_geometry) {
+    for (const point of currentTrip.road_geometry.points) {
+      coordinates.push({
+        latitude: point.latitude,
+        longitude: point.longitude
+      });
+    }
   }
   return coordinates;
 }
@@ -256,7 +272,29 @@ function renderTripMap() {
     }
   }
 
-  for (const item of tripMapCoordinates()) {
+  if (currentTrip && currentTrip.road_geometry && currentTrip.road_geometry.points.length >= 2) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+    svg.setAttribute("width", String(width));
+    svg.setAttribute("height", String(height));
+    svg.style.position = "absolute";
+    svg.style.inset = "0";
+    const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    const shownPoints = currentTrip.road_geometry.points.map(point => {
+      const projected = mapProject(point.latitude, point.longitude, zoom);
+      return (projected.x - left) + "," + (projected.y - top);
+    });
+    polyline.setAttribute("points", shownPoints.join(" "));
+    polyline.setAttribute("fill", "none");
+    polyline.setAttribute("stroke", "rgb(23, 105, 170)");
+    polyline.setAttribute("stroke-width", "5");
+    polyline.setAttribute("stroke-linecap", "round");
+    polyline.setAttribute("stroke-linejoin", "round");
+    svg.append(polyline);
+    overlayLayer.append(svg);
+  }
+
+  for (const item of tripMapMarkerCoordinates()) {
     const projected = mapProject(item.latitude, item.longitude, zoom);
     const marker = document.createElement("div");
     marker.className = item.type === "location"
@@ -272,7 +310,7 @@ function renderTripMap() {
 
 function fitTripMap() {
   const host = document.getElementById("tripMap");
-  const coordinates = tripMapCoordinates();
+  const coordinates = tripMapExtentCoordinates();
   if (!host || !coordinates.length) {
     tripMapState.initialized = true;
     renderTripMap();
@@ -304,7 +342,10 @@ function fitTripMap() {
 }
 
 function updateTripMap() {
-  const signature = JSON.stringify(tripMapCoordinates());
+  const signature = JSON.stringify({
+    markers: tripMapMarkerCoordinates(),
+    roadGeometry: currentTrip ? currentTrip.road_geometry : null
+  });
   if (tripMapState.initialized && signature === tripMapState.dataSignature) return;
   tripMapState.dataSignature = signature;
   if (!tripMapState.initialized) {
@@ -675,11 +716,32 @@ pub struct DriverDocumentSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DriverRoadGeometryPointSnapshot {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DriverRoutingIdentitySnapshot {
+    pub engine: String,
+    pub engine_version: String,
+    pub map_dataset_id: String,
+    pub profile_fingerprint: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DriverRoadGeometrySnapshot {
+    pub routing: DriverRoutingIdentitySnapshot,
+    pub points: Vec<DriverRoadGeometryPointSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DriverTripSnapshot {
     pub trip_id: String,
     pub trip_version: u64,
     pub local_route_revision: u64,
     pub points: Vec<DriverPointSnapshot>,
+    pub road_geometry: Option<DriverRoadGeometrySnapshot>,
     pub documents: Vec<DriverDocumentSnapshot>,
     pub latest_location: Option<DriverLocationSnapshot>,
 }
@@ -939,6 +1001,25 @@ fn snapshot(trip: &TripFolder) -> DriverTripSnapshot {
                     }),
             })
             .collect(),
+        road_geometry: state
+            .route_geometry
+            .as_ref()
+            .map(|geometry| DriverRoadGeometrySnapshot {
+                routing: DriverRoutingIdentitySnapshot {
+                    engine: geometry.routing.engine.clone(),
+                    engine_version: geometry.routing.engine_version.clone(),
+                    map_dataset_id: geometry.routing.map_dataset_id.clone(),
+                    profile_fingerprint: geometry.routing.profile_fingerprint.clone(),
+                },
+                points: geometry
+                    .points
+                    .iter()
+                    .map(|point| DriverRoadGeometryPointSnapshot {
+                        latitude: point.latitude(),
+                        longitude: point.longitude(),
+                    })
+                    .collect(),
+            }),
         documents: trip.documents().iter().map(document_snapshot).collect(),
         latest_location: trip.latest_location().map(location_snapshot),
     }
@@ -1470,6 +1551,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).expect("operator"),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            route_geometry: None,
         };
         export_package(&package, &draft, &route)?;
         let folder = TripFolder::import(&folder, &package)?;

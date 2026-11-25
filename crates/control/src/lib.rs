@@ -2,8 +2,8 @@
 
 use cargo_dispatch_contracts::{
     PackageContentFingerprint, ReplanContractError, ReplanReasonCode, ReplanRequest,
-    ReplanRequestData, RouteContractError, TripPackageHeader, TripRoutePoint, TripVersion,
-    validate_route_points,
+    ReplanRequestData, RouteContractError, TripPackageHeader, TripRoadGeometry, TripRoutePoint,
+    TripVersion, validate_route_points,
 };
 use cargo_dispatch_domain::{PointId, ReplanRequestId, TripId};
 use std::collections::{BTreeMap, BTreeSet};
@@ -13,6 +13,7 @@ pub struct TripImportCandidate {
     pub header: TripPackageHeader,
     pub content_fingerprint: PackageContentFingerprint,
     pub route_points: Vec<TripRoutePoint>,
+    pub route_geometry: Option<TripRoadGeometry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,6 +22,7 @@ pub struct StoredTripPlan {
     pub current_version: TripVersion,
     pub content_fingerprint: PackageContentFingerprint,
     pub route_points: Vec<TripRoutePoint>,
+    pub route_geometry: Option<TripRoadGeometry>,
     pub completed_point_ids: BTreeSet<PointId>,
     pub local_route_revision: u64,
 }
@@ -144,6 +146,7 @@ impl InMemoryTripRegistry {
             .checked_add(1)
             .ok_or(LocalRouteEditError::RevisionOverflow)?;
         current.route_points = proposed;
+        current.route_geometry = None;
         current.local_route_revision = revision;
         Ok(revision)
     }
@@ -166,6 +169,7 @@ impl InMemoryTripRegistry {
                     current_version: incoming_version,
                     content_fingerprint: candidate.content_fingerprint,
                     route_points: candidate.route_points,
+                    route_geometry: candidate.route_geometry,
                     completed_point_ids: BTreeSet::new(),
                     local_route_revision: 0,
                 },
@@ -209,6 +213,7 @@ impl InMemoryTripRegistry {
                 current_version: incoming_version,
                 content_fingerprint: candidate.content_fingerprint,
                 route_points: candidate.route_points,
+                route_geometry: candidate.route_geometry,
                 completed_point_ids,
                 local_route_revision: 0,
             },
@@ -338,7 +343,54 @@ mod tests {
             .expect("header"),
             content_fingerprint: fingerprint(fingerprint_byte),
             route_points,
+            route_geometry: None,
         }
+    }
+
+    #[test]
+    fn local_route_edit_invalidates_imported_road_geometry() {
+        use cargo_dispatch_contracts::{
+            TripRoadGeometry, TripRoadGeometryPoint, TripRoutingIdentity,
+        };
+
+        let trip = trip_id(9);
+        let mut candidate = candidate(trip, 1, None, 7, points(1, 2));
+        candidate.route_geometry = Some(TripRoadGeometry {
+            routing: TripRoutingIdentity {
+                engine: "valhalla".to_owned(),
+                engine_version: "3.9.2".to_owned(),
+                map_dataset_id: "fixture".to_owned(),
+                profile_fingerprint: "profile".to_owned(),
+            },
+            points: vec![
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_393_000,
+                    longitude_e7: 240_296_000,
+                },
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_430_000,
+                    longitude_e7: 240_360_000,
+                },
+            ],
+        });
+
+        let mut registry = InMemoryTripRegistry::default();
+        registry.import(candidate).expect("import");
+        let shown = registry.get(trip).expect("stored");
+        assert!(shown.route_geometry.is_some());
+
+        let mut reordered = shown.route_points.clone();
+        reordered.swap(0, 1);
+        for (index, point) in reordered.iter_mut().enumerate() {
+            point.sequence = u32::try_from(index + 1).expect("sequence");
+        }
+        registry
+            .edit_active_route(&shown, reordered)
+            .expect("local reorder");
+
+        let after = registry.get(trip).expect("stored after reorder");
+        assert!(after.route_geometry.is_none());
+        assert_eq!(after.local_route_revision, 1);
     }
 
     #[test]

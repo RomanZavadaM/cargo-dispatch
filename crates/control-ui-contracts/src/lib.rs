@@ -82,11 +82,32 @@ pub struct DashboardDocument {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DashboardRoadGeometryPoint {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DashboardRoutingIdentity {
+    pub engine: String,
+    pub engine_version: String,
+    pub map_dataset_id: String,
+    pub profile_fingerprint: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DashboardRoadGeometry {
+    pub routing: DashboardRoutingIdentity,
+    pub points: Vec<DashboardRoadGeometryPoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TripDashboard {
     pub trip_id: String,
     pub trip_version: u64,
     pub local_route_revision: u64,
     pub points: Vec<DashboardPoint>,
+    pub road_geometry: Option<DashboardRoadGeometry>,
     pub documents: Vec<DashboardDocument>,
     pub latest_location: Option<DashboardLocation>,
 }
