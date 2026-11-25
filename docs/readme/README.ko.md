@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · **🇰🇷 한국어** · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **상태:** 현재 개발 중입니다. 현재 테스트 프리릴리스는 **v0.1.0-preview.3**이며, 아직 안정적인 완성 제품은 없습니다.
+> **상태:** 현재 개발 중입니다. 현재 테스트 프리릴리스는 **v0.1.0-preview.4**이며, 아직 안정적인 완성 제품은 없습니다.
 
 ## 제품 소개
 
@@ -43,11 +43,11 @@ Control과 Driver Browser에는 운행 지점과 마지막으로 승인된 운�
 
 ## 테스트 빌드
 
-현재 프리릴리스: [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.3).
+현재 프리릴리스: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
 
 Windows ZIP에는 Control, 합성 활성 운행 데이터와 로컬 loopback 검사용 샘플 PDF가 포함됩니다.
 
-이 빌드는 **테스트/프리릴리스**이며 안정판이 아닙니다. `main`은 이미 preview.3보다 앞서 있으며, Valhalla adapter와 schema 1.2 road-geometry pipeline은 이 prerelease가 게시된 뒤 병합되었습니다.
+이 빌드는 **테스트/프리릴리스**이며 안정판이 아닙니다. Preview.4에는 이미 Valhalla adapter와 schema 1.2 road-geometry pipeline이 포함됩니다. 이후 Android와 iOS/iPadOS native Driver r2가 병합되어 `main`은 다시 preview.4보다 앞서 있습니다.
 
 ## 앞으로 필요한 작업
 
@@ -57,7 +57,7 @@ Windows ZIP에는 Control, 합성 활성 운행 데이터와 로컬 loopback 검
 - HTTPS를 통한 브라우저 GPS 전체 검수;
 - 서로 다른 네트워크/NAT/CGNAT 현장 테스트;
 - 실제 Valhalla HTTP transport 및 순서 변경 후 geometry 재계산;
-- Android와 iOS/iPadOS native Driver App — 현재 별도 draft branch에서 병렬 개발 중;
+- native map: Android는 MapLibre, iOS/iPadOS는 MapKit;\n- 카메라 촬영, background GPS, 연결된 virtual-device smoke, offline queue, secure session storage;
 - 안정판 릴리스.
 
 ## 인터페이스 언어
