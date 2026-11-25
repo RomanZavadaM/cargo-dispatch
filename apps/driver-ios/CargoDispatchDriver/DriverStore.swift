@@ -12,7 +12,6 @@ final class DriverStore: ObservableObject {
     private var api: ControlAPI?
     private var pendingQueue: PendingOutboundQueue?
     private let sessionStore: SecureSessionStore
-    private let defaults: UserDefaults
     private let queueBaseRoot: URL
 
     init(
@@ -21,7 +20,6 @@ final class DriverStore: ObservableObject {
     ) {
         let secureSessionStore = SecureSessionStore(defaults: defaults)
         self.sessionStore = secureSessionStore
-        self.defaults = defaults
         self.driverURL = secureSessionStore.loadDriverURL() ?? ""
 
         if let queueBaseRoot {
@@ -66,10 +64,6 @@ final class DriverStore: ObservableObject {
                     pendingOutbound = await queue.pendingCount()
                     do {
                         try sessionStore.save(driverURL: driverURL)
-#if DEBUG
-                        let smokeKey = "cargo_dispatch_debug_connect_count"
-                        defaults.set(defaults.integer(forKey: smokeKey) + 1, forKey: smokeKey)
-#endif
                     } catch {
                         // Keep the live in-memory session, but never fall back
                         // to persisting a raw token if Keychain storage fails.
