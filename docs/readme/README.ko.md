@@ -79,11 +79,13 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 - HTTPS를 통한 브라우저 GPS 전체 검수;
 - 서로 다른 네트워크/NAT/CGNAT 현장 테스트;
 - 실제 Valhalla HTTP transport 및 순서 변경 후 geometry 재계산;
+- Android Keystore + Apple Keychain을 이용한 안전한 Driver session 저장과 기존 raw URL 마이그레이션;
+- 안정판 릴리스.
 
 
 ## 인터페이스 언어
 
-Control, Driver Browser, Android Driver, iOS/iPadOS Driver는 이제 프로젝트의 전체 언어 집합인 **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**을 구현하고 자동 검증합니다. Control과 Driver Browser는 기본적으로 시스템 언어를 사용하며 수동 언어 선택도 저장합니다. 문서도 같은 언어 집합으로 유지됩니다.
+현재 통합된 desktop/browser UI는 **우크라이나어, 영어, 독일어**를 구현·검증합니다. 새 Android 및 iOS/iPadOS native client는 첫 화면부터 **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** 언어팩을 포함하며 문서도 같은 언어 집합으로 유지됩니다.
 
 ## 문서
 
