@@ -46,13 +46,25 @@ const DRIVER_HTML: &str = r#"<!doctype html>
 :root{font-family:system-ui,sans-serif;color:#202124;background:#f6f7f8}
 *{box-sizing:border-box}
 body{margin:0;background:#f6f7f8;color:#202124;overflow-x:hidden}
-main{width:min(100%,1440px);margin:auto;padding:20px;display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);grid-template-areas:"title title" "status status" "route files" "route location";gap:14px;align-items:start}
+main{width:min(100%,1440px);margin:auto;padding:20px;display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);grid-template-areas:"title title" "status status" "map files" "route files" "route location";gap:14px;align-items:start}
 h1{grid-area:title;margin:0}
 #status{grid-area:status;margin:0;padding:10px 12px;border-radius:10px;background:#eef3f8}
 section{background:white;border:1px solid #ddd;border-radius:12px;padding:16px;min-width:0}
+#mapSection{grid-area:map}
 #routeSection{grid-area:route}
 #filesSection{grid-area:files}
 #locationSection{grid-area:location}
+.trip-map{position:relative;height:420px;overflow:hidden;border:1px solid #c8d0d8;border-radius:10px;background:#e7ecef;touch-action:none}
+.map-tiles,.map-overlays{position:absolute;inset:0;overflow:hidden}
+.map-tiles img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none}
+.map-overlays{pointer-events:none;z-index:2}
+.map-marker{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;width:30px;height:30px;border:2px solid #fff;border-radius:999px;background:#1769aa;color:#fff;font-size:12px;font-weight:700;box-shadow:0 1px 5px #0006}
+.map-marker.completed{background:#68727d}
+.map-location-marker{width:18px;height:18px;background:#d63b2f;border-width:3px;box-shadow:0 0 0 5px #d63b2f33}
+.map-controls{position:absolute;top:10px;right:10px;z-index:4;display:flex;gap:6px}
+.map-controls button{min-width:42px;background:#fff}
+.map-attribution{position:absolute;right:4px;bottom:3px;z-index:4;padding:2px 5px;border-radius:4px;background:#ffffffe6;color:#345;font-size:11px;text-decoration:none}
+.map-note{margin-bottom:0;color:#5f6670;font-size:13px}
 button,input,select{font:inherit;max-width:100%}
 button{min-height:40px;padding:8px 12px;border:1px solid #b8bec6;border-radius:8px;background:#fff;cursor:pointer}
 button:disabled{cursor:default;opacity:.55}
@@ -70,7 +82,8 @@ label{display:grid;gap:6px;margin:10px 0}
 #documents li{overflow-wrap:anywhere;margin:6px 0}
 small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
 @media (min-width:700px) and (max-width:1099px){
-  main{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title title" "status status" "route route" "files location";padding:18px}
+  main{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title title" "status status" "map map" "route route" "files location";padding:18px}
+  .trip-map{height:360px}
 }
 @media (max-width:699px){
   main{display:block;width:100%;padding:12px}
@@ -82,6 +95,7 @@ small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
   .point-header{display:block}
   .point-actions{margin-top:8px}
   .point-actions button{flex:1 1 72px}
+  .trip-map{height:300px}
 }
 </style>
 </head>
@@ -89,6 +103,21 @@ small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
 <main>
 <h1>Cargo Dispatch — рейс</h1>
 <p id="status">Завантаження…</p>
+
+<section id="mapSection">
+<h2>Карта</h2>
+<div id="tripMap" class="trip-map" aria-label="Карта рейсу">
+  <div class="map-tiles" aria-hidden="true"></div>
+  <div class="map-overlays" aria-hidden="true"></div>
+  <div class="map-controls">
+    <button id="mapZoomIn" type="button" aria-label="Збільшити карту">+</button>
+    <button id="mapZoomOut" type="button" aria-label="Зменшити карту">−</button>
+    <button id="mapFit" type="button">Рейс</button>
+  </div>
+  <a class="map-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>
+</div>
+<p class="map-note">Показані точки рейсу та остання прийнята позиція водія. Номери показують черговість; дорожня геометрія буде додана окремо з маршрутизатора.</p>
+</section>
 
 <section id="routeSection">
 <h2>Маршрут</h2>
@@ -126,6 +155,166 @@ let watchId = null;
 let lastLocationSentAt = 0;
 let pendingUpload = null;
 
+const tripMapState = {
+  zoom: 6,
+  centerLat: 49.0,
+  centerLon: 31.0,
+  initialized: false,
+  dragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  dragCenterX: 0,
+  dragCenterY: 0
+};
+
+function mapClampLat(latitude) {
+  return Math.max(-85.05112878, Math.min(85.05112878, latitude));
+}
+
+function mapWorldSize(zoom) {
+  return 256 * Math.pow(2, zoom);
+}
+
+function mapProject(latitude, longitude, zoom) {
+  const size = mapWorldSize(zoom);
+  const lat = mapClampLat(latitude) * Math.PI / 180;
+  const sin = Math.sin(lat);
+  return {
+    x: (longitude + 180) / 360 * size,
+    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * size
+  };
+}
+
+function mapUnproject(x, y, zoom) {
+  const size = mapWorldSize(zoom);
+  const longitude = x / size * 360 - 180;
+  const mercator = Math.PI * (1 - 2 * y / size);
+  const latitude = Math.atan(Math.sinh(mercator)) * 180 / Math.PI;
+  return {latitude: mapClampLat(latitude), longitude};
+}
+
+function tripMapCoordinates() {
+  if (!currentTrip) return [];
+  const coordinates = [];
+  for (const point of currentTrip.points) {
+    if (point.navigation) {
+      coordinates.push({
+        latitude: point.navigation.latitude,
+        longitude: point.navigation.longitude,
+        type: "point",
+        sequence: point.sequence,
+        title: point.title,
+        completed: point.completed
+      });
+    }
+  }
+  if (currentTrip.latest_location) {
+    coordinates.push({
+      latitude: currentTrip.latest_location.latitude,
+      longitude: currentTrip.latest_location.longitude,
+      type: "location",
+      title: "Остання позиція водія"
+    });
+  }
+  return coordinates;
+}
+
+function renderTripMap() {
+  const host = document.getElementById("tripMap");
+  if (!host) return;
+  const width = Math.max(1, host.clientWidth);
+  const height = Math.max(1, host.clientHeight);
+  const zoom = tripMapState.zoom;
+  const center = mapProject(tripMapState.centerLat, tripMapState.centerLon, zoom);
+  const left = center.x - width / 2;
+  const top = center.y - height / 2;
+  const tileLayer = host.querySelector(".map-tiles");
+  const overlayLayer = host.querySelector(".map-overlays");
+  tileLayer.replaceChildren();
+  overlayLayer.replaceChildren();
+
+  const tileMinX = Math.floor(left / 256) - 1;
+  const tileMaxX = Math.floor((left + width) / 256) + 1;
+  const tileMinY = Math.floor(top / 256) - 1;
+  const tileMaxY = Math.floor((top + height) / 256) + 1;
+  const tileCount = Math.pow(2, zoom);
+  for (let tileX = tileMinX; tileX <= tileMaxX; tileX++) {
+    const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
+    for (let tileY = tileMinY; tileY <= tileMaxY; tileY++) {
+      if (tileY < 0 || tileY >= tileCount) continue;
+      const image = document.createElement("img");
+      image.alt = "";
+      image.draggable = false;
+      image.loading = "lazy";
+      image.referrerPolicy = "no-referrer";
+      image.src = "https://tile.openstreetmap.org/" + zoom + "/" + wrappedX + "/" + tileY + ".png";
+      image.style.left = (tileX * 256 - left) + "px";
+      image.style.top = (tileY * 256 - top) + "px";
+      image.addEventListener("error", () => image.remove());
+      tileLayer.append(image);
+    }
+  }
+
+  for (const item of tripMapCoordinates()) {
+    const projected = mapProject(item.latitude, item.longitude, zoom);
+    const marker = document.createElement("div");
+    marker.className = item.type === "location"
+      ? "map-marker map-location-marker"
+      : "map-marker" + (item.completed ? " completed" : "");
+    marker.style.left = (projected.x - left) + "px";
+    marker.style.top = (projected.y - top) + "px";
+    marker.title = item.title;
+    marker.textContent = item.type === "location" ? "" : String(item.sequence);
+    overlayLayer.append(marker);
+  }
+}
+
+function fitTripMap() {
+  const host = document.getElementById("tripMap");
+  const coordinates = tripMapCoordinates();
+  if (!host || !coordinates.length) {
+    tripMapState.initialized = true;
+    renderTripMap();
+    return;
+  }
+  const width = Math.max(1, host.clientWidth - 72);
+  const height = Math.max(1, host.clientHeight - 72);
+  let chosenZoom = 3;
+  let center = {latitude: coordinates[0].latitude, longitude: coordinates[0].longitude};
+  for (let zoom = 18; zoom >= 3; zoom--) {
+    const projected = coordinates.map(item => mapProject(item.latitude, item.longitude, zoom));
+    const xs = projected.map(item => item.x);
+    const ys = projected.map(item => item.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    if (maxX - minX <= width && maxY - minY <= height) {
+      chosenZoom = zoom;
+      center = mapUnproject((minX + maxX) / 2, (minY + maxY) / 2, zoom);
+      break;
+    }
+  }
+  tripMapState.zoom = chosenZoom;
+  tripMapState.centerLat = center.latitude;
+  tripMapState.centerLon = center.longitude;
+  tripMapState.initialized = true;
+  renderTripMap();
+}
+
+function updateTripMap() {
+  if (!tripMapState.initialized) {
+    fitTripMap();
+  } else {
+    renderTripMap();
+  }
+}
+
+function changeTripMapZoom(delta) {
+  tripMapState.zoom = Math.max(3, Math.min(18, tripMapState.zoom + delta));
+  renderTripMap();
+}
+
 function endpoint(path) {
   return "/api/trip/" + encodeURIComponent(token) + path;
 }
@@ -152,6 +341,7 @@ async function loadTrip() {
     renderRoute();
     renderDocuments();
     renderLocation();
+    updateTripMap();
   } catch (error) {
     document.getElementById("status").textContent = "Немає доступу до рейсу";
     document.getElementById("status").className = "error";
@@ -395,6 +585,42 @@ document.getElementById("stopLocation").addEventListener("click", () => {
   document.getElementById("startLocation").disabled = false;
   document.getElementById("stopLocation").disabled = true;
 });
+
+document.getElementById("mapZoomIn").addEventListener("click", () => changeTripMapZoom(1));
+document.getElementById("mapZoomOut").addEventListener("click", () => changeTripMapZoom(-1));
+document.getElementById("mapFit").addEventListener("click", fitTripMap);
+const tripMapHost = document.getElementById("tripMap");
+tripMapHost.addEventListener("wheel", event => {
+  event.preventDefault();
+  changeTripMapZoom(event.deltaY < 0 ? 1 : -1);
+}, {passive: false});
+tripMapHost.addEventListener("pointerdown", event => {
+  if (event.target.closest("button,a")) return;
+  const center = mapProject(tripMapState.centerLat, tripMapState.centerLon, tripMapState.zoom);
+  tripMapState.dragging = true;
+  tripMapState.dragStartX = event.clientX;
+  tripMapState.dragStartY = event.clientY;
+  tripMapState.dragCenterX = center.x;
+  tripMapState.dragCenterY = center.y;
+  tripMapHost.setPointerCapture(event.pointerId);
+});
+tripMapHost.addEventListener("pointermove", event => {
+  if (!tripMapState.dragging) return;
+  const x = tripMapState.dragCenterX - (event.clientX - tripMapState.dragStartX);
+  const y = tripMapState.dragCenterY - (event.clientY - tripMapState.dragStartY);
+  const center = mapUnproject(x, y, tripMapState.zoom);
+  tripMapState.centerLat = center.latitude;
+  tripMapState.centerLon = center.longitude;
+  renderTripMap();
+});
+tripMapHost.addEventListener("pointerup", event => {
+  tripMapState.dragging = false;
+  if (tripMapHost.hasPointerCapture(event.pointerId)) tripMapHost.releasePointerCapture(event.pointerId);
+});
+tripMapHost.addEventListener("pointercancel", () => {
+  tripMapState.dragging = false;
+});
+window.addEventListener("resize", renderTripMap);
 
 loadTrip();
 setInterval(loadTrip, 2000);
@@ -1306,6 +1532,10 @@ mod tests {
 
     #[test]
     fn driver_page_declares_phone_tablet_and_wide_layouts() {
+        assert!(DRIVER_HTML.contains("id=\"mapSection\""));
+        assert!(DRIVER_HTML.contains("id=\"tripMap\""));
+        assert!(DRIVER_HTML.contains("tile.openstreetmap.org"));
+        assert!(DRIVER_HTML.contains("© OpenStreetMap contributors"));
         assert!(DRIVER_HTML.contains("id=\"routeSection\""));
         assert!(DRIVER_HTML.contains("id=\"filesSection\""));
         assert!(DRIVER_HTML.contains("id=\"locationSection\""));
