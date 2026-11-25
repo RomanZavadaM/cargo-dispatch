@@ -51,7 +51,8 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath apps/driver-ios/build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY=- \
             build
 
       - name: Verify background location mode in built app
@@ -60,6 +61,8 @@ jobs:
           INFO="apps/driver-ios/build/DerivedData/Build/Products/Debug-iphonesimulator/CargoDispatchDriver.app/Info.plist"
           test -f "$INFO"
           plutil -p "$INFO"
+          codesign -dv --verbose=2 "$(dirname "$INFO")" 2>&1
+          codesign --verify --deep --strict "$(dirname "$INFO")"
           python3 - "$INFO" <<'PY'
           import plistlib, sys
           with open(sys.argv[1], "rb") as handle:
