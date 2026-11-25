@@ -157,14 +157,21 @@ jobs:
           BUNDLE="com.romanzavada.cargodispatch.driver"
           xcrun simctl install "$DEVICE" "$APP"
 
-          # Seed the r1-r5 legacy raw URL on disk. r6 must use it only for one
-          # successful reconnect, migrate the token to Keychain, then remove the
-          # raw URL from UserDefaults.
-          xcrun simctl spawn "$DEVICE" defaults write "$BUNDLE" cargo_dispatch_driver_url "$IOS_DRIVER_URL"
-          xcrun simctl launch "$DEVICE" "$BUNDLE"
-
+          # Seed the r1-r5 legacy raw URL directly inside the installed app's
+          # data container. The app has never launched, so this accurately
+          # represents an on-disk UserDefaults value carried over from r1-r5.
           DATA_CONTAINER="$(xcrun simctl get_app_container "$DEVICE" "$BUNDLE" data)"
           PREFS="$DATA_CONTAINER/Library/Preferences/$BUNDLE.plist"
+          python3 - "$PREFS" "$IOS_DRIVER_URL" <<'PY'
+          import os, plistlib, sys
+          path, driver_url = sys.argv[1:]
+          os.makedirs(os.path.dirname(path), exist_ok=True)
+          with open(path, "wb") as handle:
+              plistlib.dump({"cargo_dispatch_driver_url": driver_url}, handle)
+          PY
+          plutil -p "$PREFS"
+
+          xcrun simctl launch "$DEVICE" "$BUNDLE"
 
           MIGRATED=0
           for _ in $(seq 1 60); do
