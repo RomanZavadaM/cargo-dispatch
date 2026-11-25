@@ -18,14 +18,6 @@ final class DriverStore: ObservableObject {
         defaults: UserDefaults = .standard,
         queueBaseRoot: URL? = nil
     ) {
-#if DEBUG
-        let arguments = ProcessInfo.processInfo.arguments
-        if let marker = arguments.firstIndex(of: "--cargo-dispatch-seed-legacy-driver-url"),
-           arguments.indices.contains(marker + 1) {
-            defaults.set(arguments[marker + 1], forKey: "cargo_dispatch_driver_url")
-            defaults.removeObject(forKey: "cargo_dispatch_driver_base_url")
-        }
-#endif
         let secureSessionStore = SecureSessionStore(defaults: defaults)
         self.sessionStore = secureSessionStore
         self.driverURL = secureSessionStore.loadDriverURL() ?? ""
