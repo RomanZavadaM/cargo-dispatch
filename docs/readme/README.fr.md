@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · **🇫🇷 Français** · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Statut :** développement actif. La version stable actuelle est **v0.1.0**. Après la localisation complète, le prochain grand axe sera le Planner d’itinéraire.
+> **Statut :** développement actif. La version stable actuelle est **v0.1.0**. La localisation complète en 8 langues est intégrée ; le prochain grand axe est le Planner d’itinéraire.
 
 ## À propos
 
@@ -83,7 +83,7 @@ Les packages Android et Apple ne sont pas encore signés pour les stores. App St
 
 ## Langues de l’interface
 
-L’interface desktop/browser intégrée implémente actuellement **l’ukrainien, l’anglais et l’allemand**. Les nouveaux clients natifs Android et iOS/iPadOS démarrent directement avec les packs **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**, et leur documentation suit le même ensemble de langues.
+Control, Driver Browser, Android Driver et iOS/iPadOS Driver sont implémentés et vérifiés avec le même **ensemble de 8 langues : uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control et Driver Browser utilisent la langue système avec un choix manuel mémorisé, et le CI vérifie la couverture complète des 8 localisations.
 
 ## Documentation
 
