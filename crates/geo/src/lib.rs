@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 
 use core::fmt;
+use serde::Serialize;
+use sha2::{Digest, Sha256};
+
+pub mod valhalla;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GeoPoint {
@@ -30,14 +34,15 @@ impl GeoPoint {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum TollPreference {
     Allow,
     PreferAvoid,
     Avoid,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct VehicleRoutingProfile {
     pub height_m: Option<f64>,
     pub width_m: Option<f64>,
@@ -67,6 +72,13 @@ impl VehicleRoutingProfile {
         }
 
         Ok(())
+    }
+
+    #[must_use]
+    pub fn profile_fingerprint(&self) -> String {
+        let canonical = serde_json::to_vec(self).expect("vehicle routing profile serializes");
+        let digest = Sha256::digest(canonical);
+        format!("{digest:x}")
     }
 
     #[must_use]
@@ -383,6 +395,19 @@ mod tests {
             GeoPoint::new(49.0, f64::NAN),
             Err(GeoContractError::InvalidLongitude)
         );
+    }
+
+    #[test]
+    fn profile_fingerprint_changes_with_vehicle_constraints() {
+        let baseline = profile();
+        let mut taller = baseline.clone();
+        taller.height_m = Some(3.8);
+
+        assert_ne!(
+            baseline.profile_fingerprint(),
+            taller.profile_fingerprint()
+        );
+        assert_eq!(baseline.profile_fingerprint().len(), 64);
     }
 
     #[test]
