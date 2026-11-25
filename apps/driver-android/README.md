@@ -7,7 +7,7 @@
 ## Поточний обсяг
 
 - Kotlin + Jetpack Compose;
-- Android 17 / API 37;
+- Android 16 / API 36;
 - paste Driver URL з Control;
 - для Android Emulator автоматична заміна `127.0.0.1` / `localhost` на `10.0.2.2`;
 - завантаження active trip snapshot;
