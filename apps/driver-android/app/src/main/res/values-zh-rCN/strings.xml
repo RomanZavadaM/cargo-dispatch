@@ -37,4 +37,14 @@
     <string name="capture_photo">拍照</string>
     <string name="capture_video">录制视频</string>
     <string name="pending_outbound">连接恢复后等待发送：%1$d</string>
+    <string name="tracking_start">开始跟踪</string>
+    <string name="tracking_stop">停止跟踪</string>
+    <string name="tracking_status_active">后台跟踪已启用。</string>
+    <string name="tracking_status_stopped">后台跟踪已停止。</string>
+    <string name="tracking_permission_required">跟踪需要位置权限。</string>
+    <string name="tracking_channel_name">行程跟踪</string>
+    <string name="tracking_channel_description">Cargo Dispatch 发送司机位置时显示的常驻通知。</string>
+    <string name="tracking_notification_title">Cargo Dispatch — 行程跟踪</string>
+    <string name="tracking_notification_active">正在将司机位置发送到 Control。</string>
+    <string name="tracking_notification_pending">位置已保存；待发送：%1$d</string>
 </resources>
