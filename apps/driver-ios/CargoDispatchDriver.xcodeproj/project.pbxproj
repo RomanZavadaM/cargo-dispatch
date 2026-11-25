@@ -1,0 +1,262 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B00000000000000000000001 /* CargoDispatchDriverApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000001 /* CargoDispatchDriverApp.swift */; };
+		B00000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000002 /* ContentView.swift */; };
+		B00000000000000000000003 /* DriverStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000003 /* DriverStore.swift */; };
+		B00000000000000000000004 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000004 /* Models.swift */; };
+		B00000000000000000000005 /* SessionLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000005 /* SessionLink.swift */; };
+		B00000000000000000000006 /* RouteOrderPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000006 /* RouteOrderPlanner.swift */; };
+		B00000000000000000000007 /* ControlAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000007 /* ControlAPI.swift */; };
+		B00000000000000000000008 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000008 /* Localizable.xcstrings */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A00000000000000000000001 /* CargoDispatchDriverApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CargoDispatchDriverApp.swift; sourceTree = "<group>"; };
+		A00000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A00000000000000000000003 /* DriverStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverStore.swift; sourceTree = "<group>"; };
+		A00000000000000000000004 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		A00000000000000000000005 /* SessionLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLink.swift; sourceTree = "<group>"; };
+		A00000000000000000000006 /* RouteOrderPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteOrderPlanner.swift; sourceTree = "<group>"; };
+		A00000000000000000000007 /* ControlAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlAPI.swift; sourceTree = "<group>"; };
+		A00000000000000000000008 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		A00000000000000000000009 /* CargoDispatchDriver.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CargoDispatchDriver.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C00000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000009 /* CargoDispatchDriver.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		000000000000000000000004 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000005 /* CargoDispatchDriver */,
+				000000000000000000000006 /* DriverCore */,
+				000000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000005 /* CargoDispatchDriver */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000001 /* CargoDispatchDriverApp.swift */,
+				A00000000000000000000002 /* ContentView.swift */,
+				A00000000000000000000003 /* DriverStore.swift */,
+				A00000000000000000000008 /* Localizable.xcstrings */,
+			);
+			path = CargoDispatchDriver;
+			sourceTree = "<group>";
+		};
+		000000000000000000000006 /* DriverCore */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000004 /* Models.swift */,
+				A00000000000000000000005 /* SessionLink.swift */,
+				A00000000000000000000006 /* RouteOrderPlanner.swift */,
+				A00000000000000000000007 /* ControlAPI.swift */,
+			);
+			path = Core/Sources/DriverCore;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000000000002 /* CargoDispatchDriver */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E00000000000000000000002 /* Build configuration list for PBXNativeTarget "CargoDispatchDriver" */;
+			buildPhases = (
+				C00000000000000000000001 /* Sources */,
+				C00000000000000000000003 /* Frameworks */,
+				C00000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CargoDispatchDriver;
+			productName = CargoDispatchDriver;
+			productReference = A00000000000000000000009 /* CargoDispatchDriver.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					000000000000000000000002 = {
+						CreatedOnToolsVersion = 27.2;
+					};
+				};
+			};
+			buildConfigurationList = E00000000000000000000001 /* Build configuration list for PBXProject "CargoDispatchDriver" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = uk;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				uk,
+				en,
+				de,
+				fr,
+				es,
+				ko,
+				ja,
+				"zh-Hans",
+				Base,
+			);
+			mainGroup = 000000000000000000000004;
+			productRefGroup = 000000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000000000002 /* CargoDispatchDriver */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C00000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000008 /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C00000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000001 /* CargoDispatchDriverApp.swift in Sources */,
+				B00000000000000000000002 /* ContentView.swift in Sources */,
+				B00000000000000000000003 /* DriverStore.swift in Sources */,
+				B00000000000000000000004 /* Models.swift in Sources */,
+				B00000000000000000000005 /* SessionLink.swift in Sources */,
+				B00000000000000000000006 /* RouteOrderPlanner.swift in Sources */,
+				B00000000000000000000007 /* ControlAPI.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		D00000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		D00000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		D00000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Cargo Dispatch Driver";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = "0.1.0-dev";
+				PRODUCT_BUNDLE_IDENTIFIER = com.romanzavada.cargodispatch.driver;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D00000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Cargo Dispatch Driver";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = NO;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = "0.1.0-dev";
+				PRODUCT_BUNDLE_IDENTIFIER = com.romanzavada.cargodispatch.driver;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		E00000000000000000000001 /* Build configuration list for PBXProject "CargoDispatchDriver" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D00000000000000000000001 /* Debug */,
+				D00000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E00000000000000000000002 /* Build configuration list for PBXNativeTarget "CargoDispatchDriver" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D00000000000000000000003 /* Debug */,
+				D00000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 000000000000000000000001 /* Project object */;
+}
