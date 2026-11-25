@@ -1121,6 +1121,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+        route_geometry: None,
         };
         export_package(path, &draft, &route)?;
         Ok((trip, route))
@@ -1181,6 +1182,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([3; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|p| p.point_id).collect(),
+        route_geometry: None,
         };
         export_package(&package, &draft, &route)?;
         let mut control = TripFolder::import(&folder, &package)?;
