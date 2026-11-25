@@ -120,6 +120,7 @@ jobs:
 
           DEVICE="$(xcrun simctl create CargoDispatchDriverCI "$DEVICE_TYPE" "$RUNTIME")"
           cleanup() {
+            kill "${PROXY_PID:-}" 2>/dev/null || true
             kill "${SERVER_PID:-}" 2>/dev/null || true
             xcrun simctl shutdown "$DEVICE" 2>/dev/null || true
             xcrun simctl delete "$DEVICE" 2>/dev/null || true
@@ -140,7 +141,28 @@ jobs:
             sleep 0.25
           done
           cat apps/driver-ios/native-smoke.log
-          IOS_DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_LOCAL_URL=//p' apps/driver-ios/native-smoke.log | tail -n 1)"
+          CONTROL_DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_LOCAL_URL=//p' apps/driver-ios/native-smoke.log | tail -n 1)"
+          test -n "$CONTROL_DRIVER_URL"
+
+          : > apps/driver-ios/native-proxy-requests.log
+          python3 .github/scripts/native-ios-smoke-proxy.py \
+            "$CONTROL_DRIVER_URL" \
+            apps/driver-ios/native-proxy-requests.log \
+            > apps/driver-ios/native-proxy.log 2>&1 &
+          PROXY_PID=$!
+
+          for _ in $(seq 1 80); do
+            if grep -q '^CARGO_DISPATCH_SMOKE_PROXY_URL=' apps/driver-ios/native-proxy.log; then
+              break
+            fi
+            if ! kill -0 "$PROXY_PID" 2>/dev/null; then
+              cat apps/driver-ios/native-proxy.log
+              exit 1
+            fi
+            sleep 0.25
+          done
+          cat apps/driver-ios/native-proxy.log
+          IOS_DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_PROXY_URL=//p' apps/driver-ios/native-proxy.log | tail -n 1)"
           test -n "$IOS_DRIVER_URL"
 
           xcrun simctl boot "$DEVICE"
@@ -173,62 +195,67 @@ jobs:
 
           xcrun simctl launch "$DEVICE" "$BUNDLE"
 
-          MIGRATED=0
-          for _ in $(seq 1 60); do
-            if [ -f "$PREFS" ]; then
-              if python3 - "$PREFS" <<'PY'
+          FIRST_CONNECTED=0
+          for _ in $(seq 1 120); do
+            REQUEST_COUNT="$(grep -c '^GET /api/trip/native-smoke-session-00000001 ' apps/driver-ios/native-proxy-requests.log || true)"
+            if [ "$REQUEST_COUNT" -ge 1 ]; then
+              FIRST_CONNECTED=1
+              break
+            fi
+            sleep 0.5
+          done
+          if [ "$FIRST_CONNECTED" -ne 1 ]; then
+            echo "Apple Driver did not reach Control during legacy-session migration." >&2
+            cat apps/driver-ios/native-proxy.log || true
+            cat apps/driver-ios/native-proxy-requests.log || true
+            exit 1
+          fi
+
+          # Stop the first process so UserDefaults is flushed to its real
+          # on-disk state before inspecting migration output.
+          xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
+          sleep 1
+
+          if [ ! -f "$PREFS" ]; then
+            echo "Apple Driver preferences were not persisted after first connection." >&2
+            exit 1
+          fi
+          python3 - "$PREFS" <<'PY'
           import plistlib, sys
           with open(sys.argv[1], "rb") as handle:
               prefs = plistlib.load(handle)
           raw = prefs.get("cargo_dispatch_driver_url")
           base = prefs.get("cargo_dispatch_driver_base_url")
-          count = int(prefs.get("cargo_dispatch_debug_connect_count", 0))
-          raise SystemExit(0 if raw is None and base and count >= 1 else 1)
+          if raw is not None:
+              raise SystemExit("legacy raw Driver URL remained in UserDefaults")
+          if not isinstance(base, str) or not base:
+              raise SystemExit("non-secret Driver base URL was not persisted")
           PY
-              then
-                MIGRATED=1
-                break
-              fi
-            fi
-            sleep 0.5
-          done
-          if [ "$MIGRATED" -ne 1 ]; then
-            echo "Apple Driver did not migrate legacy raw session into Keychain-backed storage." >&2
-            [ -f "$PREFS" ] && plutil -p "$PREFS" || true
-            exit 1
-          fi
           if plutil -p "$PREFS" | grep -q 'native-smoke-session-00000001'; then
             echo "Raw Apple Driver session token remained in UserDefaults after migration." >&2
             plutil -p "$PREFS" >&2
             exit 1
           fi
 
-          # Relaunch with no Driver URL. The second successful connection must
-          # come only from base URL + Keychain token.
-          xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
+          REQUESTS_BEFORE_RELAUNCH="$(grep -c '^GET /api/trip/native-smoke-session-00000001 ' apps/driver-ios/native-proxy-requests.log || true)"
+
+          # Relaunch with no Driver URL. Any new trip request proves the app
+          # reconstructed the session from UserDefaults base URL + Keychain token.
           xcrun simctl launch "$DEVICE" "$BUNDLE"
 
           RECONNECTED=0
-          for _ in $(seq 1 60); do
-            if [ -f "$PREFS" ]; then
-              if python3 - "$PREFS" <<'PY'
-          import plistlib, sys
-          with open(sys.argv[1], "rb") as handle:
-              prefs = plistlib.load(handle)
-          count = int(prefs.get("cargo_dispatch_debug_connect_count", 0))
-          raw = prefs.get("cargo_dispatch_driver_url")
-          raise SystemExit(0 if count >= 2 and raw is None else 1)
-          PY
-              then
-                RECONNECTED=1
-                break
-              fi
+          for _ in $(seq 1 120); do
+            REQUEST_COUNT="$(grep -c '^GET /api/trip/native-smoke-session-00000001 ' apps/driver-ios/native-proxy-requests.log || true)"
+            if [ "$REQUEST_COUNT" -gt "$REQUESTS_BEFORE_RELAUNCH" ]; then
+              RECONNECTED=1
+              break
             fi
             sleep 0.5
           done
           if [ "$RECONNECTED" -ne 1 ]; then
             echo "Apple Driver did not reconnect from Keychain after relaunch." >&2
-            [ -f "$PREFS" ] && plutil -p "$PREFS" || true
+            plutil -p "$PREFS" || true
+            cat apps/driver-ios/native-proxy-requests.log || true
             exit 1
           fi
 
