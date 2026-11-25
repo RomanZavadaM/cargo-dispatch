@@ -2,9 +2,11 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
-enum DriverCameraMode {
+enum DriverCameraMode: String, Identifiable {
     case photo
     case video
+
+    var id: String { rawValue }
 
     var mediaType: String {
         switch self {
@@ -25,6 +27,7 @@ struct DriverCapturedMedia {
 struct DriverCameraCaptureView: UIViewControllerRepresentable {
     let mode: DriverCameraMode
     let onResult: (Result<DriverCapturedMedia, Error>) -> Void
+    let onCancel: () -> Void
 
     final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
         let parent: DriverCameraCaptureView
@@ -34,6 +37,7 @@ struct DriverCameraCaptureView: UIViewControllerRepresentable {
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.onCancel()
             picker.dismiss(animated: true)
         }
 
