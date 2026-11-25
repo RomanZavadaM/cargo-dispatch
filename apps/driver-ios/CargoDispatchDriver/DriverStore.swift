@@ -94,9 +94,7 @@ final class DriverStore: ObservableObject {
                 errorKey = "error.connection"
             }
             pendingOutbound = await pendingQueue.pendingCount()
-            if showBusy {
-                busy = false
-            }
+            busy = false
         }
     }
 
@@ -174,7 +172,9 @@ final class DriverStore: ObservableObject {
                 errorKey = "error.location"
             }
             pendingOutbound = await pendingQueue.pendingCount()
-            busy = false
+            if showBusy {
+                busy = false
+            }
         }
     }
 
