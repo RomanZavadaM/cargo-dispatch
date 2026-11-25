@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -51,9 +52,9 @@ private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Text("Cargo Dispatch — Driver App", style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.screen_title), style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    "Native Android client використовує той самий Control API, що й Driver Browser.",
+                    stringResource(R.string.screen_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -79,22 +80,22 @@ private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(14.dp)) {
                             Text(
-                                "Рейс ${trip.tripId.take(8)}…",
+                                stringResource(R.string.trip_title, trip.tripId.take(8)),
                                 style = MaterialTheme.typography.titleMedium,
                             )
-                            Text("Версія ${trip.tripVersion}; local revision ${trip.localRouteRevision}")
-                            Text("Точки: ${trip.points.size}; документи: ${trip.documents.size}")
+                            Text(stringResource(R.string.version_revision, trip.tripVersion, trip.localRouteRevision))
+                            Text(stringResource(R.string.points_documents, trip.points.size, trip.documents.size))
                             Text(
                                 trip.roadGeometry?.let {
-                                    "Road geometry: ${it.points.size} точок (${it.routing.engine} ${it.routing.engineVersion})"
-                                } ?: "Road geometry: немає / інвалідована"
+                                    stringResource(R.string.road_geometry_present, it.points.size, it.routing.engine, it.routing.engineVersion)
+                                } ?: stringResource(R.string.road_geometry_missing)
                             )
                         }
                     }
                 }
 
                 item {
-                    Text("Маршрут", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.route_title), style = MaterialTheme.typography.titleLarge)
                 }
 
                 items(trip.points, key = { it.pointId }) { point ->
@@ -124,13 +125,13 @@ private fun ConnectionCard(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Підключення до Control", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.connection_title), style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 value = state.driverUrl,
                 onValueChange = setDriverUrl,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Driver URL з Control") },
-                placeholder = { Text("http://127.0.0.1:12345/driver/trip-...") },
+                label = { Text(stringResource(R.string.driver_url_label)) },
+                placeholder = { Text(stringResource(R.string.driver_url_placeholder)) },
                 singleLine = true,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -139,25 +140,25 @@ private fun ConnectionCard(
                     onCheckedChange = setEmulatorMode,
                 )
                 Column {
-                    Text("Android Emulator")
+                    Text(stringResource(R.string.emulator_label))
                     Text(
-                        "127.0.0.1/localhost автоматично → 10.0.2.2",
+                        stringResource(R.string.emulator_hint),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = connect, enabled = !state.busy) {
-                    Text(if (state.busy) "Підключення…" else "Підключити")
+                    Text(if (state.busy) stringResource(R.string.connecting) else stringResource(R.string.connect))
                 }
                 if (state.trip != null) {
                     Button(onClick = refresh, enabled = !state.busy) {
-                        Text("Оновити")
+                        Text(stringResource(R.string.refresh))
                     }
                 }
             }
             state.connectedBaseUrl?.let {
-                Text("Control: $it", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.control_prefix, it), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -180,7 +181,7 @@ private fun PointCard(
                 "${point.sequence}. ${point.title}",
                 style = MaterialTheme.typography.titleMedium,
             )
-            Text(if (point.completed) "Виконано" else "Відкрита точка")
+            Text(if (point.completed) stringResource(R.string.completed) else stringResource(R.string.open_point))
             point.navigation?.let { navigation ->
                 Text(
                     navigation.address
@@ -193,7 +194,7 @@ private fun PointCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = moveUp, enabled = !busy) { Text("↑") }
                     Button(onClick = moveDown, enabled = !busy) { Text("↓") }
-                    Button(onClick = complete, enabled = !busy) { Text("Виконано") }
+                    Button(onClick = complete, enabled = !busy) { Text(stringResource(R.string.done_button)) }
                 }
             }
         }
