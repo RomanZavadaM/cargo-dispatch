@@ -1,5 +1,8 @@
 #![forbid(unsafe_code)]
 
+mod i18n;
+
+use crate::i18n::{UiLocale, strings};
 use cargo_dispatch_control_ui_contracts::{
     ControlUiStatus, DashboardDocumentDirection, DashboardPoint, ListenerMode,
     OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput, SaveDocumentInput,
@@ -32,6 +35,16 @@ export function cargoControlNow() {
 export function cargoControlSetInterval(callback, ms) {
   return window.setInterval(callback, ms);
 }
+export function cargoControlInitialLocale() {
+  const saved = localStorage.getItem("cargo-dispatch-control-locale");
+  const locale = saved || navigator.language || "en";
+  document.documentElement.lang = locale;
+  return locale;
+}
+export function cargoControlSetLocale(locale) {
+  localStorage.setItem("cargo-dispatch-control-locale", locale);
+  document.documentElement.lang = locale;
+}
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = cargoControlInvoke)]
@@ -48,6 +61,12 @@ extern "C" {
 
     #[wasm_bindgen(js_name = cargoControlSetInterval)]
     fn cargo_control_set_interval(callback: &js_sys::Function, milliseconds: i32) -> i32;
+
+    #[wasm_bindgen(js_name = cargoControlInitialLocale)]
+    fn cargo_control_initial_locale() -> String;
+
+    #[wasm_bindgen(js_name = cargoControlSetLocale)]
+    fn cargo_control_set_locale(locale: &str);
 }
 
 #[wasm_bindgen(inline_js = r#"
@@ -66,7 +85,8 @@ let controlMapState = {
   roadGeometry: null,
   location: null,
   tripId: null,
-  dataKey: ""
+  dataKey: "",
+  locationTitle: "Latest driver position"
 };
 
 function clampLat(latitude) {
@@ -114,7 +134,7 @@ function coordinates() {
       latitude: controlMapState.location.latitude,
       longitude: controlMapState.location.longitude,
       type: "location",
-      title: "Остання позиція водія"
+      title: controlMapState.locationTitle
     });
   }
   return result;
@@ -279,12 +299,13 @@ function fit() {
   render();
 }
 
-export function cargoControlMapRender(tripId, pointsJson, roadGeometryJson, locationJson) {
-  const dataKey = tripId + "|" + pointsJson + "|" + roadGeometryJson + "|" + locationJson;
+export function cargoControlMapRender(tripId, pointsJson, roadGeometryJson, locationJson, locationTitle) {
+  const dataKey = tripId + "|" + pointsJson + "|" + roadGeometryJson + "|" + locationJson + "|" + locationTitle;
   if (controlMapState.initialized && controlMapState.dataKey === dataKey) return;
   controlMapState.points = JSON.parse(pointsJson);
   controlMapState.roadGeometry = JSON.parse(roadGeometryJson);
   controlMapState.location = JSON.parse(locationJson);
+  controlMapState.locationTitle = locationTitle;
   if (controlMapState.tripId !== tripId) {
     controlMapState.tripId = tripId;
     controlMapState.initialized = false;
@@ -303,13 +324,13 @@ export function cargoControlMapFit() {
   fit();
 }
 
-export function cargoControlCopyText(value) {
+export function cargoControlCopyText(value, promptLabel) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(value).catch(() => {
-      window.prompt("Скопіюйте Driver URL:", value);
+      window.prompt(promptLabel, value);
     });
   } else {
-    window.prompt("Скопіюйте Driver URL:", value);
+    window.prompt(promptLabel, value);
   }
 }
 "#)]
@@ -320,6 +341,7 @@ extern "C" {
         points_json: &str,
         road_geometry_json: &str,
         location_json: &str,
+        location_title: &str,
     );
 
     #[wasm_bindgen(js_name = cargoControlMapZoom)]
@@ -329,7 +351,7 @@ extern "C" {
     fn cargo_control_map_fit();
 
     #[wasm_bindgen(js_name = cargoControlCopyText)]
-    fn cargo_control_copy_text(value: &str);
+    fn cargo_control_copy_text(value: &str, prompt_label: &str);
 }
 
 fn js_error(value: JsValue) -> String {
@@ -410,6 +432,7 @@ fn main() {
 
 #[component]
 fn ControlApp() -> impl IntoView {
+    let locale = RwSignal::new(UiLocale::parse(&cargo_control_initial_locale()));
     let folder = RwSignal::new(String::new());
     let token = RwSignal::new(String::new());
     let lan_ip = RwSignal::new(String::new());
@@ -469,6 +492,7 @@ fn ControlApp() -> impl IntoView {
                 &points_json,
                 &road_geometry_json,
                 &location_json,
+                strings(locale.get()).latest_driver_position,
             );
         }
     });
