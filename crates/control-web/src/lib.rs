@@ -37,18 +37,18 @@ const MAX_UPLOAD_BYTES: u64 = 512 * 1024 * 1024;
 const STREAM_CHUNK_BYTES: usize = 64 * 1024;
 
 const DRIVER_HTML: &str = r#"<!doctype html>
-<html lang="uk">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<title>Cargo Dispatch — рейс</title>
+<title>Cargo Dispatch — Trip</title>
 <style>
 :root{font-family:system-ui,sans-serif;color:#202124;background:#f6f7f8}
 *{box-sizing:border-box}
 body{margin:0;background:#f6f7f8;color:#202124;overflow-x:hidden}
 main{width:min(100%,1440px);margin:auto;padding:20px;display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);grid-template-areas:"title title" "status status" "map files" "route files" "route location";gap:14px;align-items:start}
-h1{grid-area:title;margin:0}
+h1{margin:0}.title-row{grid-area:title;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.language-picker{display:flex;gap:8px;align-items:center}.language-picker select{width:auto;min-width:180px}
 #status{grid-area:status;margin:0;padding:10px 12px;border-radius:10px;background:#eef3f8}
 section{background:white;border:1px solid #ddd;border-radius:12px;padding:16px;min-width:0}
 #mapSection{grid-area:map}
@@ -104,58 +104,257 @@ small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
 </head>
 <body>
 <main>
-<h1>Cargo Dispatch — рейс</h1>
-<p id="status">Завантаження…</p>
+<div class="title-row">
+<h1 id="appTitle">Cargo Dispatch — Trip</h1>
+<label class="language-picker"><span id="languageLabel">Language</span>
+<select id="languageSelect"></select>
+</label>
+</div>
+<p id="status">Loading…</p>
 
 <section id="mapSection">
-<h2>Карта</h2>
-<div id="tripMap" class="trip-map" aria-label="Карта рейсу">
+<h2 id="mapTitle">Map</h2>
+<div id="tripMap" class="trip-map" aria-label="Trip map">
   <div class="map-tiles" aria-hidden="true"></div>
   <div class="map-overlays" aria-hidden="true"></div>
   <div class="map-controls">
-    <button id="mapZoomIn" type="button" aria-label="Збільшити карту">+</button>
-    <button id="mapZoomOut" type="button" aria-label="Зменшити карту">−</button>
-    <button id="mapFit" type="button">Рейс</button>
+    <button id="mapZoomIn" type="button" aria-label="Zoom in">+</button>
+    <button id="mapZoomOut" type="button" aria-label="Zoom out">−</button>
+    <button id="mapFit" type="button">Trip</button>
   </div>
   <a class="map-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>
 </div>
-<p class="map-note">Показані точки рейсу та остання прийнята позиція водія. Дорожня лінія показується лише коли Control має актуальну geometry для поточного порядку точок.</p>
+<p id="mapNote" class="map-note"></p>
 </section>
 
 <section id="routeSection">
-<h2>Маршрут</h2>
+<h2 id="routeTitle">Route</h2>
 <div id="points"></div>
 </section>
 
 <section id="filesSection">
-<h2>Документи / фото / відео</h2>
+<h2 id="filesTitle">Documents / photos / video</h2>
 <div id="documents"></div>
-<label>Прив'язати до точки:
-<select id="filePoint"><option value="">Рейс у цілому</option></select>
+<label><span id="attachPointLabel">Attach to point</span>
+<select id="filePoint"><option value="">Whole trip</option></select>
 </label>
 <div class="row">
-<label class="file-picker"><span>Файл</span>
+<label class="file-picker"><span id="fileLabel">File</span>
 <input id="file" type="file" accept="image/*,video/*,application/pdf,*/*">
 </label>
-<label class="file-picker"><span>Фото / відео</span>
+<label class="file-picker"><span id="cameraLabel">Photo / video</span>
 <input id="camera" type="file" accept="image/*,video/*" capture="environment">
 </label>
-<button id="sendFile" type="button">Передати в Control</button>
+<button id="sendFile" type="button">Send to Control</button>
 </div>
 <p id="fileStatus"></p>
 </section>
 
 <section id="locationSection">
-<h2>Геолокація</h2>
-<p id="location">Ще не передавалась</p>
+<h2 id="locationTitle">Location</h2>
+<p id="location">Not sent yet</p>
 <div class="row">
-<button id="startLocation" type="button">Почати передачу геолокації</button>
-<button id="stopLocation" type="button" disabled>Зупинити</button>
+<button id="startLocation" type="button">Start location sharing</button>
+<button id="stopLocation" type="button" disabled>Stop</button>
 </div>
 <p id="locationStatus"></p>
 </section>
 </main>
 <script>
+const LANGUAGES = [
+  ["uk", "🇺🇦 Українська"],
+  ["en", "🇬🇧 English"],
+  ["de", "🇩🇪 Deutsch"],
+  ["fr", "🇫🇷 Français"],
+  ["es", "🇪🇸 Español"],
+  ["ko", "🇰🇷 한국어"],
+  ["ja", "🇯🇵 日本語"],
+  ["zh-Hans", "🇨🇳 简体中文"]
+];
+
+const I18N = {
+  uk: {
+    title:"Cargo Dispatch — рейс", language:"Мова", loading:"Завантаження…", map:"Карта", tripMap:"Карта рейсу",
+    zoomIn:"Збільшити карту", zoomOut:"Зменшити карту", fit:"Рейс",
+    mapNote:"Показані точки рейсу та остання прийнята позиція водія. Дорожня лінія показується лише коли Control має актуальну geometry для поточного порядку точок.",
+    route:"Маршрут", files:"Документи / фото / відео", attach:"Прив'язати до точки", wholeTrip:"Рейс у цілому",
+    file:"Файл", camera:"Фото / відео", sendControl:"Передати в Control", location:"Геолокація", noLocation:"Ще не передавалась",
+    startLocation:"Почати передачу геолокації", stop:"Зупинити", latestPosition:"Остання позиція водія",
+    version:"Версія", change:"зміна", noTrip:"Немає доступу до рейсу", completed:"виконано", open:"відкрито",
+    complete:"Виконано", moveUp:"Перемістити точку вище", moveDown:"Перемістити точку нижче",
+    rejectChange:"Control не прийняв зміну", routeChanged:"Маршрут уже змінився або Control відхилив порядок",
+    openNavigation:"Відкрити навігацію", noDocuments:"Документів ще немає", fromOperator:"Control → водій",
+    fromDriver:"водій → Control", bytes:"байт", chooseMedia:"Спочатку виберіть файл або фото/відео",
+    transferring:"Передача…", fileAccepted:"Файл прийнятий Control",
+    transferFailed:"Передача не вдалася", retrySameId:"Повтор для того самого файла використає той самий ID.",
+    geoUnsupported:"Браузер не підтримує геолокацію",
+    geoHttps:"Для геолокації телефонний браузер зазвичай вимагає HTTPS. LAN HTTP можна використовувати для маршруту й файлів.",
+    positionAccepted:"Позиція прийнята Control", positionRejected:"Control не прийняв позицію", geoUnavailable:"Геолокація недоступна"
+  },
+  en: {
+    title:"Cargo Dispatch — Trip", language:"Language", loading:"Loading…", map:"Map", tripMap:"Trip map",
+    zoomIn:"Zoom in", zoomOut:"Zoom out", fit:"Trip",
+    mapNote:"Trip points and the latest accepted driver position are shown. The road line appears only when Control has current geometry for the current point order.",
+    route:"Route", files:"Documents / photos / video", attach:"Attach to point", wholeTrip:"Whole trip",
+    file:"File", camera:"Photo / video", sendControl:"Send to Control", location:"Location", noLocation:"Not sent yet",
+    startLocation:"Start location sharing", stop:"Stop", latestPosition:"Latest driver position",
+    version:"Version", change:"change", noTrip:"Trip is unavailable", completed:"completed", open:"open",
+    complete:"Complete", moveUp:"Move point up", moveDown:"Move point down",
+    rejectChange:"Control rejected the change", routeChanged:"The route changed or Control rejected the order",
+    openNavigation:"Open navigation", noDocuments:"No documents yet", fromOperator:"Control → driver",
+    fromDriver:"driver → Control", bytes:"bytes", chooseMedia:"Choose a file or photo/video first",
+    transferring:"Sending…", fileAccepted:"File accepted by Control",
+    transferFailed:"Transfer failed", retrySameId:"Retrying the same file will use the same ID.",
+    geoUnsupported:"This browser does not support geolocation",
+    geoHttps:"Phone browsers usually require HTTPS for geolocation. LAN HTTP can still be used for route and files.",
+    positionAccepted:"Position accepted by Control", positionRejected:"Control rejected the position", geoUnavailable:"Geolocation unavailable"
+  },
+  de: {
+    title:"Cargo Dispatch — Tour", language:"Sprache", loading:"Laden…", map:"Karte", tripMap:"Tourkarte",
+    zoomIn:"Vergrößern", zoomOut:"Verkleinern", fit:"Tour", mapNote:"Tourpunkte und die letzte angenommene Fahrerposition werden angezeigt. Die Straßenlinie erscheint nur bei aktueller Geometrie.",
+    route:"Route", files:"Dokumente / Fotos / Videos", attach:"An Punkt anhängen", wholeTrip:"Gesamte Tour", file:"Datei", camera:"Foto / Video",
+    sendControl:"An Control senden", location:"Standort", noLocation:"Noch nicht gesendet", startLocation:"Standortübertragung starten", stop:"Stoppen",
+    latestPosition:"Letzte Fahrerposition", version:"Version", change:"Änderung", noTrip:"Tour nicht verfügbar", completed:"erledigt", open:"offen",
+    complete:"Erledigt", moveUp:"Punkt nach oben", moveDown:"Punkt nach unten", rejectChange:"Control hat die Änderung abgelehnt",
+    routeChanged:"Die Route wurde geändert oder Control hat die Reihenfolge abgelehnt", openNavigation:"Navigation öffnen", noDocuments:"Noch keine Dokumente",
+    fromOperator:"Control → Fahrer", fromDriver:"Fahrer → Control", bytes:"Bytes", chooseMedia:"Zuerst Datei oder Foto/Video wählen",
+    transferring:"Übertragung…", fileAccepted:"Datei von Control angenommen", transferFailed:"Übertragung fehlgeschlagen",
+    retrySameId:"Ein erneuter Versuch derselben Datei verwendet dieselbe ID.", geoUnsupported:"Browser unterstützt keine Geolokalisierung",
+    geoHttps:"Für Geolokalisierung benötigt der Telefonbrowser normalerweise HTTPS. LAN-HTTP kann für Route und Dateien verwendet werden.",
+    positionAccepted:"Position von Control angenommen", positionRejected:"Control hat die Position abgelehnt", geoUnavailable:"Geolokalisierung nicht verfügbar"
+  },
+  fr: {
+    title:"Cargo Dispatch — Trajet", language:"Langue", loading:"Chargement…", map:"Carte", tripMap:"Carte du trajet",
+    zoomIn:"Zoom avant", zoomOut:"Zoom arrière", fit:"Trajet", mapNote:"Les points du trajet et la dernière position acceptée sont affichés. La ligne routière apparaît seulement avec une géométrie actuelle.",
+    route:"Itinéraire", files:"Documents / photos / vidéos", attach:"Associer au point", wholeTrip:"Trajet entier", file:"Fichier", camera:"Photo / vidéo",
+    sendControl:"Envoyer à Control", location:"Géolocalisation", noLocation:"Pas encore transmise", startLocation:"Démarrer la géolocalisation", stop:"Arrêter",
+    latestPosition:"Dernière position du conducteur", version:"Version", change:"modification", noTrip:"Trajet indisponible", completed:"terminé", open:"ouvert",
+    complete:"Terminé", moveUp:"Monter le point", moveDown:"Descendre le point", rejectChange:"Control a refusé la modification",
+    routeChanged:"Le trajet a changé ou Control a refusé l’ordre", openNavigation:"Ouvrir la navigation", noDocuments:"Aucun document",
+    fromOperator:"Control → conducteur", fromDriver:"conducteur → Control", bytes:"octets", chooseMedia:"Choisissez d’abord un fichier ou une photo/vidéo",
+    transferring:"Envoi…", fileAccepted:"Fichier accepté par Control", transferFailed:"Échec du transfert",
+    retrySameId:"Un nouvel essai du même fichier utilisera le même ID.", geoUnsupported:"Ce navigateur ne prend pas en charge la géolocalisation",
+    geoHttps:"La géolocalisation sur téléphone nécessite généralement HTTPS. Le LAN HTTP reste utilisable pour l’itinéraire et les fichiers.",
+    positionAccepted:"Position acceptée par Control", positionRejected:"Control a refusé la position", geoUnavailable:"Géolocalisation indisponible"
+  },
+  es: {
+    title:"Cargo Dispatch — Viaje", language:"Idioma", loading:"Cargando…", map:"Mapa", tripMap:"Mapa del viaje",
+    zoomIn:"Acercar", zoomOut:"Alejar", fit:"Viaje", mapNote:"Se muestran los puntos del viaje y la última posición aceptada. La línea vial aparece solo con geometría actual.",
+    route:"Ruta", files:"Documentos / fotos / vídeo", attach:"Adjuntar al punto", wholeTrip:"Viaje completo", file:"Archivo", camera:"Foto / vídeo",
+    sendControl:"Enviar a Control", location:"Geolocalización", noLocation:"Aún no enviada", startLocation:"Iniciar geolocalización", stop:"Detener",
+    latestPosition:"Última posición del conductor", version:"Versión", change:"cambio", noTrip:"Viaje no disponible", completed:"completado", open:"abierto",
+    complete:"Completado", moveUp:"Mover punto arriba", moveDown:"Mover punto abajo", rejectChange:"Control rechazó el cambio",
+    routeChanged:"La ruta cambió o Control rechazó el orden", openNavigation:"Abrir navegación", noDocuments:"Aún no hay documentos",
+    fromOperator:"Control → conductor", fromDriver:"conductor → Control", bytes:"bytes", chooseMedia:"Elija primero un archivo o foto/vídeo",
+    transferring:"Enviando…", fileAccepted:"Archivo aceptado por Control", transferFailed:"Falló la transferencia",
+    retrySameId:"Reintentar el mismo archivo usará el mismo ID.", geoUnsupported:"El navegador no admite geolocalización",
+    geoHttps:"La geolocalización en el navegador del teléfono suele requerir HTTPS. LAN HTTP puede usarse para ruta y archivos.",
+    positionAccepted:"Posición aceptada por Control", positionRejected:"Control rechazó la posición", geoUnavailable:"Geolocalización no disponible"
+  },
+  ko: {
+    title:"Cargo Dispatch — 운행", language:"언어", loading:"불러오는 중…", map:"지도", tripMap:"운행 지도", zoomIn:"확대", zoomOut:"축소", fit:"운행",
+    mapNote:"운행 지점과 마지막으로 수신된 운전자 위치를 표시합니다. 현재 geometry가 있을 때만 도로선을 표시합니다.",
+    route:"경로", files:"문서 / 사진 / 동영상", attach:"지점에 연결", wholeTrip:"전체 운행", file:"파일", camera:"사진 / 동영상",
+    sendControl:"Control로 전송", location:"위치", noLocation:"아직 전송되지 않음", startLocation:"위치 전송 시작", stop:"중지",
+    latestPosition:"마지막 운전자 위치", version:"버전", change:"변경", noTrip:"운행에 접근할 수 없음", completed:"완료", open:"열림",
+    complete:"완료", moveUp:"지점 위로", moveDown:"지점 아래로", rejectChange:"Control이 변경을 거부했습니다",
+    routeChanged:"경로가 변경되었거나 Control이 순서를 거부했습니다", openNavigation:"내비게이션 열기", noDocuments:"아직 문서가 없습니다",
+    fromOperator:"Control → 운전자", fromDriver:"운전자 → Control", bytes:"바이트", chooseMedia:"먼저 파일 또는 사진/동영상을 선택하세요",
+    transferring:"전송 중…", fileAccepted:"Control이 파일을 받았습니다", transferFailed:"전송 실패",
+    retrySameId:"같은 파일을 다시 보내면 같은 ID를 사용합니다.", geoUnsupported:"브라우저가 위치 기능을 지원하지 않습니다",
+    geoHttps:"휴대폰 브라우저의 위치 기능은 보통 HTTPS가 필요합니다. LAN HTTP는 경로와 파일에 사용할 수 있습니다.",
+    positionAccepted:"Control이 위치를 받았습니다", positionRejected:"Control이 위치를 거부했습니다", geoUnavailable:"위치를 사용할 수 없습니다"
+  },
+  ja: {
+    title:"Cargo Dispatch — 運行", language:"言語", loading:"読み込み中…", map:"地図", tripMap:"運行マップ", zoomIn:"拡大", zoomOut:"縮小", fit:"運行",
+    mapNote:"運行地点と最後に受信したドライバー位置を表示します。現在の geometry がある場合のみ道路線を表示します。",
+    route:"ルート", files:"文書 / 写真 / 動画", attach:"地点に関連付け", wholeTrip:"運行全体", file:"ファイル", camera:"写真 / 動画",
+    sendControl:"Control へ送信", location:"位置情報", noLocation:"まだ送信されていません", startLocation:"位置送信を開始", stop:"停止",
+    latestPosition:"最新のドライバー位置", version:"バージョン", change:"変更", noTrip:"運行にアクセスできません", completed:"完了", open:"未完了",
+    complete:"完了", moveUp:"地点を上へ", moveDown:"地点を下へ", rejectChange:"Control が変更を拒否しました",
+    routeChanged:"ルートが変更されたか Control が順序を拒否しました", openNavigation:"ナビを開く", noDocuments:"文書はまだありません",
+    fromOperator:"Control → ドライバー", fromDriver:"ドライバー → Control", bytes:"バイト", chooseMedia:"先にファイルまたは写真/動画を選択してください",
+    transferring:"送信中…", fileAccepted:"Control がファイルを受信しました", transferFailed:"送信に失敗しました",
+    retrySameId:"同じファイルの再試行では同じ ID を使用します。", geoUnsupported:"ブラウザは位置情報に対応していません",
+    geoHttps:"スマホブラウザの位置情報は通常 HTTPS が必要です。LAN HTTP はルートとファイルに使用できます。",
+    positionAccepted:"Control が位置を受信しました", positionRejected:"Control が位置を拒否しました", geoUnavailable:"位置情報を利用できません"
+  },
+  "zh-Hans": {
+    title:"Cargo Dispatch — 行程", language:"语言", loading:"正在加载…", map:"地图", tripMap:"行程地图", zoomIn:"放大", zoomOut:"缩小", fit:"行程",
+    mapNote:"显示行程站点和最近接收的司机位置。只有存在当前 geometry 时才显示道路线。",
+    route:"路线", files:"文档 / 照片 / 视频", attach:"关联到站点", wholeTrip:"整个行程", file:"文件", camera:"照片 / 视频",
+    sendControl:"发送到 Control", location:"位置", noLocation:"尚未发送", startLocation:"开始发送位置", stop:"停止",
+    latestPosition:"最近司机位置", version:"版本", change:"变更", noTrip:"无法访问行程", completed:"已完成", open:"未完成",
+    complete:"已完成", moveUp:"上移站点", moveDown:"下移站点", rejectChange:"Control 拒绝了变更",
+    routeChanged:"路线已改变或 Control 拒绝了顺序", openNavigation:"打开导航", noDocuments:"尚无文档",
+    fromOperator:"Control → 司机", fromDriver:"司机 → Control", bytes:"字节", chooseMedia:"请先选择文件或照片/视频",
+    transferring:"正在发送…", fileAccepted:"Control 已接收文件", transferFailed:"传输失败",
+    retrySameId:"重试同一文件将使用相同 ID。", geoUnsupported:"浏览器不支持地理位置",
+    geoHttps:"手机浏览器通常要求 HTTPS 才能使用地理位置。LAN HTTP 仍可用于路线和文件。",
+    positionAccepted:"Control 已接收位置", positionRejected:"Control 拒绝了位置", geoUnavailable:"无法使用地理位置"
+  }
+};
+
+function normalizeLanguage(value) {
+  const lower = (value || "").toLowerCase();
+  if (lower.startsWith("uk")) return "uk";
+  if (lower.startsWith("de")) return "de";
+  if (lower.startsWith("fr")) return "fr";
+  if (lower.startsWith("es")) return "es";
+  if (lower.startsWith("ko")) return "ko";
+  if (lower.startsWith("ja")) return "ja";
+  if (lower.startsWith("zh")) return "zh-Hans";
+  return "en";
+}
+
+let uiLanguage = normalizeLanguage(localStorage.getItem("cargo-dispatch-driver-locale") || navigator.language);
+function t(key) { return I18N[uiLanguage][key] || I18N.en[key] || key; }
+
+function applyLanguage() {
+  document.documentElement.lang = uiLanguage;
+  document.title = t("title");
+  document.getElementById("appTitle").textContent = t("title");
+  document.getElementById("languageLabel").textContent = t("language");
+  document.getElementById("mapTitle").textContent = t("map");
+  document.getElementById("tripMap").setAttribute("aria-label", t("tripMap"));
+  document.getElementById("mapZoomIn").setAttribute("aria-label", t("zoomIn"));
+  document.getElementById("mapZoomOut").setAttribute("aria-label", t("zoomOut"));
+  document.getElementById("mapFit").textContent = t("fit");
+  document.getElementById("mapNote").textContent = t("mapNote");
+  document.getElementById("routeTitle").textContent = t("route");
+  document.getElementById("filesTitle").textContent = t("files");
+  document.getElementById("attachPointLabel").textContent = t("attach");
+  document.getElementById("fileLabel").textContent = t("file");
+  document.getElementById("cameraLabel").textContent = t("camera");
+  document.getElementById("sendFile").textContent = t("sendControl");
+  document.getElementById("locationTitle").textContent = t("location");
+  document.getElementById("startLocation").textContent = t("startLocation");
+  document.getElementById("stopLocation").textContent = t("stop");
+  if (!currentTrip) {
+    document.getElementById("status").textContent = t("loading");
+    document.getElementById("location").textContent = t("noLocation");
+    return;
+  }
+  renderRoute();
+  renderDocuments();
+  renderLocation();
+  renderTripMap();
+}
+
+const languageSelect = document.getElementById("languageSelect");
+for (const [code, label] of LANGUAGES) {
+  const option = document.createElement("option");
+  option.value = code;
+  option.textContent = label;
+  languageSelect.append(option);
+}
+languageSelect.value = uiLanguage;
+languageSelect.addEventListener("change", () => {
+  uiLanguage = normalizeLanguage(languageSelect.value);
+  localStorage.setItem("cargo-dispatch-driver-locale", uiLanguage);
+  applyLanguage();
+});
+
 const token = decodeURIComponent(location.pathname.split("/").pop());
 let currentTrip = null;
 let watchId = null;
@@ -221,7 +420,7 @@ function tripMapMarkerCoordinates() {
       latitude: currentTrip.latest_location.latitude,
       longitude: currentTrip.latest_location.longitude,
       type: "location",
-      title: "Остання позиція водія"
+      title: t("latestPosition")
     });
   }
   return coordinates;
@@ -388,13 +587,13 @@ async function loadTrip() {
     const response = await api("");
     currentTrip = await response.json();
     document.getElementById("status").textContent =
-      "Версія " + currentTrip.trip_version + ", зміна " + currentTrip.local_route_revision;
+      t("version") + " " + currentTrip.trip_version + ", " + t("change") + " " + currentTrip.local_route_revision;
     renderRoute();
     renderDocuments();
     renderLocation();
     updateTripMap();
   } catch (error) {
-    document.getElementById("status").textContent = "Немає доступу до рейсу";
+    document.getElementById("status").textContent = t("noTrip");
     document.getElementById("status").className = "error";
   }
 }
@@ -407,7 +606,7 @@ function renderRoute() {
   pointSelect.replaceChildren();
   const tripOption = document.createElement("option");
   tripOption.value = "";
-  tripOption.textContent = "Рейс у цілому";
+  tripOption.textContent = t("wholeTrip");
   pointSelect.append(tripOption);
   for (const point of currentTrip.points) {
     const option = document.createElement("option");
@@ -428,7 +627,7 @@ function renderRoute() {
     const text = document.createElement("span");
     text.className = "point-title";
     text.textContent = point.sequence + ". " + point.title +
-      (point.completed ? " — виконано" : " — відкрито");
+      (point.completed ? " — " + t("completed") : " — " + t("open"));
     header.append(text);
 
     if (!point.completed) {
@@ -436,13 +635,13 @@ function renderRoute() {
       actions.className = "point-actions";
       const done = document.createElement("button");
       done.type = "button";
-      done.textContent = "Виконано";
+      done.textContent = t("complete");
       done.addEventListener("click", async () => {
         try {
           await api("/complete/" + point.point_id, {method: "POST"});
           await loadTrip();
         } catch (error) {
-          alert("Control не прийняв зміну: " + error.message);
+          alert(t("rejectChange") + ": " + error.message);
         }
       });
       actions.append(done);
@@ -452,7 +651,7 @@ function renderRoute() {
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = move < 0 ? "↑" : "↓";
-        button.setAttribute("aria-label", move < 0 ? "Перемістити точку вище" : "Перемістити точку нижче");
+        button.setAttribute("aria-label", move < 0 ? t("moveUp") : t("moveDown"));
         button.disabled =
           (move < 0 && openIndex === 0) ||
           (move > 0 && openIndex === openPoints.length - 1);
@@ -471,7 +670,7 @@ function renderRoute() {
             });
             await loadTrip();
           } catch (error) {
-            alert("Маршрут уже змінився або Control відхилив порядок: " + error.message);
+            alert(t("routeChanged") + ": " + error.message);
             await loadTrip();
           }
         });
@@ -493,7 +692,7 @@ function renderRoute() {
         encodeURIComponent(point.navigation.latitude + "," + point.navigation.longitude);
       link.target = "_blank";
       link.rel = "noopener";
-      link.textContent = "Відкрити навігацію";
+      link.textContent = t("openNavigation");
       nav.append(link);
       row.append(nav);
     }
@@ -505,7 +704,7 @@ function renderDocuments() {
   const host = document.getElementById("documents");
   host.replaceChildren();
   if (!currentTrip.documents.length) {
-    host.textContent = "Документів ще немає";
+    host.textContent = t("noDocuments");
     return;
   }
   const list = document.createElement("ul");
@@ -514,8 +713,8 @@ function renderDocuments() {
     const link = document.createElement("a");
     link.href = endpoint("/documents/" + item.document_id);
     link.textContent = item.original_name;
-    const direction = item.direction === "from_operator" ? "Control → водій" : "водій → Control";
-    row.append(link, " — " + direction + " — " + item.size + " байт");
+    const direction = item.direction === "from_operator" ? t("fromOperator") : t("fromDriver");
+    row.append(link, " — " + direction + " — " + item.size + " " + t("bytes"));
     list.append(row);
   }
   host.append(list);
@@ -524,11 +723,11 @@ function renderDocuments() {
 function renderLocation() {
   const host = document.getElementById("location");
   if (!currentTrip.latest_location) {
-    host.textContent = "Ще не передавалась";
+    host.textContent = t("noLocation");
     return;
   }
   const item = currentTrip.latest_location;
-  const accuracy = item.accuracy_m == null ? "" : ", ±" + item.accuracy_m.toFixed(1) + " м";
+  const accuracy = item.accuracy_m == null ? "" : ", ±" + item.accuracy_m.toFixed(1) + " m";
   host.textContent =
     item.latitude.toFixed(6) + ", " + item.longitude.toFixed(6) + accuracy +
     " — " + new Date(item.observed_at_unix_ms).toLocaleString();
@@ -542,7 +741,7 @@ document.getElementById("sendFile").addEventListener("click", async () => {
     input.files && input.files.length ? input.files[0] :
     camera.files && camera.files.length ? camera.files[0] : null;
   if (!file) {
-    status.textContent = "Спочатку виберіть файл або фото/відео";
+    status.textContent = t("chooseMedia");
     status.className = "error";
     return;
   }
@@ -558,7 +757,7 @@ document.getElementById("sendFile").addEventListener("click", async () => {
     pendingUpload = {signature, documentId: newDocumentId()};
   }
   const documentId = pendingUpload.documentId;
-  status.textContent = "Передача…";
+  status.textContent = t("transferring");
   status.className = "";
   try {
     const headers = {
@@ -575,13 +774,12 @@ document.getElementById("sendFile").addEventListener("click", async () => {
     input.value = "";
     camera.value = "";
     pendingUpload = null;
-    status.textContent = "Файл прийнятий Control";
+    status.textContent = t("fileAccepted");
     status.className = "ok";
     await loadTrip();
   } catch (error) {
     status.textContent =
-      "Передача не вдалася: " + error.message +
-      ". Повтор для того самого файла використає той самий ID.";
+      t("transferFailed") + ": " + error.message + ". " + t("retrySameId");
     status.className = "error";
   }
 });
@@ -589,15 +787,14 @@ document.getElementById("sendFile").addEventListener("click", async () => {
 document.getElementById("startLocation").addEventListener("click", () => {
   const status = document.getElementById("locationStatus");
   if (!navigator.geolocation) {
-    status.textContent = "Браузер не підтримує геолокацію";
+    status.textContent = t("geoUnsupported");
     status.className = "error";
     return;
   }
   if (!window.isSecureContext &&
       location.hostname !== "127.0.0.1" &&
       location.hostname !== "localhost") {
-    status.textContent =
-      "Для геолокації телефонний браузер зазвичай вимагає HTTPS. LAN HTTP можна використовувати для маршруту й файлів.";
+    status.textContent = t("geoHttps");
     status.className = "error";
   }
   watchId = navigator.geolocation.watchPosition(async position => {
@@ -615,15 +812,15 @@ document.getElementById("startLocation").addEventListener("click", () => {
           observed_at_unix_ms: Math.round(position.timestamp || now)
         })
       });
-      status.textContent = "Позиція прийнята Control";
+      status.textContent = t("positionAccepted");
       status.className = "ok";
       await loadTrip();
     } catch (error) {
-      status.textContent = "Control не прийняв позицію: " + error.message;
+      status.textContent = t("positionRejected") + ": " + error.message;
       status.className = "error";
     }
   }, error => {
-    status.textContent = "Геолокація недоступна: " + error.message;
+    status.textContent = t("geoUnavailable") + ": " + error.message;
     status.className = "error";
   }, {enableHighAccuracy: true, maximumAge: 5000, timeout: 15000});
   document.getElementById("startLocation").disabled = true;
@@ -673,6 +870,7 @@ tripMapHost.addEventListener("pointercancel", () => {
 });
 window.addEventListener("resize", renderTripMap);
 
+applyLanguage();
 loadTrip();
 setInterval(loadTrip, 2000);
 </script>
@@ -1632,8 +1830,17 @@ mod tests {
         assert!(!DRIVER_HTML.contains("referrerPolicy = \"no-referrer\""));
         assert!(DRIVER_HTML.contains("id=\"routeSection\""));
         assert!(DRIVER_HTML.contains("id=\"filesSection\""));
-        assert!(DRIVER_HTML.contains("<span>Файл</span>"));
-        assert!(DRIVER_HTML.contains("<span>Фото / відео</span>"));
+        assert!(DRIVER_HTML.contains("id=\"fileLabel\""));
+        assert!(DRIVER_HTML.contains("id=\"cameraLabel\""));
+        assert!(DRIVER_HTML.contains("id=\"languageSelect\""));
+        assert!(!DRIVER_HTML.contains("<html lang=\"uk\">"));
+        for locale in ["uk", "en", "de", "fr", "es", "ko", "ja", "zh-Hans"] {
+            assert!(
+                DRIVER_HTML.contains(&format!("{locale}: {{"))
+                    || DRIVER_HTML.contains(&format!("\"{locale}\": {{")),
+                "Driver Browser locale missing: {locale}"
+            );
+        }
         assert!(DRIVER_HTML.contains("id=\"locationSection\""));
         assert!(DRIVER_HTML.contains("@media (min-width:700px) and (max-width:1099px)"));
         assert!(DRIVER_HTML.contains("@media (max-width:699px)"));
@@ -1700,7 +1907,9 @@ mod tests {
         )
         .await?;
         assert_eq!(status, 200);
-        assert!(String::from_utf8_lossy(&page).contains("Передати в Control"));
+        let page = String::from_utf8_lossy(&page);
+        assert!(page.contains("id=\"languageSelect\""));
+        assert!(page.contains("id=\"sendFile\""));
 
         let mut trip: DriverTripSnapshot =
             get_json(server.address(), "/api/trip/trip-a-token-0001").await?;
