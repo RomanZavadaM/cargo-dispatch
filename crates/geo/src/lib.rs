@@ -403,10 +403,7 @@ mod tests {
         let mut taller = baseline.clone();
         taller.height_m = Some(3.8);
 
-        assert_ne!(
-            baseline.profile_fingerprint(),
-            taller.profile_fingerprint()
-        );
+        assert_ne!(baseline.profile_fingerprint(), taller.profile_fingerprint());
         assert_eq!(baseline.profile_fingerprint().len(), 64);
     }
 
