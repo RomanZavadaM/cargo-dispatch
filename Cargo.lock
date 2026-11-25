@@ -437,12 +437,16 @@ dependencies = [
 name = "cargo-dispatch-control-desktop"
 version = "0.1.0"
 dependencies = [
+ "axum",
+ "cargo-dispatch-addressing-gateway",
  "cargo-dispatch-contracts",
+ "cargo-dispatch-control-gateway-client",
  "cargo-dispatch-control-ui-contracts",
  "cargo-dispatch-control-web",
  "cargo-dispatch-domain",
  "cargo-dispatch-planner",
  "cargo-dispatch-trip-files",
+ "reqwest",
  "serde",
  "tauri",
  "tauri-build",
