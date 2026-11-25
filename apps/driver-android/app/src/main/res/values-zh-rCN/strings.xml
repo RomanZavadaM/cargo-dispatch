@@ -21,4 +21,15 @@
     <string name="open_point">未完成站点</string>
     <string name="done_button">完成</string>
     <string name="control_prefix">Control：%1$s</string>
+
+    <string name="disconnect">断开连接</string>
+    <string name="location_title">位置</string>
+    <string name="location_missing">尚未发送位置。</string>
+    <string name="location_value">%1$.6f, %2$.6f · ±%3$.0f 米</string>
+    <string name="send_location">发送当前位置</string>
+    <string name="documents_title">文档 / 照片 / 视频</string>
+    <string name="documents_empty">暂无文档。</string>
+    <string name="save_document">保存</string>
+    <string name="upload_file">发送文件</string>
+    <string name="upload_media">发送照片 / 视频</string>
 </resources>
