@@ -3,6 +3,7 @@
 mod i18n;
 
 // UI language is selected at runtime and persisted in the desktop webview.
+// The same eight-language set is enforced by .github/scripts/check-localizations.py.
 use crate::i18n::{UiLocale, localize_problem, strings};
 use cargo_dispatch_control_ui_contracts::{
     ControlUiStatus, DashboardDocumentDirection, DashboardPoint, ListenerMode,
