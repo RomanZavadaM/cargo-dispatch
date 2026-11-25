@@ -660,7 +660,7 @@ mod tests {
         .expect("valid trip header");
 
         assert_eq!(header.schema_name, TRIP_PACKAGE_SCHEMA_NAME);
-        assert_eq!(header.schema_version, SchemaVersion::new(1, 1));
+        assert_eq!(header.schema_version, SchemaVersion::new(1, 2));
         assert_eq!(header.trip_version.get(), 7);
         assert_eq!(header.base_version.map(TripVersion::get), Some(6));
     }
