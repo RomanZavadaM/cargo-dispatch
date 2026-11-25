@@ -12,6 +12,7 @@
       {
         "label": "control",
         "title": "Cargo Dispatch — Control",
+        "userAgent": "CargoDispatchControl/0.1.0 (+https://github.com/RomanZavadaM/cargo-dispatch)",
         "width": 1080,
         "height": 760,
         "minWidth": 860,
