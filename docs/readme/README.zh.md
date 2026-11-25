@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · **🇨🇳 简体中文**
 
-> **状态：** 正在积极开发。当前测试预发布版本为 **v0.1.0-preview.3**，尚无稳定的完整产品。
+> **状态：** 正在积极开发。当前测试预发布版本为 **v0.1.0-preview.4**，尚无稳定的完整产品。
 
 ## 产品简介
 
@@ -43,11 +43,11 @@ Control 和 Driver Browser 已经包含真正的交互式基础地图，可显�
 
 ## 测试版本
 
-当前预发布版本：[v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.3)。
+当前预发布版本：[v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4)。
 
 Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback 验收的示例 PDF。
 
-这是**测试/预发布版本**，不是稳定版。请注意，`main` 已经领先于 preview.3：Valhalla adapter 和 schema 1.2 road-geometry pipeline 是在该 prerelease 发布后合并的。
+这是**测试/预发布版本**，不是稳定版。Preview.4 已包含 Valhalla adapter 和 schema 1.2 road-geometry pipeline。此后 Android 与 iOS/iPadOS 原生 Driver r2 已合并，因此 `main` 再次领先于 preview.4。
 
 ## 后续工作
 
@@ -57,7 +57,7 @@ Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback �
 - 通过 HTTPS 完成浏览器 GPS 验收；
 - 不同网络/NAT/CGNAT 的现场测试；
 - 真实 Valhalla HTTP transport，以及重新排序后的 geometry 重算；
-- Android 与 iOS/iPadOS 原生 Driver App，目前已在独立 draft 分支中并行开发；
+- 原生地图：Android 使用 MapLibre，iOS/iPadOS 使用 MapKit；\n- 相机拍摄、后台 GPS、连接真实协议的虚拟设备 smoke、离线队列与安全会话存储；
 - 稳定版本。
 
 ## 界面语言
