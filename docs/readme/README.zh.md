@@ -79,8 +79,6 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 - 通过 HTTPS 完成浏览器 GPS 验收；
 - 不同网络/NAT/CGNAT 的现场测试；
 - 真实 Valhalla HTTP transport，以及重新排序后的 geometry 重算；
-- 使用 Android Keystore + Apple Keychain 安全保存 Driver session，并迁移旧的 raw URL；
-- 稳定版本。
 
 
 ## 界面语言
