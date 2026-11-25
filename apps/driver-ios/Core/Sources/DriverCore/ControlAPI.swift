@@ -5,7 +5,7 @@ public enum ControlAPIError: Error, Equatable {
     case http(status: Int, body: String)
 }
 
-public struct ControlAPI: Sendable {
+public struct ControlAPI {
     private let baseURL: URL
     private let token: String
     private let session: URLSession
