@@ -1249,11 +1249,69 @@ mod tests {
             created_at_unix_ms: 1,
             operator: OperatorId::from_bytes([4; 16]).unwrap().as_bytes(),
             points: vec![decoded],
+            road_geometry: None,
         };
         let candidate = manifest.candidate()?;
         assert_eq!(candidate.header.schema_version.major, 1);
         assert_eq!(candidate.header.schema_version.minor, 0);
         assert!(candidate.route_points[0].navigation.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn schema_1_2_roundtrips_road_geometry_and_legacy_remains_optional() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package = tmp.path().join("geometry.zip");
+        let folder = tmp.path().join("geometry-trip");
+        let trip = TripId::from_bytes([31; 16]).unwrap();
+        let route = vec![
+            TripRoutePoint {
+                point_id: PointId::from_bytes([32; 16]).unwrap(),
+                sequence: 1,
+                kind: TripPointKind::Load,
+                title: "A".to_owned(),
+                navigation: None,
+            },
+            TripRoutePoint {
+                point_id: PointId::from_bytes([33; 16]).unwrap(),
+                sequence: 2,
+                kind: TripPointKind::Unload,
+                title: "B".to_owned(),
+                navigation: None,
+            },
+        ];
+        let draft = PlannerTripExportDraft {
+            header: TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap(),
+            working_route_id: WorkingRouteId::from_bytes([34; 16]).unwrap(),
+            working_route_revision: 1,
+            created_at_unix_ms: 1,
+            created_by: OperatorId::from_bytes([35; 16]).unwrap(),
+            ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            route_geometry: Some(TripRoadGeometry {
+                routing: TripRoutingIdentity {
+                    engine: "valhalla".to_owned(),
+                    engine_version: "3.9.2".to_owned(),
+                    map_dataset_id: "fixture".to_owned(),
+                    profile_fingerprint: "profile".to_owned(),
+                },
+                points: vec![
+                    TripRoadGeometryPoint {
+                        latitude_e7: 498_393_000,
+                        longitude_e7: 240_296_000,
+                    },
+                    TripRoadGeometryPoint {
+                        latitude_e7: 498_430_000,
+                        longitude_e7: 240_360_000,
+                    },
+                ],
+            }),
+        };
+
+        export_package(&package, &draft, &route)?;
+        let imported = TripFolder::import(&folder, &package)?;
+        let state = imported.state();
+        assert_eq!(state.current_version.get(), 1);
+        assert_eq!(state.route_geometry, draft.route_geometry);
         Ok(())
     }
 
