@@ -51,7 +51,7 @@ final class DriverStore: ObservableObject {
         }
     }
 
-    private func run(_ operation: @escaping @Sendable () async throws -> DriverTrip) {
+    private func run(_ operation: @escaping () async throws -> DriverTrip) {
         busy = true
         errorKey = nil
         Task {
