@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_contracts::{
-    TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion,
+    TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoadGeometry,
+    TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity, TripVersion,
 };
 use cargo_dispatch_domain::{OperatorId, PointId, TripId, WorkingRouteId};
 use cargo_dispatch_planner::PlannerTripExportDraft;
@@ -100,7 +101,44 @@ fn main() -> io::Result<()> {
         created_at_unix_ms: 1_795_550_000_000,
         created_by: OperatorId::from_bytes([0x43; 16]).expect("synthetic operator id"),
         ordered_point_ids: route.iter().map(|item| item.point_id).collect(),
-        route_geometry: None,
+        route_geometry: Some(TripRoadGeometry {
+            routing: TripRoutingIdentity {
+                engine: "synthetic-test".to_owned(),
+                engine_version: "1".to_owned(),
+                map_dataset_id: "local-browser-fixture".to_owned(),
+                profile_fingerprint: "synthetic-profile".to_owned(),
+            },
+            points: vec![
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_393_000,
+                    longitude_e7: 240_296_000,
+                },
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_410_000,
+                    longitude_e7: 240_320_000,
+                },
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_430_000,
+                    longitude_e7: 240_360_000,
+                },
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_455_000,
+                    longitude_e7: 240_300_000,
+                },
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_485_000,
+                    longitude_e7: 240_250_000,
+                },
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_505_000,
+                    longitude_e7: 240_330_000,
+                },
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_520_000,
+                    longitude_e7: 240_410_000,
+                },
+            ],
+        }),
     };
 
     export_package(&package, &draft, &route)?;
