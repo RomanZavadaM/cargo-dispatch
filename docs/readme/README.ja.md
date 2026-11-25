@@ -71,6 +71,8 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 
 ## 今後の作業
 
+- Windows・macOS・Linux 向け Planner/editor デスクトップ UI とリリースビルド;
+
 - ローカル browser の手動受け入れ;
 - 同じ Driver Browser を実機の電話で同一 LAN 内テスト;
 - HTTPS/public addressing path;
