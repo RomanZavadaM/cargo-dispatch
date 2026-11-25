@@ -69,10 +69,15 @@ jobs:
           device_types = json.loads(
               subprocess.check_output(["xcrun", "simctl", "list", "devicetypes", "-j"])
           ).get("devicetypes", [])
-          iphones = [item for item in device_types if item.get("name", "").startswith("iPhone")]
+          import re
+          iphones = []
+          for item in device_types:
+              match = re.match(r"^iPhone\s+(\d+)", item.get("name", ""))
+              if match:
+                  iphones.append((int(match.group(1)), item.get("name", ""), item["identifier"]))
           if not iphones:
-              raise SystemExit("No iPhone Simulator device type")
-          device_type = iphones[-1]["identifier"]
+              raise SystemExit("No numbered iPhone Simulator device type")
+          _, _, device_type = max(iphones)
           print(runtime["identifier"], device_type)
           PY
           )
