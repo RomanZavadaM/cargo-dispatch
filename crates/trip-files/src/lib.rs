@@ -3,8 +3,8 @@
 use cargo_dispatch_contracts::{
     CURRENT_SCHEMA_VERSION, PackageContentFingerprint, ReplanRequest, TRIP_PACKAGE_SCHEMA_NAME,
     TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoadGeometry,
-    TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity, TripVersion,
-    validate_route_points, validate_trip_road_geometry,
+    TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity, TripVersion, validate_route_points,
+    validate_trip_road_geometry,
 };
 use cargo_dispatch_control::{
     InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft, StoredTripPlan, TripImportCandidate,
@@ -641,10 +641,7 @@ pub fn export_package(
         created_at_unix_ms: draft.created_at_unix_ms,
         operator: draft.created_by.as_bytes(),
         points: route.iter().map(Point::from).collect(),
-        road_geometry: draft
-            .route_geometry
-            .as_ref()
-            .map(RoadGeometryFile::from),
+        road_geometry: draft.route_geometry.as_ref().map(RoadGeometryFile::from),
     };
     manifest.candidate()?;
     let data = serde_json::to_vec(&manifest)?;
@@ -1218,7 +1215,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
-        route_geometry: None,
+            route_geometry: None,
         };
         export_package(path, &draft, &route)?;
         Ok((trip, route))
@@ -1337,7 +1334,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([3; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|p| p.point_id).collect(),
-        route_geometry: None,
+            route_geometry: None,
         };
         export_package(&package, &draft, &route)?;
         let mut control = TripFolder::import(&folder, &package)?;
