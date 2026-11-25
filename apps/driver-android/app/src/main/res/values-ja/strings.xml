@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cargo Dispatch — ドライバー</string>
+    <string name="screen_title">Cargo Dispatch — ドライバー</string>
+    <string name="screen_subtitle">ネイティブ Android クライアントは Driver Browser と同じ Control API を使用します。</string>
+    <string name="connection_title">Control に接続</string>
+    <string name="driver_url_label">Control の Driver URL</string>
+    <string name="driver_url_placeholder">http://127.0.0.1:12345/driver/trip-...</string>
+    <string name="emulator_label">Android Emulator</string>
+    <string name="emulator_hint">127.0.0.1/localhost は自動的に 10.0.2.2 に変換されます</string>
+    <string name="connect">接続</string>
+    <string name="connecting">接続中…</string>
+    <string name="refresh">更新</string>
+    <string name="trip_title">運行 %1$s…</string>
+    <string name="version_revision">バージョン %1$d; ローカルリビジョン %2$d</string>
+    <string name="points_documents">地点: %1$d; 書類: %2$d</string>
+    <string name="road_geometry_present">道路形状: %1$d 地点 (%2$s %3$s)</string>
+    <string name="road_geometry_missing">道路形状: なし / 無効化済み</string>
+    <string name="route_title">ルート</string>
+    <string name="completed">完了</string>
+    <string name="open_point">未完了地点</string>
+    <string name="done_button">完了</string>
+    <string name="control_prefix">Control: %1$s</string>
+</resources>

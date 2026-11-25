@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cargo Dispatch — Fahrer</string>
+    <string name="screen_title">Cargo Dispatch — Fahrer</string>
+    <string name="screen_subtitle">Der native Android-Client verwendet dieselbe Control-API wie der Driver Browser.</string>
+    <string name="connection_title">Mit Control verbinden</string>
+    <string name="driver_url_label">Driver-URL aus Control</string>
+    <string name="driver_url_placeholder">http://127.0.0.1:12345/driver/trip-...</string>
+    <string name="emulator_label">Android Emulator</string>
+    <string name="emulator_hint">127.0.0.1/localhost wird automatisch auf 10.0.2.2 abgebildet</string>
+    <string name="connect">Verbinden</string>
+    <string name="connecting">Verbindung…</string>
+    <string name="refresh">Aktualisieren</string>
+    <string name="trip_title">Tour %1$s…</string>
+    <string name="version_revision">Version %1$d; lokale Revision %2$d</string>
+    <string name="points_documents">Stopps: %1$d; Dokumente: %2$d</string>
+    <string name="road_geometry_present">Straßengeometrie: %1$d Punkte (%2$s %3$s)</string>
+    <string name="road_geometry_missing">Straßengeometrie: nicht verfügbar / ungültig</string>
+    <string name="route_title">Route</string>
+    <string name="completed">Erledigt</string>
+    <string name="open_point">Offener Stopp</string>
+    <string name="done_button">Erledigen</string>
+    <string name="control_prefix">Control: %1$s</string>
+</resources>

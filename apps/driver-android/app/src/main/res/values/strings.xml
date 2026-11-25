@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cargo Dispatch — Водій</string>
+    <string name="screen_title">Cargo Dispatch — Водій</string>
+    <string name="screen_subtitle">Нативний Android-клієнт використовує той самий Control API, що й Driver Browser.</string>
+    <string name="connection_title">Підключення до Control</string>
+    <string name="driver_url_label">Driver URL з Control</string>
+    <string name="driver_url_placeholder">http://127.0.0.1:12345/driver/trip-...</string>
+    <string name="emulator_label">Android Emulator</string>
+    <string name="emulator_hint">127.0.0.1/localhost автоматично → 10.0.2.2</string>
+    <string name="connect">Підключити</string>
+    <string name="connecting">Підключення…</string>
+    <string name="refresh">Оновити</string>
+    <string name="trip_title">Рейс %1$s…</string>
+    <string name="version_revision">Версія %1$d; local revision %2$d</string>
+    <string name="points_documents">Точки: %1$d; документи: %2$d</string>
+    <string name="road_geometry_present">Дорожня geometry: %1$d точок (%2$s %3$s)</string>
+    <string name="road_geometry_missing">Дорожня geometry: немає / інвалідована</string>
+    <string name="route_title">Маршрут</string>
+    <string name="completed">Виконано</string>
+    <string name="open_point">Відкрита точка</string>
+    <string name="done_button">Виконано</string>
+    <string name="control_prefix">Control: %1$s</string>
+</resources>
