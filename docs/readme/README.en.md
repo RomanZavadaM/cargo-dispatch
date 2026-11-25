@@ -23,6 +23,15 @@ The main development language is **Rust**.
 - an interactive OpenStreetMap map in both Control and Driver Browser;
 - loopback and explicit LAN modes for testing and local operation.
 
+## Native Driver Apps
+
+Both native clients are already integrated in `main`:
+
+- **Android** — Jetpack Compose, route/complete/reorder, files/photo/video, foreground GPS, restart recovery, native MapLibre + OpenStreetMap, current road geometry, route markers/latest position, and system photo/video capture; Emulator build/install/launch/screenshot PASS.
+- **iPhone/iPad** — SwiftUI, route/complete/reorder, files/photo/video, foreground CoreLocation, restart recovery, native MapKit, current road geometry, route markers/latest position, and system photo/video capture; Simulator build/install/launch/screenshot PASS.
+
+Both use the same Control API and do not create a separate trip database.
+
 ## Driver Browser
 
 Driver Browser is **one product**, not separate phone and desktop versions. It has three normal layouts:
@@ -47,7 +56,7 @@ Current prerelease: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dis
 
 The Windows ZIP contains Control, a synthetic active trip, and a sample PDF for local loopback acceptance.
 
-This is a **test/prerelease build**, not stable. Preview.4 already contains the Valhalla adapter and schema 1.2 road-geometry pipeline. `main` is ahead again: Android and iOS/iPadOS native Driver r2 were integrated after preview.4 was published.
+This is a **test/prerelease build**, not stable. Preview.4 already contains the Valhalla adapter and schema 1.2 road-geometry pipeline. `main` is ahead again: Android and iOS/iPadOS native Driver r2+r3, including native maps and system camera capture, plus improved Control-to-Driver URL handoff, were integrated after preview.4 was published.
 
 ## What is still ahead
 
@@ -57,7 +66,8 @@ This is a **test/prerelease build**, not stable. Preview.4 already contains the 
 - full browser GPS acceptance over HTTPS;
 - field testing across different networks/NAT/CGNAT;
 - live Valhalla HTTP transport and geometry recalculation after reorder;
-- native maps: MapLibre on Android and MapKit on iOS/iPadOS;\n- native camera capture, background GPS, connected virtual-device smoke, offline queue, and secure session storage;
+- connected virtual-device smoke through a real headless Control session;
+- background GPS, offline queue, and secure session storage for native apps;
 - a stable release.
 
 ## Interface languages
