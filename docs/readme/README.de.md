@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · **🇩🇪 Deutsch** · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** aktive Entwicklung. Der aktuelle Test-Prerelease ist **v0.1.0-preview.3**. Ein stabiles fertiges Produkt gibt es noch nicht.
+> **Status:** aktive Entwicklung. Der aktuelle Test-Prerelease ist **v0.1.0-preview.4**. Ein stabiles fertiges Produkt gibt es noch nicht.
 
 ## Über das Produkt
 
@@ -43,11 +43,11 @@ Noch fehlt der **Live-HTTP-Transport zu Valhalla und die automatische Neuberechn
 
 ## Testversion
 
-Aktueller Prerelease: [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.3).
+Aktueller Prerelease: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
 
 Das Windows-ZIP enthält Control, eine synthetische aktive Tour und eine Test-PDF für die lokale Loopback-Abnahme.
 
-Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. `main` ist bereits weiter als preview.3: Valhalla-Adapter und Schema-1.2-Road-Geometry-Pipeline wurden erst nach diesem Prerelease integriert.
+Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. Preview.4 enthält bereits Valhalla-Adapter und Schema-1.2-Road-Geometry-Pipeline. `main` ist erneut weiter: Android- und iOS/iPadOS-Driver r2 wurden nach preview.4 integriert.
 
 ## Was noch fehlt
 
@@ -57,7 +57,7 @@ Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. `main` ist berei
 - vollständige Browser-GPS-Abnahme über HTTPS;
 - Feldtests über verschiedene Netze/NAT/CGNAT;
 - Live-Valhalla-HTTP-Transport und Neuberechnung der Geometrie nach Reorder;
-- native Driver Apps für Android und iOS/iPadOS, die bereits parallel in getrennten Draft-Branches entwickelt werden;
+- native Karten: MapLibre auf Android und MapKit auf iOS/iPadOS;\n- Kameraaufnahme, Hintergrund-GPS, verbundene Virtual-Device-Smokes, Offline-Queue und sichere Session-Speicherung;
 - Stable Release.
 
 ## Sprachen der Benutzeroberfläche
