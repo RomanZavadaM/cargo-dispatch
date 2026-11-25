@@ -151,6 +151,7 @@ pub struct ControlStrings {
     pub choose_file_first: &'static str,
     pub file_sent: &'static str,
     pub file_saved: &'static str,
+    pub operation_failed: &'static str,
 }
 
 pub fn strings(locale: UiLocale) -> &'static ControlStrings {
@@ -245,6 +246,7 @@ static UK: ControlStrings = ControlStrings {
     choose_file_first: "Спочатку виберіть файл.",
     file_sent: "Файл записаний у рейс і доступний водієві.",
     file_saved: "Файл збережено",
+    operation_failed: "Операцію не вдалося виконати",
 };
 
 static EN: ControlStrings = ControlStrings {
@@ -326,6 +328,7 @@ static EN: ControlStrings = ControlStrings {
     choose_file_first: "Choose a file first.",
     file_sent: "The file was added to the trip and is available to the driver.",
     file_saved: "File saved",
+    operation_failed: "The operation could not be completed",
 };
 
 static DE: ControlStrings = ControlStrings {
@@ -407,6 +410,7 @@ static DE: ControlStrings = ControlStrings {
     choose_file_first: "Zuerst eine Datei wählen.",
     file_sent: "Die Datei wurde der Tour hinzugefügt und ist für den Fahrer verfügbar.",
     file_saved: "Datei gespeichert",
+    operation_failed: "Der Vorgang konnte nicht ausgeführt werden",
 };
 
 static FR: ControlStrings = ControlStrings {
@@ -488,6 +492,7 @@ static FR: ControlStrings = ControlStrings {
     choose_file_first: "Choisissez d’abord un fichier.",
     file_sent: "Le fichier a été ajouté au trajet et est disponible pour le conducteur.",
     file_saved: "Fichier enregistré",
+    operation_failed: "L’opération n’a pas pu être effectuée",
 };
 
 static ES: ControlStrings = ControlStrings {
@@ -569,6 +574,7 @@ static ES: ControlStrings = ControlStrings {
     choose_file_first: "Elija primero un archivo.",
     file_sent: "El archivo se añadió al viaje y está disponible para el conductor.",
     file_saved: "Archivo guardado",
+    operation_failed: "No se pudo completar la operación",
 };
 
 static KO: ControlStrings = ControlStrings {
@@ -650,6 +656,7 @@ static KO: ControlStrings = ControlStrings {
     choose_file_first: "먼저 파일을 선택하세요.",
     file_sent: "파일이 운행에 추가되어 운전자가 사용할 수 있습니다.",
     file_saved: "파일 저장됨",
+    operation_failed: "작업을 완료하지 못했습니다",
 };
 
 static JA: ControlStrings = ControlStrings {
@@ -731,6 +738,7 @@ static JA: ControlStrings = ControlStrings {
     choose_file_first: "先にファイルを選択してください。",
     file_sent: "ファイルを運行に追加し、ドライバーが利用できるようになりました。",
     file_saved: "ファイルを保存しました",
+    operation_failed: "操作を完了できませんでした",
 };
 
 static ZH: ControlStrings = ControlStrings {
@@ -812,4 +820,32 @@ static ZH: ControlStrings = ControlStrings {
     choose_file_first: "请先选择文件。",
     file_sent: "文件已加入行程，司机可以访问。",
     file_saved: "文件已保存",
+    operation_failed: "无法完成操作",
 };
+
+
+pub fn localize_problem(locale: UiLocale, problem: &str) -> String {
+    if locale == UiLocale::Uk
+        || !problem
+            .chars()
+            .any(|ch| ('\u{0400}'..='\u{04ff}').contains(&ch))
+    {
+        return problem.to_owned();
+    }
+
+    let detail = problem
+        .split_once(": ")
+        .map(|(_, detail)| detail.trim())
+        .filter(|detail| {
+            !detail
+                .chars()
+                .any(|ch| ('\u{0400}'..='\u{04ff}').contains(&ch))
+        });
+
+    match detail {
+        Some(detail) if !detail.is_empty() => {
+            format!("{}: {detail}", strings(locale).operation_failed)
+        }
+        _ => strings(locale).operation_failed.to_owned(),
+    }
+}
