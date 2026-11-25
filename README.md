@@ -73,6 +73,8 @@ Android та Apple пакети поки не підписані для мага
 
 ## Що ще попереду
 
+- Planner/editor desktop UI та релізні збірки для Windows, macOS і Linux;
+
 - ручне local browser acceptance;
 - перевірка того самого Driver Browser на реальному телефоні в LAN;
 - HTTPS/public addressing path;
