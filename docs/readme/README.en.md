@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · **🇬🇧 English** · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** active development. The current test prerelease is **v0.1.0-preview.3**. There is no stable finished product yet.
+> **Status:** active development. The current test prerelease is **v0.1.0-preview.4**. There is no stable finished product yet.
 
 ## About
 
@@ -43,11 +43,11 @@ What is still missing is the **live HTTP transport to Valhalla and automatic geo
 
 ## Test build
 
-Current prerelease: [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.3).
+Current prerelease: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
 
 The Windows ZIP contains Control, a synthetic active trip, and a sample PDF for local loopback acceptance.
 
-This is a **test/prerelease build**, not stable. Note that `main` is already ahead of preview.3: the Valhalla adapter and schema 1.2 road-geometry pipeline were merged after this prerelease was published.
+This is a **test/prerelease build**, not stable. Preview.4 already contains the Valhalla adapter and schema 1.2 road-geometry pipeline. `main` is ahead again: Android and iOS/iPadOS native Driver r2 were integrated after preview.4 was published.
 
 ## What is still ahead
 
@@ -57,7 +57,7 @@ This is a **test/prerelease build**, not stable. Note that `main` is already ahe
 - full browser GPS acceptance over HTTPS;
 - field testing across different networks/NAT/CGNAT;
 - live Valhalla HTTP transport and geometry recalculation after reorder;
-- native Android and iOS/iPadOS Driver Apps, now being developed in parallel on separate draft branches;
+- native maps: MapLibre on Android and MapKit on iOS/iPadOS;\n- native camera capture, background GPS, connected virtual-device smoke, offline queue, and secure session storage;
 - a stable release.
 
 ## Interface languages
