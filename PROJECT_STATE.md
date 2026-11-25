@@ -15,7 +15,7 @@
 - iOS/iPadOS Driver: native map, camera/files/media, foreground/background tracking, durable retry queue, secure Keychain session recovery, 8 мов.
 - Release matrix Stable: Control Windows + macOS + Linux, Android Driver, Apple Simulator, Linux Gateway, SHA256SUMS.
 - Production mobile signing/App Store/TestFlight/Google Play відкладені на окремий етап.
-- Основний поточний борг перед Planner: повна локалізація Control і Driver Browser та синхронізація всієї публічної документації.
-- Наступний великий функціональний етап після локалізації: **Planner маршруту**.
+- Повна локалізація Control, Driver Browser, Android та iOS/iPadOS у 8 мовах інтегрована; CI контролює повноту мовних каталогів і README.
+- Наступний великий функціональний етап: **Planner маршруту** — real Valhalla HTTP transport/runtime config, потім live reroute geometry.
 
 Для продовження: `START_HERE.md` → private module logs → live GitHub.
