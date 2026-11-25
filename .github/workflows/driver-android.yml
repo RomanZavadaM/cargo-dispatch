@@ -6,10 +6,14 @@ on:
       - "product/driver-android-r*"
     paths:
       - "apps/driver-android/**"
+      - "crates/control-web/**"
+      - "crates/trip-files/**"
       - ".github/workflows/driver-android.yml"
   pull_request:
     paths:
       - "apps/driver-android/**"
+      - "crates/control-web/**"
+      - "crates/trip-files/**"
       - ".github/workflows/driver-android.yml"
 
 permissions:
@@ -61,6 +65,15 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+
+      - name: Prepare real Control smoke session
+        run: |
+          cargo run --locked -p cargo-dispatch-trip-files --example local_browser_fixture -- native-smoke-data
+          cargo build --locked -p cargo-dispatch-control-web --example native_smoke_server
+
       - name: Enable KVM access
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -81,9 +94,45 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
+            set -euo pipefail
+            target/debug/examples/native_smoke_server               native-smoke-data/synthetic-trip-package.zip               native-smoke-session-00000001               > native-smoke.log 2>&1 &
+            SERVER_PID=$!
+            trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+            for _ in $(seq 1 80); do
+              if grep -q '^CARGO_DISPATCH_SMOKE_ANDROID_URL=' native-smoke.log; then
+                break
+              fi
+              if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+                cat native-smoke.log
+                exit 1
+              fi
+              sleep 0.25
+            done
+            cat native-smoke.log
+            ANDROID_DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_ANDROID_URL=//p' native-smoke.log | tail -n 1)"
+            test -n "$ANDROID_DRIVER_URL"
+
             adb install -r android-apk/app-debug.apk
-            adb shell am start -W -n com.romanzavada.cargodispatch.driver/.MainActivity
-            sleep 3
+            adb shell am start -W               -n com.romanzavada.cargodispatch.driver/.MainActivity               --es cargo_dispatch_driver_url "$ANDROID_DRIVER_URL"               --ez cargo_dispatch_emulator_mode true
+
+            CONNECTED=0
+            for _ in $(seq 1 40); do
+              adb shell uiautomator dump /sdcard/cargo-driver-window.xml >/dev/null 2>&1 || true
+              adb exec-out cat /sdcard/cargo-driver-window.xml > android-driver-window.xml 2>/dev/null || true
+              if grep -q '41414141' android-driver-window.xml; then
+                CONNECTED=1
+                break
+              fi
+              sleep 1
+            done
+
+            if [ "$CONNECTED" -ne 1 ]; then
+              cat android-driver-window.xml || true
+              adb logcat -d -t 300 || true
+              exit 1
+            fi
+
             adb exec-out screencap -p > android-driver-smoke.png
             adb shell am force-stop com.romanzavada.cargodispatch.driver
 
