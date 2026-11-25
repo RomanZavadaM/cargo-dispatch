@@ -177,12 +177,52 @@ jobs:
           path: Cargo-Dispatch-Control-*-macOS-universal.zip
           if-no-files-found: error
 
+  gateway-preview:
+    name: Build Linux Addressing Gateway preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+
+      - name: Test and build gateway
+        run: |
+          cargo test --locked -p cargo-dispatch-addressing-gateway --all-targets
+          cargo build --locked -p cargo-dispatch-addressing-gateway --release
+
+      - name: Stage gateway release package
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="$(tr -d '\r\n' < .release-preview)"
+          PACKAGE="Cargo-Dispatch-Gateway-$TAG-Linux-x64"
+          mkdir -p "$PACKAGE"
+          cp target/release/cargo-dispatch-addressing-gateway "$PACKAGE/"
+          cp deploy/addressing-gateway/Dockerfile "$PACKAGE/"
+          cp deploy/addressing-gateway/docker-compose.example.yml "$PACKAGE/"
+          cp deploy/addressing-gateway/README.md "$PACKAGE/README.md"
+          cp crates/addressing-gateway/README.md "$PACKAGE/PROTOCOL.md"
+          tar -czf "$PACKAGE.tar.gz" "$PACKAGE"
+
+      - name: Upload gateway release asset
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: Cargo-Dispatch-Preview-Gateway
+          path: Cargo-Dispatch-Gateway-*-Linux-x64.tar.gz
+          if-no-files-found: error
+
   windows-preview:
     name: Build and publish product preview
     needs:
       - android-preview
       - apple-preview
       - macos-preview
+      - gateway-preview
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -203,6 +243,11 @@ jobs:
         with:
           name: Cargo-Dispatch-Preview-macOS
           path: desktop-assets
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: Cargo-Dispatch-Preview-Gateway
+          path: server-assets
 
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
         with:
@@ -269,14 +314,16 @@ jobs:
           $android = Get-ChildItem "mobile-assets/Cargo-Dispatch-Driver-*-Android-debug.apk" | Select-Object -First 1
           $apple = Get-ChildItem "mobile-assets/Cargo-Dispatch-Driver-*-iOS-Simulator.zip" | Select-Object -First 1
           $macos = Get-ChildItem "desktop-assets/Cargo-Dispatch-Control-*-macOS-universal.zip" | Select-Object -First 1
-          if (-not $android -or -not $apple -or -not $macos) {
+          $gateway = Get-ChildItem "server-assets/Cargo-Dispatch-Gateway-*-Linux-x64.tar.gz" | Select-Object -First 1
+          if (-not $android -or -not $apple -or -not $macos -or -not $gateway) {
             throw "Required release assets are missing"
           }
           Copy-Item $android.FullName $android.Name
           Copy-Item $apple.FullName $apple.Name
           Copy-Item $macos.FullName $macos.Name
+          Copy-Item $gateway.FullName $gateway.Name
 
-          @($windowsZip, $macos.Name, $android.Name, $apple.Name) | ForEach-Object {
+          @($windowsZip, $macos.Name, $android.Name, $apple.Name, $gateway.Name) | ForEach-Object {
             $hash = (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower()
             "$hash  $_"
           } | Set-Content -Encoding ASCII SHA256SUMS.txt
@@ -293,7 +340,8 @@ jobs:
           - Windows Control x64 ZIP;
           - macOS Control universal ZIP (Intel + Apple Silicon);
           - Android Driver debug APK для тестового встановлення;
-          - iOS/iPadOS Driver Simulator ZIP для тестування в Apple Simulator.
+          - iOS/iPadOS Driver Simulator ZIP для тестування в Apple Simulator;
+          - Linux Addressing Gateway x64 tar.gz із Docker/Compose deployment files.
 
           Android та Apple assets поки тестові й не підписані для магазинів. App Store/TestFlight/Google Play signing і distribution будуть опрацьовані окремо пізніше.
 
@@ -305,7 +353,8 @@ jobs:
           - документи, фото, відео та геолокація;
           - інтерактивні карти;
           - Valhalla adapter і schema 1.2 road geometry;
-          - native Android та iOS/iPadOS Driver source і test builds з того самого release commit.
+          - native Android та iOS/iPadOS Driver source і test builds з того самого release commit;
+          - Addressing Gateway server для публічного зв'язку Control ↔ Driver без зберігання рейсу на сервері.
 
           ### Ще не stable
           - real phone/iPhone LAN та background tracking acceptance;
@@ -319,6 +368,7 @@ jobs:
           macOS: розпакувати universal ZIP і відкрити Cargo Dispatch Control.app; підпис/notarization буде пізніше.
           Android: встановити debug APK вручну на тестовий пристрій.
           Apple: Simulator ZIP призначений для Apple Simulator, не для фізичного iPhone/iPad.
+          Gateway: розпакувати Linux tar.gz або використати Docker/Compose files; HTTPS ставиться reverse proxy перед gateway.
           "@ | Set-Content -Encoding UTF8 RELEASE_NOTES.md
 
       - name: Publish GitHub prerelease
@@ -329,6 +379,7 @@ jobs:
           $android = (Get-ChildItem "Cargo-Dispatch-Driver-*-Android-debug.apk" | Select-Object -First 1).Name
           $apple = (Get-ChildItem "Cargo-Dispatch-Driver-*-iOS-Simulator.zip" | Select-Object -First 1).Name
           $macos = (Get-ChildItem "Cargo-Dispatch-Control-*-macOS-universal.zip" | Select-Object -First 1).Name
+          $gateway = (Get-ChildItem "Cargo-Dispatch-Gateway-*-Linux-x64.tar.gz" | Select-Object -First 1).Name
           gh release create "$env:TAG" `
             --repo "${{ github.repository }}" `
             --target "$env:GITHUB_SHA" `
@@ -339,4 +390,5 @@ jobs:
             "$macos" `
             "$android" `
             "$apple" `
+            "$gateway" `
             "SHA256SUMS.txt"

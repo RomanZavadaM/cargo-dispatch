@@ -1,0 +1,12 @@
+services:
+  cargo-dispatch-addressing-gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/addressing-gateway/Dockerfile
+    restart: unless-stopped
+    environment:
+      CARGO_DISPATCH_GATEWAY_BIND: 0.0.0.0:8080
+      CARGO_DISPATCH_GATEWAY_CONTROL_TOKEN: ${CARGO_DISPATCH_GATEWAY_CONTROL_TOKEN:?set a strong server-side token}
+      CARGO_DISPATCH_GATEWAY_MAX_RELAY_BYTES: ${CARGO_DISPATCH_GATEWAY_MAX_RELAY_BYTES:-67108864}
+    ports:
+      - "127.0.0.1:8080:8080"
