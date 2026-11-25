@@ -1998,6 +1998,38 @@ mod tests {
         .await?;
         assert_eq!(status, 400);
 
+        let current_location = serde_json::to_vec(&serde_json::json!({
+            "latitude": 49.8393,
+            "longitude": 24.0296,
+            "accuracy_m": 5.0,
+            "observed_at_unix_ms": 100_u64
+        }))?;
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            "/api/trip/guard-trip-token-0001/location",
+            &[("Content-Type", "application/json".to_owned())],
+            &current_location,
+        )
+        .await?;
+        assert_eq!(status, 200);
+
+        let stale_location = serde_json::to_vec(&serde_json::json!({
+            "latitude": 49.8400,
+            "longitude": 24.0300,
+            "accuracy_m": 6.0,
+            "observed_at_unix_ms": 99_u64
+        }))?;
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            "/api/trip/guard-trip-token-0001/location",
+            &[("Content-Type", "application/json".to_owned())],
+            &stale_location,
+        )
+        .await?;
+        assert_eq!(status, 409);
+
         let oversized_document = DocumentId::from_bytes([140; 16]).unwrap();
         let oversized_path = format!(
             "/api/trip/guard-trip-token-0001/documents/{}",
@@ -2023,7 +2055,10 @@ mod tests {
             get_json(server.address(), "/api/trip/guard-trip-token-0001").await?;
         assert_eq!(after.points, before.points);
         assert_eq!(after.local_route_revision, before.local_route_revision);
-        assert!(after.latest_location.is_none());
+        let location = after.latest_location.expect("newest location preserved");
+        assert_eq!(location.observed_at_unix_ms, 100);
+        assert!((location.latitude - 49.8393).abs() < 0.000001);
+        assert!((location.longitude - 24.0296).abs() < 0.000001);
         assert!(
             after
                 .documents
@@ -2038,7 +2073,13 @@ mod tests {
             recovered.state().route_points[0].point_id,
             route[0].point_id
         );
-        assert!(recovered.latest_location().is_none());
+        assert_eq!(
+            recovered
+                .latest_location()
+                .expect("newest durable location")
+                .observed_at_unix_ms,
+            100
+        );
         assert!(recovered.document(oversized_document).is_none());
         Ok(())
     }
