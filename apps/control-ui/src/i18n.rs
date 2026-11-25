@@ -153,6 +153,7 @@ pub struct ControlStrings {
     pub file_saved: &'static str,
     pub operation_failed: &'static str,
     pub meter_unit: &'static str,
+    pub timestamp: &'static str,
 }
 
 pub fn strings(locale: UiLocale) -> &'static ControlStrings {
@@ -249,6 +250,7 @@ static UK: ControlStrings = ControlStrings {
     file_saved: "Файл збережено",
     operation_failed: "Операцію не вдалося виконати",
     meter_unit: "м",
+    timestamp: "час",
 };
 
 static EN: ControlStrings = ControlStrings {
@@ -332,6 +334,7 @@ static EN: ControlStrings = ControlStrings {
     file_saved: "File saved",
     operation_failed: "The operation could not be completed",
     meter_unit: "m",
+    timestamp: "time",
 };
 
 static DE: ControlStrings = ControlStrings {
@@ -415,6 +418,7 @@ static DE: ControlStrings = ControlStrings {
     file_saved: "Datei gespeichert",
     operation_failed: "Der Vorgang konnte nicht ausgeführt werden",
     meter_unit: "m",
+    timestamp: "Zeit",
 };
 
 static FR: ControlStrings = ControlStrings {
@@ -498,6 +502,7 @@ static FR: ControlStrings = ControlStrings {
     file_saved: "Fichier enregistré",
     operation_failed: "L’opération n’a pas pu être effectuée",
     meter_unit: "m",
+    timestamp: "heure",
 };
 
 static ES: ControlStrings = ControlStrings {
@@ -581,6 +586,7 @@ static ES: ControlStrings = ControlStrings {
     file_saved: "Archivo guardado",
     operation_failed: "No se pudo completar la operación",
     meter_unit: "m",
+    timestamp: "hora",
 };
 
 static KO: ControlStrings = ControlStrings {
@@ -664,6 +670,7 @@ static KO: ControlStrings = ControlStrings {
     file_saved: "파일 저장됨",
     operation_failed: "작업을 완료하지 못했습니다",
     meter_unit: "m",
+    timestamp: "시간",
 };
 
 static JA: ControlStrings = ControlStrings {
@@ -747,6 +754,7 @@ static JA: ControlStrings = ControlStrings {
     file_saved: "ファイルを保存しました",
     operation_failed: "操作を完了できませんでした",
     meter_unit: "m",
+    timestamp: "時刻",
 };
 
 static ZH: ControlStrings = ControlStrings {
@@ -830,6 +838,7 @@ static ZH: ControlStrings = ControlStrings {
     file_saved: "文件已保存",
     operation_failed: "无法完成操作",
     meter_unit: "m",
+    timestamp: "时间",
 };
 
 pub fn localize_problem(locale: UiLocale, problem: &str) -> String {
