@@ -1007,7 +1007,16 @@ impl TripFolder {
     }
 
     pub fn record_location(&mut self, sample: DriverLocationSample) -> io::Result<()> {
-        self.record(Change::DriverLocation(sample.validate()?))
+        let sample = sample.validate()?;
+        if let Some(latest) = self.latest_location() {
+            if latest == sample {
+                return Ok(());
+            }
+            if sample.observed_at_unix_ms <= latest.observed_at_unix_ms {
+                return Err(invalid("location timestamp must advance"));
+            }
+        }
+        self.record(Change::DriverLocation(sample))
     }
 
     pub fn store_document(
@@ -1735,6 +1744,34 @@ mod tests {
         assert_eq!(control.locations(), &[sample]);
         assert_eq!(control.latest_location(), Some(sample));
 
+        let newer = DriverLocationSample {
+            latitude_e7: 498_430_000,
+            longitude_e7: 240_360_000,
+            observed_at_unix_ms: sample.observed_at_unix_ms + 1_000,
+            ..sample
+        };
+        control.record_location(newer)?;
+        assert_eq!(control.latest_location(), Some(newer));
+
+        assert!(
+            control
+                .record_location(DriverLocationSample {
+                    longitude_e7: 240_400_000,
+                    observed_at_unix_ms: newer.observed_at_unix_ms,
+                    ..newer
+                })
+                .is_err()
+        );
+        assert!(
+            control
+                .record_location(DriverLocationSample {
+                    observed_at_unix_ms: sample.observed_at_unix_ms + 500,
+                    ..sample
+                })
+                .is_err()
+        );
+        assert_eq!(control.latest_location(), Some(newer));
+
         assert!(
             control
                 .record_location(DriverLocationSample {
@@ -1754,8 +1791,8 @@ mod tests {
 
         drop(control);
         let recovered = TripFolder::open(&folder, trip)?;
-        assert_eq!(recovered.locations(), &[sample]);
-        assert_eq!(recovered.latest_location(), Some(sample));
+        assert_eq!(recovered.locations(), &[sample, newer]);
+        assert_eq!(recovered.latest_location(), Some(newer));
         Ok(())
     }
 
