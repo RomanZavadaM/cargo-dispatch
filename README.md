@@ -2,7 +2,7 @@
 
 **🇺🇦 Українська** · [🇬🇧 English](docs/readme/README.en.md) · [🇫🇷 Français](docs/readme/README.fr.md) · [🇩🇪 Deutsch](docs/readme/README.de.md) · [🇪🇸 Español](docs/readme/README.es.md) · [🇰🇷 한국어](docs/readme/README.ko.md) · [🇯🇵 日本語](docs/readme/README.ja.md) · [🇨🇳 简体中文](docs/readme/README.zh.md)
 
-> **Статус:** активна розробка. Поточний тестовий prerelease — **v0.1.0-preview.3**. Стабільного готового продукту ще немає.
+> **Статус:** активна розробка. Поточний тестовий prerelease — **v0.1.0-preview.4**. Стабільного готового продукту ще немає.
 
 ## Про продукт
 
@@ -21,7 +21,9 @@
 - файли, фото й відео **Driver Browser → Control** з локальним збереженням;
 - два одночасні browser clients одного рейсу та reconnect без окремої browser-бази;
 - інтерактивна карта OpenStreetMap у Control і Driver Browser;
-- loopback і явний LAN-режим для тестування та локальної роботи.
+- loopback і явний LAN-режим для тестування та локальної роботи;
+- нативний **Android Driver App**: route/complete/reorder, foreground location, files/photo/video, restart recovery, Emulator smoke;
+- нативний **iOS/iPadOS Driver App**: route/complete/reorder, CoreLocation foreground location, files/photo/video, restart recovery, Simulator smoke.
 
 ## Driver Browser
 
@@ -43,11 +45,11 @@ Driver Browser — **один продукт**, а не окремі телеф�
 
 ## Тестова збірка
 
-Поточний prerelease: [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.3).
+Поточний prerelease: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
 
 Windows ZIP містить Control, синтетичний активний рейс і тестовий PDF для локального loopback-приймання.
 
-Це **test/prerelease build**, не stable. Важливо: `main` уже випереджає preview.3 — Valhalla adapter і schema 1.2 road-geometry pipeline були інтегровані після публікації цього prerelease.
+Це **test/prerelease build**, не stable. Preview.4 уже містить Valhalla adapter і schema 1.2 road-geometry pipeline. `main` знову випереджає preview.4: після його публікації інтегровано Android та iOS/iPadOS native Driver r2.
 
 ## Що ще попереду
 
@@ -57,7 +59,8 @@ Windows ZIP містить Control, синтетичний активний ре
 - повний browser GPS acceptance через HTTPS;
 - польова перевірка через різні мережі/NAT/CGNAT;
 - живий Valhalla HTTP transport і перерахунок geometry після reorder;
-- native Driver App для Android та iOS/iPadOS — обидва вже розробляються паралельно в окремих draft-гілках;
+- native maps: MapLibre на Android і MapKit на iOS/iPadOS;
+- camera capture, background GPS, connected virtual-device smoke, offline queue та secure session storage для native apps;
 - stable release.
 
 ## Мови інтерфейсу
