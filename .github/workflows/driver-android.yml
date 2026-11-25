@@ -9,12 +9,14 @@ on:
       - "crates/control-web/**"
       - "crates/trip-files/**"
       - ".github/workflows/driver-android.yml"
+      - ".github/scripts/native-connected-android-smoke.sh"
   pull_request:
     paths:
       - "apps/driver-android/**"
       - "crates/control-web/**"
       - "crates/trip-files/**"
       - ".github/workflows/driver-android.yml"
+      - ".github/scripts/native-connected-android-smoke.sh"
 
 permissions:
   contents: read
@@ -93,48 +95,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: |
-            set -euo pipefail
-            target/debug/examples/native_smoke_server               native-smoke-data/synthetic-trip-package.zip               native-smoke-session-00000001               > native-smoke.log 2>&1 &
-            SERVER_PID=$!
-            trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
-
-            for _ in $(seq 1 80); do
-              if grep -q '^CARGO_DISPATCH_SMOKE_ANDROID_URL=' native-smoke.log; then
-                break
-              fi
-              if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-                cat native-smoke.log
-                exit 1
-              fi
-              sleep 0.25
-            done
-            cat native-smoke.log
-            ANDROID_DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_ANDROID_URL=//p' native-smoke.log | tail -n 1)"
-            test -n "$ANDROID_DRIVER_URL"
-
-            adb install -r android-apk/app-debug.apk
-            adb shell am start -W               -n com.romanzavada.cargodispatch.driver/.MainActivity               --es cargo_dispatch_driver_url "$ANDROID_DRIVER_URL"               --ez cargo_dispatch_emulator_mode true
-
-            CONNECTED=0
-            for _ in $(seq 1 40); do
-              adb shell uiautomator dump /sdcard/cargo-driver-window.xml >/dev/null 2>&1 || true
-              adb exec-out cat /sdcard/cargo-driver-window.xml > android-driver-window.xml 2>/dev/null || true
-              if grep -q '41414141' android-driver-window.xml; then
-                CONNECTED=1
-                break
-              fi
-              sleep 1
-            done
-
-            if [ "$CONNECTED" -ne 1 ]; then
-              cat android-driver-window.xml || true
-              adb logcat -d -t 300 || true
-              exit 1
-            fi
-
-            adb exec-out screencap -p > android-driver-smoke.png
-            adb shell am force-stop com.romanzavada.cargodispatch.driver
+          script: bash .github/scripts/native-connected-android-smoke.sh
 
       - name: Upload Android smoke screenshot
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
