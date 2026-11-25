@@ -1826,8 +1826,17 @@ mod tests {
         assert!(!DRIVER_HTML.contains("referrerPolicy = \"no-referrer\""));
         assert!(DRIVER_HTML.contains("id=\"routeSection\""));
         assert!(DRIVER_HTML.contains("id=\"filesSection\""));
-        assert!(DRIVER_HTML.contains("<span>Файл</span>"));
-        assert!(DRIVER_HTML.contains("<span>Фото / відео</span>"));
+        assert!(DRIVER_HTML.contains("id=\"fileLabel\""));
+        assert!(DRIVER_HTML.contains("id=\"cameraLabel\""));
+        assert!(DRIVER_HTML.contains("id=\"languageSelect\""));
+        assert!(!DRIVER_HTML.contains("<html lang=\"uk\">"));
+        for locale in ["uk", "en", "de", "fr", "es", "ko", "ja", "zh-Hans"] {
+            assert!(
+                DRIVER_HTML.contains(&format!("{locale}: {{"))
+                    || DRIVER_HTML.contains(&format!("\\"{locale}\\": {{")),
+                "Driver Browser locale missing: {locale}"
+            );
+        }
         assert!(DRIVER_HTML.contains("id=\"locationSection\""));
         assert!(DRIVER_HTML.contains("@media (min-width:700px) and (max-width:1099px)"));
         assert!(DRIVER_HTML.contains("@media (max-width:699px)"));
@@ -1894,7 +1903,9 @@ mod tests {
         )
         .await?;
         assert_eq!(status, 200);
-        assert!(String::from_utf8_lossy(&page).contains("Передати в Control"));
+        let page = String::from_utf8_lossy(&page);
+        assert!(page.contains("id=\"languageSelect\""));
+        assert!(page.contains("id=\"sendFile\""));
 
         let mut trip: DriverTripSnapshot =
             get_json(server.address(), "/api/trip/trip-a-token-0001").await?;
