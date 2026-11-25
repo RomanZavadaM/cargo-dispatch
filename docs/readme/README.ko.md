@@ -71,6 +71,8 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 
 ## 앞으로 필요한 작업
 
+- Windows, macOS, Linux용 Planner/editor 데스크톱 UI 및 릴리스 빌드;
+
 - 로컬 브라우저 수동 검수;
 - 동일한 Driver Browser를 실제 휴대폰에서 같은 LAN으로 테스트;
 - HTTPS/public addressing 경로;
