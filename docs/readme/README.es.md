@@ -37,7 +37,9 @@ Los datos, las acciones de ruta, los archivos y el backend son comunes; solo cam
 
 Control y Driver Browser ya incluyen un mapa base interactivo real con los puntos del viaje y la última posición aceptada del conductor.
 
-Esto **todavía no es la geometría vial completa de la ruta**. La geometría real mediante Valhalla sigue pendiente.
+La rama `main` ya contiene una canalización versionada de geometría vial (schema 1.2): Planner puede transportar geometría derivada, Control la guarda y ambos mapas dibujan la línea solo mientras coincide con el orden actual de las paradas. Un reorder invalida inmediatamente la línea anterior.
+
+Todavía falta el **transporte HTTP real hacia Valhalla y el recálculo automático de la geometría**. El contrato y el renderizado ya existen; el motor de rutas externo aún no está conectado al runtime del producto.
 
 ## Versión de prueba
 
@@ -45,7 +47,7 @@ Prerelease actual: [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-disp
 
 El ZIP de Windows contiene Control, un viaje activo sintético y un PDF de prueba para la validación local por loopback.
 
-Es una **compilación de prueba/prerelease**, no estable.
+Es una **compilación de prueba/prerelease**, no estable. `main` ya está por delante de preview.3: el adaptador Valhalla y la canalización de geometría schema 1.2 se integraron después de publicar ese prerelease.
 
 ## Qué falta
 
@@ -54,13 +56,13 @@ Es una **compilación de prueba/prerelease**, no estable.
 - ruta HTTPS/direccionamiento público;
 - validación completa del GPS del navegador mediante HTTPS;
 - pruebas de campo en distintas redes/NAT/CGNAT;
-- geometría vial real de Valhalla;
-- futura Driver App nativa;
+- transporte HTTP real de Valhalla y recálculo de geometría tras reorder;
+- Driver Apps nativas para Android e iOS/iPadOS, ya desarrolladas en paralelo en ramas draft separadas;
 - versión estable.
 
 ## Idiomas de la interfaz
 
-La interfaz actual implementa y verifica **ucraniano, inglés y alemán**. Las demás traducciones del README son idiomas de documentación u objetivos y todavía no significan que la interfaz del programa los admita.
+La interfaz desktop/browser integrada implementa actualmente **ucraniano, inglés y alemán**. Los nuevos clientes nativos Android e iOS/iPadOS incorporan desde el primer ekran los paquetes **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**, y la documentación usa el mismo conjunto de idiomas.
 
 ## Documentación
 
