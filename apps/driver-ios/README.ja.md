@@ -1,11 +1,11 @@
-# Cargo Dispatch Driver — iOS/iPadOS スキャフォールド
+# Cargo Dispatch Driver — iOS/iPadOS
 
 [🇺🇦 Українська](README.md) · [🇬🇧 English](README.en.md) · [🇩🇪 Deutsch](README.de.md) · [🇫🇷 Français](README.fr.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · **🇯🇵 日本語** · [🇨🇳 简体中文](README.zh.md)
 
-最初のネイティブ Apple スライスです。1 つの SwiftUI app target が iPhone/iPad をサポートし、Driver Browser と Android Driver App と **同じ Control API** を使用します。
+ネイティブ Apple ドライバークライアントです。1 つの SwiftUI target が iPhone/iPad をサポートし、Driver Browser/Android と **同じ Control API** を使用します。
 
-現在の範囲: Swift 6 + SwiftUI + URLSession、iOS/iPadOS 17+、Driver URL、trip snapshot、complete/reorder、永久 point ID + local revision、optional route geometry、pure Swift core test、uk/en/de/fr/es/ko/ja/zh-Hans ローカライズ。
+現在の範囲: Swift 6 + SwiftUI + URLSession、iOS/iPadOS 17+、Driver URL、trip snapshot、complete/reorder、permanent point ID + local revision、optional road geometry、CoreLocation foreground one-shot 位置送信、Control→iPhone/iPad 書類ダウンロード/fileExporter 保存、fileImporter + PhotosPicker による iPhone/iPad→Control ファイル/写真/動画アップロード、最後の Driver URL 復元、位置権限メッセージのローカライズ、uk/en/de/fr/es/ko/ja/zh-Hans、Swift protocol test と Simulator build/install/launch/screenshot CI。
 
-ローカル HTTP は Simulator/LAN の Debug のみ許可し、Release は HTTPS-first です。
+ローカル HTTP は Simulator/LAN Debug のみ許可し、Release は HTTPS-first です。
 
-未実装: ネイティブ地図、カメラ/写真/動画、文書表示/共有、バックグラウンド GPS、オフラインキュー、安全なセッション保存、push、production signing/TestFlight。
+今後: native MapKit map、カメラ撮影、background GPS、実際の synthetic Control trip との connected smoke、offline queue/retry、Keychain 強化、push、production signing/TestFlight。

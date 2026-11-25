@@ -1,11 +1,11 @@
-# Cargo Dispatch Driver — iOS/iPadOS scaffold
+# Cargo Dispatch Driver — iOS/iPadOS
 
 [🇺🇦 Українська](README.md) · **🇬🇧 English** · [🇩🇪 Deutsch](README.de.md) · [🇫🇷 Français](README.fr.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-First native Apple slice. One SwiftUI app target supports iPhone and iPad and uses the **same Control API** as Driver Browser and Android Driver App.
+Native Apple driver client. One SwiftUI target supports iPhone and iPad and uses the **same Control API** as Driver Browser and Android Driver App.
 
-Current scope: Swift 6 + SwiftUI + URLSession, iOS/iPadOS 17+, Driver URL connection, trip snapshot, complete/reorder, permanent point IDs + local route revision, optional road geometry model, pure Swift core tests, and localization in uk/en/de/fr/es/ko/ja/zh-Hans.
+Current scope: Swift 6 + SwiftUI + URLSession; iOS/iPadOS 17+; Driver URL; trip snapshot; complete/reorder; permanent point IDs + local route revision; optional road geometry; one-shot CoreLocation foreground GPS to Control; Control→iPhone/iPad document download through native fileExporter; iPhone/iPad→Control file/photo/video through fileImporter + PhotosPicker; restart recovery of the last Driver URL; localized location permission; uk/en/de/fr/es/ko/ja/zh-Hans localization; pure Swift protocol tests and Simulator build/install/launch/screenshot CI.
 
-Debug local HTTP is allowed only for Simulator/LAN development; Release remains HTTPS-first.
+Local HTTP is allowed only for Simulator/LAN Debug; Release remains HTTPS-first.
 
-Not yet implemented: native map rendering, camera/photo/video, document open/share, background GPS, offline queue, secure persisted session, push, production signing/TestFlight.
+Still ahead: native MapKit map, camera capture, background GPS, connected Simulator smoke against a real synthetic Control trip, offline queue/retry, Keychain hardening, push/notifications, and production signing/TestFlight.
