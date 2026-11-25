@@ -2,7 +2,7 @@
 
 **🇺🇦 Українська** · [🇬🇧 English](docs/readme/README.en.md) · [🇫🇷 Français](docs/readme/README.fr.md) · [🇩🇪 Deutsch](docs/readme/README.de.md) · [🇪🇸 Español](docs/readme/README.es.md) · [🇰🇷 한국어](docs/readme/README.ko.md) · [🇯🇵 日本語](docs/readme/README.ja.md) · [🇨🇳 简体中文](docs/readme/README.zh.md)
 
-> **Статус:** активна розробка. Поточна стабільна версія — **v0.1.0**. Після завершення локалізацій наступний великий напрямок — Planner маршруту.
+> **Статус:** активна розробка. Поточна стабільна версія — **v0.1.0**. Повна локалізація 8 мовами інтегрована; наступний великий напрямок — Planner маршруту.
 
 ## Про продукт
 
@@ -84,7 +84,7 @@ Android та Apple пакети поки не підписані для мага
 
 ## Мови інтерфейсу
 
-В інтегрованому desktop/browser UI наразі реалізовано й перевірено **Українську, English і Deutsch**. Для нових native Android та iOS/iPadOS клієнтів мовні пакети закладаються від першого екрана одразу для **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Документація ведеться тим самим набором мов.
+Control, Driver Browser, Android Driver та iOS/iPadOS Driver реалізовано й перевірено в одному наборі з **8 мов: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Для Control і Driver Browser є системний вибір мови та ручне перемикання зі збереженням; CI окремо контролює повноту всіх 8 локалізацій.
 
 ## Документація
 
