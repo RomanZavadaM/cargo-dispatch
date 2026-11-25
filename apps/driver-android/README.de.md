@@ -4,7 +4,7 @@
 
 Erster nativer Android-Slice. Er **ersetzt den Driver Browser nicht** und führt kein zweites Serverprotokoll ein: verwendet wird dieselbe Control-API.
 
-Aktueller Umfang: Kotlin + Jetpack Compose, Android 17/API 37, Verbindung über Driver-URL, Active-Trip-Snapshot, Complete/Reorder, Modell für Routengeometrie, Reconnect/Fehlerstatus, Protokoll-/Unit-Tests sowie Lokalisierungen uk/en/de/fr/es/ko/ja/zh-CN.
+Aktueller Umfang: Kotlin + Jetpack Compose, Android 16/API 36, Verbindung über Driver-URL, Active-Trip-Snapshot, Complete/Reorder, Modell für Routengeometrie, Reconnect/Fehlerstatus, Protokoll-/Unit-Tests sowie Lokalisierungen uk/en/de/fr/es/ko/ja/zh-CN.
 
 Im Android Emulator wird Host-`127.0.0.1`/localhost auf `10.0.2.2` abgebildet. Debug-Builds erlauben lokales HTTP nur für Entwicklung; der öffentliche Produktpfad soll HTTPS verwenden.
 
