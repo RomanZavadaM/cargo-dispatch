@@ -4,8 +4,8 @@
 
 Client conducteur Android natif. Il **ne remplace pas Driver Browser** et ne crée pas de protocole serveur séparé : il utilise la même API Control et les mêmes règles de trajet.
 
-Portée actuelle : Kotlin + Jetpack Compose ; Android 16/API 36, minSdk 26 ; Driver URL ; loopback Emulator via `10.0.2.2` ; snapshot du trajet ; complete/reorder ; géométrie routière optionnelle ; position GPS ponctuelle en premier plan vers Control ; téléchargement Control→Android avec sauvegarde native ; envoi fichier/photo/vidéo Android→Control via sélecteurs système ; restauration de la dernière Driver URL/du mode Emulator ; localisations uk/en/de/fr/es/ko/ja/zh-CN ; tests protocole/unitaires et CI Emulator install/launch/screenshot.
+Portée actuelle : Kotlin + Jetpack Compose ; Android 16/API 36, minSdk 26 ; Driver URL ; snapshot du trajet ; complete/reorder ; carte native MapLibre avec géométrie routière, points et dernière position ; localisation ponctuelle au premier plan ; transfert fichier/photo/vidéo et caméra système ; file durable de réessai pour la dernière position/les médias ; suivi d’arrière-plan Start/Stop explicite via un service de localisation au premier plan avec politique 15 s / 25 m ; récupération de session sécurisée, le token étant chiffré AES/GCM par Android Keystore tandis que seuls la base URL et le mode Emulator non secrets restent dans les préférences privées ; migration automatique de l’ancienne Driver URL brute après reconnexion réussie ; localisations uk/en/de/fr/es/ko/ja/zh-CN ; tests protocole/unitaires et smoke Emulator connecté à un vrai trajet synthétique Control.
 
 HTTP non chiffré uniquement en debug local ; le chemin public est HTTPS-first.
 
-À venir : carte native, capture caméra, GPS en arrière-plan, smoke Emulator connecté à un vrai trajet synthétique Control, file offline/retry, durcissement Keystore, push et signature production.
+À venir : validation LAN/suivi d’arrière-plan sur appareil réel, parcours HTTPS/public/NAT/CGNAT, push/notifications et signature production.
