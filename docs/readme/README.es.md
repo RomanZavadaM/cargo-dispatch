@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · **🇪🇸 Español** · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Estado:** desarrollo activo. La versión preliminar de prueba actual es **v0.1.0-preview.4**. Todavía no existe un producto estable y terminado.
+> **Estado:** desarrollo activo. La versión preliminar de prueba actual es **v0.1.0-preview.5**. Todavía no existe un producto estable y terminado.
 
 ## Acerca del producto
 
@@ -32,6 +32,8 @@ Los dos clientes nativos ya están integrados en `main`:
 
 Ambos usan la misma API de Control y no crean una base de viaje separada.
 
+Desde r4/r5, ambos clientes nativos también tienen una cola persistente de reintentos para ubicación y multimedia. Android r5 añade seguimiento en segundo plano Start/Stop explícito mediante un servicio de ubicación en primer plano, una notificación Stop persistente y una política de 15 s / 25 m. Apple r5 añade seguimiento CoreLocation en segundo plano Start/Stop explícito, `UIBackgroundModes=location`, filtro de 25 m y no solicita permiso `Always` sin una necesidad separada.
+
 ## Driver Browser
 
 Driver Browser es **un solo producto**, no versiones separadas para teléfono y escritorio. Tiene tres diseños normales:
@@ -52,11 +54,11 @@ Todavía falta el **transporte HTTP real hacia Valhalla y el recálculo automát
 
 ## Versión de prueba
 
-Prerelease actual: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
+Prerelease actual: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
 
 El ZIP de Windows contiene Control, un viaje activo sintético y un PDF de prueba para la validación local por loopback.
 
-Es una **compilación de prueba/prerelease**, no estable. Preview.4 ya contiene el adaptador Valhalla y la canalización de geometría schema 1.2. `main` vuelve a estar por delante: Driver r2+r3 nativo para Android e iOS/iPadOS, incluidos mapas nativos y cámara del sistema, además de un handoff Driver URL mejorado desde Control, se integró después de preview.4.
+Es una **compilación de prueba/prerelease**, no estable. Preview.5 fija el estado actual de Control/Driver Browser, la canalización Valhalla schema 1.2 road geometry y el código fuente de ambas Driver Apps nativas hasta r5: mapas, cámara/archivos, cola persistente de reintentos y seguimiento explícito en segundo plano. El asset binario publicado sigue siendo por ahora el preview de Windows Control; el firmado móvil de producción/TestFlight todavía está pendiente.
 
 ## Qué falta
 
@@ -69,6 +71,8 @@ Es una **compilación de prueba/prerelease**, no estable. Preview.4 ya contiene 
 - smoke conectado en dispositivos virtuales mediante una sesión Control headless real;
 - GPS en segundo plano, cola offline y almacenamiento seguro de sesión para las apps nativas;
 - versión estable.
+- almacenamiento seguro de la sesión Driver con Android Keystore + Apple Keychain y migración de la antigua URL sin cifrar;
+
 
 ## Idiomas de la interfaz
 
