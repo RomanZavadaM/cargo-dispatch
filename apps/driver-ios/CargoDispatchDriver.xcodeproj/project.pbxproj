@@ -229,6 +229,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CargoDispatchDriver/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Cargo Dispatch Driver";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Cargo Dispatch uses location to send the current driver position to Control.";
@@ -256,6 +257,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CargoDispatchDriver/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Cargo Dispatch Driver";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Cargo Dispatch uses location to send the current driver position to Control.";
