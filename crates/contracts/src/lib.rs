@@ -4,7 +4,7 @@ use cargo_dispatch_domain::{PointId, ReplanRequestId, TripId};
 use core::fmt;
 
 pub const TRIP_PACKAGE_SCHEMA_NAME: &str = "cargo-dispatch.trip-package";
-pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion::new(1, 1);
+pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion::new(1, 2);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SchemaVersion {
@@ -124,6 +124,76 @@ pub struct TripRoutePoint {
     pub kind: TripPointKind,
     pub title: String,
     pub navigation: Option<TripNavigationTarget>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TripRoadGeometryPoint {
+    pub latitude_e7: i32,
+    pub longitude_e7: i32,
+}
+
+impl TripRoadGeometryPoint {
+    #[must_use]
+    pub fn latitude(self) -> f64 {
+        f64::from(self.latitude_e7) / 10_000_000.0
+    }
+
+    #[must_use]
+    pub fn longitude(self) -> f64 {
+        f64::from(self.longitude_e7) / 10_000_000.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TripRoutingIdentity {
+    pub engine: String,
+    pub engine_version: String,
+    pub map_dataset_id: String,
+    pub profile_fingerprint: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TripRoadGeometry {
+    pub routing: TripRoutingIdentity,
+    pub points: Vec<TripRoadGeometryPoint>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TripGeometryContractError {
+    TooFewPoints,
+    EmptyIdentity(&'static str),
+    InvalidLatitude(usize),
+    InvalidLongitude(usize),
+}
+
+pub fn validate_trip_road_geometry(
+    geometry: &TripRoadGeometry,
+) -> Result<(), TripGeometryContractError> {
+    if geometry.points.len() < 2 {
+        return Err(TripGeometryContractError::TooFewPoints);
+    }
+    for (field, value) in [
+        ("engine", geometry.routing.engine.as_str()),
+        ("engine_version", geometry.routing.engine_version.as_str()),
+        ("map_dataset_id", geometry.routing.map_dataset_id.as_str()),
+        (
+            "profile_fingerprint",
+            geometry.routing.profile_fingerprint.as_str(),
+        ),
+    ] {
+        if value.trim().is_empty() {
+            return Err(TripGeometryContractError::EmptyIdentity(field));
+        }
+    }
+    for (index, point) in geometry.points.iter().enumerate() {
+        if !(-900_000_000..=900_000_000).contains(&point.latitude_e7) {
+            return Err(TripGeometryContractError::InvalidLatitude(index));
+        }
+        if !(-1_800_000_000..=1_800_000_000).contains(&point.longitude_e7) {
+            return Err(TripGeometryContractError::InvalidLongitude(index));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -542,6 +612,42 @@ mod tests {
     fn package_content_fingerprint_is_opaque_and_stable() {
         let fingerprint = PackageContentFingerprint::from_bytes([0x5a; 32]);
         assert_eq!(fingerprint.into_bytes(), [0x5a; 32]);
+    }
+
+    #[test]
+    fn road_geometry_requires_identity_and_bounded_points() {
+        let mut geometry = TripRoadGeometry {
+            routing: TripRoutingIdentity {
+                engine: "valhalla".to_owned(),
+                engine_version: "3.9.2".to_owned(),
+                map_dataset_id: "dataset-a".to_owned(),
+                profile_fingerprint: "abc".to_owned(),
+            },
+            points: vec![
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_393_000,
+                    longitude_e7: 240_296_000,
+                },
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_430_000,
+                    longitude_e7: 240_360_000,
+                },
+            ],
+        };
+        assert_eq!(validate_trip_road_geometry(&geometry), Ok(()));
+
+        geometry.points[1].latitude_e7 = 900_000_001;
+        assert_eq!(
+            validate_trip_road_geometry(&geometry),
+            Err(TripGeometryContractError::InvalidLatitude(1))
+        );
+
+        geometry.points[1].latitude_e7 = 498_430_000;
+        geometry.routing.map_dataset_id.clear();
+        assert_eq!(
+            validate_trip_road_geometry(&geometry),
+            Err(TripGeometryContractError::EmptyIdentity("map_dataset_id"))
+        );
     }
 
     #[test]
