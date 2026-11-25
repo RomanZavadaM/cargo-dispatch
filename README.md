@@ -37,7 +37,9 @@ Driver Browser — **один продукт**, а не окремі телеф�
 
 У Control і Driver Browser вже є справжня інтерактивна базова карта з точками рейсу та останньою прийнятою позицією водія.
 
-Поки що це **не повна дорожня геометрія маршруту**. Інтеграція реальної геометрії через Valhalla ще попереду.
+У `main` уже інтегровано versioned road-geometry pipeline (schema 1.2): Planner може передати похідну геометрію, Control зберігає її, обидві карти показують дорожню лінію лише поки вона відповідає поточному порядку точок. Після reorder стара лінія негайно інвалідовується.
+
+Ще попереду **живий HTTP transport до Valhalla та автоматичний перерахунок geometry**. Тобто структура й відображення дороги вже є, але зовнішній маршрутизатор ще не підключений до product runtime.
 
 ## Тестова збірка
 
@@ -45,7 +47,7 @@ Driver Browser — **один продукт**, а не окремі телеф�
 
 Windows ZIP містить Control, синтетичний активний рейс і тестовий PDF для локального loopback-приймання.
 
-Це **test/prerelease build**, не stable.
+Це **test/prerelease build**, не stable. Важливо: `main` уже випереджає preview.3 — Valhalla adapter і schema 1.2 road-geometry pipeline були інтегровані після публікації цього prerelease.
 
 ## Що ще попереду
 
@@ -54,13 +56,13 @@ Windows ZIP містить Control, синтетичний активний ре
 - HTTPS/public addressing path;
 - повний browser GPS acceptance через HTTPS;
 - польова перевірка через різні мережі/NAT/CGNAT;
-- реальна Valhalla road geometry;
-- майбутній native Driver App;
+- живий Valhalla HTTP transport і перерахунок geometry після reorder;
+- native Driver App для Android та iOS/iPadOS — обидва вже розробляються паралельно в окремих draft-гілках;
 - stable release.
 
 ## Мови інтерфейсу
 
-У поточному UI реалізовано й перевірено **Українську, English і Deutsch**. Інші мови цього README — переклади документації та цільові локалізації; це ще не означає підтримку відповідної мови в програмі.
+В інтегрованому desktop/browser UI наразі реалізовано й перевірено **Українську, English і Deutsch**. Для нових native Android та iOS/iPadOS клієнтів мовні пакети закладаються від першого екрана одразу для **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Документація ведеться тим самим набором мов.
 
 ## Документація
 
