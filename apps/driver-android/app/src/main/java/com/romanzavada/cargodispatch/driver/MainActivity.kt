@@ -43,16 +43,35 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         MapLibre.getInstance(applicationContext)
+
+        val launchSession = intent
+            ?.getStringExtra(EXTRA_DRIVER_URL)
+            ?.takeIf(String::isNotBlank)
+            ?.let { driverUrl ->
+                SavedDriverSession(
+                    driverUrl = driverUrl,
+                    emulatorMode = intent.getBooleanExtra(EXTRA_EMULATOR_MODE, true),
+                )
+            }
+
         setContent {
             MaterialTheme {
-                DriverScreen()
+                DriverScreen(launchSession = launchSession)
             }
         }
+    }
+
+    private companion object {
+        const val EXTRA_DRIVER_URL = "cargo_dispatch_driver_url"
+        const val EXTRA_EMULATOR_MODE = "cargo_dispatch_emulator_mode"
     }
 }
 
 @Composable
-private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
+private fun DriverScreen(
+    launchSession: SavedDriverSession? = null,
+    viewModel: DriverViewModel = viewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val sessionPreferences = remember { SessionPreferences(context.applicationContext) }
@@ -129,7 +148,7 @@ private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
     }
 
     LaunchedEffect(Unit) {
-        sessionPreferences.load()?.let(viewModel::restoreSession)
+        (launchSession ?: sessionPreferences.load())?.let(viewModel::restoreSession)
     }
 
     LaunchedEffect(state.connectedBaseUrl) {
