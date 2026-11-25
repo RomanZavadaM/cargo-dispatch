@@ -1,6 +1,9 @@
 #![forbid(unsafe_code)]
 
-use cargo_dispatch_contracts::{ContractError, ReplanRequest, TripPackageHeader, TripVersion};
+use cargo_dispatch_contracts::{
+    ContractError, ReplanRequest, TripGeometryContractError, TripPackageHeader, TripRoadGeometry,
+    TripVersion, validate_trip_road_geometry,
+};
 use cargo_dispatch_domain::{
     AvailabilityState, CalculationId, CallTaskId, CandidateId, CargoId, CargoSummary, LoadRequest,
     NegotiatedTermsId, OperatorId, PlanningAssignment, PointId, RequestId, RequestRevision,
@@ -758,6 +761,18 @@ pub struct PlannerTripExportDraft {
     pub created_at_unix_ms: u64,
     pub created_by: OperatorId,
     pub ordered_point_ids: Vec<PointId>,
+    pub route_geometry: Option<TripRoadGeometry>,
+}
+
+impl PlannerTripExportDraft {
+    pub fn with_route_geometry(
+        mut self,
+        geometry: TripRoadGeometry,
+    ) -> Result<Self, PlannerExportError> {
+        validate_trip_road_geometry(&geometry).map_err(PlannerExportError::InvalidGeometry)?;
+        self.route_geometry = Some(geometry);
+        Ok(self)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -765,6 +780,7 @@ pub enum PlannerExportError {
     RouteNotReady(WorkingRouteState),
     DuplicatePoint(PointId),
     Contract(ContractError),
+    InvalidGeometry(TripGeometryContractError),
 }
 
 pub fn build_trip_export_draft(
@@ -796,6 +812,7 @@ pub fn build_trip_export_draft(
         created_at_unix_ms,
         created_by,
         ordered_point_ids: route.points.iter().map(|point| point.point_id).collect(),
+        route_geometry: None,
     })
 }
 
