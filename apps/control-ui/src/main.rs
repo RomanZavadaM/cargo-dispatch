@@ -3,7 +3,7 @@
 use cargo_dispatch_control_ui_contracts::{
     ControlUiStatus, DashboardDocumentDirection, DashboardPoint, ListenerMode,
     OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput, SaveDocumentInput,
-    SessionInput, StartLanInput, TripDashboard,
+    SessionInput, StartGatewayInput, StartLanInput, TripDashboard,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -414,6 +414,8 @@ fn ControlApp() -> impl IntoView {
     let token = RwSignal::new(String::new());
     let lan_ip = RwSignal::new(String::new());
     let lan_port = RwSignal::new("8080".to_owned());
+    let gateway_url = RwSignal::new(String::new());
+    let gateway_secret = RwSignal::new(String::new());
     let status = RwSignal::new(None::<ControlUiStatus>);
     let selected_token = RwSignal::new(String::new());
     let dashboard = RwSignal::new(None::<TripDashboard>);
@@ -580,6 +582,45 @@ fn ControlApp() -> impl IntoView {
         });
     };
 
+    let start_gateway = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let base_url = gateway_url.get_untracked().trim().to_owned();
+        let secret = gateway_secret.get_untracked();
+        if base_url.is_empty() {
+            message.set("Вкажіть публічну HTTPS-адресу Gateway.".to_owned());
+            error.set(true);
+            return;
+        }
+        if secret.len() < 32 {
+            message.set("Control secret має містити щонайменше 32 символи.".to_owned());
+            error.set(true);
+            return;
+        }
+
+        busy.set(true);
+        let input = StartGatewayInput {
+            gateway_base_url: base_url,
+            control_secret: secret,
+        };
+        spawn_local(async move {
+            let result = invoke("start_gateway", &serde_json::json!({ "input": input })).await;
+            set_status_result(result, "Публічну Gateway-трансляцію запущено.");
+        });
+    };
+
+    let stop_gateway = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            let result = invoke("stop_gateway", &serde_json::json!({})).await;
+            set_status_result(result, "Публічну Gateway-трансляцію вимкнено.");
+        });
+    };
+
     let stop = move |_| {
         if busy.get_untracked() {
             return;
@@ -741,6 +782,41 @@ fn ControlApp() -> impl IntoView {
                 <p class="note">
                     "LAN не відкриває роутер/NAT автоматично. Route/files/media працюють напряму; GPS у телефонному браузері через HTTP зазвичай потребує HTTPS."
                 </p>
+                <h3>"Публічно через Gateway"</h3>
+                <div class="grid">
+                    <label>
+                        "Публічна адреса Gateway"
+                        <input
+                            id="gateway-url"
+                            type="url"
+                            placeholder="https://cargo.example.com"
+                            prop:value=move || gateway_url.get()
+                            on:input=move |event| gateway_url.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label>
+                        "Control secret"
+                        <input
+                            id="gateway-secret"
+                            type="password"
+                            minlength="32"
+                            autocomplete="off"
+                            prop:value=move || gateway_secret.get()
+                            on:input=move |event| gateway_secret.set(event_target_value(&event))
+                        />
+                    </label>
+                </div>
+                <div class="actions">
+                    <button class="primary" type="button" on:click=start_gateway disabled=move || busy.get()>
+                        "Увімкнути публічну трансляцію"
+                    </button>
+                    <button type="button" on:click=stop_gateway disabled=move || busy.get()>
+                        "Вимкнути Gateway"
+                    </button>
+                </div>
+                <p class="note">
+                    "Control сам виходить на Gateway через HTTPS. Порт на цьому комп'ютері відкривати не треба; Gateway не зберігає рейс, документи чи історію позицій."
+                </p>
             </section>
 
             <section>
@@ -748,7 +824,7 @@ fn ControlApp() -> impl IntoView {
                 <div class="status">
                     {move || {
                         status.get().map(|current| {
-                            match current.listener {
+                            let local = match current.listener {
                                 Some(listener) => {
                                     let mode = match listener.mode {
                                         ListenerMode::Loopback => "loopback",
@@ -757,7 +833,17 @@ fn ControlApp() -> impl IntoView {
                                     format!("Listener: {mode} · {}", listener.address)
                                 }
                                 None => "Listener вимкнений".to_owned(),
-                            }
+                            };
+                            let public = match current.gateway {
+                                Some(gateway) => format!(
+                                    "Gateway: {} · активні {}/{}",
+                                    gateway.base_url,
+                                    gateway.active_sessions,
+                                    gateway.total_sessions
+                                ),
+                                None => "Gateway вимкнений".to_owned(),
+                            };
+                            format!("{local} · {public}")
                         }).unwrap_or_else(|| "Читаю стан…".to_owned())
                     }}
                 </div>
@@ -769,22 +855,44 @@ fn ControlApp() -> impl IntoView {
                             let trip = session.trip_id.clone();
                             let session_token = session.token.clone();
                             let dashboard_token = session.token.clone();
-                            let url = session.driver_url.clone();
+                            let local_url = session.driver_url.clone();
+                            let public_url = session.public_driver_url.clone();
                             view! {
                                 <li>
                                     <div><strong>"Trip: "</strong><code>{trip}</code></div>
-                                    {url.map(|driver_url| {
+                                    {public_url.map(|driver_url| {
                                         let href = driver_url.clone();
                                         let copy_url = driver_url.clone();
                                         view! {
-                                            <div class="actions">
-                                                <a href=href target="_blank" rel="noopener">"Відкрити Driver Browser"</a>
-                                                <button
-                                                    type="button"
-                                                    on:click=move |_| cargo_control_copy_text(&copy_url)
-                                                >
-                                                    "Копіювати Driver URL"
-                                                </button>
+                                            <div>
+                                                <strong>"Публічний Driver URL: "</strong>
+                                                <div class="actions">
+                                                    <a href=href target="_blank" rel="noopener">"Відкрити"</a>
+                                                    <button
+                                                        type="button"
+                                                        on:click=move |_| cargo_control_copy_text(&copy_url)
+                                                    >
+                                                        "Копіювати"
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }
+                                    })}
+                                    {local_url.map(|driver_url| {
+                                        let href = driver_url.clone();
+                                        let copy_url = driver_url.clone();
+                                        view! {
+                                            <div>
+                                                <strong>"Локальний Driver URL: "</strong>
+                                                <div class="actions">
+                                                    <a href=href target="_blank" rel="noopener">"Відкрити"</a>
+                                                    <button
+                                                        type="button"
+                                                        on:click=move |_| cargo_control_copy_text(&copy_url)
+                                                    >
+                                                        "Копіювати"
+                                                    </button>
+                                                </div>
                                             </div>
                                         }
                                     })}
