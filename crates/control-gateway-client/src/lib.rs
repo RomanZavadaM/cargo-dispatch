@@ -341,7 +341,13 @@ impl ControlGatewayClient {
 
     pub async fn run(&self, shutdown: watch::Receiver<bool>) -> Result<(), GatewayClientError> {
         self.register().await?;
+        self.run_registered(shutdown).await
+    }
 
+    pub async fn run_registered(
+        &self,
+        shutdown: watch::Receiver<bool>,
+    ) -> Result<(), GatewayClientError> {
         while !*shutdown.borrow() {
             match self.relay_once().await {
                 Ok(RelayOnceOutcome::Relayed | RelayOnceOutcome::NoRequest) => {}
