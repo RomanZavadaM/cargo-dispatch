@@ -1305,10 +1305,16 @@ mod tests {
         };
 
         export_package(&package, &draft, &route)?;
-        let imported = TripFolder::import(&folder, &package)?;
+        let mut imported = TripFolder::import(&folder, &package)?;
         let state = imported.state();
         assert_eq!(state.current_version.get(), 1);
         assert_eq!(state.route_geometry, draft.route_geometry);
+
+        imported.driver_order(&state, &[route[1].point_id, route[0].point_id])?;
+        assert!(imported.state().route_geometry.is_none());
+
+        let recovered = TripFolder::open(&folder, trip)?;
+        assert!(recovered.state().route_geometry.is_none());
         Ok(())
     }
 
