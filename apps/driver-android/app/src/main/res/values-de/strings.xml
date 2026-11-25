@@ -37,4 +37,14 @@
     <string name="capture_photo">Foto aufnehmen</string>
     <string name="capture_video">Video aufnehmen</string>
     <string name="pending_outbound">Wartet nach Wiederherstellung der Verbindung auf Übertragung: %1$d</string>
+    <string name="tracking_start">Tracking starten</string>
+    <string name="tracking_stop">Tracking stoppen</string>
+    <string name="tracking_status_active">Hintergrund-Tracking ist aktiv.</string>
+    <string name="tracking_status_stopped">Hintergrund-Tracking ist gestoppt.</string>
+    <string name="tracking_permission_required">Für das Tracking ist Standortzugriff erforderlich.</string>
+    <string name="tracking_channel_name">Tour-Tracking</string>
+    <string name="tracking_channel_description">Dauerhafte Meldung, solange Cargo Dispatch die Fahrerposition sendet.</string>
+    <string name="tracking_notification_title">Cargo Dispatch — Tour-Tracking</string>
+    <string name="tracking_notification_active">Die Fahrerposition wird an Control gesendet.</string>
+    <string name="tracking_notification_pending">Position gespeichert; ausstehend: %1$d</string>
 </resources>
