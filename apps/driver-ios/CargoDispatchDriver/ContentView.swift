@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store = DriverStore()
     @StateObject private var locationController = ForegroundLocationController()
 
@@ -38,6 +39,17 @@ struct ContentView: View {
                             store.refresh()
                         }
                         .disabled(store.busy)
+
+                        if store.pendingOutbound > 0 {
+                            Text(
+                                String(
+                                    format: NSLocalizedString("queue.pending.format", comment: ""),
+                                    store.pendingOutbound
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        }
 
                         Button("disconnect") {
                             store.disconnect()
@@ -291,6 +303,11 @@ struct ContentView: View {
                         cameraMode = nil
                     }
                 )
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    store.retryPending()
+                }
             }
         }
     }
