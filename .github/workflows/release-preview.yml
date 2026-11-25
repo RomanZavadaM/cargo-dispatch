@@ -66,7 +66,15 @@ jobs:
 
       - name: Build iPhone/iPad Simulator app
         run: |
-          xcodebuild             -project apps/driver-ios/CargoDispatchDriver.xcodeproj             -scheme CargoDispatchDriver             -configuration Debug             -sdk iphonesimulator             -destination 'generic/platform=iOS Simulator'             -derivedDataPath apps/driver-ios/build/DerivedData             CODE_SIGNING_ALLOWED=NO             build
+          xcodebuild             -project apps/driver-ios/CargoDispatchDriver.xcodeproj             -scheme CargoDispatchDriver             -configuration Debug             -sdk iphonesimulator             -destination 'generic/platform=iOS Simulator'             -derivedDataPath apps/driver-ios/build/DerivedData             CODE_SIGNING_ALLOWED=YES             CODE_SIGN_IDENTITY=-             build
+
+      - name: Verify Apple Simulator signature
+        shell: bash
+        run: |
+          APP="apps/driver-ios/build/DerivedData/Build/Products/Debug-iphonesimulator/CargoDispatchDriver.app"
+          test -d "$APP"
+          codesign -dv --verbose=2 "$APP" 2>&1
+          codesign --verify --deep --strict "$APP"
 
       - name: Stage Apple Simulator release asset
         shell: bash
