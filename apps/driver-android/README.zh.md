@@ -4,7 +4,7 @@
 
 首个原生 Android 开发阶段。它**不会替代 Driver Browser**，也不会创建第二套服务器协议；它使用相同的 Control API。
 
-当前范围：Kotlin + Jetpack Compose、Android 17/API 37、Driver URL 连接、active trip snapshot、complete/reorder、路线几何模型、重连/错误状态、协议/单元测试，以及 uk/en/de/fr/es/ko/ja/zh-CN 本地化。
+当前范围：Kotlin + Jetpack Compose、Android 16/API 36、Driver URL 连接、active trip snapshot、complete/reorder、路线几何模型、重连/错误状态、协议/单元测试，以及 uk/en/de/fr/es/ko/ja/zh-CN 本地化。
 
 在 Android Emulator 中，主机的 `127.0.0.1`/localhost 映射到 `10.0.2.2`。明文 HTTP 仅允许本地 debug；公开路径必须使用 HTTPS。
 
