@@ -627,10 +627,7 @@ mod tests {
                 ))
                 .bearer_auth(secret)
                 .header(STATUS_HEADER, "201")
-                .header(
-                    "x-cargo-relay-response-content-type",
-                    "application/json",
-                )
+                .header("x-cargo-relay-response-content-type", "application/json")
                 .body(r#"{"accepted":true}"#)
                 .send()
                 .await
