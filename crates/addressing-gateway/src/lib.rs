@@ -6,10 +6,10 @@ use axum::{
     extract::{Path, Request, State},
     http::{
         HeaderMap, HeaderName, HeaderValue, StatusCode,
-        header::{AUTHORIZATION, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE},
+        header::{AUTHORIZATION, CONTENT_LENGTH},
     },
     response::{IntoResponse, Response},
-    routing::{delete, get, post, put},
+    routing::{get, post, put},
 };
 use serde::Serialize;
 use std::{
@@ -456,6 +456,7 @@ fn collect_forward_headers(headers: &HeaderMap) -> Vec<(String, String)> {
 }
 
 fn client_response(relay: RelayResponse) -> Response {
+    let body_len = relay.body.len();
     let mut response = Response::new(Body::from(relay.body));
     *response.status_mut() = relay.status;
 
@@ -468,11 +469,6 @@ fn client_response(relay: RelayResponse) -> Response {
         }
     }
 
-    let body_len = response
-        .body()
-        .size_hint()
-        .exact()
-        .unwrap_or_default();
     if !response.headers().contains_key(CONTENT_LENGTH)
         && let Ok(value) = HeaderValue::from_str(&body_len.to_string())
     {
@@ -529,7 +525,10 @@ mod tests {
     #[test]
     fn request_header_forwarding_is_explicit() {
         let mut headers = HeaderMap::new();
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/pdf"));
+        headers.insert(
+            HeaderName::from_static("content-type"),
+            HeaderValue::from_static("application/pdf"),
+        );
         headers.insert(
             HeaderName::from_static("x-file-name"),
             HeaderValue::from_static("sample.pdf"),
