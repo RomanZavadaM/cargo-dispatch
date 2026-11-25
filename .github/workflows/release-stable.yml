@@ -177,6 +177,73 @@ jobs:
           path: Cargo-Dispatch-Control-*-macOS-universal.zip
           if-no-files-found: error
 
+  linux-control-stable:
+    name: Build Linux Control stable
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+
+      - name: Install Linux Tauri dependencies
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+
+      - name: Install pinned Trunk
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: trunk@0.22.2
+          fallback: none
+
+      - name: Build Control frontend
+        working-directory: apps/control-ui
+        run: trunk build --release=true
+
+      - name: Build Linux Control executable
+        run: cargo build --locked -p cargo-dispatch-control-desktop --release
+
+      - name: Create synthetic acceptance data
+        run: cargo run --locked -p cargo-dispatch-trip-files --example local_browser_fixture -- local-browser-test-data
+
+      - name: Stage Linux Control package
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="$(tr -d '\r\n' < .release-stable)"
+          PACKAGE="Cargo-Dispatch-Control-$TAG-Linux-x64"
+          mkdir -p "$PACKAGE"
+          cp target/release/cargo-dispatch-control-desktop "$PACKAGE/Cargo-Dispatch-Control"
+          chmod +x "$PACKAGE/Cargo-Dispatch-Control"
+          cp THIRD_PARTY_NOTICES.md "$PACKAGE/THIRD_PARTY_NOTICES.md"
+          cp -R local-browser-test-data "$PACKAGE/local-browser-test-data"
+          cat > "$PACKAGE/README-TEST.txt" <<'EOF'
+          Cargo Dispatch Control — Linux x64 stable checkpoint
+
+          Run ./Cargo-Dispatch-Control from a desktop Linux session.
+          This portable package is intended for the current stable checkpoint.
+          Distribution-specific installers/packages can be added later.
+          EOF
+          tar -czf "$PACKAGE.tar.gz" "$PACKAGE"
+
+      - name: Upload Linux Control release asset
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: Cargo-Dispatch-Stable-Control-Linux
+          path: Cargo-Dispatch-Control-*-Linux-x64.tar.gz
+          if-no-files-found: error
+
   gateway-stable:
     name: Build Linux Addressing Gateway stable
     runs-on: ubuntu-latest
@@ -222,6 +289,7 @@ jobs:
       - android-stable
       - apple-stable
       - macos-stable
+      - linux-control-stable
       - gateway-stable
     runs-on: windows-latest
     steps:
@@ -242,6 +310,11 @@ jobs:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: Cargo-Dispatch-Stable-macOS
+          path: desktop-assets
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: Cargo-Dispatch-Stable-Control-Linux
           path: desktop-assets
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
@@ -314,16 +387,18 @@ jobs:
           $android = Get-ChildItem "mobile-assets/Cargo-Dispatch-Driver-*-Android-debug.apk" | Select-Object -First 1
           $apple = Get-ChildItem "mobile-assets/Cargo-Dispatch-Driver-*-iOS-Simulator.zip" | Select-Object -First 1
           $macos = Get-ChildItem "desktop-assets/Cargo-Dispatch-Control-*-macOS-universal.zip" | Select-Object -First 1
+          $linux = Get-ChildItem "desktop-assets/Cargo-Dispatch-Control-*-Linux-x64.tar.gz" | Select-Object -First 1
           $gateway = Get-ChildItem "server-assets/Cargo-Dispatch-Gateway-*-Linux-x64.tar.gz" | Select-Object -First 1
-          if (-not $android -or -not $apple -or -not $macos -or -not $gateway) {
+          if (-not $android -or -not $apple -or -not $macos -or -not $linux -or -not $gateway) {
             throw "Required release assets are missing"
           }
           Copy-Item $android.FullName $android.Name
           Copy-Item $apple.FullName $apple.Name
           Copy-Item $macos.FullName $macos.Name
+          Copy-Item $linux.FullName $linux.Name
           Copy-Item $gateway.FullName $gateway.Name
 
-          @($windowsZip, $macos.Name, $android.Name, $apple.Name, $gateway.Name) | ForEach-Object {
+          @($windowsZip, $macos.Name, $linux.Name, $android.Name, $apple.Name, $gateway.Name) | ForEach-Object {
             $hash = (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower()
             "$hash  $_"
           } | Set-Content -Encoding ASCII SHA256SUMS.txt
@@ -339,10 +414,11 @@ jobs:
           ### Збірки в релізі
           - Windows Control x64 ZIP;
           - macOS Control universal ZIP (Intel + Apple Silicon);
+          - Linux Control x64 tar.gz;
           - Android Driver debug APK для тестового встановлення;
           - iOS/iPadOS Driver Simulator ZIP для Apple Simulator;
           - Linux Addressing Gateway x64 tar.gz із Docker/Compose deployment files;
-          - SHA256SUMS для всіх п'яти пакетів.
+          - SHA256SUMS для всіх шести пакетів.
 
           Android APK та Apple Simulator ZIP залишаються тестовими пакетами без магазинного підпису. App Store/TestFlight/Google Play signing і distribution, як домовлено, будуть опрацьовані пізніше.
 
@@ -360,7 +436,7 @@ jobs:
 
           ### Наступні напрями
           - завершення локалізації Control UI і Driver Browser всіма мовами проєкту;
-          - Planner/editor desktop UI і його Windows/macOS builds;
+          - Planner/editor desktop UI і його Windows/macOS/Linux builds;
           - live HTTP transport до Valhalla та автоматичний recalculation geometry;
           - real phone/iPhone field acceptance;
           - NAT/CGNAT field acceptance;
@@ -368,6 +444,7 @@ jobs:
 
           Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
           macOS: розпакувати universal ZIP і відкрити Cargo Dispatch Control.app; підпис/notarization буде пізніше.
+          Linux: розпакувати tar.gz і запустити ./Cargo-Dispatch-Control у desktop Linux session.
           Android: встановити debug APK вручну на тестовий пристрій.
           Apple: Simulator ZIP призначений для Apple Simulator, не для фізичного iPhone/iPad.
           Gateway: розпакувати Linux tar.gz або використати Docker/Compose files; HTTPS ставиться reverse proxy перед gateway.
@@ -381,6 +458,7 @@ jobs:
           $android = (Get-ChildItem "Cargo-Dispatch-Driver-*-Android-debug.apk" | Select-Object -First 1).Name
           $apple = (Get-ChildItem "Cargo-Dispatch-Driver-*-iOS-Simulator.zip" | Select-Object -First 1).Name
           $macos = (Get-ChildItem "Cargo-Dispatch-Control-*-macOS-universal.zip" | Select-Object -First 1).Name
+          $linux = (Get-ChildItem "Cargo-Dispatch-Control-*-Linux-x64.tar.gz" | Select-Object -First 1).Name
           $gateway = (Get-ChildItem "Cargo-Dispatch-Gateway-*-Linux-x64.tar.gz" | Select-Object -First 1).Name
           gh release create "$env:TAG" `
             --repo "${{ github.repository }}" `
@@ -389,6 +467,7 @@ jobs:
             --notes-file RELEASE_NOTES.md `
             "Cargo-Dispatch-Control-$env:TAG-Windows-x64.zip" `
             "$macos" `
+            "$linux" `
             "$android" `
             "$apple" `
             "$gateway" `
