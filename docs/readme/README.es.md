@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · **🇪🇸 Español** · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Estado:** desarrollo activo. La versión estable actual es **v0.1.0**. Tras completar la localización, el siguiente gran foco será el Planner de rutas.
+> **Estado:** desarrollo activo. La versión estable actual es **v0.1.0**. La localización completa en 8 idiomas está integrada; el siguiente gran foco es el Planner de rutas.
 
 ## Acerca del producto
 
@@ -83,7 +83,7 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 
 ## Idiomas de la interfaz
 
-La interfaz desktop/browser integrada implementa actualmente **ucraniano, inglés y alemán**. Los nuevos clientes nativos Android e iOS/iPadOS incorporan desde el primer ekran los paquetes **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**, y la documentación usa el mismo conjunto de idiomas.
+Control, Driver Browser, Android Driver e iOS/iPadOS Driver están implementados y verificados con el mismo **conjunto de 8 idiomas: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control y Driver Browser usan el idioma del sistema más una selección manual persistente, y el CI verifica la cobertura completa de las 8 localizaciones.
 
 ## Documentación
 
