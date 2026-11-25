@@ -1,0 +1,70 @@
+name: Update product preview metadata
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".release-preview-notes"
+
+permissions:
+  contents: write
+
+jobs:
+  metadata:
+    name: Correct current preview metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Read current preview tag
+        shell: bash
+        run: |
+          TAG="$(tr -d '\r\n' < .release-preview)"
+          test -n "$TAG"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Write current release notes
+        shell: bash
+        run: |
+          cat > RELEASE_NOTES.md <<'EOF'
+          ## Що це
+
+          Cargo Dispatch CURRENT_TAG — інтегрований тестовий preview поточного продукту. Це **prerelease**, не stable.
+
+          ### Уже в цьому preview
+          - Control desktop на Rust/Tauri + Leptos;
+          - durable active trip і restart recovery;
+          - один адаптивний Driver Browser для phone / tablet / wide desktop;
+          - route reorder у Control і Driver Browser;
+          - PDF/files Control → Driver Browser;
+          - file/photo/video Driver Browser → Control + local Save;
+          - два одночасні browser clients та reconnect;
+          - інтерактивна OpenStreetMap-карта в Control і Driver Browser;
+          - product Valhalla adapter;
+          - trip-package schema 1.2 з optional auditable road geometry;
+          - stale road geometry автоматично інвалідовується після reorder;
+          - Windows GUI build без зайвого console window;
+          - synthetic active-trip, road geometry і sample PDF у Windows ZIP.
+
+          ### Ще не stable
+          - формальний local browser acceptance ще не закритий;
+          - live HTTP transport до Valhalla та automatic geometry recalculation ще не інтегровані;
+          - real phone LAN acceptance ще попереду;
+          - browser/native GPS product acceptance має пройти через HTTPS;
+          - public addressing/NAT/CGNAT field path ще попереду;
+          - Android та iOS/iPadOS Driver Apps розробляються окремо й не входять у цей Windows preview.
+
+          Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
+          EOF
+          sed -i "s/CURRENT_TAG/$TAG/g" RELEASE_NOTES.md
+
+      - name: Update GitHub prerelease metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "Cargo Dispatch $TAG" \
+            --notes-file RELEASE_NOTES.md \
+            --prerelease
