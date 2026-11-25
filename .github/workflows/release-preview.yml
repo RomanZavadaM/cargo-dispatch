@@ -107,6 +107,7 @@ jobs:
           - інтерактивна OpenStreetMap-карта в Control і Driver Browser;
           - product Valhalla adapter і versioned schema 1.2 road geometry;
           - stale road geometry автоматично інвалідовується після reorder;
+          - у source tag інтегровані Android та iOS/iPadOS Driver через r5: native maps, camera/files, durable retry queue та explicit Start/Stop background tracking;
           - Windows GUI build без зайвого console window;
           - у ZIP є synthetic active-trip, road geometry і sample PDF для локального тесту.
 
