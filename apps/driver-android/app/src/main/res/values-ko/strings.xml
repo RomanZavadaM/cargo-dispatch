@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cargo Dispatch — 운전자</string>
+    <string name="screen_title">Cargo Dispatch — 운전자</string>
+    <string name="screen_subtitle">네이티브 Android 클라이언트는 Driver Browser와 동일한 Control API를 사용합니다.</string>
+    <string name="connection_title">Control에 연결</string>
+    <string name="driver_url_label">Control의 Driver URL</string>
+    <string name="driver_url_placeholder">http://127.0.0.1:12345/driver/trip-...</string>
+    <string name="emulator_label">Android Emulator</string>
+    <string name="emulator_hint">127.0.0.1/localhost는 자동으로 10.0.2.2에 연결됩니다</string>
+    <string name="connect">연결</string>
+    <string name="connecting">연결 중…</string>
+    <string name="refresh">새로고침</string>
+    <string name="trip_title">운행 %1$s…</string>
+    <string name="version_revision">버전 %1$d; 로컬 리비전 %2$d</string>
+    <string name="points_documents">지점: %1$d; 문서: %2$d</string>
+    <string name="road_geometry_present">도로 경로 형상: %1$d개 지점 (%2$s %3$s)</string>
+    <string name="road_geometry_missing">도로 경로 형상: 없음 / 무효화됨</string>
+    <string name="route_title">경로</string>
+    <string name="completed">완료</string>
+    <string name="open_point">열린 지점</string>
+    <string name="done_button">완료 처리</string>
+    <string name="control_prefix">Control: %1$s</string>
+</resources>
