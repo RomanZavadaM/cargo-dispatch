@@ -81,12 +81,10 @@ Android та Apple пакети поки не підписані для мага
 - повний browser GPS acceptance через HTTPS;
 - польова перевірка через різні мережі/NAT/CGNAT;
 - живий Valhalla HTTP transport і перерахунок geometry після reorder;
-- захищене збереження Driver session: Android Keystore + Apple Keychain і міграція старого raw URL;
-- stable release.
 
 ## Мови інтерфейсу
 
-В інтегрованому desktop/browser UI наразі реалізовано й перевірено **Українську, English і Deutsch**. Для нових native Android та iOS/iPadOS клієнтів мовні пакети закладаються від першого екрана одразу для **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Документація ведеться тим самим набором мов.
+Control, Driver Browser, Android Driver та iOS/iPadOS Driver реалізують і автоматично перевіряють повний набір мов проєкту: **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. У Control і Driver Browser мова вибирається за системною мовою та може бути змінена вручну зі збереженням вибору. Документація ведеться тим самим набором мов.
 
 ## Документація
 
