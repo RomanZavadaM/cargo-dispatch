@@ -37,4 +37,14 @@
     <string name="capture_photo">Prendre une photo</string>
     <string name="capture_video">Enregistrer une vidéo</string>
     <string name="pending_outbound">En attente d’envoi après le rétablissement de la connexion : %1$d</string>
+    <string name="tracking_start">Démarrer le suivi</string>
+    <string name="tracking_stop">Arrêter le suivi</string>
+    <string name="tracking_status_active">Le suivi en arrière-plan est actif.</string>
+    <string name="tracking_status_stopped">Le suivi en arrière-plan est arrêté.</string>
+    <string name="tracking_permission_required">L’accès à la position est nécessaire pour le suivi.</string>
+    <string name="tracking_channel_name">Suivi du trajet</string>
+    <string name="tracking_channel_description">Notification permanente pendant l’envoi de la position du conducteur.</string>
+    <string name="tracking_notification_title">Cargo Dispatch — suivi du trajet</string>
+    <string name="tracking_notification_active">La position du conducteur est envoyée à Control.</string>
+    <string name="tracking_notification_pending">Position enregistrée ; en attente d’envoi : %1$d</string>
 </resources>
