@@ -24,7 +24,7 @@ cargo-dispatch може містити або розповсюджуватися
 - Control desktop shell reuses the already accepted UI-probe icon resource; no additional icon/runtime dependency is introduced.
 
 ## Дані
-- Базова карта використовує стандартні raster tiles OpenStreetMap через `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; дані OpenStreetMap поширюються за ODbL і в обох map views показується атрибуція «© OpenStreetMap contributors». Це runtime network request до стороннього tile service: провайдер бачить IP клієнта та запитану область карти. Bulk/offline prefetch не виконується; недоступність tiles не повинна блокувати route/files/media.
+- Базова карта використовує стандартні raster tiles OpenStreetMap через `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; дані OpenStreetMap поширюються за ODbL і в обох map views показується атрибуція «© OpenStreetMap contributors». Це runtime network request до стороннього tile service: провайдер бачить IP клієнта та запитану область карти. Driver Browser використовує звичайний browser User-Agent + cross-origin origin Referer; Control webview ідентифікується як `CargoDispatchControl/0.1.0 (+https://github.com/RomanZavadaM/cargo-dispatch)`. Browser cache не обходиться, bulk/offline prefetch не виконується; недоступність tiles не повинна блокувати route/files/media.
 - Реальні дані користувачів (авто, водії, заявки, координати) у репозиторії не зберігаються.
 
 
