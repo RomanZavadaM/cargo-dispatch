@@ -2,18 +2,16 @@
 
 Оновлено: 2026-11-25, Europe/Kyiv.
 
-Це короткий публічний стан. Деталі, рішення й журнал — у private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
+Короткий public state; деталі — private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
 
-- Product foundation інтегровано в `main`.
-- Responsive Control + Driver Browser slice з PR #2 також інтегровано в `main`; merge commit: `f41d32044f8ac0eb3290c9638a58f4c7f8046d77`.
-- Exact-head PR CI перед merge: Product foundation `45571225967` — **SUCCESS**; Control desktop UI `45571226378` — **SUCCESS**.
-- Planner і Control — окремі desktop-компоненти; після передачі активного trip фактом володіє Control.
-- Driver Browser — один адаптивний browser client для телефона, планшета, ноутбука й desktop browser; backend та дані спільні.
-- У Control і Driver Browser є інтерактивна OpenStreetMap-карта з точками рейсу та останньою прийнятою позицією водія.
-- Уже перевірено автоматично: trip package, durable recovery, route reorder, loopback/LAN session boundary, route/location, двосторонні PDF/file/photo/video, два browser clients, reconnect, Tauri/Leptos Control dashboard та native Save.
-- Поточний test/prerelease: **v0.1.0-preview.3**; stable product release ще немає.
-- Ручне local browser acceptance ще не завершене; після нього — реальний телефон у LAN.
-- Повний browser GPS acceptance — через HTTPS.
-- Ще не готові: production HTTPS/public gateway path, field NAT/CGNAT acceptance, real Valhalla road geometry, native Driver App, stable release.
+- Control і Driver Browser інтегровані в `main`: durable trip, route reorder, files/media, location, maps, reconnect.
+- Valhalla product adapter та schema 1.2 road-geometry pipeline інтегровані; live external Valhalla HTTP transport ще попереду.
+- Android Driver r2 інтегровано: Kotlin/Compose, route actions, foreground location, file/photo/video transfer, restart recovery, 8 мов, Emulator smoke.
+- iOS/iPadOS Driver r2 інтегровано: SwiftUI, route actions, CoreLocation, file/photo/video transfer, restart recovery, 8 мов, Simulator smoke.
+- Усі driver clients використовують один Control API і не мають окремого source of truth.
+- Поточний published prerelease: **v0.1.0-preview.4**; Windows Control asset SHA256 `30028d5fd95653903417411bffbb31c85bf664176092902672224f50e9c0090d`.
+- `main` уже випереджає preview.4 native r2 змінами.
+- Наступний native крок: MapLibre Android + MapKit Apple, потім connected virtual-device smoke.
+- Ще не закрито: formal browser field acceptance, real phone/device LAN, HTTPS/public gateway, browser/native background GPS policy, NAT/CGNAT, live Valhalla transport, production signing/TestFlight, stable release.
 
-Для продовження роботи: `START_HERE.md` → private HANDOFF/PROJECT_STATE → active module logs → live GitHub.
+Для продовження: `START_HERE.md` → private module logs → live GitHub.
