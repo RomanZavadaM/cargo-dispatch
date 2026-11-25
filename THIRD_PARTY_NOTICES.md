@@ -24,7 +24,7 @@ cargo-dispatch може містити або розповсюджуватися
 - Control desktop shell reuses the already accepted UI-probe icon resource; no additional icon/runtime dependency is introduced.
 
 ## Дані
-- Дорожні дані OpenStreetMap, якщо будуть використані, поширюються за ліцензією ODbL; потрібна атрибуція «© OpenStreetMap contributors».
+- Базова карта використовує стандартні raster tiles OpenStreetMap через `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; дані OpenStreetMap поширюються за ODbL і в обох map views показується атрибуція «© OpenStreetMap contributors». Це runtime network request до стороннього tile service: провайдер бачить IP клієнта та запитану область карти. Bulk/offline prefetch не виконується; недоступність tiles не повинна блокувати route/files/media.
 - Реальні дані користувачів (авто, водії, заявки, координати) у репозиторії не зберігаються.
 
 
