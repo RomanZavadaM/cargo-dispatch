@@ -2132,6 +2132,214 @@
           }
         }
       }
+    },
+    "location.tracking.start": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Почати відстеження рейсу"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start trip tracking"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tour-Tracking starten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer le suivi du trajet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar seguimiento del viaje"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "운행 추적 시작"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運行追跡を開始"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始行程跟踪"
+          }
+        }
+      }
+    },
+    "location.tracking.stop": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Зупинити відстеження"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop tracking"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracking stoppen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter le suivi"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detener seguimiento"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "추적 중지"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追跡を停止"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止跟踪"
+          }
+        }
+      }
+    },
+    "location.tracking.active": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відстеження рейсу активне"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trip tracking is active"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tour-Tracking ist aktiv"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le suivi du trajet est actif"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El seguimiento del viaje está activo"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "운행 추적이 활성화됨"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運行追跡中"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "行程跟踪已启用"
+          }
+        }
+      }
+    },
+    "location.tracking.note": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поки відстеження активне, iPhone/iPad може передавати позицію в Control і у фоні. Stop повністю вимикає безперервний GPS."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "While tracking is active, iPhone/iPad can send location to Control in the background. Stop fully disables continuous GPS."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei aktivem Tracking kann iPhone/iPad den Standort auch im Hintergrund an Control senden. Stop deaktiviert den kontinuierlichen GPS-Empfang vollständig."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quand le suivi est actif, l’iPhone/iPad peut envoyer la position à Control en arrière-plan. Arrêter désactive complètement le GPS continu."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mientras el seguimiento está activo, iPhone/iPad puede enviar la ubicación a Control en segundo plano. Detener desactiva por completo el GPS continuo."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "추적이 활성화되어 있으면 iPhone/iPad가 백그라운드에서도 위치를 Control로 보낼 수 있습니다. 중지하면 연속 GPS가 완전히 꺼집니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追跡中は iPhone/iPad がバックグラウンドでも位置を Control に送信できます。停止すると連続 GPS は完全に無効になります。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟踪启用时，iPhone/iPad 可在后台向 Control 发送位置。停止后会完全关闭连续 GPS。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

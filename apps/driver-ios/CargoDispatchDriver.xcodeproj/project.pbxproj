@@ -22,6 +22,7 @@
 		B0000000000000000000000D /* DriverCameraCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000E /* DriverCameraCaptureView.swift */; };
 		B0000000000000000000000E /* DriverMapContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000F /* DriverMapContent.swift */; };
 		B0000000000000000000000F /* PendingOutboundQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000010 /* PendingOutboundQueue.swift */; };
+		B00000000000000000000010 /* BackgroundTrackingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000011 /* BackgroundTrackingController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,6 +42,7 @@
 		A0000000000000000000000E /* DriverCameraCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverCameraCaptureView.swift; sourceTree = "<group>"; };
 		A0000000000000000000000F /* DriverMapContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverMapContent.swift; sourceTree = "<group>"; };
 		A00000000000000000000010 /* PendingOutboundQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingOutboundQueue.swift; sourceTree = "<group>"; };
+		A00000000000000000000011 /* BackgroundTrackingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTrackingController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +80,7 @@
 				A00000000000000000000002 /* ContentView.swift */,
 				A00000000000000000000003 /* DriverStore.swift */,
 				A0000000000000000000000A /* ForegroundLocationController.swift */,
+				A00000000000000000000011 /* BackgroundTrackingController.swift */,
 				A0000000000000000000000B /* DriverFileDocument.swift */,
 				A0000000000000000000000D /* DriverTripMap.swift */,
 				A0000000000000000000000E /* DriverCameraCaptureView.swift */,
@@ -181,6 +184,7 @@
 				B00000000000000000000002 /* ContentView.swift in Sources */,
 				B00000000000000000000003 /* DriverStore.swift in Sources */,
 				B00000000000000000000009 /* ForegroundLocationController.swift in Sources */,
+				B00000000000000000000010 /* BackgroundTrackingController.swift in Sources */,
 				B0000000000000000000000A /* DriverFileDocument.swift in Sources */,
 				B0000000000000000000000C /* DriverTripMap.swift in Sources */,
 				B0000000000000000000000D /* DriverCameraCaptureView.swift in Sources */,
@@ -225,6 +229,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CargoDispatchDriver/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Cargo Dispatch Driver";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Cargo Dispatch uses location to send the current driver position to Control.";
@@ -233,6 +238,7 @@
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cargo Dispatch uses the local network so the driver's iPhone or iPad can connect directly to Control on the dispatcher's computer.";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIBackgroundModes = location;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = "0.1.0-dev";
@@ -251,6 +257,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CargoDispatchDriver/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Cargo Dispatch Driver";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Cargo Dispatch uses location to send the current driver position to Control.";
@@ -259,6 +266,7 @@
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cargo Dispatch uses the local network so the driver's iPhone or iPad can connect directly to Control on the dispatcher's computer.";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIBackgroundModes = location;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = "0.1.0-dev";

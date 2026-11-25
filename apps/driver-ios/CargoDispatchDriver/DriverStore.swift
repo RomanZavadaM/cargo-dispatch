@@ -133,9 +133,11 @@ final class DriverStore: ObservableObject {
         }
     }
 
-    func sendLocation(_ update: LocationUpdate) {
+    func sendLocation(_ update: LocationUpdate, showBusy: Bool = true) {
         guard let api, let pendingQueue else { return }
-        busy = true
+        if showBusy {
+            busy = true
+        }
         errorKey = nil
         Task {
             do {
@@ -170,7 +172,9 @@ final class DriverStore: ObservableObject {
                 errorKey = "error.location"
             }
             pendingOutbound = await pendingQueue.pendingCount()
-            busy = false
+            if showBusy {
+                busy = false
+            }
         }
     }
 

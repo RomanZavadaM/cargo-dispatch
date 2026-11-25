@@ -7,6 +7,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store = DriverStore()
     @StateObject private var locationController = ForegroundLocationController()
+    @StateObject private var trackingController = BackgroundTrackingController()
 
     @State private var showFileImporter = false
     @State private var mediaSelection: PhotosPickerItem?
@@ -52,6 +53,7 @@ struct ContentView: View {
                         }
 
                         Button("disconnect") {
+                            trackingController.stop()
                             store.disconnect()
                         }
                         .disabled(store.busy)
@@ -133,6 +135,32 @@ struct ContentView: View {
                             }
                         }
                         .disabled(store.busy)
+
+                        if trackingController.isTracking {
+                            Text("location.tracking.active")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+
+                            Button("location.tracking.stop", role: .destructive) {
+                                trackingController.stop()
+                            }
+                        } else {
+                            Button("location.tracking.start") {
+                                trackingController.start(
+                                    onUpdate: { update in
+                                        store.sendLocation(update, showBusy: false)
+                                    },
+                                    onFailure: {
+                                        store.reportError("error.location")
+                                    }
+                                )
+                            }
+                            .disabled(store.busy)
+                        }
+
+                        Text("location.tracking.note")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
                     Section("documents.title") {

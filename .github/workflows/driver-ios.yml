@@ -54,6 +54,21 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
+      - name: Verify background location mode in built app
+        shell: bash
+        run: |
+          INFO="apps/driver-ios/build/DerivedData/Build/Products/Debug-iphonesimulator/CargoDispatchDriver.app/Info.plist"
+          test -f "$INFO"
+          plutil -p "$INFO"
+          python3 - "$INFO" <<'PY'
+          import plistlib, sys
+          with open(sys.argv[1], "rb") as handle:
+              info = plistlib.load(handle)
+          modes = info.get("UIBackgroundModes")
+          if not isinstance(modes, list) or "location" not in modes:
+              raise SystemExit(f"UIBackgroundModes must be an array containing location, got: {modes!r}")
+          PY
+
       - name: Prepare real Control smoke session
         run: |
           cargo run --locked -p cargo-dispatch-trip-files --example local_browser_fixture -- native-smoke-data
