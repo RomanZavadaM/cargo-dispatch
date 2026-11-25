@@ -79,13 +79,11 @@ Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/Te
 - vollständige Browser-GPS-Abnahme über HTTPS;
 - Feldtests über verschiedene Netze/NAT/CGNAT;
 - Live-Valhalla-HTTP-Transport und Neuberechnung der Geometrie nach Reorder;
-- sichere Driver-Session-Speicherung mit Android Keystore + Apple Keychain einschließlich Migration der alten Raw-URL;
-- Stable Release.
 
 
 ## Sprachen der Benutzeroberfläche
 
-Die integrierte Desktop-/Browser-Oberfläche implementiert und prüft derzeit **Ukrainisch, Englisch und Deutsch**. Die neuen nativen Android- und iOS/iPadOS-Clients erhalten von Anfang an Sprachpakete für **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**; die Dokumentation wird mit demselben Sprachsatz gepflegt.
+Control, Driver Browser, Android Driver und iOS/iPadOS Driver implementieren und prüfen jetzt automatisch den vollständigen Sprachsatz des Projekts: **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control und Driver Browser verwenden standardmäßig die Systemsprache und erlauben zusätzlich eine dauerhaft gespeicherte manuelle Sprachauswahl. Die Dokumentation verwendet denselben Sprachsatz.
 
 ## Dokumentation
 
