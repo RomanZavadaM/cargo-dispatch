@@ -52,4 +52,3 @@ async fn main() -> io::Result<()> {
     )
     .await
 }
-
