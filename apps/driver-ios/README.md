@@ -1,5 +1,7 @@
 # Cargo Dispatch Driver — iOS/iPadOS scaffold
 
+**🇺🇦 Українська** · [🇬🇧 English](README.en.md) · [🇩🇪 Deutsch](README.de.md) · [🇫🇷 Français](README.fr.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
+
 Перший native Apple slice. Один SwiftUI app target працює на iPhone та iPad і використовує **той самий Control API**, що Driver Browser та Android Driver App.
 
 ## Поточний обсяг
