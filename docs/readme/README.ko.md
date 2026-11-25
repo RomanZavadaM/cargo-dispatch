@@ -2,11 +2,11 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · **🇰🇷 한국어** · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **상태:** 현재 개발 중입니다. 현재 테스트 프리릴리스는 **v0.1.0-preview.5**이며, 아직 안정적인 완성 제품은 없습니다.
+> **상태:** 활발히 개발 중입니다. 현재 안정 버전은 **v0.1.0**입니다. 전체 현지화가 끝나면 다음 큰 작업은 경로 Planner입니다.
 
 ## 제품 소개
 
-**cargo-dispatch**는 소형 트럭 차량군(총중량 7.5톤 이하)을 위한 배차 시스템입니다. 시장 화물을 선택하고, 운행을 구성·재계획하고, 실행 단계로 전달하며, 배차 담당자가 실제 진행 상황을 관리할 수 있도록 하는 것을 목표로 합니다.
+**cargo-dispatch**는 화물 운송 차량군을 위한 배차 시스템입니다. 화물을 선택하고, 운행을 구성·재계획하고, 실행 단계로 전달하며, 배차 담당자가 실제 진행 상황을 관리할 수 있도록 하는 것을 목표로 합니다.
 
 주요 개발 언어는 **Rust**입니다.
 
@@ -52,15 +52,26 @@ Control과 Driver Browser에는 운행 지점과 마지막으로 승인된 운�
 
 아직 남은 것은 **Valhalla로의 실제 HTTP transport와 geometry 자동 재계산**입니다. 계약과 표시 계층은 준비되어 있지만 외부 라우팅 엔진은 아직 product runtime에 연결되지 않았습니다.
 
-## 테스트 빌드
+## Stable v0.1.0
 
-현재 프리릴리스: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
+[Stable v0.1.0 열기](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
 
-Windows ZIP에는 Control, 합성 활성 운행 데이터와 로컬 loopback 검사용 샘플 PDF가 포함됩니다.
+Stable은 하나의 정확한 소스에서 다시 빌드되며 다음을 게시합니다.
+- Windows Control x64 ZIP;
+- macOS Control universal ZIP — Intel + Apple Silicon;
+- Linux Control x64 tar.gz;
+- 테스트 설치용 Android Driver debug APK;
+- iOS/iPadOS Driver Simulator ZIP;
+- Docker/Compose가 포함된 Linux Addressing Gateway x64 패키지;
+- SHA256SUMS.
 
-이 빌드는 **테스트/프리릴리스**이며 안정판이 아닙니다. Preview.5는 현재 Control/Driver Browser, Valhalla schema 1.2 road-geometry pipeline, 그리고 r5까지의 두 native Driver App 소스(지도, 카메라/파일, durable retry queue, 명시적 백그라운드 운행 추적)를 포함합니다. 공개 바이너리 asset은 아직 Windows Control preview이며, 모바일 production signing/TestFlight는 이후 단계입니다.
+**Linux Control**은 운영자용 데스크톱 애플리케이션입니다. **Linux Addressing Gateway**는 별도의 서버 relay 모듈이며 서로 다른 패키지입니다.
+
+Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습니다. App Store/TestFlight/Google Play와 production signing은 이후 별도로 처리합니다.
 
 ## 앞으로 필요한 작업
+
+- Windows, macOS, Linux용 Planner/editor 데스크톱 UI 및 릴리스 빌드;
 
 - 로컬 브라우저 수동 검수;
 - 동일한 Driver Browser를 실제 휴대폰에서 같은 LAN으로 테스트;

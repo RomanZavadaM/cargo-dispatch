@@ -4,34 +4,31 @@
 
 Це короткий public anchor. Повний стан і журнали — private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
 
-## Live checkpoints
-- Preview.5 release/source commit: `3f3e3897cbd003ff709f588c6351ce5a3f7cfe44`.
-- Android Driver r5 merged as `a366f8f8c4ee42dd8202b3dddce7de13948d93d6`.
-- Apple Driver r5 exact head `244cb35321189bcf4a0c77c8d35c5d74a772aa51` passed core/build/Info.plist/connected Simulator smoke and merged as `99c4654e7183424d28adb72ecbb859c0e3b45bc7`.
-- Published test prerelease: `v0.1.0-preview.5`.
-- Windows ZIP SHA-256: `f0365e86db54a0ee3190bbf60ce8e09a08540649110460ebe7776ac819c0ddfc`.
-- Stable release ще немає.
+## Stable checkpoint
+- Поточна стабільна версія: `v0.1.0`.
+- Exact source і SHA256 пакетів фіксуються в самому GitHub Release.
+- Release matrix:
+  - Control Windows x64;
+  - Control macOS universal — Intel + Apple Silicon;
+  - Control Linux x64;
+  - Driver Android debug APK;
+  - Driver iOS/iPadOS Simulator ZIP;
+  - Addressing Gateway Linux x64 + Docker/Compose;
+  - спільний `SHA256SUMS.txt`.
+- Mobile store signing, TestFlight і Google Play поки свідомо відкладені.
 
-## Native clients у release source
-Android та iPhone/iPad використовують той самий Control API, що Driver Browser:
-- snapshot, complete, reorder;
-- native maps + current road geometry/markers/latest position;
-- Control→device documents та device→Control files/photo/video;
-- system camera;
-- durable retry queue для newest location/media;
-- connected Emulator/Simulator smoke проти real synthetic Control session;
-- explicit Start/Stop background trip tracking;
-- restart recovery;
-- 8 мов UI.
-
-Control залишається єдиним джерелом стану рейсу; mobile queues/background tracking не створюють окремої trip database.
+## Інтегровано
+- Control + Driver Browser з durable trip state, maps, files/media, location, route reorder і reconnect.
+- Android Driver із MapLibre, camera/files, durable retry queue, explicit background tracking і Keystore-protected session.
+- Apple Driver із MapKit, camera/files, durable retry queue, explicit background tracking і Keychain-protected session.
+- Addressing Gateway: RAM-only relay, Docker deployment, без центрального зберігання рейсу.
+- Desktop Control має режим `Публічно через Gateway` і показує окремий public Driver URL.
+- Control desktop release line: Windows + macOS + Linux.
 
 ## Next
-- secure Driver session storage: Android Keystore / Apple Keychain + migration of legacy raw Driver URL;
-- real-device LAN/background tracking acceptance;
-- HTTPS/public addressing;
-- NAT/CGNAT field acceptance;
-- live Valhalla HTTP transport/recalculation;
-- production mobile signing/TestFlight/release.
+1. Закрити повну локалізацію Control і Driver Browser усіма мовами проєкту.
+2. Звірити README/мобільні описи після локалізації.
+3. Перейти до Planner маршруту.
+4. Planner desktop release line: Windows + macOS + Linux.
 
 Продовження: `START_HERE.md` → private HANDOFF/PROJECT_STATE → active module STATE/WORKLOG → live GitHub.

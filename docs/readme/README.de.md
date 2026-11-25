@@ -2,11 +2,11 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · **🇩🇪 Deutsch** · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** aktive Entwicklung. Der aktuelle Test-Prerelease ist **v0.1.0-preview.5**. Ein stabiles fertiges Produkt gibt es noch nicht.
+> **Status:** aktive Entwicklung. Die aktuelle stabile Version ist **v0.1.0**. Nach Abschluss der Lokalisierung liegt der nächste große Schwerpunkt auf dem Routen-Planner.
 
 ## Über das Produkt
 
-**cargo-dispatch** ist ein Dispositionssystem für eine Flotte kleiner Lkw (zulässiges Gesamtgewicht bis 7,5 t). Es soll Ladungen auswählen, Touren planen und neu planen, sie zur Ausführung übergeben und dem Disponenten die Kontrolle über den tatsächlichen Ablauf geben.
+**cargo-dispatch** ist ein Dispositionssystem für Frachtflotten. Es soll Ladungen auswählen, Touren planen und neu planen, sie zur Ausführung übergeben und dem Disponenten die Kontrolle über den tatsächlichen Ablauf geben.
 
 Die Hauptentwicklungssprache ist **Rust**.
 
@@ -52,15 +52,26 @@ In `main` ist jetzt eine versionierte Road-Geometry-Pipeline (Schema 1.2) integr
 
 Noch fehlt der **Live-HTTP-Transport zu Valhalla und die automatische Neuberechnung der Geometrie**. Vertrag und Darstellung sind vorhanden; der externe Routing-Engine-Pfad ist noch nicht in die Product-Runtime eingebunden.
 
-## Testversion
+## Stable v0.1.0
 
-Aktueller Prerelease: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
+[Stable v0.1.0 öffnen](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
 
-Das Windows-ZIP enthält Control, eine synthetische aktive Tour und eine Test-PDF für die lokale Loopback-Abnahme.
+Stable wird aus genau einem Quellstand neu gebaut und veröffentlicht:
+- Windows Control x64 ZIP;
+- macOS Control universal ZIP — Intel + Apple Silicon;
+- Linux Control x64 tar.gz;
+- Android Driver debug APK für Testinstallation;
+- iOS/iPadOS Driver Simulator ZIP;
+- Linux Addressing Gateway x64 Paket mit Docker/Compose;
+- SHA256SUMS.
 
-Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. Preview.5 bildet den aktuellen Stand von Control/Driver Browser, die Valhalla-Schema-1.2-Road-Geometry-Pipeline und den Quellcode beider nativen Driver Apps bis r5 ab: Karten, Kamera/Dateien, dauerhafte Retry-Queue und explizites Hintergrundtracking. Als öffentlicher Binär-Asset wird vorerst weiterhin der Windows-Control-Preview veröffentlicht; Production-Signing/TestFlight für Mobile steht noch aus.
+**Linux Control** ist die Desktop-Anwendung des Operators. **Linux Addressing Gateway** ist das separate Server-Relay-Modul; es sind zwei verschiedene Pakete.
+
+Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/TestFlight/Google Play und Production Signing folgen später separat.
 
 ## Was noch fehlt
+
+- Planner/editor-Desktop-UI und Release-Builds für Windows, macOS und Linux;
 
 - manuelle lokale Browser-Abnahme;
 - Test desselben Driver Browser auf einem echten Telefon im selben LAN;

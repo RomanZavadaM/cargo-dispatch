@@ -2,11 +2,11 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · **🇯🇵 日本語** · [🇨🇳 简体中文](README.zh.md)
 
-> **ステータス:** 開発中です。現在のテスト用プレリリースは **v0.1.0-preview.5** です。安定版の完成製品はまだありません。
+> **ステータス:** 開発中です。現在の安定版は **v0.1.0** です。ローカライズ完了後の次の大きな作業はルート Planner です。
 
 ## 製品について
 
-**cargo-dispatch** は、小型トラック車両群（車両総重量 7.5 t 以下）向けの配車システムです。貨物の選定、運行の作成・再計画、実行への引き渡し、そして配車担当者による実際の進行管理を目的としています。
+**cargo-dispatch** は貨物車両群向けの配車システムです。貨物の選定、運行の作成・再計画、実行への引き渡し、そして配車担当者による実際の進行管理を目的としています。
 
 主な開発言語は **Rust** です。
 
@@ -52,15 +52,26 @@ Control と Driver Browser には、運行地点と最後に受理されたド�
 
 残っているのは **Valhalla への実 HTTP transport と geometry の自動再計算**です。契約と表示は実装済みですが、外部ルーティングエンジンはまだ product runtime に接続されていません。
 
-## テストビルド
+## Stable v0.1.0
 
-現在のプレリリース: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
+[Stable v0.1.0 を開く](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0)。
 
-Windows ZIP には Control、合成されたアクティブ運行、ローカル loopback 検証用のサンプル PDF が含まれます。
+Stable は 1 つの正確なソースから再ビルドされ、次を公開します。
+- Windows Control x64 ZIP;
+- macOS Control universal ZIP — Intel + Apple Silicon;
+- Linux Control x64 tar.gz;
+- テストインストール用 Android Driver debug APK;
+- iOS/iPadOS Driver Simulator ZIP;
+- Docker/Compose を含む Linux Addressing Gateway x64 パッケージ;
+- SHA256SUMS。
 
-これは **test/prerelease build** であり stable ではありません。Preview.5 は現在の Control/Driver Browser、Valhalla schema 1.2 road-geometry pipeline、および r5 までの両 native Driver App のソース（地図、カメラ/ファイル、durable retry queue、明示的なバックグラウンド運行追跡）を固定します。公開されるバイナリ asset は当面 Windows Control preview のみで、mobile production signing/TestFlight は今後の作業です。
+**Linux Control** はオペレーター用デスクトップアプリです。**Linux Addressing Gateway** は別のサーバー relay モジュールであり、異なるパッケージです。
+
+Android と Apple のパッケージはまだストア用署名を行っていません。App Store/TestFlight/Google Play と production signing は後で別途対応します。
 
 ## 今後の作業
+
+- Windows・macOS・Linux 向け Planner/editor デスクトップ UI とリリースビルド;
 
 - ローカル browser の手動受け入れ;
 - 同じ Driver Browser を実機の電話で同一 LAN 内テスト;

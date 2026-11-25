@@ -2,11 +2,11 @@
 
 [🇺🇦 Українська](../../README.md) · **🇬🇧 English** · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** active development. The current test prerelease is **v0.1.0-preview.5**. There is no stable finished product yet.
+> **Status:** active development. The current stable version is **v0.1.0**. After localization is completed, the next major focus is the route Planner.
 
 ## About
 
-**cargo-dispatch** is a dispatch system for a small-truck fleet (gross vehicle weight up to 7.5 t). It is intended to select loads, build and re-plan trips, hand trips over for execution, and give the dispatcher control over actual progress.
+**cargo-dispatch** is a dispatch system for cargo fleets. It is intended to select loads, build and re-plan trips, hand trips over for execution, and give the dispatcher control over actual progress.
 
 The main development language is **Rust**.
 
@@ -52,15 +52,26 @@ The `main` branch now contains a versioned road-geometry pipeline (schema 1.2): 
 
 What is still missing is the **live HTTP transport to Valhalla and automatic geometry recalculation**. The geometry contract and rendering exist; the external routing engine is not yet connected to the product runtime.
 
-## Test build
+## Stable v0.1.0
 
-Current prerelease: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
+[Open Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
 
-The Windows ZIP contains Control, a synthetic active trip, and a sample PDF for local loopback acceptance.
+Stable is rebuilt from one exact source and publishes:
+- Windows Control x64 ZIP;
+- macOS Control universal ZIP — Intel + Apple Silicon;
+- Linux Control x64 tar.gz;
+- Android Driver debug APK for test installation;
+- iOS/iPadOS Driver Simulator ZIP;
+- Linux Addressing Gateway x64 package with Docker/Compose;
+- SHA256SUMS.
 
-This is a **test/prerelease build**, not stable. Preview.5 captures the current Control/Driver Browser, the Valhalla schema 1.2 road-geometry pipeline, and source for both native Driver Apps through r5: maps, camera/files, durable retry queues, and explicit background trip tracking. The published binary asset is still the Windows Control preview; production mobile signing/TestFlight is still ahead.
+**Linux Control** is the operator desktop application. **Linux Addressing Gateway** is the separate server relay module; they are different packages.
+
+Android and Apple packages are not yet store-signed. App Store/TestFlight/Google Play distribution and production signing will be handled separately later.
 
 ## What is still ahead
+
+- Planner/editor desktop UI and release builds for Windows, macOS, and Linux;
 
 - manual local-browser acceptance;
 - testing the same Driver Browser on a real phone in the same LAN;

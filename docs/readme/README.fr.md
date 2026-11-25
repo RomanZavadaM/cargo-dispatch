@@ -2,11 +2,11 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · **🇫🇷 Français** · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Statut :** développement actif. La préversion de test actuelle est **v0.1.0-preview.5**. Il n’existe pas encore de produit stable et finalisé.
+> **Statut :** développement actif. La version stable actuelle est **v0.1.0**. Après la localisation complète, le prochain grand axe sera le Planner d’itinéraire.
 
 ## À propos
 
-**cargo-dispatch** est un système de dispatch pour une flotte de petits camions (poids total jusqu’à 7,5 t). Il doit sélectionner des chargements, construire et recalculer des tournées, les transmettre à l’exécution et permettre au dispatcheur de suivre l’exécution réelle.
+**cargo-dispatch** est un système de dispatch pour les flottes de fret. Il doit sélectionner des chargements, construire et recalculer des tournées, les transmettre à l’exécution et permettre au dispatcheur de suivre l’exécution réelle.
 
 Le principal langage de développement est **Rust**.
 
@@ -52,15 +52,26 @@ La branche `main` contient maintenant une chaîne de géométrie routière versi
 
 Il reste à connecter le **transport HTTP réel vers Valhalla et le recalcul automatique de la géométrie**. Le contrat et l’affichage sont présents ; le moteur de routage externe n’est pas encore relié au runtime produit.
 
-## Version de test
+## Stable v0.1.0
 
-Préversion actuelle : [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
+[Ouvrir Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
 
-Le ZIP Windows contient Control, un trajet actif synthétique et un PDF de test pour la validation locale en loopback.
+La version Stable est reconstruite depuis une seule source exacte et publie :
+- Windows Control x64 ZIP ;
+- macOS Control universal ZIP — Intel + Apple Silicon ;
+- Linux Control x64 tar.gz ;
+- Android Driver debug APK pour installation de test ;
+- iOS/iPadOS Driver Simulator ZIP ;
+- package Linux Addressing Gateway x64 avec Docker/Compose ;
+- SHA256SUMS.
 
-Il s’agit d’une **version de test/préversion**, pas d’une version stable. Preview.5 fige l’état actuel de Control/Driver Browser, la chaîne Valhalla schema 1.2 road geometry et le code source des deux Driver Apps natifs jusqu’à r5 : cartes, caméra/fichiers, file de réessai durable et suivi explicite en arrière-plan. L’asset binaire publié reste pour l’instant le preview Windows Control ; la signature mobile de production/TestFlight reste à faire.
+**Linux Control** est l’application desktop de l’opérateur. **Linux Addressing Gateway** est le module serveur relay séparé ; ce sont deux packages différents.
+
+Les packages Android et Apple ne sont pas encore signés pour les stores. App Store/TestFlight/Google Play et la signature de production seront traités séparément plus tard.
 
 ## Étapes restantes
+
+- UI desktop Planner/editor et builds de release pour Windows, macOS et Linux ;
 
 - validation manuelle locale dans le navigateur ;
 - test du même Driver Browser sur un vrai téléphone dans le même LAN ;

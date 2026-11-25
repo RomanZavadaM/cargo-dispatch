@@ -2,11 +2,11 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · **🇨🇳 简体中文**
 
-> **状态：** 正在积极开发。当前测试预发布版本为 **v0.1.0-preview.5**，尚无稳定的完整产品。
+> **状态：** 正在积极开发。当前稳定版本为 **v0.1.0**。完成全部本地化后，下一个主要方向是路线 Planner。
 
 ## 产品简介
 
-**cargo-dispatch** 是面向小型货车车队（总质量不超过 7.5 吨）的调度系统。目标包括选择货源、创建和重新规划行程、将行程交付执行，并让调度员掌握实际执行进度。
+**cargo-dispatch** 是面向货运车队的调度系统。目标包括选择货源、创建和重新规划行程、将行程交付执行，并让调度员掌握实际执行进度。
 
 主要开发语言为 **Rust**。
 
@@ -52,15 +52,26 @@ Control 和 Driver Browser 已经包含真正的交互式基础地图，可显�
 
 仍待完成的是**连接 Valhalla 的真实 HTTP transport 和 geometry 自动重算**。数据契约与显示层已经存在，但外部路由引擎尚未接入 product runtime。
 
-## 测试版本
+## Stable v0.1.0
 
-当前预发布版本：[v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5)。
+[打开 Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0)。
 
-Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback 验收的示例 PDF。
+Stable 从同一个精确源码重新构建并发布：
+- Windows Control x64 ZIP；
+- macOS Control universal ZIP — Intel + Apple Silicon；
+- Linux Control x64 tar.gz；
+- 用于测试安装的 Android Driver debug APK；
+- iOS/iPadOS Driver Simulator ZIP；
+- 带 Docker/Compose 的 Linux Addressing Gateway x64 包；
+- SHA256SUMS。
 
-这是**测试/预发布版本**，不是稳定版。Preview.5 固化当前 Control/Driver Browser、Valhalla schema 1.2 road-geometry pipeline，以及两个原生 Driver App 到 r5 的源代码：地图、相机/文件、持久重试队列和显式后台行程跟踪。当前公开的二进制 asset 仍是 Windows Control preview；移动端 production signing/TestFlight 仍在后续计划中。
+**Linux Control** 是操作员桌面应用。**Linux Addressing Gateway** 是独立的服务器 relay 模块，两者是不同的软件包。
+
+Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight/Google Play 和 production signing 将在之后单独处理。
 
 ## 后续工作
+
+- 面向 Windows、macOS 和 Linux 的 Planner/editor 桌面 UI 与发布构建；
 
 - 本地浏览器手动验收；
 - 在同一 LAN 中用真实手机测试相同的 Driver Browser；

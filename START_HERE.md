@@ -2,12 +2,20 @@
 
 Публічний вхід у проєкт.
 
-1. Опис продукту, поточний prerelease і мовні версії: [README.md](README.md).
+1. Опис продукту, Stable release і мовні версії: [README.md](README.md).
 2. Короткий публічний якір стану: [HANDOFF_CURRENT.md](HANDOFF_CURRENT.md) і [PROJECT_STATE.md](PROJECT_STATE.md).
 3. Ліцензія та сторонні компоненти: [LICENSE.md](LICENSE.md), [COPYRIGHT.md](COPYRIGHT.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 4. Розширені правила, журнали, плани й архітектура: private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
 5. Перед продовженням роботи звірити live GitHub: `main`, open PR, Actions, branches і Releases. GitHub має пріоритет.
-6. У `main` інтегровані Control + Driver Browser, Valhalla adapter/schema 1.2 geometry pipeline, Android Driver r5 та iOS/iPadOS Driver r5.
-7. Поточний test/prerelease — `v0.1.0-preview.5`; stable готового продукту ще немає.
-8. Native maps, camera/files, durable retry queues, connected virtual-device smoke та explicit background trip tracking уже інтегровані в обидва native Driver clients.
-9. Наступні великі кроки: secure Driver session storage, real-device LAN, HTTPS/public addressing, NAT/CGNAT field acceptance і live Valhalla transport.
+6. Stable checkpoint — `v0.1.0`.
+7. У Stable входять:
+   - Control desktop для Windows, macOS і Linux;
+   - Driver Android;
+   - Driver iPhone/iPad Simulator build;
+   - Driver Browser;
+   - Addressing Gateway для Linux;
+   - maps/files/media/location/reconnect/background tracking;
+   - durable mobile retry queues;
+   - публічна Gateway-трансляція Control ↔ Driver без відкритого inbound-порту на машині Control.
+8. Control залишається єдиним джерелом стану рейсу. Gateway не зберігає trip DB, документи, медіа чи історію позицій.
+9. Після закриття локалізацій наступний великий напрямок — Planner маршруту для Windows, macOS і Linux.
