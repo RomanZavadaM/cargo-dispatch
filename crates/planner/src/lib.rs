@@ -3551,6 +3551,50 @@ mod tests {
     }
 
     #[test]
+    fn verified_route_result_becomes_auditable_trip_geometry() {
+        let mut route = manual_working_route(working_route_id(28), &[point_id(68), point_id(69)])
+            .expect("route");
+        route.state = WorkingRouteState::Ready;
+        let draft = build_trip_export_draft(
+            &route,
+            trip_id(8),
+            TripVersion::new(1).expect("trip version"),
+            None,
+            1,
+            operator_id(17),
+        )
+        .expect("export");
+
+        let result = RouteResult {
+            status: NormalizedStatus::Ok,
+            identity: cargo_dispatch_geo::RoutingIdentity::new(
+                "valhalla",
+                "3.9.2",
+                "dataset-a",
+                "profile-a",
+            )
+            .expect("identity"),
+            distance_m: Some(1000.0),
+            duration_s: Some(120.0),
+            geometry: vec![
+                GeoPoint::new(49.8393, 24.0296).expect("point"),
+                GeoPoint::new(49.8430, 24.0360).expect("point"),
+            ],
+            snapped_points: Vec::new(),
+            warnings: Vec::new(),
+        };
+
+        let draft = draft
+            .with_route_result_geometry(&result)
+            .expect("geometry");
+        let geometry = draft.route_geometry.expect("road geometry");
+        assert_eq!(geometry.routing.engine, "valhalla");
+        assert_eq!(geometry.routing.map_dataset_id, "dataset-a");
+        assert_eq!(geometry.points[0].latitude_e7, 498_393_000);
+        assert_eq!(geometry.points[1].longitude_e7, 240_360_000);
+    }
+
+    #[test]
     fn trip_export_version_is_separate_from_working_route_revision() {
         let mut route = manual_working_route(working_route_id(22), &[point_id(54), point_id(55)])
             .expect("route");
