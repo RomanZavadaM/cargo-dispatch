@@ -113,11 +113,12 @@ jobs:
 
           ### Ще не stable
           - ручний local browser acceptance ще має бути завершений власником;
-          - real phone LAN acceptance — наступний етап;
+          - real phone LAN/background GPS acceptance ще попереду;
           - browser GPS повністю приймається через HTTPS;
           - public addressing/NAT/CGNAT field path ще попереду;
           - live HTTP transport до Valhalla та автоматичний recalculation geometry ще попереду;
-          - Android та iOS/iPadOS Driver Apps розробляються окремо й не входять у Windows preview.
+          - secure Driver session storage через Android Keystore / Apple Keychain ще наступний крок;
+          - mobile production signing/TestFlight/production APK ще не завершені; release asset цього preview поки Windows-only.
 
           Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
           "@ | Set-Content -Encoding UTF8 RELEASE_NOTES.md
