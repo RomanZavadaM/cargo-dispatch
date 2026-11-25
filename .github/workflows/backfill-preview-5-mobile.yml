@@ -1,0 +1,72 @@
+name: Backfill preview.5 mobile assets
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".release-mobile-backfill"
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: backfill-preview-5-mobile-assets
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    name: Add Android and Apple r5 test builds to preview.5
+    runs-on: ubuntu-latest
+    env:
+      TAG: v0.1.0-preview.5
+      ANDROID_ARTIFACT_ID: "15052975260"
+      APPLE_ARTIFACT_ID: "15054824550"
+    steps:
+      - name: Download exact r5 artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p mobile/android
+          curl --fail --location             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ANDROID_ARTIFACT_ID/zip"             -o android-artifact.zip
+          unzip -q android-artifact.zip -d mobile/android
+
+          curl --fail --location             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$APPLE_ARTIFACT_ID/zip"             -o "Cargo-Dispatch-Driver-$TAG-iOS-Simulator.zip"
+
+          APK="$(find mobile/android -type f -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          cp "$APK" "Cargo-Dispatch-Driver-$TAG-Android-debug.apk"
+
+      - name: Extend checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt
+          grep -v 'Cargo-Dispatch-Driver-' SHA256SUMS.txt > SHA256SUMS.new
+          sha256sum "Cargo-Dispatch-Driver-$TAG-Android-debug.apk"                     "Cargo-Dispatch-Driver-$TAG-iOS-Simulator.zip" >> SHA256SUMS.new
+          mv SHA256SUMS.new SHA256SUMS.txt
+
+      - name: Add mobile assets and notes to existing prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG"             --repo "$GITHUB_REPOSITORY"             --clobber             "Cargo-Dispatch-Driver-$TAG-Android-debug.apk"             "Cargo-Dispatch-Driver-$TAG-iOS-Simulator.zip"             SHA256SUMS.txt
+
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > RELEASE_BODY.md
+          if ! grep -q '^### Мобільні тестові збірки' RELEASE_BODY.md; then
+            printf '%s\n' \
+              '' \
+              '### Мобільні тестові збірки' \
+              '- Android: debug APK для ручного тестового встановлення; build із Android r5 exact head.' \
+              '- Apple: iOS/iPadOS Simulator ZIP; build із Apple r5 exact head.' \
+              '- Це ще не store-signed builds. Google Play / App Store / TestFlight distribution буде налаштована окремо пізніше.' \
+              >> RELEASE_BODY.md
+          fi
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file RELEASE_BODY.md

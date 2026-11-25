@@ -15,13 +15,94 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  android-preview:
+    name: Build Android preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Install Android 16 SDK
+        shell: bash
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n 1)"
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Test and build Android Driver
+        working-directory: apps/driver-android
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+
+      - name: Stage Android release asset
+        shell: bash
+        run: |
+          TAG="$(tr -d '\r\n' < .release-preview)"
+          test -n "$TAG"
+          cp apps/driver-android/app/build/outputs/apk/debug/app-debug.apk             "Cargo-Dispatch-Driver-$TAG-Android-debug.apk"
+
+      - name: Upload Android release asset
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: Cargo-Dispatch-Preview-Android
+          path: Cargo-Dispatch-Driver-*-Android-debug.apk
+          if-no-files-found: error
+
+  apple-preview:
+    name: Build Apple Simulator preview
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Core protocol tests
+        run: swift test --package-path apps/driver-ios
+
+      - name: Build iPhone/iPad Simulator app
+        run: |
+          xcodebuild             -project apps/driver-ios/CargoDispatchDriver.xcodeproj             -scheme CargoDispatchDriver             -configuration Debug             -sdk iphonesimulator             -destination 'generic/platform=iOS Simulator'             -derivedDataPath apps/driver-ios/build/DerivedData             CODE_SIGNING_ALLOWED=NO             build
+
+      - name: Stage Apple Simulator release asset
+        shell: bash
+        run: |
+          TAG="$(tr -d '\r\n' < .release-preview)"
+          APP="apps/driver-ios/build/DerivedData/Build/Products/Debug-iphonesimulator/CargoDispatchDriver.app"
+          test -d "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP"             "Cargo-Dispatch-Driver-$TAG-iOS-Simulator.zip"
+
+      - name: Upload Apple Simulator release asset
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: Cargo-Dispatch-Preview-Apple
+          path: Cargo-Dispatch-Driver-*-iOS-Simulator.zip
+          if-no-files-found: error
+
   windows-preview:
-    name: Build and publish Windows preview
+    name: Build and publish product preview
+    needs:
+      - android-preview
+      - apple-preview
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: Cargo-Dispatch-Preview-Android
+          path: mobile-assets
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: Cargo-Dispatch-Preview-Apple
+          path: mobile-assets
 
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
         with:
@@ -54,10 +135,9 @@ jobs:
           if (-not $tag.StartsWith("v0.1.0-preview.")) {
             throw "Unexpected preview tag: $tag"
           }
-          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Stage preview package
+      - name: Stage preview package and checksums
         shell: pwsh
         run: |
           $packageName = "Cargo-Dispatch-Control-$env:TAG-Windows-x64"
@@ -83,10 +163,21 @@ jobs:
           HTTPS/public addressing and field NAT/CGNAT acceptance are not finished in this preview.
           "@ | Set-Content -Encoding UTF8 "$packageName/README-TEST.txt"
 
-          $zip = "$packageName.zip"
-          Compress-Archive -Path "$packageName/*" -DestinationPath $zip -CompressionLevel Optimal
-          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  $zip" | Set-Content -Encoding ASCII SHA256SUMS.txt
+          $windowsZip = "$packageName.zip"
+          Compress-Archive -Path "$packageName/*" -DestinationPath $windowsZip -CompressionLevel Optimal
+
+          $android = Get-ChildItem "mobile-assets/Cargo-Dispatch-Driver-*-Android-debug.apk" | Select-Object -First 1
+          $apple = Get-ChildItem "mobile-assets/Cargo-Dispatch-Driver-*-iOS-Simulator.zip" | Select-Object -First 1
+          if (-not $android -or -not $apple) {
+            throw "Mobile release assets are missing"
+          }
+          Copy-Item $android.FullName $android.Name
+          Copy-Item $apple.FullName $apple.Name
+
+          @($windowsZip, $android.Name, $apple.Name) | ForEach-Object {
+            $hash = (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower()
+            "$hash  $_"
+          } | Set-Content -Encoding ASCII SHA256SUMS.txt
 
       - name: Write release notes
         shell: pwsh
@@ -96,31 +187,34 @@ jobs:
 
           Cargo Dispatch $env:TAG — інтегрований тестовий preview поточного продукту. Це **prerelease**, не stable.
 
+          ### Збірки в релізі
+          - Windows Control x64 ZIP;
+          - Android Driver debug APK для тестового встановлення;
+          - iOS/iPadOS Driver Simulator ZIP для тестування в Apple Simulator.
+
+          Android та Apple assets поки тестові й не підписані для магазинів. App Store/TestFlight/Google Play signing і distribution будуть опрацьовані окремо пізніше.
+
           ### Уже в цьому preview
           - Control desktop на Rust/Tauri + Leptos;
           - durable активний рейс і відновлення після перезапуску;
-          - один адаптивний Driver Browser для phone / tablet / wide desktop;
-          - зміна порядку відкритих точок у Control і Driver Browser;
-          - PDF/файли Control → Driver Browser;
-          - file/photo/video Driver Browser → Control з локальним Save;
-          - два одночасні browser clients одного рейсу та reconnect;
-          - інтерактивна OpenStreetMap-карта в Control і Driver Browser;
-          - product Valhalla adapter і versioned schema 1.2 road geometry;
-          - stale road geometry автоматично інвалідовується після reorder;
-          - у source tag інтегровані Android та iOS/iPadOS Driver через r5: native maps, camera/files, durable retry queue та explicit Start/Stop background tracking;
-          - Windows GUI build без зайвого console window;
-          - у ZIP є synthetic active-trip, road geometry і sample PDF для локального тесту.
+          - адаптивний Driver Browser для phone / tablet / wide desktop;
+          - зміна порядку відкритих точок;
+          - документи, фото, відео та геолокація;
+          - інтерактивні карти;
+          - Valhalla adapter і schema 1.2 road geometry;
+          - native Android та iOS/iPadOS Driver source і test builds з того самого release commit.
 
           ### Ще не stable
-          - ручний local browser acceptance ще має бути завершений власником;
-          - real phone LAN/background GPS acceptance ще попереду;
-          - browser GPS повністю приймається через HTTPS;
-          - public addressing/NAT/CGNAT field path ще попереду;
-          - live HTTP transport до Valhalla та автоматичний recalculation geometry ще попереду;
-          - secure Driver session storage через Android Keystore / Apple Keychain ще наступний крок;
-          - mobile production signing/TestFlight/production APK ще не завершені; release asset цього preview поки Windows-only.
+          - real phone/iPhone LAN та background tracking acceptance;
+          - HTTPS/public addressing;
+          - NAT/CGNAT field path;
+          - live HTTP transport до Valhalla та автоматичний recalculation geometry;
+          - production mobile signing/TestFlight/Google Play;
+          - stable release.
 
           Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
+          Android: встановити debug APK вручну на тестовий пристрій.
+          Apple: Simulator ZIP призначений для Apple Simulator, не для фізичного iPhone/iPad.
           "@ | Set-Content -Encoding UTF8 RELEASE_NOTES.md
 
       - name: Publish GitHub prerelease
@@ -128,6 +222,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $android = (Get-ChildItem "Cargo-Dispatch-Driver-*-Android-debug.apk" | Select-Object -First 1).Name
+          $apple = (Get-ChildItem "Cargo-Dispatch-Driver-*-iOS-Simulator.zip" | Select-Object -First 1).Name
           gh release create "$env:TAG" `
             --repo "${{ github.repository }}" `
             --target "$env:GITHUB_SHA" `
@@ -135,4 +231,6 @@ jobs:
             --notes-file RELEASE_NOTES.md `
             --prerelease `
             "Cargo-Dispatch-Control-$env:TAG-Windows-x64.zip" `
+            "$android" `
+            "$apple" `
             "SHA256SUMS.txt"
