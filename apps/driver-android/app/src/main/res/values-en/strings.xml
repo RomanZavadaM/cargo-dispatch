@@ -32,4 +32,8 @@
     <string name="save_document">Save</string>
     <string name="upload_file">Send file</string>
     <string name="upload_media">Send photo / video</string>
+    <string name="map_title">Trip map</string>
+    <string name="map_provider_note">OpenStreetMap · the road line is shown only for current geometry.</string>
+    <string name="capture_photo">Take photo</string>
+    <string name="capture_video">Record video</string>
 </resources>

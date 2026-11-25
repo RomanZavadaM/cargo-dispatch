@@ -37,10 +37,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.romanzavada.cargodispatch.driver.model.DriverDocument
 import com.romanzavada.cargodispatch.driver.model.DriverPoint
+import org.maplibre.android.MapLibre
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        MapLibre.getInstance(applicationContext)
         setContent {
             MaterialTheme {
                 DriverScreen()
@@ -56,6 +58,7 @@ private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
     val sessionPreferences = remember { SessionPreferences(context.applicationContext) }
     val locationProvider = remember { ForegroundLocationProvider(context.applicationContext) }
     var pendingSave by remember { mutableStateOf<DriverDocument?>(null) }
+    var pendingCapture by remember { mutableStateOf<PendingCapture?>(null) }
 
     val saveDocument = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("*/*"),
@@ -89,6 +92,28 @@ private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
     ) { uri ->
         if (uri != null) {
             runCatching { context.contentResolver.readUpload(uri) }
+                .onSuccess(viewModel::upload)
+        }
+    }
+
+    val takePhoto = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { success ->
+        val capture = pendingCapture
+        pendingCapture = null
+        if (success && capture != null) {
+            runCatching { capture.readUpload(context) }
+                .onSuccess(viewModel::upload)
+        }
+    }
+
+    val captureVideo = rememberLauncherForActivityResult(
+        ActivityResultContracts.CaptureVideo(),
+    ) { success ->
+        val capture = pendingCapture
+        pendingCapture = null
+        if (success && capture != null) {
+            runCatching { capture.readUpload(context) }
                 .onSuccess(viewModel::upload)
         }
     }
@@ -174,6 +199,10 @@ private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
                 }
 
                 item {
+                    DriverMapCard(trip)
+                }
+
+                item {
                     LocationCard(
                         state = state,
                         requestLocation = {
@@ -191,6 +220,16 @@ private fun DriverScreen(viewModel: DriverViewModel = viewModel()) {
                             mediaPicker.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                             )
+                        },
+                        capturePhoto = {
+                            val capture = createCapture(context, CaptureKind.Photo)
+                            pendingCapture = capture
+                            takePhoto.launch(capture.uri)
+                        },
+                        captureVideo = {
+                            val capture = createCapture(context, CaptureKind.Video)
+                            pendingCapture = capture
+                            captureVideo.launch(capture.uri)
                         },
                         save = { selected ->
                             pendingSave = selected
@@ -311,6 +350,8 @@ private fun DocumentsCard(
     busy: Boolean,
     pickFile: () -> Unit,
     pickMedia: () -> Unit,
+    capturePhoto: () -> Unit,
+    captureVideo: () -> Unit,
     save: (DriverDocument) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -339,6 +380,14 @@ private fun DocumentsCard(
                 }
                 Button(onClick = pickMedia, enabled = !busy) {
                     Text(stringResource(R.string.upload_media))
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = capturePhoto, enabled = !busy) {
+                    Text(stringResource(R.string.capture_photo))
+                }
+                Button(onClick = captureVideo, enabled = !busy) {
+                    Text(stringResource(R.string.capture_video))
                 }
             }
         }

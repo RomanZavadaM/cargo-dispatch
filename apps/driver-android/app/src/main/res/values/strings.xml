@@ -32,4 +32,8 @@
     <string name="save_document">Зберегти</string>
     <string name="upload_file">Передати файл</string>
     <string name="upload_media">Передати фото / відео</string>
+    <string name="map_title">Карта рейсу</string>
+    <string name="map_provider_note">OpenStreetMap · дорожня лінія показується лише для актуальної geometry.</string>
+    <string name="capture_photo">Зняти фото</string>
+    <string name="capture_video">Зняти відео</string>
 </resources>

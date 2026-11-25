@@ -23,8 +23,15 @@ cargo-dispatch може містити або розповсюджуватися
 - Tauri/Leptos versions are the exact starting versions already accepted by UI probe P01–P15; product code still receives its own CI and dependency/license gate.
 - Control desktop shell reuses the already accepted UI-probe icon resource; no additional icon/runtime dependency is introduced.
 
+## Native Driver clients
+- Android Driver використовує AndroidX/Jetpack (Apache-2.0) для Compose UI, lifecycle, Activity Result contracts і FileProvider; exact dependency graph фіксується Gradle/Maven metadata.
+- Android native map використовує `org.maplibre.gl:android-sdk-opengl:13.7.1`, upstream `maplibre/maplibre-native`, BSD-2-Clause. Обрано stable OpenGL artifact для ширшої сумісності реальних пристроїв та Emulator.
+- MapLibre 13.7.1 HTTP implementation формує User-Agent з application package/version/code через `HttpIdentifier` перед MapLibre version, тому tile requests ідентифікують саме `com.romanzavada.cargodispatch.driver`, а не лише generic map library; це відповідає OSM native-app identification rule без окремого custom network client.
+- MapLibre є лише renderer/client map layer. Source of truth рейсу лишається Control API; route geometry, stop order і latest driver location не зберігаються в окремій map-базі.
+- Захоплення фото/відео викликає системний Android camera contract; окремий camera SDK не додається.
+
 ## Дані
-- Базова карта використовує стандартні raster tiles OpenStreetMap через `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; дані OpenStreetMap поширюються за ODbL і в обох map views показується атрибуція «© OpenStreetMap contributors». Це runtime network request до стороннього tile service: провайдер бачить IP клієнта та запитану область карти. Driver Browser використовує звичайний browser User-Agent + cross-origin origin Referer; Control webview ідентифікується як `CargoDispatchControl/0.1.0 (+https://github.com/RomanZavadaM/cargo-dispatch)`. Browser cache не обходиться, bulk/offline prefetch не виконується; недоступність tiles не повинна блокувати route/files/media.
+- Базова карта використовує стандартні raster tiles OpenStreetMap через `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; дані OpenStreetMap поширюються за ODbL і у Control, Driver Browser і native Android map показується атрибуція «© OpenStreetMap contributors». Це runtime network request до стороннього tile service: провайдер бачить IP клієнта та запитану область карти. Driver Browser використовує звичайний browser User-Agent + cross-origin origin Referer; Control webview ідентифікується як `CargoDispatchControl/0.1.0 (+https://github.com/RomanZavadaM/cargo-dispatch)`. Browser cache не обходиться, bulk/offline prefetch не виконується; недоступність tiles не повинна блокувати route/files/media.
 - Реальні дані користувачів (авто, водії, заявки, координати) у репозиторії не зберігаються.
 
 
