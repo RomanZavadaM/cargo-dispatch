@@ -146,7 +146,7 @@ jobs:
           @"
           Cargo Dispatch Control — local Driver Browser test
 
-          1. Run cargo-dispatch-control-desktop.exe.
+          1. Run Cargo-Dispatch-Control.exe.
           2. Select local-browser-test-data\active-trip and connect it.
           3. Start "Локально 127.0.0.1".
           4. Open the Driver URL shown by Control in a normal browser.
@@ -161,14 +161,20 @@ jobs:
           This is a CI test artifact, not a release.
           "@ | Set-Content -Encoding UTF8 LOCAL_BROWSER_TEST.txt
 
+      - name: Stage clean manual test package
+        shell: pwsh
+        run: |
+          $package = "local-browser-manual-test"
+          New-Item -ItemType Directory -Force $package | Out-Null
+          Copy-Item "target/release/cargo-dispatch-control-desktop.exe" "$package/Cargo-Dispatch-Control.exe"
+          Copy-Item "LOCAL_BROWSER_TEST.txt" "$package/LOCAL_BROWSER_TEST.txt"
+          Copy-Item "THIRD_PARTY_NOTICES.md" "$package/THIRD_PARTY_NOTICES.md"
+          Copy-Item "local-browser-test-data" "$package/local-browser-test-data" -Recurse
+
       - name: Upload Windows manual test artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: Cargo-Dispatch-Control-local-browser-Windows-x64
-          path: |
-            target/release/cargo-dispatch-control-desktop.exe
-            LOCAL_BROWSER_TEST.txt
-            THIRD_PARTY_NOTICES.md
-            local-browser-test-data/**
+          path: local-browser-manual-test/
           if-no-files-found: error
           retention-days: 7
