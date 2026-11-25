@@ -1,41 +1,50 @@
 # HANDOFF_CURRENT — cargo-dispatch
 
-Оновлено: 2026-11-24 23:18, Europe/Kyiv.
+Оновлено: 2026-11-25, Europe/Kyiv.
 
 Цей файл — короткий публічний якір. Повний поточний стан, правила й журнал ведуться приватно в `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
 
 ## Live public state
 
-- `main`: product foundation інтегровано.
-- Integration commit: `018c89c3ea85e56b5d533fb760ee26384abc9bac`.
-- PR #1 merged.
-- Product head перед злиттям: `9b71f76424b3c9f4d3fb5f2634bc4df65517a406`.
-- PR Product foundation `45486110804`: **SUCCESS**.
-- PR Control desktop UI `45486111221`: **SUCCESS**.
-- Test UI preview: `v0.1.0-preview.2`.
+- PR #2 `Prepare responsive local Driver Browser acceptance` — merged.
+- Integration merge commit: `f41d32044f8ac0eb3290c9638a58f4c7f8046d77`.
+- Exact product head перед merge: `2d10f0db81346311525861d948104caf8a8fc1ac`.
+- PR Product foundation run `45571225967`: **SUCCESS**.
+- PR Control desktop UI run `45571226378`: **SUCCESS**.
+- Поточний test/prerelease: `v0.1.0-preview.3`.
 - Stable готового продукту ще немає.
 
-## Driver Browser
+## Control + Driver Browser
 
-Driver Browser — один браузерний продукт з адаптивним інтерфейсом:
-- phone layout для телефона;
-- tablet layout для планшета;
-- wide/desktop layout для ноутбука або великого екрана.
+Control уже працює з durable active-trip, loopback/LAN session, route actions, location і двосторонніми файлами/media.
 
-Це не три різні клієнти: дані, функції та backend однакові; змінюється компонування під розмір екрана. Desktop/tablet режим не скасований.
+Driver Browser — один адаптивний продукт:
+- phone layout;
+- tablet layout;
+- wide desktop/laptop layout.
 
-## Одна наступна дія
+У Control і Driver Browser є інтерактивна OpenStreetMap-карта з route points та останньою прийнятою позицією водія.
 
-**Local responsive browser acceptance через loopback Control на тому самому комп'ютері.**
+## Поточна межа приймання
 
-Перевірити:
-- wide desktop/laptop layout;
-- tablet-size layout;
-- narrow phone layout без спотворення мобільного інтерфейсу;
-- однаковий функціонал у всіх режимах: route reorder, PDF/file, photo/video/file, native Save у Control, два browser clients, refresh/reconnect;
-- повноцінну карту у Control і Driver Browser не підміняти списком координат.
+Manual local browser acceptance ще потрібен для:
+- wide/tablet/narrow;
+- route reorder в обидва боки;
+- PDF/file Control → Driver Browser;
+- file/photo/video Driver Browser → Control + native Save;
+- два browser clients;
+- refresh/reconnect;
+- карти в Control і Driver Browser.
 
-Після local PASS — той самий Driver Browser на реальному телефоні в LAN. Повний GPS acceptance — через HTTPS path.
+Після local PASS — той самий Driver Browser на реальному телефоні в LAN. Повний GPS acceptance — через HTTPS.
+
+## Ще попереду
+
+- real Valhalla road geometry;
+- HTTPS/public addressing path;
+- різні мережі/NAT/CGNAT;
+- native Driver App;
+- stable release.
 
 ## Як продовжити
 
