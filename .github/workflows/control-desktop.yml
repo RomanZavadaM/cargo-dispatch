@@ -107,3 +107,60 @@ jobs:
 
       - name: Test desktop service
         run: cargo test --locked -p cargo-dispatch-control-desktop --all-targets
+
+
+  windows-artifact:
+    name: Windows loopback manual test artifact
+    runs-on: windows-latest
+    needs:
+      - browser
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+
+      - name: Install pinned Trunk
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: trunk@0.22.2
+          fallback: none
+
+      - name: Build Control frontend
+        working-directory: apps/control-ui
+        run: trunk build --release=true
+
+      - name: Build Control test executable
+        run: cargo build --locked -p cargo-dispatch-control-desktop --release
+
+      - name: Write local test instructions
+        shell: pwsh
+        run: |
+          @"
+          Cargo Dispatch Control — local Driver Browser test
+
+          1. Run cargo-dispatch-control-desktop.exe.
+          2. Select an active trip folder and connect it.
+          3. Start "Локально 127.0.0.1".
+          4. Open the Driver URL shown by Control in a normal browser.
+          5. Test the same URL at wide desktop/laptop, tablet and narrow phone viewport widths.
+          6. Check route reorder, Control -> Browser files/PDF, Browser -> Control file/photo/video,
+             two browser clients, and refresh/reconnect.
+          7. Full map is still a separate open requirement and is not accepted by this artifact.
+
+          This is a CI test artifact, not a release.
+          "@ | Set-Content -Encoding UTF8 LOCAL_BROWSER_TEST.txt
+
+      - name: Upload Windows manual test artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: Cargo-Dispatch-Control-local-browser-Windows-x64
+          path: |
+            target/release/cargo-dispatch-control-desktop.exe
+            LOCAL_BROWSER_TEST.txt
+          if-no-files-found: error
+          retention-days: 7
