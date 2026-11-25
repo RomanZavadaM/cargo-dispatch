@@ -2,9 +2,10 @@
 
 use cargo_dispatch_control_ui_contracts::{
     ControlUiStatus, DashboardDocument, DashboardDocumentDirection, DashboardLocation,
-    DashboardNavigation, DashboardPoint, ListenerMode, ListenerStatus, OperatorDocumentInput,
-    PickedFile, RegisterTripInput, ReorderRouteInput, SaveDocumentInput, SessionInput,
-    SessionStatus, StartLanInput, TripDashboard,
+    DashboardNavigation, DashboardPoint, DashboardRoadGeometry, DashboardRoadGeometryPoint,
+    DashboardRoutingIdentity, ListenerMode, ListenerStatus, OperatorDocumentInput, PickedFile,
+    RegisterTripInput, ReorderRouteInput, SaveDocumentInput, SessionInput, SessionStatus,
+    StartLanInput, TripDashboard,
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
@@ -134,6 +135,22 @@ fn dashboard(snapshot: DriverTripSnapshot) -> Result<TripDashboard, String> {
                 }),
             })
             .collect(),
+        road_geometry: snapshot.road_geometry.map(|geometry| DashboardRoadGeometry {
+            routing: DashboardRoutingIdentity {
+                engine: geometry.routing.engine,
+                engine_version: geometry.routing.engine_version,
+                map_dataset_id: geometry.routing.map_dataset_id,
+                profile_fingerprint: geometry.routing.profile_fingerprint,
+            },
+            points: geometry
+                .points
+                .into_iter()
+                .map(|point| DashboardRoadGeometryPoint {
+                    latitude: point.latitude,
+                    longitude: point.longitude,
+                })
+                .collect(),
+        }),
         documents,
         latest_location: snapshot.latest_location.map(|location| DashboardLocation {
             latitude: location.latitude,
