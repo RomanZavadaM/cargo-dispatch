@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · **🇫🇷 Français** · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Statut :** développement actif. La préversion de test actuelle est **v0.1.0-preview.4**. Il n’existe pas encore de produit stable et finalisé.
+> **Statut :** développement actif. La préversion de test actuelle est **v0.1.0-preview.5**. Il n’existe pas encore de produit stable et finalisé.
 
 ## À propos
 
@@ -32,6 +32,8 @@ Les deux clients natifs sont déjà intégrés dans `main` :
 
 Les deux utilisent la même API Control et ne créent pas de base de trajet séparée.
 
+Depuis r4/r5, les deux clients natifs disposent aussi d’une file durable de réessai pour la position et les médias. Android r5 ajoute un suivi d’arrière-plan Start/Stop explicite via un service de localisation au premier plan, une notification Stop persistante et une politique 15 s / 25 m. Apple r5 ajoute un suivi CoreLocation d’arrière-plan Start/Stop explicite, `UIBackgroundModes=location`, un filtre de 25 m et ne demande pas l’autorisation `Always` sans besoin distinct.
+
 ## Driver Browser
 
 Driver Browser est **un seul produit**, et non des versions téléphone et desktop séparées. Il possède trois dispositions normales :
@@ -52,11 +54,11 @@ Il reste à connecter le **transport HTTP réel vers Valhalla et le recalcul aut
 
 ## Version de test
 
-Préversion actuelle : [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
+Préversion actuelle : [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
 
 Le ZIP Windows contient Control, un trajet actif synthétique et un PDF de test pour la validation locale en loopback.
 
-Il s’agit d’une **version de test/préversion**, pas d’une version stable. Preview.4 contient déjà l’adaptateur Valhalla et la chaîne de géométrie du schéma 1.2. `main` est de nouveau en avance : Android et iOS/iPadOS Driver r2+r3, avec cartes natives et capture caméra système, ainsi qu’un handoff Driver URL amélioré depuis Control, ont été intégrés après preview.4.
+Il s’agit d’une **version de test/préversion**, pas d’une version stable. Preview.5 fige l’état actuel de Control/Driver Browser, la chaîne Valhalla schema 1.2 road geometry et le code source des deux Driver Apps natifs jusqu’à r5 : cartes, caméra/fichiers, file de réessai durable et suivi explicite en arrière-plan. L’asset binaire publié reste pour l’instant le preview Windows Control ; la signature mobile de production/TestFlight reste à faire.
 
 ## Étapes restantes
 
@@ -66,9 +68,9 @@ Il s’agit d’une **version de test/préversion**, pas d’une version stable.
 - validation GPS complète du navigateur via HTTPS ;
 - tests terrain sur différents réseaux/NAT/CGNAT ;
 - transport HTTP Valhalla réel et recalcul de la géométrie après changement d’ordre ;
-- smoke connecté sur appareils virtuels via une vraie session Control headless ;
-- GPS en arrière-plan, file offline et stockage de session sécurisé pour les apps natives ;
 - version stable.
+- stockage sécurisé de la session Driver avec Android Keystore + Apple Keychain et migration de l’ancienne URL brute ;
+
 
 ## Langues de l’interface
 
