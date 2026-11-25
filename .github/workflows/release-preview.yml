@@ -1,0 +1,134 @@
+name: Publish product preview
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".release-preview"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-product-preview
+  cancel-in-progress: false
+
+jobs:
+  windows-preview:
+    name: Build and publish Windows preview
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+
+      - name: Install pinned Trunk
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: trunk@0.22.2
+          fallback: none
+
+      - name: Build Control frontend
+        working-directory: apps/control-ui
+        run: trunk build --release=true
+
+      - name: Build Control Windows executable
+        run: cargo build --locked -p cargo-dispatch-control-desktop --release
+
+      - name: Create synthetic acceptance data
+        run: cargo run --locked -p cargo-dispatch-trip-files --example local_browser_fixture -- local-browser-test-data
+
+      - name: Read release tag
+        shell: pwsh
+        run: |
+          $tag = (Get-Content ".release-preview" -Raw).Trim()
+          if (-not $tag.StartsWith("v0.1.0-preview.")) {
+            throw "Unexpected preview tag: $tag"
+          }
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Stage preview package
+        shell: pwsh
+        run: |
+          $packageName = "Cargo-Dispatch-Control-$env:TAG-Windows-x64"
+          New-Item -ItemType Directory -Force $packageName | Out-Null
+          Copy-Item "target/release/cargo-dispatch-control-desktop.exe" "$packageName/Cargo-Dispatch-Control.exe"
+          Copy-Item "THIRD_PARTY_NOTICES.md" "$packageName/THIRD_PARTY_NOTICES.md"
+          Copy-Item "local-browser-test-data" "$packageName/local-browser-test-data" -Recurse
+          @"
+          Cargo Dispatch $env:TAG — Windows preview
+
+          This is a test/pre-release build, not a stable product.
+
+          Local Driver Browser test:
+          1. Run Cargo-Dispatch-Control.exe.
+          2. Select local-browser-test-data\active-trip and connect it.
+          3. Start "Локально 127.0.0.1".
+          4. Open the Driver URL shown by Control in a normal browser.
+          5. Test wide desktop/laptop, tablet and narrow phone layouts.
+          6. Check route reorder both ways, files/PDF, Browser -> Control photo/video/file + Save,
+             two browser clients, refresh/reconnect and maps in Control/Driver Browser.
+
+          Full Valhalla road geometry, HTTPS/public addressing and field NAT/CGNAT acceptance
+          are not finished in this preview.
+          "@ | Set-Content -Encoding UTF8 "$packageName/README-TEST.txt"
+
+          $zip = "$packageName.zip"
+          Compress-Archive -Path "$packageName/*" -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Set-Content -Encoding ASCII SHA256SUMS.txt
+
+      - name: Write release notes
+        shell: pwsh
+        run: |
+          @"
+          ## Що це
+
+          Cargo Dispatch $env:TAG — інтегрований тестовий preview поточного продукту. Це **prerelease**, не stable.
+
+          ### Уже в цьому preview
+          - Control desktop на Rust/Tauri + Leptos;
+          - durable активний рейс і відновлення після перезапуску;
+          - один адаптивний Driver Browser для phone / tablet / wide desktop;
+          - зміна порядку відкритих точок у Control і Driver Browser;
+          - PDF/файли Control → Driver Browser;
+          - file/photo/video Driver Browser → Control з локальним Save;
+          - два одночасні browser clients одного рейсу та reconnect;
+          - інтерактивна OpenStreetMap-карта в Control і Driver Browser;
+          - Windows GUI build без зайвого console window;
+          - у ZIP є synthetic active-trip і sample PDF для локального тесту.
+
+          ### Ще не stable
+          - ручний local browser acceptance ще має бути завершений власником;
+          - real phone LAN acceptance — наступний етап;
+          - browser GPS повністю приймається через HTTPS;
+          - public addressing/NAT/CGNAT field path ще попереду;
+          - real Valhalla road geometry ще не інтегрована;
+          - native Driver App ще не розпочатий.
+
+          Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
+          "@ | Set-Content -Encoding UTF8 RELEASE_NOTES.md
+
+      - name: Publish GitHub prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$env:TAG" `
+            --repo "${{ github.repository }}" `
+            --target "$env:GITHUB_SHA" `
+            --title "Cargo Dispatch Product Preview 0.3" `
+            --notes-file RELEASE_NOTES.md `
+            --prerelease `
+            "Cargo-Dispatch-Control-$env:TAG-Windows-x64.zip" `
+            "SHA256SUMS.txt"
