@@ -23,6 +23,15 @@
 - Control と Driver Browser のインタラクティブ OpenStreetMap;
 - テストとローカル運用用の loopback および明示的 LAN モード.
 
+## ネイティブ Driver App
+
+2 つのネイティブクライアントはすでに `main` に統合されています。
+
+- **Android** — Jetpack Compose、route/complete/reorder、ファイル/写真/動画、foreground GPS、session recovery、native MapLibre + OpenStreetMap、現在の road geometry、地点/最新位置、システム写真・動画撮影；Emulator build/install/launch/screenshot PASS。
+- **iPhone/iPad** — SwiftUI、route/complete/reorder、ファイル/写真/動画、foreground CoreLocation、session recovery、native MapKit、現在の geometry、地点/最新位置、システム写真・動画撮影；Simulator build/install/launch/screenshot PASS。
+
+両方とも同じ Control API を使用し、別の運行データベースは作りません。
+
 ## Driver Browser
 
 Driver Browser は電話版と desktop 版に分かれた製品ではなく、**1 つの製品**です。標準レイアウトは次の 3 つです。
@@ -47,7 +56,7 @@ Control と Driver Browser には、運行地点と最後に受理されたド�
 
 Windows ZIP には Control、合成されたアクティブ運行、ローカル loopback 検証用のサンプル PDF が含まれます。
 
-これは **test/prerelease build** であり、stable ではありません。Preview.4 には Valhalla adapter と schema 1.2 road-geometry pipeline が含まれています。その後 Android と iOS/iPadOS の native Driver r2 が統合され、`main` は再び preview.4 より先に進んでいます。
+これは **test/prerelease build** であり、stable ではありません。Preview.4 には Valhalla adapter と schema 1.2 road-geometry pipeline が含まれています。その後 Android と iOS/iPadOS の native Driver r2+r3（native map と system camera を含む）および改善された Control→Driver URL handoff が統合され、`main` は再び preview.4 より先に進んでいます。
 
 ## 今後の作業
 
@@ -57,7 +66,8 @@ Windows ZIP には Control、合成されたアクティブ運行、ローカル
 - HTTPS 経由での browser GPS 完全受け入れ;
 - 異なるネットワーク/NAT/CGNAT でのフィールドテスト;
 - 実 Valhalla HTTP transport と reorder 後の geometry 再計算;
-- native map：Android は MapLibre、iOS/iPadOS は MapKit;\n- カメラ撮影、background GPS、接続済み virtual-device smoke、offline queue、安全な session storage;
+- 実際の headless Control session を使う connected virtual-device smoke;
+- background GPS、offline queue、native app の安全な session storage;
 - stable release.
 
 ## インターフェース言語
