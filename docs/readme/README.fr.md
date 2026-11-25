@@ -37,7 +37,9 @@ Les données, les actions de trajet, les fichiers et le backend sont communs ; s
 
 Control et Driver Browser disposent maintenant d’une vraie carte interactive avec les points du trajet et la dernière position acceptée du conducteur.
 
-Il ne s’agit **pas encore de la géométrie routière complète**. L’intégration de la géométrie réelle via Valhalla reste à faire.
+La branche `main` contient maintenant une chaîne de géométrie routière versionnée (schéma 1.2) : Planner peut transmettre une géométrie dérivée, Control la conserve et les deux cartes n’affichent la ligne routière que tant qu’elle correspond à l’ordre actuel des arrêts. Tout changement d’ordre invalide immédiatement l’ancienne ligne.
+
+Il reste à connecter le **transport HTTP réel vers Valhalla et le recalcul automatique de la géométrie**. Le contrat et l’affichage sont présents ; le moteur de routage externe n’est pas encore relié au runtime produit.
 
 ## Version de test
 
@@ -45,7 +47,7 @@ Préversion actuelle : [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-
 
 Le ZIP Windows contient Control, un trajet actif synthétique et un PDF de test pour la validation locale en loopback.
 
-Il s’agit d’une **version de test/préversion**, pas d’une version stable.
+Il s’agit d’une **version de test/préversion**, pas d’une version stable. `main` est déjà en avance sur preview.3 : l’adaptateur Valhalla et la chaîne de géométrie du schéma 1.2 ont été intégrés après cette préversion.
 
 ## Étapes restantes
 
@@ -54,13 +56,13 @@ Il s’agit d’une **version de test/préversion**, pas d’une version stable.
 - chemin HTTPS/adressage public ;
 - validation GPS complète du navigateur via HTTPS ;
 - tests terrain sur différents réseaux/NAT/CGNAT ;
-- géométrie routière réelle Valhalla ;
-- futur Driver App natif ;
+- transport HTTP Valhalla réel et recalcul de la géométrie après changement d’ordre ;
+- applications Driver natives Android et iOS/iPadOS, déjà développées en parallèle dans des branches draft séparées ;
 - version stable.
 
 ## Langues de l’interface
 
-L’interface actuelle implémente et vérifie **l’ukrainien, l’anglais et l’allemand**. Les autres traductions du README sont des langues de documentation ou des langues cibles et ne signifient pas encore que l’interface les prend en charge.
+L’interface desktop/browser intégrée implémente actuellement **l’ukrainien, l’anglais et l’allemand**. Les nouveaux clients natifs Android et iOS/iPadOS démarrent directement avec les packs **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**, et leur documentation suit le même ensemble de langues.
 
 ## Documentation
 
