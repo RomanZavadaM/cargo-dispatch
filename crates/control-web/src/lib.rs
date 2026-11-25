@@ -1001,8 +1001,10 @@ fn snapshot(trip: &TripFolder) -> DriverTripSnapshot {
                     }),
             })
             .collect(),
-        road_geometry: state.route_geometry.as_ref().map(|geometry| {
-            DriverRoadGeometrySnapshot {
+        road_geometry: state
+            .route_geometry
+            .as_ref()
+            .map(|geometry| DriverRoadGeometrySnapshot {
                 routing: DriverRoutingIdentitySnapshot {
                     engine: geometry.routing.engine.clone(),
                     engine_version: geometry.routing.engine_version.clone(),
@@ -1017,8 +1019,7 @@ fn snapshot(trip: &TripFolder) -> DriverTripSnapshot {
                         longitude: point.longitude(),
                     })
                     .collect(),
-            }
-        }),
+            }),
         documents: trip.documents().iter().map(document_snapshot).collect(),
         latest_location: trip.latest_location().map(location_snapshot),
     }
