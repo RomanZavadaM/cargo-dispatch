@@ -79,11 +79,13 @@ Android and Apple packages are not yet store-signed. App Store/TestFlight/Google
 - full browser GPS acceptance over HTTPS;
 - field testing across different networks/NAT/CGNAT;
 - live Valhalla HTTP transport and geometry recalculation after reorder;
+- secure Driver session storage with Android Keystore + Apple Keychain, including migration away from the legacy raw URL;
+- a stable release.
 
 
 ## Interface languages
 
-Control, Driver Browser, Android Driver, and iOS/iPadOS Driver now implement and automatically verify the full project language set: **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control and Driver Browser follow the system language by default and also provide a persisted manual language choice. Documentation follows the same language set.
+The integrated desktop/browser UI currently implements and verifies **Ukrainian, English, and German**. The new native Android and iOS/iPadOS clients start with localization packs for **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** from the first screen, and their documentation follows the same language set.
 
 ## Documentation
 
