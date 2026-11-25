@@ -937,7 +937,10 @@ fn ControlApp() -> impl IntoView {
                                                     <a href=href target="_blank" rel="noopener">{move || strings(locale.get()).open}</a>
                                                     <button
                                                         type="button"
-                                                        on:click=move |_| cargo_control_copy_text(&copy_url)
+                                                        on:click=move |_| cargo_control_copy_text(
+                                                            &copy_url,
+                                                            strings(locale.get_untracked()).copy_driver_url,
+                                                        )
                                                     >
                                                         {move || strings(locale.get()).copy}
                                                     </button>
@@ -973,14 +976,14 @@ fn ControlApp() -> impl IntoView {
             </section>
 
             <section id="control-map-section">
-                <h2>"4. Карта рейсу"</h2>
-                <div id="control-map" class="trip-map" aria-label="Карта активного рейсу">
+                <h2>{move || strings(locale.get()).trip_map}</h2>
+                <div id="control-map" class="trip-map" aria-label=move || strings(locale.get()).active_trip_map>
                     <div class="map-tiles" aria-hidden="true"></div>
                     <div class="map-overlays" aria-hidden="true"></div>
                     <div class="map-controls">
-                        <button type="button" aria-label="Збільшити карту" on:click=move |_| cargo_control_map_zoom(1)> "+"</button>
-                        <button type="button" aria-label="Зменшити карту" on:click=move |_| cargo_control_map_zoom(-1)> "−"</button>
-                        <button type="button" on:click=move |_| cargo_control_map_fit()> "Рейс"</button>
+                        <button type="button" aria-label=move || strings(locale.get()).zoom_in on:click=move |_| cargo_control_map_zoom(1)> "+"</button>
+                        <button type="button" aria-label=move || strings(locale.get()).zoom_out on:click=move |_| cargo_control_map_zoom(-1)> "−"</button>
+                        <button type="button" on:click=move |_| cargo_control_map_fit()> {move || strings(locale.get()).fit_trip}</button>
                     </div>
                     <a
                         class="map-attribution"
@@ -991,15 +994,13 @@ fn ControlApp() -> impl IntoView {
                         "© OpenStreetMap contributors"
                     </a>
                 </div>
-                <p class="note">
-                    "Показані точки рейсу та остання прийнята позиція водія. Road line показується лише коли Control має актуальну geometry для поточного порядку точок."
-                </p>
+                <p class="note">{move || strings(locale.get()).map_note}</p>
             </section>
 
             <section>
-                <h2>"5. Живий рейс"</h2>
+                <h2>{move || strings(locale.get()).live_trip}</h2>
                 <div class="actions">
-                    <button type="button" on:click=refresh_dashboard>"Оновити"</button>
+                    <button type="button" on:click=refresh_dashboard>{move || strings(locale.get()).refresh}</button>
                 </div>
                 {move || dashboard.get().map(|trip| {
                     let revision = trip.local_route_revision;
@@ -1018,12 +1019,12 @@ fn ControlApp() -> impl IntoView {
                     view! {
                         <div>
                             <p>
-                                <strong>"Trip: "</strong><code>{trip_id}</code>
-                                " · version " {version}
-                                " · route revision " {revision}
+                                <strong>{move || format!("{}: ", strings(locale.get()).trip)}</strong><code>{trip_id}</code>
+                                {move || format!(" · {} ", strings(locale.get()).version)} {version}
+                                {move || format!(" · {} ", strings(locale.get()).route_revision)} {revision}
                             </p>
 
-                            <h3>"Маршрут"</h3>
+                            <h3>{move || strings(locale.get()).route}</h3>
                             <div>
                                 <For
                                     each=move || route_rows.clone()
@@ -1037,7 +1038,13 @@ fn ControlApp() -> impl IntoView {
                                         view! {
                                             <div class="point">
                                                 <strong>{format!("{}. {}", point.sequence, point.title)}</strong>
-                                                <span>{if point.completed { " — виконано" } else { " — відкрито" }}</span>
+                                                <span>{move || {
+                                                    if point.completed {
+                                                        format!(" — {}", strings(locale.get()).completed)
+                                                    } else {
+                                                        format!(" — {}", strings(locale.get()).open_status)
+                                                    }
+                                                }}</span>
                                                 {navigation.map(|nav| view! {
                                                     <div class="note">
                                                         {nav.address.unwrap_or_default()}
@@ -1101,7 +1108,7 @@ fn ControlApp() -> impl IntoView {
                                 />
                             </div>
 
-                            <h3>"Остання позиція водія"</h3>
+                            <h3>{move || strings(locale.get()).latest_driver_position}</h3>
                             {match location {
                                 Some(location) => view! {
                                     <p>
@@ -1111,10 +1118,10 @@ fn ControlApp() -> impl IntoView {
                                         {format!("timestamp {}", location.observed_at_unix_ms)}
                                     </p>
                                 }.into_any(),
-                                None => view! { <p class="note">"Позиція ще не надходила."</p> }.into_any(),
+                                None => view! { <p class="note">{move || strings(locale.get()).no_position}</p> }.into_any(),
                             }}
 
-                            <h3>"Документи / фото / відео"</h3>
+                            <h3>{move || strings(locale.get()).documents_media}</h3>
                             <ul>
                                 <For
                                     each=move || documents.clone()
@@ -1122,17 +1129,17 @@ fn ControlApp() -> impl IntoView {
                                     children=move |document| {
                                         let document_id = document.document_id.clone();
                                         let direction = match document.direction {
-                                            DashboardDocumentDirection::FromOperator => "Control → водій",
-                                            DashboardDocumentDirection::FromDriver => "водій → Control",
+                                            DashboardDocumentDirection::FromOperator => strings(locale.get_untracked()).from_operator,
+                                            DashboardDocumentDirection::FromDriver => strings(locale.get_untracked()).from_driver,
                                         };
                                         view! {
                                             <li>
                                                 <strong>{document.original_name}</strong>
                                                 " · " {direction}
                                                 " · " {document.mime_type}
-                                                " · " {document.size} " байт"
+                                                " · " {document.size} " " {move || strings(locale.get()).bytes}
                                                 {document.point_id.map(|point| view! {
-                                                    <span>" · point " <code>{point}</code></span>
+                                                    <span>{move || format!(" · {} ", strings(locale.get()).point)} <code>{point}</code></span>
                                                 })}
                                                 <button
                                                     type="button"
@@ -1152,7 +1159,8 @@ fn ControlApp() -> impl IntoView {
                                                             {
                                                                 Ok(Some(path)) => {
                                                                     message.set(format!(
-                                                                        "Файл збережено: {path}"
+                                                                        "{}: {path}",
+                                                                        strings(locale.get_untracked()).file_saved
                                                                     ));
                                                                     error.set(false);
                                                                 }
@@ -1166,7 +1174,7 @@ fn ControlApp() -> impl IntoView {
                                                         });
                                                     }
                                                 >
-                                                    "Зберегти…"
+                                                    {move || strings(locale.get()).save}
                                                 </button>
                                             </li>
                                         }
@@ -1174,23 +1182,23 @@ fn ControlApp() -> impl IntoView {
                                 />
                             </ul>
 
-                            <h3>"Передати файл водієві"</h3>
+                            <h3>{move || strings(locale.get()).send_file}</h3>
                             <div class="actions">
                                 <button type="button" on:click=pick_file disabled=move || busy.get()>
-                                    "Вибрати файл…"
+                                    {move || strings(locale.get()).choose_file}
                                 </button>
                                 <span>
                                     {move || picked_file.get()
                                         .map(|file| file.original_name)
-                                        .unwrap_or_else(|| "Файл не вибрано".to_owned())}
+                                        .unwrap_or_else(|| strings(locale.get()).no_file.to_owned())}
                                 </span>
                             </div>
                             <label>
-                                "Прив'язати до точки"
+                                {move || strings(locale.get()).attach_point}
                                 <select
                                     on:change=move |event| attachment_point.set(event_target_value(&event))
                                 >
-                                    <option value="">"Рейс у цілому"</option>
+                                    <option value="">{move || strings(locale.get()).whole_trip}</option>
                                     <For
                                         each=move || trip.points.clone()
                                         key=|point| point.point_id.clone()
@@ -1204,7 +1212,7 @@ fn ControlApp() -> impl IntoView {
                             </label>
                             <div class="actions">
                                 <button class="primary" type="button" on:click=send_file disabled=move || busy.get()>
-                                    "Передати водієві"
+                                    {move || strings(locale.get()).send_to_driver}
                                 </button>
                             </div>
                         </div>
