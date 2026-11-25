@@ -68,8 +68,8 @@ Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. Preview.5 bildet
 - vollständige Browser-GPS-Abnahme über HTTPS;
 - Feldtests über verschiedene Netze/NAT/CGNAT;
 - Live-Valhalla-HTTP-Transport und Neuberechnung der Geometrie nach Reorder;
-- Stable Release.
 - sichere Driver-Session-Speicherung mit Android Keystore + Apple Keychain einschließlich Migration der alten Raw-URL;
+- Stable Release.
 
 
 ## Sprachen der Benutzeroberfläche
