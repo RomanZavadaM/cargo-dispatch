@@ -36,7 +36,7 @@ kotlin {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
+    val composeBom = platform("androidx.compose:compose-bom:2026.04.01")
 
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -45,9 +45,9 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
