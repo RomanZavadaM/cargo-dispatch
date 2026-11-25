@@ -4,8 +4,8 @@
 
 네이티브 Apple 운전자 클라이언트입니다. 하나의 SwiftUI target이 iPhone과 iPad를 지원하며 Driver Browser/Android 앱과 **동일한 Control API**를 사용합니다.
 
-현재 범위: Swift 6 + SwiftUI + URLSession, iOS/iPadOS 17+, Driver URL, trip snapshot, complete/reorder, permanent point ID + local revision, optional road geometry, CoreLocation foreground one-shot 위치 전송, Control→iPhone/iPad 문서 다운로드/fileExporter 저장, fileImporter + PhotosPicker를 통한 iPhone/iPad→Control 파일/사진/동영상 업로드, 마지막 Driver URL 복구, 위치 권한 문구 현지화, uk/en/de/fr/es/ko/ja/zh-Hans, Swift protocol test 및 Simulator build/install/launch/screenshot CI.
+현재 범위: Swift 6 + SwiftUI + URLSession, iOS/iPadOS 17+, Driver URL, trip snapshot, complete/reorder, 현재 road geometry·지점·최신 위치를 보여 주는 native MapKit, CoreLocation foreground one-shot 위치, 파일/사진/동영상 전송과 시스템 카메라, 최신 위치/미디어용 durable retry queue, `UIBackgroundModes=location` 및 25m filter를 사용하는 명시적 Start/Stop background CoreLocation tracking, token을 동기화되지 않는 Keychain 항목(`AfterFirstUnlockThisDeviceOnly`)에 저장하고 비밀이 아닌 base URL만 UserDefaults에 두는 안전한 session recovery, 성공적인 reconnect 후 기존 raw Driver URL 자동 마이그레이션, uk/en/de/fr/es/ko/ja/zh-Hans, Swift protocol test 및 실제 synthetic Control trip 연결 Simulator smoke.
 
 로컬 HTTP는 Simulator/LAN Debug에서만 허용하며 Release는 HTTPS-first입니다.
 
-다음 작업: native MapKit map, 카메라 촬영, background GPS, 실제 synthetic Control trip 연결 smoke, offline queue/retry, Keychain 보안 강화, push, production signing/TestFlight.
+다음 작업: 실제 기기 LAN/background tracking 검수, HTTPS/public/NAT/CGNAT 현장 경로, push/notifications, production signing/TestFlight.

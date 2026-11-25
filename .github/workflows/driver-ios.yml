@@ -51,7 +51,8 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath apps/driver-ios/build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY=- \
             build
 
       - name: Verify background location mode in built app
@@ -60,6 +61,8 @@ jobs:
           INFO="apps/driver-ios/build/DerivedData/Build/Products/Debug-iphonesimulator/CargoDispatchDriver.app/Info.plist"
           test -f "$INFO"
           plutil -p "$INFO"
+          codesign -dv --verbose=2 "$(dirname "$INFO")" 2>&1
+          codesign --verify --deep --strict "$(dirname "$INFO")"
           python3 - "$INFO" <<'PY'
           import plistlib, sys
           with open(sys.argv[1], "rb") as handle:
@@ -120,6 +123,7 @@ jobs:
 
           DEVICE="$(xcrun simctl create CargoDispatchDriverCI "$DEVICE_TYPE" "$RUNTIME")"
           cleanup() {
+            kill "${PROXY_PID:-}" 2>/dev/null || true
             kill "${SERVER_PID:-}" 2>/dev/null || true
             xcrun simctl shutdown "$DEVICE" 2>/dev/null || true
             xcrun simctl delete "$DEVICE" 2>/dev/null || true
@@ -140,7 +144,28 @@ jobs:
             sleep 0.25
           done
           cat apps/driver-ios/native-smoke.log
-          IOS_DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_LOCAL_URL=//p' apps/driver-ios/native-smoke.log | tail -n 1)"
+          CONTROL_DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_LOCAL_URL=//p' apps/driver-ios/native-smoke.log | tail -n 1)"
+          test -n "$CONTROL_DRIVER_URL"
+
+          : > apps/driver-ios/native-proxy-requests.log
+          python3 .github/scripts/native-ios-smoke-proxy.py \
+            "$CONTROL_DRIVER_URL" \
+            apps/driver-ios/native-proxy-requests.log \
+            > apps/driver-ios/native-proxy.log 2>&1 &
+          PROXY_PID=$!
+
+          for _ in $(seq 1 80); do
+            if grep -q '^CARGO_DISPATCH_SMOKE_PROXY_URL=' apps/driver-ios/native-proxy.log; then
+              break
+            fi
+            if ! kill -0 "$PROXY_PID" 2>/dev/null; then
+              cat apps/driver-ios/native-proxy.log
+              exit 1
+            fi
+            sleep 0.25
+          done
+          cat apps/driver-ios/native-proxy.log
+          IOS_DRIVER_URL="$(sed -n 's/^CARGO_DISPATCH_SMOKE_PROXY_URL=//p' apps/driver-ios/native-proxy.log | tail -n 1)"
           test -n "$IOS_DRIVER_URL"
 
           xcrun simctl boot "$DEVICE"
@@ -154,28 +179,96 @@ jobs:
           PY
 
           APP="apps/driver-ios/build/DerivedData/Build/Products/Debug-iphonesimulator/CargoDispatchDriver.app"
+          BUNDLE="com.romanzavada.cargodispatch.driver"
           xcrun simctl install "$DEVICE" "$APP"
-          xcrun simctl launch "$DEVICE" com.romanzavada.cargodispatch.driver             -cargo_dispatch_driver_url "$IOS_DRIVER_URL"
 
-          DATA_CONTAINER="$(xcrun simctl get_app_container "$DEVICE" com.romanzavada.cargodispatch.driver data)"
-          PREFS="$DATA_CONTAINER/Library/Preferences/com.romanzavada.cargodispatch.driver.plist"
-          CONNECTED=0
-          for _ in $(seq 1 40); do
-            if [ -f "$PREFS" ]               && plutil -p "$PREFS" | grep -q 'native-smoke-session-00000001'; then
-              CONNECTED=1
+          # First launch supplies the old raw Driver URL through Apple's
+          # standard UserDefaults launch-argument domain. This is the same key
+          # used by r1-r5. After the authenticated connection succeeds, r6 must
+          # persist only base URL + Keychain token. The second launch has no URL.
+          DATA_CONTAINER="$(xcrun simctl get_app_container "$DEVICE" "$BUNDLE" data)"
+          PREFS="$DATA_CONTAINER/Library/Preferences/$BUNDLE.plist"
+
+          xcrun simctl launch "$DEVICE" "$BUNDLE" \
+            -cargo_dispatch_driver_url "$IOS_DRIVER_URL"
+
+          FIRST_CONNECTED=0
+          for _ in $(seq 1 160); do
+            REQUEST_COUNT="$(grep -c '^GET /api/trip/native-smoke-session-00000001 ' apps/driver-ios/native-proxy-requests.log || true)"
+            # DriverStore completes its initial connection with two trip reads:
+            # one verifies the session, the second refreshes after pending-queue
+            # flushing. SecureSessionStore.save() runs immediately after that.
+            if [ "$REQUEST_COUNT" -ge 2 ]; then
+              FIRST_CONNECTED=1
               break
             fi
             sleep 0.5
           done
-          if [ "$CONNECTED" -ne 1 ]; then
+          if [ "$FIRST_CONNECTED" -ne 1 ]; then
+            echo "Apple Driver did not complete the initial Control connection during legacy-session migration." >&2
+            cat apps/driver-ios/native-proxy.log || true
+            cat apps/driver-ios/native-proxy-requests.log || true
+            exit 1
+          fi
+
+          # Stop the first process after the authenticated save. Do not use
+          # immediate plist-file visibility as the persistence oracle: UserDefaults
+          # is mediated by cfprefsd and its on-disk plist may lag behind the value
+          # already committed for the next process.
+          sleep 1
+          xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
+          sleep 1
+
+          REQUESTS_BEFORE_RELAUNCH="$(grep -c '^GET /api/trip/native-smoke-session-00000001 ' apps/driver-ios/native-proxy-requests.log || true)"
+
+          # Relaunch with no Driver URL. A new authenticated trip request is the
+          # decisive end-to-end proof that the second process reconstructed the
+          # session from persisted non-secret base URL + Keychain token.
+          xcrun simctl launch "$DEVICE" "$BUNDLE"
+
+          RECONNECTED=0
+          for _ in $(seq 1 120); do
+            REQUEST_COUNT="$(grep -c '^GET /api/trip/native-smoke-session-00000001 ' apps/driver-ios/native-proxy-requests.log || true)"
+            if [ "$REQUEST_COUNT" -gt "$REQUESTS_BEFORE_RELAUNCH" ]; then
+              RECONNECTED=1
+              break
+            fi
+            sleep 0.5
+          done
+          if [ "$RECONNECTED" -ne 1 ]; then
+            echo "Apple Driver did not reconnect from persisted Keychain session after relaunch." >&2
             if [ -f "$PREFS" ]; then
               plutil -p "$PREFS" || true
             fi
+            xcrun simctl spawn "$DEVICE" defaults read "$BUNDLE" || true
+            cat apps/driver-ios/native-proxy-requests.log || true
             exit 1
           fi
 
           xcrun simctl io "$DEVICE" screenshot apps/driver-ios/driver-ios-smoke.png
-          xcrun simctl terminate "$DEVICE" com.romanzavada.cargodispatch.driver || true
+          xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
+          sleep 1
+
+          # The raw legacy URL/token must never become persistent preferences.
+          # The reconnect above already proves that base URL + Keychain token are
+          # durable across process restart; this check only guards secret leakage.
+          if [ -f "$PREFS" ]; then
+            plutil -p "$PREFS"
+            python3 - "$PREFS" <<'PY'
+          import plistlib, sys
+          with open(sys.argv[1], "rb") as handle:
+              prefs = plistlib.load(handle)
+          if prefs.get("cargo_dispatch_driver_url") is not None:
+              raise SystemExit("legacy raw Driver URL remained in app UserDefaults")
+          if "native-smoke-session-00000001" in repr(prefs):
+              raise SystemExit("raw Driver token remained in app UserDefaults")
+          PY
+          fi
+
+          if grep -R -a -q 'native-smoke-session-00000001' "$DATA_CONTAINER/Library/Preferences" 2>/dev/null; then
+            echo "Raw Apple Driver session token found in persistent preference files." >&2
+            exit 1
+          fi
 
       - name: Upload Simulator smoke screenshot
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

@@ -4,8 +4,8 @@
 
 Nativer Apple-Fahrerclient. Ein SwiftUI-Target unterstützt iPhone und iPad und verwendet **dieselbe Control-API** wie Driver Browser und Android Driver App.
 
-Aktueller Umfang: Swift 6 + SwiftUI + URLSession; iOS/iPadOS 17+; Driver-URL; Trip-Snapshot; Complete/Reorder; permanente Punkt-IDs + lokale Routenrevision; optionale Routengeometrie; einmalige CoreLocation-Vordergrundposition an Control; Dokumentdownload Control→iPhone/iPad über fileExporter; Datei/Foto/Video iPhone/iPad→Control über fileImporter + PhotosPicker; Wiederherstellung der letzten Driver-URL; lokalisierter Standort-Hinweis; uk/en/de/fr/es/ko/ja/zh-Hans; Swift-Protokolltests und Simulator-Build/Install/Launch/Screenshot-CI.
+Aktueller Umfang: Swift 6 + SwiftUI + URLSession; iOS/iPadOS 17+; Driver-URL; Trip-Snapshot; Complete/Reorder; native MapKit-Karte mit aktueller Straßengeometrie, Markern und letzter Position; einmalige CoreLocation-Vordergrundposition; Datei/Foto/Video-Transfer und Systemkamera; dauerhafte Retry-Queue für neueste Position/Medien; explizites Start/Stop-CoreLocation-Tracking im Hintergrund mit `UIBackgroundModes=location` und 25-m-Filter; sichere Session-Wiederherstellung mit Token in einem nicht synchronisierenden Keychain-Eintrag (`AfterFirstUnlockThisDeviceOnly`) und nur der nicht geheimen Base-URL in UserDefaults; automatische Migration der alten Raw-Driver-URL nach erfolgreichem Reconnect; uk/en/de/fr/es/ko/ja/zh-Hans; Swift-Protokolltests und connected Simulator-Smoke gegen einen echten synthetischen Control-Trip.
 
 Lokales HTTP ist nur in Debug für Simulator/LAN erlaubt; Release bleibt HTTPS-first.
 
-Noch offen: native MapKit-Karte, Kameraaufnahme, Hintergrund-GPS, verbundener Simulator-Smoke gegen einen echten synthetischen Control-Trip, Offline-Queue/Retry, Keychain-Härtung, Push und Production Signing/TestFlight.
+Noch offen: Real-Device-LAN-/Background-Tracking-Abnahme, HTTPS/Public/NAT/CGNAT-Feldpfad, Push/Notifications und Production Signing/TestFlight.
