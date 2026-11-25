@@ -68,8 +68,8 @@ Windows ZIP 包含 Control、合成的活跃行程以及用于本地 loopback �
 - 通过 HTTPS 完成浏览器 GPS 验收；
 - 不同网络/NAT/CGNAT 的现场测试；
 - 真实 Valhalla HTTP transport，以及重新排序后的 geometry 重算；
-- 稳定版本。
 - 使用 Android Keystore + Apple Keychain 安全保存 Driver session，并迁移旧的 raw URL；
+- 稳定版本。
 
 
 ## 界面语言
