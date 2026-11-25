@@ -322,7 +322,7 @@ impl DesktopControlService {
             })?;
         let local_control_base_url = format!("http://{}", internal_server.address());
 
-        let mut prepared = Vec::new();
+        let mut prepared: Vec<(String, ControlGatewayClient, String)> = Vec::new();
         for token in session_tokens {
             let config = match GatewayRelayConfig::new(
                 &gateway_base_url,
