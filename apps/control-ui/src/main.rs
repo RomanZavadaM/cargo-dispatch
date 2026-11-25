@@ -302,6 +302,16 @@ export function cargoControlMapZoom(delta) {
 export function cargoControlMapFit() {
   fit();
 }
+
+export function cargoControlCopyText(value) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(value).catch(() => {
+      window.prompt("Скопіюйте Driver URL:", value);
+    });
+  } else {
+    window.prompt("Скопіюйте Driver URL:", value);
+  }
+}
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = cargoControlMapRender)]
@@ -317,6 +327,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = cargoControlMapFit)]
     fn cargo_control_map_fit();
+
+    #[wasm_bindgen(js_name = cargoControlCopyText)]
+    fn cargo_control_copy_text(value: &str);
 }
 
 fn js_error(value: JsValue) -> String {
@@ -760,16 +773,25 @@ fn ControlApp() -> impl IntoView {
                             view! {
                                 <li>
                                     <div><strong>"Trip: "</strong><code>{trip}</code></div>
-                                    <div><strong>"Token: "</strong><code>{session_token}</code></div>
                                     {url.map(|driver_url| {
                                         let href = driver_url.clone();
+                                        let copy_url = driver_url.clone();
                                         view! {
-                                            <div>
-                                                <strong>"Driver URL: "</strong>
-                                                <a href=href target="_blank" rel="noopener">{driver_url}</a>
+                                            <div class="actions">
+                                                <a href=href target="_blank" rel="noopener">"Відкрити Driver Browser"</a>
+                                                <button
+                                                    type="button"
+                                                    on:click=move |_| cargo_control_copy_text(&copy_url)
+                                                >
+                                                    "Копіювати Driver URL"
+                                                </button>
                                             </div>
                                         }
                                     })}
+                                    <details>
+                                        <summary>"Технічні дані"</summary>
+                                        <div><strong>"Token: "</strong><code>{session_token}</code></div>
+                                    </details>
                                     <button
                                         type="button"
                                         on:click=move |_| {

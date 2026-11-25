@@ -71,6 +71,8 @@ button{min-height:40px;padding:8px 12px;border:1px solid #b8bec6;border-radius:8
 button:disabled{cursor:default;opacity:.55}
 input[type=file],select{width:100%;min-width:0}
 label{display:grid;gap:6px;margin:10px 0}
+.file-picker{flex:1 1 220px;margin:0}
+.file-picker span{font-weight:600}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .point{padding:12px 0;border-bottom:1px solid #eee;min-width:0}
 .point:last-child{border-bottom:0}
@@ -132,8 +134,12 @@ small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
 <select id="filePoint"><option value="">Рейс у цілому</option></select>
 </label>
 <div class="row">
+<label class="file-picker"><span>Файл</span>
 <input id="file" type="file" accept="image/*,video/*,application/pdf,*/*">
+</label>
+<label class="file-picker"><span>Фото / відео</span>
 <input id="camera" type="file" accept="image/*,video/*" capture="environment">
+</label>
 <button id="sendFile" type="button">Передати в Control</button>
 </div>
 <p id="fileStatus"></p>
@@ -1626,6 +1632,8 @@ mod tests {
         assert!(!DRIVER_HTML.contains("referrerPolicy = \"no-referrer\""));
         assert!(DRIVER_HTML.contains("id=\"routeSection\""));
         assert!(DRIVER_HTML.contains("id=\"filesSection\""));
+        assert!(DRIVER_HTML.contains("<span>Файл</span>"));
+        assert!(DRIVER_HTML.contains("<span>Фото / відео</span>"));
         assert!(DRIVER_HTML.contains("id=\"locationSection\""));
         assert!(DRIVER_HTML.contains("@media (min-width:700px) and (max-width:1099px)"));
         assert!(DRIVER_HTML.contains("@media (max-width:699px)"));
