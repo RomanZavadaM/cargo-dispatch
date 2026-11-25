@@ -71,6 +71,8 @@ Android and Apple packages are not yet store-signed. App Store/TestFlight/Google
 
 ## What is still ahead
 
+- Planner/editor desktop UI and release builds for Windows, macOS, and Linux;
+
 - manual local-browser acceptance;
 - testing the same Driver Browser on a real phone in the same LAN;
 - HTTPS/public addressing path;
