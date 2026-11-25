@@ -131,7 +131,11 @@ def check_driver_browser() -> None:
         if not match:
             fail(f"Driver Browser catalog missing {locale}")
         locale_keys[locale] = set(
-            re.findall(r"^    ([A-Za-z][A-Za-z0-9]*):", match.group("body"), flags=re.MULTILINE)
+            re.findall(
+                r"(?:^|,\\s+)([A-Za-z][A-Za-z0-9]*):",
+                match.group("body"),
+                flags=re.MULTILINE,
+            )
         )
 
     baseline = locale_keys["uk"]
