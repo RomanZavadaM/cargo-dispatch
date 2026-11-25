@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · **🇯🇵 日本語** · [🇨🇳 简体中文](README.zh.md)
 
-> **ステータス:** 開発中です。現在の安定版は **v0.1.0** です。ローカライズ完了後の次の大きな作業はルート Planner です。
+> **ステータス:** 開発中です。現在の安定版は **v0.1.0** です。8言語の完全なローカライズを統合済みで、次の大きな作業はルート Planner です。
 
 ## 製品について
 
@@ -83,7 +83,7 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 
 ## インターフェース言語
 
-現在統合済みの desktop/browser UI は **ウクライナ語、英語、ドイツ語** を実装・検証しています。新しい Android と iOS/iPadOS の native client は最初の画面から **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** の言語パックを持ち、ドキュメントも同じ言語セットで管理します。
+Control、Driver Browser、Android Driver、iOS/iPadOS Driver は共通の **8言語セット: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** で実装・検証済みです。Control と Driver Browser はシステム言語と保存される手動選択をサポートし、CI が8言語すべての完全性を確認します。
 
 ## ドキュメント
 
