@@ -550,7 +550,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([24; 16]).expect("operator"),
             ordered_point_ids: vec![point],
-        route_geometry: None,
+            route_geometry: None,
         };
         let package = root.join("desktop-trip.zip");
         let folder = root.join("desktop-trip");
