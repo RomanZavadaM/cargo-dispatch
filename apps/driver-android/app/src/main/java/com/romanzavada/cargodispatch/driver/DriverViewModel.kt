@@ -224,9 +224,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }.onSuccess {
                 mutableState.value = it.copy(busy = false)
             }.onFailure { problem ->
-                if (problem is ControlApiException) {
-                    queue.removeMedia(documentId)
-                }
                 mutableState.value = mutableState.value.copy(
                     busy = false,
                     pendingOutbound = queue.pendingCount(),
