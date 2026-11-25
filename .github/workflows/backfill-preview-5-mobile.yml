@@ -61,12 +61,12 @@ jobs:
 
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > RELEASE_BODY.md
           if ! grep -q '^### Мобільні тестові збірки' RELEASE_BODY.md; then
-            cat >> RELEASE_BODY.md <<'EOF'
-
-          ### Мобільні тестові збірки
-          - Android: debug APK для ручного тестового встановлення; build із Android r5 exact head.
-          - Apple: iOS/iPadOS Simulator ZIP; build із Apple r5 exact head.
-          - Це ще не store-signed builds. Google Play / App Store / TestFlight distribution буде налаштована окремо пізніше.
-          EOF
+            printf '%s\n' \
+              '' \
+              '### Мобільні тестові збірки' \
+              '- Android: debug APK для ручного тестового встановлення; build із Android r5 exact head.' \
+              '- Apple: iOS/iPadOS Simulator ZIP; build із Apple r5 exact head.' \
+              '- Це ще не store-signed builds. Google Play / App Store / TestFlight distribution буде налаштована окремо пізніше.' \
+              >> RELEASE_BODY.md
           fi
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file RELEASE_BODY.md
