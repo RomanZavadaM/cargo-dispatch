@@ -2,7 +2,6 @@ package com.romanzavada.cargodispatch.driver
 
 import com.romanzavada.cargodispatch.driver.model.LocationUpdate
 import java.nio.file.Files
-import kotlin.io.path.toFile
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlinx.coroutines.runBlocking
