@@ -59,16 +59,20 @@ final class DriverStore: ObservableObject {
             Task {
                 do {
                     _ = try await client.trip()
-                    await flushPending(client: client, queue: queue)
-                    trip = try await client.trip()
-                    pendingOutbound = await queue.pendingCount()
                     do {
+                        // The first successful authenticated trip read proves the
+                        // Driver session is valid. Persist it securely before any
+                        // queue flushing or follow-up refresh so a fast app stop
+                        // cannot leave the legacy raw URL on disk.
                         try sessionStore.save(driverURL: driverURL)
                     } catch {
                         // Keep the live in-memory session, but never fall back
                         // to persisting a raw token if Keychain storage fails.
                         sessionStore.clear()
                     }
+                    await flushPending(client: client, queue: queue)
+                    trip = try await client.trip()
+                    pendingOutbound = await queue.pendingCount()
                 } catch {
                     pendingOutbound = await queue.pendingCount()
                     errorKey = "error.connection"
