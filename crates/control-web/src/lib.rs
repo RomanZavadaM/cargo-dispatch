@@ -1833,7 +1833,7 @@ mod tests {
         for locale in ["uk", "en", "de", "fr", "es", "ko", "ja", "zh-Hans"] {
             assert!(
                 DRIVER_HTML.contains(&format!("{locale}: {{"))
-                    || DRIVER_HTML.contains(&format!("\\"{locale}\\": {{")),
+                    || DRIVER_HTML.contains(&format!("\"{locale}\": {{")),
                 "Driver Browser locale missing: {locale}"
             );
         }
