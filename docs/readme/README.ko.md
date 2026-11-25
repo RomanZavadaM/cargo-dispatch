@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · **🇰🇷 한국어** · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **상태:** 활발히 개발 중입니다. 현재 안정 버전은 **v0.1.0**입니다. 전체 현지화가 끝나면 다음 큰 작업은 경로 Planner입니다.
+> **상태:** 활발히 개발 중입니다. 현재 안정 버전은 **v0.1.0**입니다. 8개 언어 전체 현지화가 통합되었으며 다음 큰 작업은 경로 Planner입니다.
 
 ## 제품 소개
 
@@ -83,7 +83,7 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 
 ## 인터페이스 언어
 
-현재 통합된 desktop/browser UI는 **우크라이나어, 영어, 독일어**를 구현·검증합니다. 새 Android 및 iOS/iPadOS native client는 첫 화면부터 **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** 언어팩을 포함하며 문서도 같은 언어 집합으로 유지됩니다.
+Control, Driver Browser, Android Driver, iOS/iPadOS Driver는 모두 동일한 **8개 언어 세트: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**로 구현·검증되었습니다. Control과 Driver Browser는 시스템 언어와 저장되는 수동 선택을 지원하며 CI가 8개 현지화의 완전성을 검사합니다.
 
 ## 문서
 
