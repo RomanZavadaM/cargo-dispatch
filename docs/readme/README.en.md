@@ -37,7 +37,9 @@ Trip data, route actions, files, and backend calls are shared; only layout chang
 
 Control and Driver Browser now contain a real interactive basemap with trip points and the latest accepted driver position.
 
-This is **not yet full road-route geometry**. Real Valhalla route geometry is still to be integrated.
+The `main` branch now contains a versioned road-geometry pipeline (schema 1.2): Planner can carry derived geometry, Control stores it, and both maps draw the road line only while it matches the current stop order. Any reorder invalidates the stale line immediately.
+
+What is still missing is the **live HTTP transport to Valhalla and automatic geometry recalculation**. The geometry contract and rendering exist; the external routing engine is not yet connected to the product runtime.
 
 ## Test build
 
@@ -45,7 +47,7 @@ Current prerelease: [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-dis
 
 The Windows ZIP contains Control, a synthetic active trip, and a sample PDF for local loopback acceptance.
 
-This is a **test/prerelease build**, not stable.
+This is a **test/prerelease build**, not stable. Note that `main` is already ahead of preview.3: the Valhalla adapter and schema 1.2 road-geometry pipeline were merged after this prerelease was published.
 
 ## What is still ahead
 
@@ -54,13 +56,13 @@ This is a **test/prerelease build**, not stable.
 - HTTPS/public addressing path;
 - full browser GPS acceptance over HTTPS;
 - field testing across different networks/NAT/CGNAT;
-- real Valhalla road geometry;
-- a future native Driver App;
+- live Valhalla HTTP transport and geometry recalculation after reorder;
+- native Android and iOS/iPadOS Driver Apps, now being developed in parallel on separate draft branches;
 - a stable release.
 
 ## Interface languages
 
-The current UI implements and verifies **Ukrainian, English, and German**. The other README translations are documentation/target languages and do not yet mean that the program UI supports them.
+The integrated desktop/browser UI currently implements and verifies **Ukrainian, English, and German**. The new native Android and iOS/iPadOS clients start with localization packs for **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** from the first screen, and their documentation follows the same language set.
 
 ## Documentation
 
