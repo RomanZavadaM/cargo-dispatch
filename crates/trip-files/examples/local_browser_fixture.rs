@@ -33,12 +33,13 @@ fn point(
 }
 
 fn write_sample_pdf(path: &Path) -> io::Result<()> {
-    let objects = [
-        "<< /Type /Catalog /Pages 2 0 R >>",
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-        "<< /Length 77 >>\nstream\nBT /F1 18 Tf 72 720 Td (Cargo Dispatch local browser test PDF) Tj ET\nendstream",
+    let stream = "BT /F1 18 Tf 72 720 Td (Cargo Dispatch local browser test PDF) Tj ET\n";
+    let objects = vec![
+        "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_owned(),
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>".to_owned(),
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_owned(),
+        format!("<< /Length {} >>\nstream\n{stream}endstream", stream.len()),
     ];
 
     let mut bytes = b"%PDF-1.4\n".to_vec();
