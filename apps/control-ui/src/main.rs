@@ -521,7 +521,11 @@ fn ControlApp() -> impl IntoView {
     let refresh_dashboard = move |_| {
         let active = selected_token.get_untracked();
         if active.is_empty() {
-            message.set(strings(locale.get_untracked()).choose_session_first.to_owned());
+            message.set(
+                strings(locale.get_untracked())
+                    .choose_session_first
+                    .to_owned(),
+            );
             error.set(true);
             return;
         }
@@ -613,7 +617,11 @@ fn ControlApp() -> impl IntoView {
         let base_url = gateway_url.get_untracked().trim().to_owned();
         let secret = gateway_secret.get_untracked();
         if base_url.is_empty() {
-            message.set(strings(locale.get_untracked()).gateway_url_required.to_owned());
+            message.set(
+                strings(locale.get_untracked())
+                    .gateway_url_required
+                    .to_owned(),
+            );
             error.set(true);
             return;
         }
@@ -684,7 +692,11 @@ fn ControlApp() -> impl IntoView {
             return;
         };
         if active.is_empty() {
-            message.set(strings(locale.get_untracked()).choose_session_first.to_owned());
+            message.set(
+                strings(locale.get_untracked())
+                    .choose_session_first
+                    .to_owned(),
+            );
             error.set(true);
             return;
         }
