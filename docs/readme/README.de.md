@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · **🇩🇪 Deutsch** · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** aktive Entwicklung. Der aktuelle Test-Prerelease ist **v0.1.0-preview.4**. Ein stabiles fertiges Produkt gibt es noch nicht.
+> **Status:** aktive Entwicklung. Der aktuelle Test-Prerelease ist **v0.1.0-preview.5**. Ein stabiles fertiges Produkt gibt es noch nicht.
 
 ## Über das Produkt
 
@@ -32,6 +32,8 @@ Beide nativen Clients sind bereits in `main` integriert:
 
 Beide verwenden dieselbe Control-API und erzeugen keine separate Tour-Datenbank.
 
+Seit r4/r5 besitzen beide nativen Clients außerdem eine dauerhafte Retry-Queue für Positionen und Medien. Android r5 ergänzt explizites Start/Stop-Hintergrundtracking über einen Foreground-Location-Service, eine dauerhafte Stop-Benachrichtigung und eine 15-s-/25-m-Policy. Apple r5 ergänzt explizites Start/Stop-CoreLocation-Tracking im Hintergrund, `UIBackgroundModes=location`, einen 25-m-Filter und fordert `Always` nicht ohne gesonderten Bedarf an.
+
 ## Driver Browser
 
 Driver Browser ist **ein einziges Produkt**, nicht getrennte Telefon- und Desktop-Versionen. Es gibt drei reguläre Layouts:
@@ -52,11 +54,11 @@ Noch fehlt der **Live-HTTP-Transport zu Valhalla und die automatische Neuberechn
 
 ## Testversion
 
-Aktueller Prerelease: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
+Aktueller Prerelease: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
 
 Das Windows-ZIP enthält Control, eine synthetische aktive Tour und eine Test-PDF für die lokale Loopback-Abnahme.
 
-Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. Preview.4 enthält bereits Valhalla-Adapter und Schema-1.2-Road-Geometry-Pipeline. `main` ist erneut weiter: Android- und iOS/iPadOS-Driver r2+r3 einschließlich nativer Karten und Systemkamera sowie ein verbesserter Driver-URL-Handoff aus Control wurden nach preview.4 integriert.
+Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. Preview.5 bildet den aktuellen Stand von Control/Driver Browser, die Valhalla-Schema-1.2-Road-Geometry-Pipeline und den Quellcode beider nativen Driver Apps bis r5 ab: Karten, Kamera/Dateien, dauerhafte Retry-Queue und explizites Hintergrundtracking. Als öffentlicher Binär-Asset wird vorerst weiterhin der Windows-Control-Preview veröffentlicht; Production-Signing/TestFlight für Mobile steht noch aus.
 
 ## Was noch fehlt
 
@@ -66,9 +68,9 @@ Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. Preview.4 enthä
 - vollständige Browser-GPS-Abnahme über HTTPS;
 - Feldtests über verschiedene Netze/NAT/CGNAT;
 - Live-Valhalla-HTTP-Transport und Neuberechnung der Geometrie nach Reorder;
-- verbundener Virtual-Device-Smoke über eine echte headless Control-Session;
-- Hintergrund-GPS, Offline-Queue und sichere Session-Speicherung für die nativen Apps;
 - Stable Release.
+- sichere Driver-Session-Speicherung mit Android Keystore + Apple Keychain einschließlich Migration der alten Raw-URL;
+
 
 ## Sprachen der Benutzeroberfläche
 
