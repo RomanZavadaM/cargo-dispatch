@@ -1,0 +1,64 @@
+name: Control Gateway Client
+
+on:
+  push:
+    branches:
+      - "product/control-gateway-r*"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/addressing-gateway/**"
+      - "crates/control-gateway-client/**"
+      - ".github/workflows/control-gateway-client.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/addressing-gateway/**"
+      - "crates/control-gateway-client/**"
+      - ".github/workflows/control-gateway-client.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-gateway-client-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Control gateway client quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          components: rustfmt, clippy
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Test relay client
+        run: cargo test --locked -p cargo-dispatch-control-gateway-client --all-targets
+      - name: Clippy relay client
+        run: cargo clippy --locked -p cargo-dispatch-control-gateway-client --all-targets -- -D warnings
+
+  portability:
+    name: Control gateway client (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+      - name: Test relay client
+        run: cargo test --locked -p cargo-dispatch-control-gateway-client --all-targets
