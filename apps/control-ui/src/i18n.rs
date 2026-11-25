@@ -152,6 +152,7 @@ pub struct ControlStrings {
     pub file_sent: &'static str,
     pub file_saved: &'static str,
     pub operation_failed: &'static str,
+    pub meter_unit: &'static str,
 }
 
 pub fn strings(locale: UiLocale) -> &'static ControlStrings {
@@ -247,6 +248,7 @@ static UK: ControlStrings = ControlStrings {
     file_sent: "Файл записаний у рейс і доступний водієві.",
     file_saved: "Файл збережено",
     operation_failed: "Операцію не вдалося виконати",
+    meter_unit: "м",
 };
 
 static EN: ControlStrings = ControlStrings {
@@ -329,6 +331,7 @@ static EN: ControlStrings = ControlStrings {
     file_sent: "The file was added to the trip and is available to the driver.",
     file_saved: "File saved",
     operation_failed: "The operation could not be completed",
+    meter_unit: "m",
 };
 
 static DE: ControlStrings = ControlStrings {
@@ -411,6 +414,7 @@ static DE: ControlStrings = ControlStrings {
     file_sent: "Die Datei wurde der Tour hinzugefügt und ist für den Fahrer verfügbar.",
     file_saved: "Datei gespeichert",
     operation_failed: "Der Vorgang konnte nicht ausgeführt werden",
+    meter_unit: "m",
 };
 
 static FR: ControlStrings = ControlStrings {
@@ -493,6 +497,7 @@ static FR: ControlStrings = ControlStrings {
     file_sent: "Le fichier a été ajouté au trajet et est disponible pour le conducteur.",
     file_saved: "Fichier enregistré",
     operation_failed: "L’opération n’a pas pu être effectuée",
+    meter_unit: "m",
 };
 
 static ES: ControlStrings = ControlStrings {
@@ -575,6 +580,7 @@ static ES: ControlStrings = ControlStrings {
     file_sent: "El archivo se añadió al viaje y está disponible para el conductor.",
     file_saved: "Archivo guardado",
     operation_failed: "No se pudo completar la operación",
+    meter_unit: "m",
 };
 
 static KO: ControlStrings = ControlStrings {
@@ -657,6 +663,7 @@ static KO: ControlStrings = ControlStrings {
     file_sent: "파일이 운행에 추가되어 운전자가 사용할 수 있습니다.",
     file_saved: "파일 저장됨",
     operation_failed: "작업을 완료하지 못했습니다",
+    meter_unit: "m",
 };
 
 static JA: ControlStrings = ControlStrings {
@@ -739,6 +746,7 @@ static JA: ControlStrings = ControlStrings {
     file_sent: "ファイルを運行に追加し、ドライバーが利用できるようになりました。",
     file_saved: "ファイルを保存しました",
     operation_failed: "操作を完了できませんでした",
+    meter_unit: "m",
 };
 
 static ZH: ControlStrings = ControlStrings {
@@ -821,6 +829,7 @@ static ZH: ControlStrings = ControlStrings {
     file_sent: "文件已加入行程，司机可以访问。",
     file_saved: "文件已保存",
     operation_failed: "无法完成操作",
+    meter_unit: "m",
 };
 
 pub fn localize_problem(locale: UiLocale, problem: &str) -> String {
