@@ -60,7 +60,6 @@ struct SecureSessionStore {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrSynchronizable as String: kCFBooleanFalse as Any,
         ]
         SecItemDelete(query as CFDictionary)
     }
@@ -70,7 +69,6 @@ struct SecureSessionStore {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrSynchronizable as String: kCFBooleanFalse as Any,
             kSecReturnData as String: kCFBooleanTrue as Any,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -86,12 +84,13 @@ struct SecureSessionStore {
     }
 
     private func writeToken(_ token: String) throws {
+        // Omitting kSecAttrSynchronizable keeps the generic-password item
+        // device-local. ThisDeviceOnly then also prevents backup migration.
         let data = Data(token.utf8)
         let lookup: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrSynchronizable as String: kCFBooleanFalse as Any,
         ]
 
         let updateStatus = SecItemUpdate(
