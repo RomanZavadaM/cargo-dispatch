@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · **🇨🇳 简体中文**
 
-> **状态：** 正在积极开发。当前稳定版本为 **v0.1.0**。完成全部本地化后，下一个主要方向是路线 Planner。
+> **状态：** 正在积极开发。当前稳定版本为 **v0.1.0**。完整的 8 语言本地化已集成；下一个主要方向是路线 Planner。
 
 ## 产品简介
 
@@ -83,7 +83,7 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 
 ## 界面语言
 
-当前已集成的 desktop/browser UI 实现并验证 **乌克兰语、英语和德语**。新的 Android 与 iOS/iPadOS 原生客户端从第一个界面起就包含 **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** 语言包，文档也使用同一组语言。
+Control、Driver Browser、Android Driver 和 iOS/iPadOS Driver 已使用同一套 **8 种语言：uk、en、de、fr、es、ko、ja、zh-Hans/zh-CN** 完成实现与验证。Control 和 Driver Browser 支持系统语言与持久化手动选择，CI 会检查全部 8 个本地化的完整性。
 
 ## 文档
 
