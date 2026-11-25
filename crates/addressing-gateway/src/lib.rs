@@ -147,7 +147,11 @@ impl GatewayState {
 
     async fn register_session(&self, session: String) -> Arc<RelaySession> {
         let relay = Arc::new(RelaySession::new());
-        self.inner.sessions.write().await.insert(session, relay.clone());
+        self.inner
+            .sessions
+            .write()
+            .await
+            .insert(session, relay.clone());
         relay
     }
 
@@ -176,7 +180,10 @@ pub fn router(state: GatewayState) -> Router {
     Router::new()
         .route("/healthz", get(health))
         .route("/v1/session/{session}", get(session_status))
-        .route("/v1/control/{session}", put(register_control).delete(unregister_control))
+        .route(
+            "/v1/control/{session}",
+            put(register_control).delete(unregister_control),
+        )
         .route("/v1/control/{session}/next", get(control_next))
         .route(
             "/v1/control/{session}/response/{request_id}",
@@ -192,9 +199,9 @@ async fn health() -> Json<HealthResponse> {
 
 fn valid_session_token(value: &str) -> bool {
     (16..=256).contains(&value.len())
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~')
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~'))
 }
 
 fn session_from_public_path(path: &str) -> Option<&str> {
@@ -461,10 +468,7 @@ fn client_response(relay: RelayResponse) -> Response {
     *response.status_mut() = relay.status;
 
     for (name, value) in relay.headers {
-        if let (Ok(name), Ok(value)) = (
-            HeaderName::try_from(name),
-            HeaderValue::try_from(value),
-        ) {
+        if let (Ok(name), Ok(value)) = (HeaderName::try_from(name), HeaderValue::try_from(value)) {
             response.headers_mut().insert(name, value);
         }
     }
@@ -479,10 +483,7 @@ fn client_response(relay: RelayResponse) -> Response {
 }
 
 fn insert_text_header(headers: &mut HeaderMap, name: &str, value: &str) {
-    if let (Ok(name), Ok(value)) = (
-        HeaderName::try_from(name),
-        HeaderValue::try_from(value),
-    ) {
+    if let (Ok(name), Ok(value)) = (HeaderName::try_from(name), HeaderValue::try_from(value)) {
         headers.insert(name, value);
     }
 }
@@ -502,7 +503,10 @@ mod tests {
             Some("abcdefghijklmnop")
         );
         assert_eq!(session_from_public_path("/healthz"), None);
-        assert_eq!(session_from_public_path("/v1/control/abcdefghijklmnop"), None);
+        assert_eq!(
+            session_from_public_path("/v1/control/abcdefghijklmnop"),
+            None
+        );
     }
 
     #[test]
