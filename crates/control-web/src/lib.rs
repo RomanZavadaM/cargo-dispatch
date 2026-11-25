@@ -43,12 +43,46 @@ const DRIVER_HTML: &str = r#"<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cargo Dispatch — рейс</title>
 <style>
-body{font-family:system-ui,sans-serif;margin:0;background:#f6f7f8;color:#202124}
-main{max-width:760px;margin:auto;padding:16px}
-section{background:white;border:1px solid #ddd;border-radius:12px;padding:14px;margin:12px 0}
-button,input{font:inherit}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.point{padding:8px 0;border-bottom:1px solid #eee}.point:last-child{border-bottom:0}
+:root{font-family:system-ui,sans-serif;color:#202124;background:#f6f7f8}
+*{box-sizing:border-box}
+body{margin:0;background:#f6f7f8;color:#202124;overflow-x:hidden}
+main{width:min(100%,1440px);margin:auto;padding:20px;display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);grid-template-areas:"title title" "status status" "route files" "route location";gap:14px;align-items:start}
+h1{grid-area:title;margin:0}
+#status{grid-area:status;margin:0;padding:10px 12px;border-radius:10px;background:#eef3f8}
+section{background:white;border:1px solid #ddd;border-radius:12px;padding:16px;min-width:0}
+#routeSection{grid-area:route}
+#filesSection{grid-area:files}
+#locationSection{grid-area:location}
+button,input,select{font:inherit;max-width:100%}
+button{min-height:40px;padding:8px 12px;border:1px solid #b8bec6;border-radius:8px;background:#fff;cursor:pointer}
+button:disabled{cursor:default;opacity:.55}
+input[type=file],select{width:100%;min-width:0}
+label{display:grid;gap:6px;margin:10px 0}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.point{padding:12px 0;border-bottom:1px solid #eee;min-width:0}
+.point:last-child{border-bottom:0}
+.point-header{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.point-title{font-weight:650;overflow-wrap:anywhere}
+.point-actions{display:flex;gap:6px;flex-wrap:wrap}
+.point-nav{margin-top:8px;color:#4f5660;overflow-wrap:anywhere}
+.point-nav a{display:inline-block;margin-left:4px}
+#documents ul{padding-left:20px;margin-bottom:0}
+#documents li{overflow-wrap:anywhere;margin:6px 0}
 small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
+@media (min-width:700px) and (max-width:1099px){
+  main{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title title" "status status" "route route" "files location";padding:18px}
+}
+@media (max-width:699px){
+  main{display:block;width:100%;padding:12px}
+  h1{font-size:1.55rem}
+  #status{margin:10px 0}
+  section{margin:10px 0;padding:13px}
+  .row{align-items:stretch}
+  .row>button,.row>input{width:100%}
+  .point-header{display:block}
+  .point-actions{margin-top:8px}
+  .point-actions button{flex:1 1 72px}
+}
 </style>
 </head>
 <body>
@@ -56,12 +90,12 @@ small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
 <h1>Cargo Dispatch — рейс</h1>
 <p id="status">Завантаження…</p>
 
-<section>
+<section id="routeSection">
 <h2>Маршрут</h2>
 <div id="points"></div>
 </section>
 
-<section>
+<section id="filesSection">
 <h2>Документи / фото / відео</h2>
 <div id="documents"></div>
 <label>Прив'язати до точки:
@@ -75,7 +109,7 @@ small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
 <p id="fileStatus"></p>
 </section>
 
-<section>
+<section id="locationSection">
 <h2>Геолокація</h2>
 <p id="location">Ще не передавалась</p>
 <div class="row">
@@ -148,27 +182,17 @@ function renderRoute() {
   for (const point of currentTrip.points) {
     const row = document.createElement("div");
     row.className = "point";
+    const header = document.createElement("div");
+    header.className = "point-header";
     const text = document.createElement("span");
+    text.className = "point-title";
     text.textContent = point.sequence + ". " + point.title +
       (point.completed ? " — виконано" : " — відкрито");
-    row.append(text);
-    if (point.navigation) {
-      const nav = document.createElement("div");
-      const address = point.navigation.address ? point.navigation.address + " — " : "";
-      nav.textContent = address +
-        point.navigation.latitude.toFixed(6) + ", " +
-        point.navigation.longitude.toFixed(6) + " ";
-      const link = document.createElement("a");
-      link.href = "https://www.google.com/maps/dir/?api=1&destination=" +
-        encodeURIComponent(point.navigation.latitude + "," + point.navigation.longitude);
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.textContent = "Відкрити навігацію";
-      nav.append(link);
-      row.append(nav);
-    }
+    header.append(text);
 
     if (!point.completed) {
+      const actions = document.createElement("div");
+      actions.className = "point-actions";
       const done = document.createElement("button");
       done.type = "button";
       done.textContent = "Виконано";
@@ -180,13 +204,14 @@ function renderRoute() {
           alert("Control не прийняв зміну: " + error.message);
         }
       });
-      row.append(" ", done);
+      actions.append(done);
 
       const openIndex = openPoints.findIndex(item => item.point_id === point.point_id);
       for (const move of [-1, 1]) {
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = move < 0 ? "↑" : "↓";
+        button.setAttribute("aria-label", move < 0 ? "Перемістити точку вище" : "Перемістити точку нижче");
         button.disabled =
           (move < 0 && openIndex === 0) ||
           (move > 0 && openIndex === openPoints.length - 1);
@@ -209,8 +234,27 @@ function renderRoute() {
             await loadTrip();
           }
         });
-        row.append(" ", button);
+        actions.append(button);
       }
+      header.append(actions);
+    }
+    row.append(header);
+
+    if (point.navigation) {
+      const nav = document.createElement("div");
+      nav.className = "point-nav";
+      const address = point.navigation.address ? point.navigation.address + " — " : "";
+      nav.textContent = address +
+        point.navigation.latitude.toFixed(6) + ", " +
+        point.navigation.longitude.toFixed(6) + " ";
+      const link = document.createElement("a");
+      link.href = "https://www.google.com/maps/dir/?api=1&destination=" +
+        encodeURIComponent(point.navigation.latitude + "," + point.navigation.longitude);
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "Відкрити навігацію";
+      nav.append(link);
+      row.append(nav);
     }
     host.append(row);
   }
@@ -1258,6 +1302,20 @@ mod tests {
         }
         serde_json::from_slice(&body)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    }
+
+    #[test]
+    fn driver_page_declares_phone_tablet_and_wide_layouts() {
+        assert!(DRIVER_HTML.contains("id=\"routeSection\""));
+        assert!(DRIVER_HTML.contains("id=\"filesSection\""));
+        assert!(DRIVER_HTML.contains("id=\"locationSection\""));
+        assert!(DRIVER_HTML.contains("@media (min-width:700px) and (max-width:1099px)"));
+        assert!(DRIVER_HTML.contains("@media (max-width:699px)"));
+        assert!(DRIVER_HTML.contains("grid-template-columns:minmax(0,2fr) minmax(320px,1fr)"));
+        assert!(!DRIVER_HTML.contains("max-width:760px"));
+        assert!(DRIVER_HTML.contains("/route/order"));
+        assert!(DRIVER_HTML.contains("/documents/"));
+        assert!(DRIVER_HTML.contains("/location"));
     }
 
     #[test]
