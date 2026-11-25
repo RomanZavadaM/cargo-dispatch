@@ -1,6 +1,7 @@
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct ContentView: View {
     @StateObject private var store = DriverStore()
@@ -11,6 +12,7 @@ struct ContentView: View {
     @State private var exportDocument = DriverFileDocument()
     @State private var exportName = "document"
     @State private var showFileExporter = false
+    @State private var cameraMode: DriverCameraMode?
 
     var body: some View {
         NavigationStack {
@@ -87,6 +89,13 @@ struct ContentView: View {
                         }
                     }
 
+                    Section("map.title") {
+                        DriverTripMap(trip: trip)
+                        Text("map.note")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     Section("location.title") {
                         if let location = trip.latestLocation {
                             Text(
@@ -150,6 +159,22 @@ struct ContentView: View {
                             Text("documents.upload_media")
                         }
                         .disabled(store.busy)
+
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            Button("documents.capture_photo") {
+                                cameraMode = .photo
+                            }
+                            .disabled(store.busy)
+
+                            Button("documents.capture_video") {
+                                cameraMode = .video
+                            }
+                            .disabled(store.busy)
+                        } else {
+                            Text("camera.unavailable")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     Section("route.title") {
@@ -245,6 +270,27 @@ struct ContentView: View {
                         store.reportError("error.file")
                     }
                 }
+            }
+            .sheet(item: $cameraMode) { mode in
+                DriverCameraCaptureView(
+                    mode: mode,
+                    onResult: { result in
+                        cameraMode = nil
+                        switch result {
+                        case let .success(media):
+                            store.upload(
+                                data: media.data,
+                                name: media.name,
+                                mimeType: media.mimeType
+                            )
+                        case .failure:
+                            store.reportError("error.camera")
+                        }
+                    },
+                    onCancel: {
+                        cameraMode = nil
+                    }
+                )
             }
         }
     }

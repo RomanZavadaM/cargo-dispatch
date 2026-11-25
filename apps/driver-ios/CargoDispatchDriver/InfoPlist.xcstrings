@@ -52,6 +52,162 @@
           }
         }
       }
+    },
+    "NSCameraUsageDescription": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch використовує камеру, щоб водій міг передати в Control фото та відео з рейсу."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch uses the camera so the driver can send trip photos and videos to Control."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch verwendet die Kamera, damit der Fahrer Fotos und Videos der Tour an Control senden kann."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch utilise la caméra afin que le conducteur puisse envoyer à Control des photos et vidéos du trajet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch usa la cámara para que el conductor pueda enviar a Control fotos y vídeos del viaje."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch는 운전자가 운행 사진과 동영상을 Control로 전송할 수 있도록 카메라를 사용합니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch はドライバーが運行中の写真や動画を Control に送信するためにカメラを使用します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch 使用相机，以便司机将行程照片和视频发送到 Control。"
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch використовує мікрофон лише для запису звуку під час відео, яке водій передає в Control."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch uses the microphone only to record audio with videos the driver sends to Control."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch verwendet das Mikrofon nur für den Ton von Videos, die der Fahrer an Control sendet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch utilise le microphone uniquement pour enregistrer le son des vidéos envoyées par le conducteur à Control."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch usa el micrófono solo para grabar el audio de los vídeos que el conductor envía a Control."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch는 운전자가 Control로 보내는 동영상의 오디오를 녹음할 때만 마이크를 사용합니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch はドライバーが Control に送信する動画の音声を録音する場合にのみマイクを使用します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch 仅在司机录制并发送到 Control 的视频中使用麦克风录音。"
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch використовує локальну мережу, щоб iPhone або iPad водія міг напряму підключитися до Control на комп’ютері диспетчера."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch uses the local network so the driver's iPhone or iPad can connect directly to Control on the dispatcher's computer."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch verwendet das lokale Netzwerk, damit das iPhone oder iPad des Fahrers direkt mit Control auf dem Rechner des Disponenten verbunden werden kann."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch utilise le réseau local afin que l’iPhone ou l’iPad du conducteur puisse se connecter directement à Control sur l’ordinateur du dispatcheur."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch usa la red local para que el iPhone o iPad del conductor pueda conectarse directamente a Control en el ordenador del despachador."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch는 운전자의 iPhone 또는 iPad가 배차 담당자 컴퓨터의 Control에 직접 연결할 수 있도록 로컬 네트워크를 사용합니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch はドライバーの iPhone または iPad が配車担当者のコンピュータ上の Control に直接接続するためにローカルネットワークを使用します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch 使用本地网络，使司机的 iPhone 或 iPad 能够直接连接调度员电脑上的 Control。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
