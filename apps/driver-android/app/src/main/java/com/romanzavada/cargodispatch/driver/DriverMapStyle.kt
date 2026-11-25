@@ -14,6 +14,7 @@ data class DriverMapCoordinate(
 object DriverMapStyle {
     const val OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
     const val OSM_ATTRIBUTION = "© OpenStreetMap contributors"
+    const val FALLBACK_BACKGROUND = "#e7ecef"
 
     fun styleJson(trip: DriverTrip): String {
         val roadFeature = trip.roadGeometry
@@ -87,6 +88,17 @@ object DriverMapStyle {
 
         val layers = JsonArray(
             listOf(
+                JsonObject(
+                    mapOf(
+                        "id" to JsonPrimitive("background"),
+                        "type" to JsonPrimitive("background"),
+                        "paint" to JsonObject(
+                            mapOf(
+                                "background-color" to JsonPrimitive(FALLBACK_BACKGROUND),
+                            ),
+                        ),
+                    ),
+                ),
                 JsonObject(
                     mapOf(
                         "id" to JsonPrimitive("osm"),
