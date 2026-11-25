@@ -116,14 +116,14 @@ def check_driver_browser() -> None:
         fail("Driver Browser language selector is missing")
 
     markers = {
-        "uk": r"  uk: \\{(?P<body>.*?)\\n  \\},\\n  en:",
-        "en": r"  en: \\{(?P<body>.*?)\\n  \\},\\n  de:",
-        "de": r"  de: \\{(?P<body>.*?)\\n  \\},\\n  fr:",
-        "fr": r"  fr: \\{(?P<body>.*?)\\n  \\},\\n  es:",
-        "es": r"  es: \\{(?P<body>.*?)\\n  \\},\\n  ko:",
-        "ko": r"  ko: \\{(?P<body>.*?)\\n  \\},\\n  ja:",
-        "ja": r"  ja: \\{(?P<body>.*?)\\n  \\},\\n  \"zh-Hans\":",
-        "zh-Hans": r'  "zh-Hans": \\{(?P<body>.*?)\\n  \\}\\n\\};',
+        "uk": r"  uk: \{(?P<body>.*?)\n  \},\n  en:",
+        "en": r"  en: \{(?P<body>.*?)\n  \},\n  de:",
+        "de": r"  de: \{(?P<body>.*?)\n  \},\n  fr:",
+        "fr": r"  fr: \{(?P<body>.*?)\n  \},\n  es:",
+        "es": r"  es: \{(?P<body>.*?)\n  \},\n  ko:",
+        "ko": r"  ko: \{(?P<body>.*?)\n  \},\n  ja:",
+        "ja": r"  ja: \{(?P<body>.*?)\n  \},\n  \"zh-Hans\":",
+        "zh-Hans": r'  "zh-Hans": \{(?P<body>.*?)\n  \}\n\};',
     }
     locale_keys: dict[str, set[str]] = {}
     for locale, pattern in markers.items():
