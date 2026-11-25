@@ -196,23 +196,27 @@ jobs:
           xcrun simctl launch "$DEVICE" "$BUNDLE"
 
           FIRST_CONNECTED=0
-          for _ in $(seq 1 120); do
+          for _ in $(seq 1 160); do
             REQUEST_COUNT="$(grep -c '^GET /api/trip/native-smoke-session-00000001 ' apps/driver-ios/native-proxy-requests.log || true)"
-            if [ "$REQUEST_COUNT" -ge 1 ]; then
+            # DriverStore completes its initial connection with two trip reads:
+            # one verifies the session, the second refreshes after pending-queue
+            # flushing. SecureSessionStore.save() runs immediately after that.
+            if [ "$REQUEST_COUNT" -ge 2 ]; then
               FIRST_CONNECTED=1
               break
             fi
             sleep 0.5
           done
           if [ "$FIRST_CONNECTED" -ne 1 ]; then
-            echo "Apple Driver did not reach Control during legacy-session migration." >&2
+            echo "Apple Driver did not complete the initial Control connection during legacy-session migration." >&2
             cat apps/driver-ios/native-proxy.log || true
             cat apps/driver-ios/native-proxy-requests.log || true
             exit 1
           fi
 
-          # Stop the first process so UserDefaults is flushed to its real
-          # on-disk state before inspecting migration output.
+          # Let the post-refresh secure save finish, then stop the first process
+          # so UserDefaults is flushed to its real on-disk state.
+          sleep 1
           xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
           sleep 1
 
