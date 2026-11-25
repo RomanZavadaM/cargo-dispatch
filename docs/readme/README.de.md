@@ -37,7 +37,9 @@ Daten, Routenaktionen, Dateien und Backend sind gemeinsam; nur das Layout passt 
 
 Control und Driver Browser enthalten jetzt eine echte interaktive Basiskarte mit den Tourpunkten und der zuletzt akzeptierten Fahrerposition.
 
-Dies ist **noch nicht die vollständige Straßenroutengeometrie**. Die reale Geometrie über Valhalla muss noch integriert werden.
+In `main` ist jetzt eine versionierte Road-Geometry-Pipeline (Schema 1.2) integriert: Planner kann abgeleitete Geometrie mitgeben, Control speichert sie, und beide Karten zeigen die Straßenlinie nur solange sie zur aktuellen Stopp-Reihenfolge passt. Nach einem Reorder wird die alte Linie sofort ungültig.
+
+Noch fehlt der **Live-HTTP-Transport zu Valhalla und die automatische Neuberechnung der Geometrie**. Vertrag und Darstellung sind vorhanden; der externe Routing-Engine-Pfad ist noch nicht in die Product-Runtime eingebunden.
 
 ## Testversion
 
@@ -45,7 +47,7 @@ Aktueller Prerelease: [v0.1.0-preview.3](https://github.com/RomanZavadaM/cargo-d
 
 Das Windows-ZIP enthält Control, eine synthetische aktive Tour und eine Test-PDF für die lokale Loopback-Abnahme.
 
-Dies ist ein **Test-/Prerelease-Build**, keine stabile Version.
+Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. `main` ist bereits weiter als preview.3: Valhalla-Adapter und Schema-1.2-Road-Geometry-Pipeline wurden erst nach diesem Prerelease integriert.
 
 ## Was noch fehlt
 
@@ -54,13 +56,13 @@ Dies ist ein **Test-/Prerelease-Build**, keine stabile Version.
 - HTTPS-/Public-Addressing-Pfad;
 - vollständige Browser-GPS-Abnahme über HTTPS;
 - Feldtests über verschiedene Netze/NAT/CGNAT;
-- reale Valhalla-Straßengeometrie;
-- zukünftige native Driver App;
+- Live-Valhalla-HTTP-Transport und Neuberechnung der Geometrie nach Reorder;
+- native Driver Apps für Android und iOS/iPadOS, die bereits parallel in getrennten Draft-Branches entwickelt werden;
 - Stable Release.
 
 ## Sprachen der Benutzeroberfläche
 
-Die aktuelle Oberfläche implementiert und prüft **Ukrainisch, Englisch und Deutsch**. Die übrigen README-Übersetzungen sind Dokumentations- bzw. Zielsprachen und bedeuten noch keine Unterstützung in der Programmoberfläche.
+Die integrierte Desktop-/Browser-Oberfläche implementiert und prüft derzeit **Ukrainisch, Englisch und Deutsch**. Die neuen nativen Android- und iOS/iPadOS-Clients erhalten von Anfang an Sprachpakete für **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**; die Dokumentation wird mit demselben Sprachsatz gepflegt.
 
 ## Dokumentation
 
