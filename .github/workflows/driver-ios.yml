@@ -1,0 +1,54 @@
+name: Driver iOS
+
+on:
+  push:
+    branches:
+      - "product/driver-ios-r1"
+    paths:
+      - "apps/driver-ios/**"
+      - ".github/workflows/driver-ios.yml"
+  pull_request:
+    paths:
+      - "apps/driver-ios/**"
+      - ".github/workflows/driver-ios.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: driver-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: iOS core tests + Simulator build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Show Apple toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Core protocol tests
+        run: swift test --package-path apps/driver-ios
+
+      - name: Build iPhone/iPad Simulator app
+        run: |
+          xcodebuild \
+            -project apps/driver-ios/CargoDispatchDriver.xcodeproj \
+            -scheme CargoDispatchDriver \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath apps/driver-ios/build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Upload Simulator app
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: Cargo-Dispatch-Driver-iOS-Simulator
+          path: apps/driver-ios/build/DerivedData/Build/Products/Debug-iphonesimulator/CargoDispatchDriver.app
+          if-no-files-found: error
