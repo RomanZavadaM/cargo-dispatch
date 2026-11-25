@@ -71,6 +71,8 @@ Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/Te
 
 ## Was noch fehlt
 
+- Planner/editor-Desktop-UI und Release-Builds für Windows, macOS und Linux;
+
 - manuelle lokale Browser-Abnahme;
 - Test desselben Driver Browser auf einem echten Telefon im selben LAN;
 - HTTPS-/Public-Addressing-Pfad;
