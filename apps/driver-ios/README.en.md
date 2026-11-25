@@ -4,8 +4,8 @@
 
 Native Apple driver client. One SwiftUI target supports iPhone and iPad and uses the **same Control API** as Driver Browser and Android Driver App.
 
-Current scope: Swift 6 + SwiftUI + URLSession; iOS/iPadOS 17+; Driver URL; trip snapshot; complete/reorder; permanent point IDs + local route revision; optional road geometry; one-shot CoreLocation foreground GPS to Control; Control→iPhone/iPad document download through native fileExporter; iPhone/iPad→Control file/photo/video through fileImporter + PhotosPicker; restart recovery of the last Driver URL; localized location permission; uk/en/de/fr/es/ko/ja/zh-Hans localization; pure Swift protocol tests and Simulator build/install/launch/screenshot CI.
+Current scope: Swift 6 + SwiftUI + URLSession; iOS/iPadOS 17+; Driver URL; trip snapshot; complete/reorder; native MapKit map with current road geometry, markers and latest position; one-shot foreground CoreLocation; file/photo/video transfer and system camera; durable retry queue for newest location/media; explicit Start/Stop background CoreLocation tracking with `UIBackgroundModes=location` and a 25 m filter; secure session recovery with the token in a non-synchronizing Keychain item (`AfterFirstUnlockThisDeviceOnly`) and only the non-secret base URL in UserDefaults; automatic migration away from the legacy raw Driver URL after a successful reconnect; uk/en/de/fr/es/ko/ja/zh-Hans localization; pure Swift protocol tests and connected Simulator smoke against a real synthetic Control trip.
 
 Local HTTP is allowed only for Simulator/LAN Debug; Release remains HTTPS-first.
 
-Still ahead: native MapKit map, camera capture, background GPS, connected Simulator smoke against a real synthetic Control trip, offline queue/retry, Keychain hardening, push/notifications, and production signing/TestFlight.
+Still ahead: real-device LAN/background-tracking acceptance, HTTPS/public/NAT/CGNAT field acceptance, push/notifications, and production signing/TestFlight.

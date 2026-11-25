@@ -4,8 +4,8 @@
 
 Client conducteur Apple natif. Une seule cible SwiftUI prend en charge iPhone et iPad et utilise **la même API Control** que Driver Browser et l’application Android.
 
-Portée actuelle : Swift 6 + SwiftUI + URLSession ; iOS/iPadOS 17+ ; Driver URL ; snapshot du trajet ; complete/reorder ; identifiants permanents + révision locale ; géométrie routière optionnelle ; position CoreLocation ponctuelle en premier plan vers Control ; téléchargement Control→iPhone/iPad via fileExporter ; fichier/photo/vidéo iPhone/iPad→Control via fileImporter + PhotosPicker ; restauration de la dernière Driver URL ; texte de permission localisation traduit ; uk/en/de/fr/es/ko/ja/zh-Hans ; tests de protocole Swift et CI Simulator build/install/launch/screenshot.
+Portée actuelle : Swift 6 + SwiftUI + URLSession ; iOS/iPadOS 17+ ; Driver URL ; snapshot du trajet ; complete/reorder ; carte MapKit native avec géométrie routière, points et dernière position ; localisation CoreLocation ponctuelle au premier plan ; transfert fichier/photo/vidéo et caméra système ; file durable de réessai pour la dernière position/les médias ; suivi CoreLocation d’arrière-plan Start/Stop explicite avec `UIBackgroundModes=location` et filtre 25 m ; récupération de session sécurisée avec le token dans un élément Keychain non synchronisé (`AfterFirstUnlockThisDeviceOnly`) et seulement la base URL non secrète dans UserDefaults ; migration automatique de l’ancienne Driver URL brute après reconnexion réussie ; uk/en/de/fr/es/ko/ja/zh-Hans ; tests de protocole Swift et smoke Simulator connecté à un vrai trajet synthétique Control.
 
 HTTP local uniquement en Debug Simulator/LAN ; Release reste HTTPS-first.
 
-À venir : carte MapKit native, capture caméra, GPS arrière-plan, smoke Simulator connecté à un vrai trajet synthétique Control, file offline/retry, durcissement Keychain, push et signature/TestFlight.
+À venir : validation LAN/suivi d’arrière-plan sur appareil réel, parcours HTTPS/public/NAT/CGNAT, push/notifications et signature production/TestFlight.
