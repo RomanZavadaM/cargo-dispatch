@@ -2,14 +2,16 @@
 
 use cargo_dispatch_contracts::{
     ContractError, ReplanRequest, TripGeometryContractError, TripPackageHeader, TripRoadGeometry,
-    TripVersion, validate_trip_road_geometry,
+    TripRoadGeometryPoint, TripRoutingIdentity, TripVersion, validate_trip_road_geometry,
 };
 use cargo_dispatch_domain::{
     AvailabilityState, CalculationId, CallTaskId, CandidateId, CargoId, CargoSummary, LoadRequest,
     NegotiatedTermsId, OperatorId, PlanningAssignment, PointId, RequestId, RequestRevision,
     ReservationId, TripId, WorkingRouteId,
 };
-use cargo_dispatch_geo::{GeoPoint, RouteRequest, RouteResult, VehicleRoutingProfile};
+use cargo_dispatch_geo::{
+    GeoPoint, NormalizedStatus, RouteRequest, RouteResult, VehicleRoutingProfile,
+};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -773,6 +775,33 @@ impl PlannerTripExportDraft {
         self.route_geometry = Some(geometry);
         Ok(self)
     }
+
+    pub fn with_route_result_geometry(
+        self,
+        result: &RouteResult,
+    ) -> Result<Self, PlannerExportError> {
+        if result.status != NormalizedStatus::Ok || result.geometry.len() < 2 {
+            return Err(PlannerExportError::RouteGeometryUnavailable);
+        }
+
+        let geometry = TripRoadGeometry {
+            routing: TripRoutingIdentity {
+                engine: result.identity.engine().to_owned(),
+                engine_version: result.identity.engine_version().to_owned(),
+                map_dataset_id: result.identity.map_dataset_id().to_owned(),
+                profile_fingerprint: result.identity.profile_fingerprint().to_owned(),
+            },
+            points: result
+                .geometry
+                .iter()
+                .map(|point| TripRoadGeometryPoint {
+                    latitude_e7: (point.lat() * 10_000_000.0).round() as i32,
+                    longitude_e7: (point.lon() * 10_000_000.0).round() as i32,
+                })
+                .collect(),
+        };
+        self.with_route_geometry(geometry)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -781,6 +810,7 @@ pub enum PlannerExportError {
     DuplicatePoint(PointId),
     Contract(ContractError),
     InvalidGeometry(TripGeometryContractError),
+    RouteGeometryUnavailable,
 }
 
 pub fn build_trip_export_draft(
