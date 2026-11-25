@@ -1,0 +1,42 @@
+name: Localization coverage
+
+on:
+  push:
+    branches:
+      - "product/**"
+      - main
+    paths:
+      - "README.md"
+      - "docs/readme/**"
+      - "apps/control-ui/**"
+      - "crates/control-web/**"
+      - "apps/driver-android/**"
+      - "apps/driver-ios/**"
+      - ".github/scripts/check-localizations.py"
+      - ".github/workflows/localization.yml"
+  pull_request:
+    paths:
+      - "README.md"
+      - "docs/readme/**"
+      - "apps/control-ui/**"
+      - "crates/control-web/**"
+      - "apps/driver-android/**"
+      - "apps/driver-ios/**"
+      - ".github/scripts/check-localizations.py"
+      - ".github/workflows/localization.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: localization-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Eight-language coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Verify all project locales
+        run: python3 .github/scripts/check-localizations.py
