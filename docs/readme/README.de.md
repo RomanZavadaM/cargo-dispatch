@@ -23,6 +23,15 @@ Die Hauptentwicklungssprache ist **Rust**.
 - interaktive OpenStreetMap-Karte in Control und Driver Browser;
 - Loopback- und expliziter LAN-Modus für Tests und lokale Arbeit.
 
+## Native Driver Apps
+
+Beide nativen Clients sind bereits in `main` integriert:
+
+- **Android** — Jetpack Compose, Route/Abschluss/Neuordnung, Dateien/Fotos/Videos, Foreground-GPS, Session-Wiederherstellung, native MapLibre + OpenStreetMap, aktuelle Straßengeometrie, Stopps/letzte Position und systemeigene Foto-/Videoaufnahme; Emulator Build/Install/Start/Screenshot PASS.
+- **iPhone/iPad** — SwiftUI, Route/Abschluss/Neuordnung, Dateien/Fotos/Videos, Foreground-CoreLocation, Session-Wiederherstellung, natives MapKit, aktuelle Geometrie, Stopps/letzte Position und systemeigene Foto-/Videoaufnahme; Simulator Build/Install/Start/Screenshot PASS.
+
+Beide verwenden dieselbe Control-API und erzeugen keine separate Tour-Datenbank.
+
 ## Driver Browser
 
 Driver Browser ist **ein einziges Produkt**, nicht getrennte Telefon- und Desktop-Versionen. Es gibt drei reguläre Layouts:
@@ -47,7 +56,7 @@ Aktueller Prerelease: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-d
 
 Das Windows-ZIP enthält Control, eine synthetische aktive Tour und eine Test-PDF für die lokale Loopback-Abnahme.
 
-Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. Preview.4 enthält bereits Valhalla-Adapter und Schema-1.2-Road-Geometry-Pipeline. `main` ist erneut weiter: Android- und iOS/iPadOS-Driver r2 wurden nach preview.4 integriert.
+Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. Preview.4 enthält bereits Valhalla-Adapter und Schema-1.2-Road-Geometry-Pipeline. `main` ist erneut weiter: Android- und iOS/iPadOS-Driver r2+r3 einschließlich nativer Karten und Systemkamera sowie ein verbesserter Driver-URL-Handoff aus Control wurden nach preview.4 integriert.
 
 ## Was noch fehlt
 
@@ -57,7 +66,8 @@ Dies ist ein **Test-/Prerelease-Build**, keine stabile Version. Preview.4 enthä
 - vollständige Browser-GPS-Abnahme über HTTPS;
 - Feldtests über verschiedene Netze/NAT/CGNAT;
 - Live-Valhalla-HTTP-Transport und Neuberechnung der Geometrie nach Reorder;
-- native Karten: MapLibre auf Android und MapKit auf iOS/iPadOS;\n- Kameraaufnahme, Hintergrund-GPS, verbundene Virtual-Device-Smokes, Offline-Queue und sichere Session-Speicherung;
+- verbundener Virtual-Device-Smoke über eine echte headless Control-Session;
+- Hintergrund-GPS, Offline-Queue und sichere Session-Speicherung für die nativen Apps;
 - Stable Release.
 
 ## Sprachen der Benutzeroberfläche
