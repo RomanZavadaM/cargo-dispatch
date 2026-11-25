@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · **🇯🇵 日本語** · [🇨🇳 简体中文](README.zh.md)
 
-> **ステータス:** 開発中です。現在のテスト用プレリリースは **v0.1.0-preview.4** です。安定版の完成製品はまだありません。
+> **ステータス:** 開発中です。現在のテスト用プレリリースは **v0.1.0-preview.5** です。安定版の完成製品はまだありません。
 
 ## 製品について
 
@@ -32,6 +32,8 @@
 
 両方とも同じ Control API を使用し、別の運行データベースは作りません。
 
+r4/r5 以降、両方の native client は位置情報とメディア用の durable retry queue も備えています。Android r5 は foreground location service、常時表示の Stop 通知、15 秒 / 25 m のポリシーによる明示的な Start/Stop バックグラウンド運行追跡を追加します。Apple r5 は明示的な Start/Stop CoreLocation バックグラウンド追跡、`UIBackgroundModes=location`、25 m フィルタを追加し、別の必要性がない限り `Always` 権限を要求しません。
+
 ## Driver Browser
 
 Driver Browser は電話版と desktop 版に分かれた製品ではなく、**1 つの製品**です。標準レイアウトは次の 3 つです。
@@ -52,11 +54,11 @@ Control と Driver Browser には、運行地点と最後に受理されたド�
 
 ## テストビルド
 
-現在のプレリリース: [v0.1.0-preview.4](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.4).
+現在のプレリリース: [v0.1.0-preview.5](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.5).
 
 Windows ZIP には Control、合成されたアクティブ運行、ローカル loopback 検証用のサンプル PDF が含まれます。
 
-これは **test/prerelease build** であり、stable ではありません。Preview.4 には Valhalla adapter と schema 1.2 road-geometry pipeline が含まれています。その後 Android と iOS/iPadOS の native Driver r2+r3（native map と system camera を含む）および改善された Control→Driver URL handoff が統合され、`main` は再び preview.4 より先に進んでいます。
+これは **test/prerelease build** であり stable ではありません。Preview.5 は現在の Control/Driver Browser、Valhalla schema 1.2 road-geometry pipeline、および r5 までの両 native Driver App のソース（地図、カメラ/ファイル、durable retry queue、明示的なバックグラウンド運行追跡）を固定します。公開されるバイナリ asset は当面 Windows Control preview のみで、mobile production signing/TestFlight は今後の作業です。
 
 ## 今後の作業
 
@@ -66,9 +68,9 @@ Windows ZIP には Control、合成されたアクティブ運行、ローカル
 - HTTPS 経由での browser GPS 完全受け入れ;
 - 異なるネットワーク/NAT/CGNAT でのフィールドテスト;
 - 実 Valhalla HTTP transport と reorder 後の geometry 再計算;
-- 実際の headless Control session を使う connected virtual-device smoke;
-- background GPS、offline queue、native app の安全な session storage;
 - stable release.
+- Android Keystore + Apple Keychain による安全な Driver session 保存と旧 raw URL の移行;
+
 
 ## インターフェース言語
 
