@@ -79,11 +79,13 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 - HTTPS 経由での browser GPS 完全受け入れ;
 - 異なるネットワーク/NAT/CGNAT でのフィールドテスト;
 - 実 Valhalla HTTP transport と reorder 後の geometry 再計算;
+- Android Keystore + Apple Keychain による安全な Driver session 保存と旧 raw URL の移行;
+- stable release.
 
 
 ## インターフェース言語
 
-Control、Driver Browser、Android Driver、iOS/iPadOS Driver は、プロジェクトの全言語セット **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** を実装し、自動検証するようになりました。Control と Driver Browser は既定でシステム言語を使い、手動で選んだ言語も保存します。ドキュメントも同じ言語セットで管理します。
+現在統合済みの desktop/browser UI は **ウクライナ語、英語、ドイツ語** を実装・検証しています。新しい Android と iOS/iPadOS の native client は最初の画面から **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** の言語パックを持ち、ドキュメントも同じ言語セットで管理します。
 
 ## ドキュメント
 
