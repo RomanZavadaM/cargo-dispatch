@@ -1,0 +1,58 @@
+{
+  "sourceLanguage": "uk",
+  "strings": {
+    "NSLocationWhenInUseUsageDescription": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch використовує геолокацію, щоб передати поточну позицію водія в Control."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch uses location to send the driver's current position to Control."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch verwendet den Standort, um die aktuelle Fahrerposition an Control zu senden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch utilise la localisation pour envoyer la position actuelle du conducteur à Control."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch usa la ubicación para enviar la posición actual del conductor a Control."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch는 운전자의 현재 위치를 Control로 전송하기 위해 위치 정보를 사용합니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch はドライバーの現在地を Control に送信するために位置情報を使用します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargo Dispatch 使用位置信息将司机当前位置发送到 Control。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
