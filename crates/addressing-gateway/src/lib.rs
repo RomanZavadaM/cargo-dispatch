@@ -547,4 +547,121 @@ mod tests {
         assert!(forwarded.iter().any(|(name, _)| name == "x-file-name"));
         assert!(!forwarded.iter().any(|(name, _)| name == "authorization"));
     }
+
+    #[tokio::test]
+    async fn public_request_round_trips_through_control_poll() {
+        let secret = "control-secret-control-secret-0001";
+        let session = "abcdefghijklmnop";
+        let state = GatewayState::new(secret, 4096);
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .expect("bind gateway");
+        let address = listener.local_addr().expect("gateway address");
+        let server = tokio::spawn(async move {
+            axum::serve(listener, router(state))
+                .await
+                .expect("gateway server");
+        });
+
+        let client = reqwest::Client::new();
+        let base = format!("http://{address}");
+
+        let registered = client
+            .put(format!("{base}/v1/control/{session}"))
+            .bearer_auth(secret)
+            .send()
+            .await
+            .expect("register Control");
+        assert_eq!(registered.status(), reqwest::StatusCode::NO_CONTENT);
+
+        let control_client = client.clone();
+        let control_base = base.clone();
+        let control = tokio::spawn(async move {
+            let next = control_client
+                .get(format!("{control_base}/v1/control/{session}/next"))
+                .bearer_auth(secret)
+                .send()
+                .await
+                .expect("poll next request");
+            assert_eq!(next.status(), reqwest::StatusCode::OK);
+
+            let request_id = next
+                .headers()
+                .get(REQUEST_ID_HEADER)
+                .expect("request id")
+                .to_str()
+                .expect("request id text")
+                .to_owned();
+            assert_eq!(
+                next.headers()
+                    .get(METHOD_HEADER)
+                    .expect("method")
+                    .to_str()
+                    .expect("method text"),
+                "POST"
+            );
+            assert_eq!(
+                next.headers()
+                    .get(PATH_HEADER)
+                    .expect("path")
+                    .to_str()
+                    .expect("path text"),
+                format!("/api/trip/{session}/location")
+            );
+            assert_eq!(
+                next.headers()
+                    .get("x-cargo-relay-header-content-type")
+                    .expect("forwarded content type")
+                    .to_str()
+                    .expect("content type text"),
+                "application/json"
+            );
+            assert_eq!(
+                next.bytes().await.expect("relayed request body").as_ref(),
+                br#"{"latitude":49.8}"#
+            );
+
+            let returned = control_client
+                .post(format!(
+                    "{control_base}/v1/control/{session}/response/{request_id}"
+                ))
+                .bearer_auth(secret)
+                .header(STATUS_HEADER, "201")
+                .header(
+                    "x-cargo-relay-response-content-type",
+                    "application/json",
+                )
+                .body(r#"{"accepted":true}"#)
+                .send()
+                .await
+                .expect("return Control response");
+            assert_eq!(returned.status(), reqwest::StatusCode::NO_CONTENT);
+        });
+
+        let public = client
+            .post(format!("{base}/api/trip/{session}/location"))
+            .header("content-type", "application/json")
+            .body(r#"{"latitude":49.8}"#)
+            .send()
+            .await
+            .expect("public relay request");
+
+        assert_eq!(public.status(), reqwest::StatusCode::CREATED);
+        assert_eq!(
+            public
+                .headers()
+                .get("content-type")
+                .expect("public content type")
+                .to_str()
+                .expect("public content type text"),
+            "application/json"
+        );
+        assert_eq!(
+            public.text().await.expect("public response body"),
+            r#"{"accepted":true}"#
+        );
+
+        control.await.expect("Control relay task");
+        server.abort();
+    }
 }
