@@ -3584,9 +3584,7 @@ mod tests {
             warnings: Vec::new(),
         };
 
-        let draft = draft
-            .with_route_result_geometry(&result)
-            .expect("geometry");
+        let draft = draft.with_route_result_geometry(&result).expect("geometry");
         let geometry = draft.route_geometry.expect("road geometry");
         assert_eq!(geometry.routing.engine, "valhalla");
         assert_eq!(geometry.routing.map_dataset_id, "dataset-a");
