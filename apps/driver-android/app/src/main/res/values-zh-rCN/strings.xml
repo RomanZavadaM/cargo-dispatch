@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cargo Dispatch — 司机</string>
+    <string name="screen_title">Cargo Dispatch — 司机</string>
+    <string name="screen_subtitle">原生 Android 客户端使用与 Driver Browser 相同的 Control API。</string>
+    <string name="connection_title">连接到 Control</string>
+    <string name="driver_url_label">Control 提供的 Driver URL</string>
+    <string name="driver_url_placeholder">http://127.0.0.1:12345/driver/trip-...</string>
+    <string name="emulator_label">Android Emulator</string>
+    <string name="emulator_hint">127.0.0.1/localhost 会自动映射到 10.0.2.2</string>
+    <string name="connect">连接</string>
+    <string name="connecting">正在连接…</string>
+    <string name="refresh">刷新</string>
+    <string name="trip_title">行程 %1$s…</string>
+    <string name="version_revision">版本 %1$d；本地修订 %2$d</string>
+    <string name="points_documents">站点：%1$d；文档：%2$d</string>
+    <string name="road_geometry_present">道路几何：%1$d 个点（%2$s %3$s）</string>
+    <string name="road_geometry_missing">道路几何：无 / 已失效</string>
+    <string name="route_title">路线</string>
+    <string name="completed">已完成</string>
+    <string name="open_point">未完成站点</string>
+    <string name="done_button">完成</string>
+    <string name="control_prefix">Control：%1$s</string>
+</resources>
