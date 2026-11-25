@@ -37,7 +37,21 @@ fi
 
 adb install -r android-apk/app-debug.apk
 
-adb shell am start -W   -n "$ACTIVITY"   --es cargo_dispatch_driver_url "$ANDROID_DRIVER_URL"   --ez cargo_dispatch_emulator_mode true
+HOST_PORT="$(python3 - "$LOCAL_DRIVER_URL" <<'PY'
+from urllib.parse import urlparse
+import sys
+parsed = urlparse(sys.argv[1])
+if not parsed.port:
+    raise SystemExit("Control smoke URL has no port")
+print(parsed.port)
+PY
+)"
+adb reverse "tcp:$HOST_PORT" "tcp:$HOST_PORT"
+
+# Use the real Control localhost URL through adb reverse. Emulator localhost mapping
+# remains covered by unit/earlier smoke tests; this removes flaky hosted-runner NAT
+# from the background-tracking acceptance path.
+adb shell am start -W   -n "$ACTIVITY"   --es cargo_dispatch_driver_url "$LOCAL_DRIVER_URL"   --ez cargo_dispatch_emulator_mode false
 
 CONNECTED=0
 for _ in $(seq 1 40); do
