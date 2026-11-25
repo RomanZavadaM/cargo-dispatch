@@ -50,6 +50,230 @@ extern "C" {
     fn cargo_control_set_interval(callback: &js_sys::Function, milliseconds: i32) -> i32;
 }
 
+#[wasm_bindgen(inline_js = r#"
+let controlMapState = {
+  zoom: 6,
+  centerLat: 49.0,
+  centerLon: 31.0,
+  initialized: false,
+  bound: false,
+  dragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  dragCenterX: 0,
+  dragCenterY: 0,
+  points: [],
+  location: null,
+  tripId: null,
+  dataKey: ""
+};
+
+function clampLat(latitude) {
+  return Math.max(-85.05112878, Math.min(85.05112878, latitude));
+}
+
+function worldSize(zoom) {
+  return 256 * Math.pow(2, zoom);
+}
+
+function project(latitude, longitude, zoom) {
+  const size = worldSize(zoom);
+  const lat = clampLat(latitude) * Math.PI / 180;
+  const sin = Math.sin(lat);
+  return {
+    x: (longitude + 180) / 360 * size,
+    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * size
+  };
+}
+
+function unproject(x, y, zoom) {
+  const size = worldSize(zoom);
+  const longitude = x / size * 360 - 180;
+  const mercator = Math.PI * (1 - 2 * y / size);
+  const latitude = Math.atan(Math.sinh(mercator)) * 180 / Math.PI;
+  return {latitude: clampLat(latitude), longitude};
+}
+
+function coordinates() {
+  const result = [];
+  for (const point of controlMapState.points) {
+    if (point.navigation) {
+      result.push({
+        latitude: point.navigation.latitude,
+        longitude: point.navigation.longitude,
+        type: "point",
+        sequence: point.sequence,
+        title: point.title,
+        completed: point.completed
+      });
+    }
+  }
+  if (controlMapState.location) {
+    result.push({
+      latitude: controlMapState.location.latitude,
+      longitude: controlMapState.location.longitude,
+      type: "location",
+      title: "Остання позиція водія"
+    });
+  }
+  return result;
+}
+
+function ensureHost() {
+  const host = document.getElementById("control-map");
+  if (!host || controlMapState.bound) return host;
+  host.addEventListener("wheel", event => {
+    event.preventDefault();
+    cargoControlMapZoom(event.deltaY < 0 ? 1 : -1);
+  }, {passive: false});
+  host.addEventListener("pointerdown", event => {
+    if (event.target.closest("button,a")) return;
+    const center = project(controlMapState.centerLat, controlMapState.centerLon, controlMapState.zoom);
+    controlMapState.dragging = true;
+    controlMapState.dragStartX = event.clientX;
+    controlMapState.dragStartY = event.clientY;
+    controlMapState.dragCenterX = center.x;
+    controlMapState.dragCenterY = center.y;
+    host.setPointerCapture(event.pointerId);
+  });
+  host.addEventListener("pointermove", event => {
+    if (!controlMapState.dragging) return;
+    const x = controlMapState.dragCenterX - (event.clientX - controlMapState.dragStartX);
+    const y = controlMapState.dragCenterY - (event.clientY - controlMapState.dragStartY);
+    const center = unproject(x, y, controlMapState.zoom);
+    controlMapState.centerLat = center.latitude;
+    controlMapState.centerLon = center.longitude;
+    render();
+  });
+  host.addEventListener("pointerup", event => {
+    controlMapState.dragging = false;
+    if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId);
+  });
+  host.addEventListener("pointercancel", () => {
+    controlMapState.dragging = false;
+  });
+  window.addEventListener("resize", render);
+  controlMapState.bound = true;
+  return host;
+}
+
+function render() {
+  const host = ensureHost();
+  if (!host) return;
+  const width = Math.max(1, host.clientWidth);
+  const height = Math.max(1, host.clientHeight);
+  const zoom = controlMapState.zoom;
+  const center = project(controlMapState.centerLat, controlMapState.centerLon, zoom);
+  const left = center.x - width / 2;
+  const top = center.y - height / 2;
+  const tileLayer = host.querySelector(".map-tiles");
+  const overlayLayer = host.querySelector(".map-overlays");
+  if (!tileLayer || !overlayLayer) return;
+  tileLayer.replaceChildren();
+  overlayLayer.replaceChildren();
+
+  const tileMinX = Math.floor(left / 256) - 1;
+  const tileMaxX = Math.floor((left + width) / 256) + 1;
+  const tileMinY = Math.floor(top / 256) - 1;
+  const tileMaxY = Math.floor((top + height) / 256) + 1;
+  const tileCount = Math.pow(2, zoom);
+  for (let tileX = tileMinX; tileX <= tileMaxX; tileX++) {
+    const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
+    for (let tileY = tileMinY; tileY <= tileMaxY; tileY++) {
+      if (tileY < 0 || tileY >= tileCount) continue;
+      const image = document.createElement("img");
+      image.alt = "";
+      image.draggable = false;
+      image.loading = "lazy";
+      image.src = "https://tile.openstreetmap.org/" + zoom + "/" + wrappedX + "/" + tileY + ".png";
+      image.style.left = (tileX * 256 - left) + "px";
+      image.style.top = (tileY * 256 - top) + "px";
+      image.addEventListener("error", () => image.remove());
+      tileLayer.append(image);
+    }
+  }
+
+  for (const item of coordinates()) {
+    const shown = project(item.latitude, item.longitude, zoom);
+    const marker = document.createElement("div");
+    marker.className = item.type === "location"
+      ? "map-marker map-location-marker"
+      : "map-marker" + (item.completed ? " completed" : "");
+    marker.style.left = (shown.x - left) + "px";
+    marker.style.top = (shown.y - top) + "px";
+    marker.title = item.title;
+    marker.textContent = item.type === "location" ? "" : String(item.sequence);
+    overlayLayer.append(marker);
+  }
+}
+
+function fit() {
+  const host = ensureHost();
+  const values = coordinates();
+  if (!host || !values.length) {
+    controlMapState.initialized = true;
+    render();
+    return;
+  }
+  const width = Math.max(1, host.clientWidth - 72);
+  const height = Math.max(1, host.clientHeight - 72);
+  let chosenZoom = 3;
+  let center = {latitude: values[0].latitude, longitude: values[0].longitude};
+  for (let zoom = 18; zoom >= 3; zoom--) {
+    const shown = values.map(item => project(item.latitude, item.longitude, zoom));
+    const xs = shown.map(item => item.x);
+    const ys = shown.map(item => item.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    if (maxX - minX <= width && maxY - minY <= height) {
+      chosenZoom = zoom;
+      center = unproject((minX + maxX) / 2, (minY + maxY) / 2, zoom);
+      break;
+    }
+  }
+  controlMapState.zoom = chosenZoom;
+  controlMapState.centerLat = center.latitude;
+  controlMapState.centerLon = center.longitude;
+  controlMapState.initialized = true;
+  render();
+}
+
+export function cargoControlMapRender(tripId, pointsJson, locationJson) {
+  const dataKey = tripId + "|" + pointsJson + "|" + locationJson;
+  if (controlMapState.initialized && controlMapState.dataKey === dataKey) return;
+  controlMapState.points = JSON.parse(pointsJson);
+  controlMapState.location = JSON.parse(locationJson);
+  if (controlMapState.tripId !== tripId) {
+    controlMapState.tripId = tripId;
+    controlMapState.initialized = false;
+  }
+  controlMapState.dataKey = dataKey;
+  if (!controlMapState.initialized) fit();
+  else render();
+}
+
+export function cargoControlMapZoom(delta) {
+  controlMapState.zoom = Math.max(3, Math.min(18, controlMapState.zoom + delta));
+  render();
+}
+
+export function cargoControlMapFit() {
+  fit();
+}
+"#)]
+extern "C" {
+    #[wasm_bindgen(js_name = cargoControlMapRender)]
+    fn cargo_control_map_render(trip_id: &str, points_json: &str, location_json: &str);
+
+    #[wasm_bindgen(js_name = cargoControlMapZoom)]
+    fn cargo_control_map_zoom(delta: i32);
+
+    #[wasm_bindgen(js_name = cargoControlMapFit)]
+    fn cargo_control_map_fit();
+}
+
 fn js_error(value: JsValue) -> String {
     value.as_string().unwrap_or_else(|| format!("{value:?}"))
 }
@@ -170,6 +394,17 @@ fn ControlApp() -> impl IntoView {
         let _ =
             cargo_control_set_interval(refresh.as_ref().unchecked_ref::<js_sys::Function>(), 2_000);
         refresh.forget();
+    });
+
+    Effect::new(move |_| {
+        if let Some(current) = dashboard.get()
+            && let (Ok(points_json), Ok(location_json)) = (
+                serde_json::to_string(&current.points),
+                serde_json::to_string(&current.latest_location),
+            )
+        {
+            cargo_control_map_render(&current.trip_id, &points_json, &location_json);
+        }
     });
 
     let set_status_result = move |result: Result<ControlUiStatus, String>,
@@ -507,8 +742,32 @@ fn ControlApp() -> impl IntoView {
                 </ul>
             </section>
 
+            <section id="control-map-section">
+                <h2>"4. Карта рейсу"</h2>
+                <div id="control-map" class="trip-map" aria-label="Карта активного рейсу">
+                    <div class="map-tiles" aria-hidden="true"></div>
+                    <div class="map-overlays" aria-hidden="true"></div>
+                    <div class="map-controls">
+                        <button type="button" aria-label="Збільшити карту" on:click=move |_| cargo_control_map_zoom(1)> "+"</button>
+                        <button type="button" aria-label="Зменшити карту" on:click=move |_| cargo_control_map_zoom(-1)> "−"</button>
+                        <button type="button" on:click=move |_| cargo_control_map_fit()> "Рейс"</button>
+                    </div>
+                    <a
+                        class="map-attribution"
+                        href="https://www.openstreetmap.org/copyright"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        "© OpenStreetMap contributors"
+                    </a>
+                </div>
+                <p class="note">
+                    "Показані точки рейсу та остання прийнята позиція водія. Номери — черговість точок; дорожня геометрія маршруту буде додана окремо."
+                </p>
+            </section>
+
             <section>
-                <h2>"4. Живий рейс"</h2>
+                <h2>"5. Живий рейс"</h2>
                 <div class="actions">
                     <button type="button" on:click=refresh_dashboard>"Оновити"</button>
                 </div>

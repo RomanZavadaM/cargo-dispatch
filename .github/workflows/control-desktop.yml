@@ -107,3 +107,74 @@ jobs:
 
       - name: Test desktop service
         run: cargo test --locked -p cargo-dispatch-control-desktop --all-targets
+
+
+  windows-artifact:
+    name: Windows loopback manual test artifact
+    runs-on: windows-latest
+    needs:
+      - browser
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+
+      - name: Install pinned Trunk
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: trunk@0.22.2
+          fallback: none
+
+      - name: Build Control frontend
+        working-directory: apps/control-ui
+        run: trunk build --release=true
+
+      - name: Build Control test executable
+        run: cargo build --locked -p cargo-dispatch-control-desktop --release
+
+      - name: Create synthetic local test trip
+        run: cargo run --locked -p cargo-dispatch-trip-files --example local_browser_fixture -- local-browser-test-data
+
+      - name: Write local test instructions
+        shell: pwsh
+        run: |
+          @"
+          Cargo Dispatch Control — local Driver Browser test
+
+          1. Run Cargo-Dispatch-Control.exe.
+          2. Select local-browser-test-data\active-trip and connect it.
+          3. Start "Локально 127.0.0.1".
+          4. Open the Driver URL shown by Control in a normal browser.
+          5. Test the same URL at wide desktop/laptop, tablet and narrow phone viewport widths.
+          6. Use local-browser-test-data\sample-control-to-driver.pdf for Control -> Browser PDF.
+             Then send any local file/photo/video from Browser -> Control and save it from Control.
+          7. Check route reorder in both directions, two browser clients, and refresh/reconnect.
+          8. Check the real OpenStreetMap view in both Control and Driver Browser: pan/zoom/fit,
+             route-point markers and the latest accepted driver position.
+          9. The map currently shows points/position, not Valhalla road geometry.
+
+          This is a CI test artifact, not a release.
+          "@ | Set-Content -Encoding UTF8 LOCAL_BROWSER_TEST.txt
+
+      - name: Stage clean manual test package
+        shell: pwsh
+        run: |
+          $package = "local-browser-manual-test"
+          New-Item -ItemType Directory -Force $package | Out-Null
+          Copy-Item "target/release/cargo-dispatch-control-desktop.exe" "$package/Cargo-Dispatch-Control.exe"
+          Copy-Item "LOCAL_BROWSER_TEST.txt" "$package/LOCAL_BROWSER_TEST.txt"
+          Copy-Item "THIRD_PARTY_NOTICES.md" "$package/THIRD_PARTY_NOTICES.md"
+          Copy-Item "local-browser-test-data" "$package/local-browser-test-data" -Recurse
+
+      - name: Upload Windows manual test artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: Cargo-Dispatch-Control-local-browser-Windows-x64
+          path: local-browser-manual-test/
+          if-no-files-found: error
+          retention-days: 7
