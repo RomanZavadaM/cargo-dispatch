@@ -119,7 +119,7 @@ class ControlApi(
             headers.forEach { (name, value) -> setRequestProperty(name, value) }
             if (body != null) {
                 doOutput = true
-                fixedLengthStreamingMode(body.size)
+                setFixedLengthStreamingMode(body.size)
             }
         }
 
@@ -129,7 +129,7 @@ class ControlApi(
             }
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val bytes = stream?.use { it.readBytes() }.orEmpty()
+            val bytes = stream?.use { it.readBytes() } ?: ByteArray(0)
             if (status !in 200..299) {
                 throw ControlApiException(
                     status,
