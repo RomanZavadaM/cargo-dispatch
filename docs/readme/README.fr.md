@@ -79,11 +79,13 @@ Les packages Android et Apple ne sont pas encore signés pour les stores. App St
 - validation GPS complète du navigateur via HTTPS ;
 - tests terrain sur différents réseaux/NAT/CGNAT ;
 - transport HTTP Valhalla réel et recalcul de la géométrie après changement d’ordre ;
+- stockage sécurisé de la session Driver avec Android Keystore + Apple Keychain et migration de l’ancienne URL brute ;
+- version stable.
 
 
 ## Langues de l’interface
 
-Control, Driver Browser, Android Driver et iOS/iPadOS Driver implémentent et vérifient désormais automatiquement l’ensemble complet des langues du projet : **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control et Driver Browser utilisent par défaut la langue du système et permettent aussi un choix manuel mémorisé. La documentation suit le même ensemble de langues.
+L’interface desktop/browser intégrée implémente actuellement **l’ukrainien, l’anglais et l’allemand**. Les nouveaux clients natifs Android et iOS/iPadOS démarrent directement avec les packs **uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**, et leur documentation suit le même ensemble de langues.
 
 ## Documentation
 
