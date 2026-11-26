@@ -24,6 +24,41 @@ pub struct PlannerRouteView {
     pub revision: u64,
     pub state: String,
     pub points: Vec<PlannerPointView>,
+    pub vehicle_profile: Option<PlannerVehicleProfileView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PlannerVehicleProfileInput {
+    pub height_m: Option<f64>,
+    pub width_m: Option<f64>,
+    pub length_m: Option<f64>,
+    pub gross_weight_t: Option<f64>,
+    pub axle_load_t: Option<f64>,
+    pub axle_count: Option<u8>,
+    pub hazmat: bool,
+    pub hgv: bool,
+    pub exclude_unpaved: bool,
+    pub prefer_truck_routes: bool,
+    pub toll_preference: String,
+    pub max_speed_kmh: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PlannerVehicleProfileView {
+    pub height_m: Option<f64>,
+    pub width_m: Option<f64>,
+    pub length_m: Option<f64>,
+    pub gross_weight_t: Option<f64>,
+    pub axle_load_t: Option<f64>,
+    pub axle_count: Option<u8>,
+    pub hazmat: bool,
+    pub hgv: bool,
+    pub exclude_unpaved: bool,
+    pub prefer_truck_routes: bool,
+    pub toll_preference: String,
+    pub max_speed_kmh: Option<f64>,
+    pub fingerprint: String,
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
