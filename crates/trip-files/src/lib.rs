@@ -1300,6 +1300,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            routing_profile: None,
             route_geometry: None,
         };
         export_package(path, &draft, &route)?;
@@ -1369,6 +1370,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([35; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            routing_profile: None,
             route_geometry: Some(TripRoadGeometry {
                 routing: TripRoutingIdentity {
                     engine: "valhalla".to_owned(),
@@ -1425,6 +1427,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([3; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|p| p.point_id).collect(),
+            routing_profile: None,
             route_geometry: None,
         };
         export_package(&package, &draft, &route)?;
