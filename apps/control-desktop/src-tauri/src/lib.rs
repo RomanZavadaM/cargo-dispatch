@@ -580,21 +580,23 @@ impl DesktopControlService {
             )
             .map_err(|error| format!("Не вдалося зберегти дані сесії: {error}"))?;
 
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
-        let session = sessions
-            .get_mut(&token)
-            .ok_or_else(|| "Сесію не знайдено".to_owned())?;
-        session.operator_display_name = operator_display_name;
-        session.endpoint_id = endpoint_id;
-        session.endpoint_label = endpoint_label;
-        session.vehicle_label = vehicle_label;
-        session.vehicle_type = vehicle_type;
-        drop(sessions);
+        {
+            let mut sessions = self
+                .sessions
+                .lock()
+                .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
+            let session = sessions
+                .get_mut(&token)
+                .ok_or_else(|| "Сесію не знайдено".to_owned())?;
+            session.operator_display_name = operator_display_name;
+            session.endpoint_id = endpoint_id;
+            session.endpoint_label = endpoint_label;
+            session.vehicle_label = vehicle_label;
+            session.vehicle_type = vehicle_type;
+        }
         self.status().await
     }
+
     fn session_window_details(&self, token: &str) -> Result<(String, String), String> {
         let sessions = self
             .sessions
