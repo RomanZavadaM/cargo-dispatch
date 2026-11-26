@@ -1,13 +1,14 @@
 #![forbid(unsafe_code)]
 
-use cargo_dispatch_domain::{PointId, WorkingRouteId};
+use cargo_dispatch_domain::{PointId, VehicleId, WorkingRouteId};
 use cargo_dispatch_geo::{TollPreference, VehicleRoutingProfile};
 use cargo_dispatch_planner::{
     WorkingRoute, WorkingRouteState, edit_manual_working_route, manual_working_route,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    PlannerPointInput, PlannerPointView, PlannerRouteView, PlannerVehicleProfileInput,
-    PlannerVehicleProfileView, PointActionInput, ReorderPointsInput,
+    PlannerPointInput, PlannerPointView, PlannerRouteView, PlannerVehicleInput,
+    PlannerVehiclePoolView, PlannerVehicleProfileInput, PlannerVehicleProfileView,
+    PlannerVehicleView, PointActionInput, ReorderPointsInput,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -31,10 +32,17 @@ struct ManualPoint {
 }
 
 #[derive(Debug, Clone)]
+struct FleetVehicle {
+    vehicle_id: VehicleId,
+    name: String,
+    profile: VehicleRoutingProfile,
+}
+
+#[derive(Debug, Clone)]
 struct PlannerState {
     route: WorkingRoute,
     points: BTreeMap<PointId, ManualPoint>,
-    vehicle_profile: Option<VehicleRoutingProfile>,
+    vehicles: BTreeMap<VehicleId, FleetVehicle>,
     next_serial: u64,
 }
 
@@ -43,7 +51,7 @@ impl Default for PlannerState {
         Self {
             route: manual_working_route(route_id(1), &[]).expect("empty manual route is valid"),
             points: BTreeMap::new(),
-            vehicle_profile: None,
+            vehicles: BTreeMap::new(),
             next_serial: 2,
         }
     }
@@ -67,7 +75,9 @@ enum PlannerDraftEvent {
     ReorderPoints {
         point_ids: Vec<[u8; 16]>,
     },
-    SetVehicleProfile {
+    AddVehicle {
+        vehicle_serial: u64,
+        name: String,
         profile: PlannerVehicleProfileInput,
     },
 }
@@ -135,12 +145,12 @@ impl PlannerDesktopService {
         &self,
         state: &mut PlannerState,
         event: PlannerDraftEvent,
-    ) -> Result<PlannerRouteView, String> {
+    ) -> Result<(), String> {
         let mut candidate = state.clone();
         apply_event(&mut candidate, &event)?;
         self.append_event(&event)?;
         *state = candidate;
-        route_view(state)
+        Ok(())
     }
 
     fn status(&self) -> Result<PlannerRouteView, String> {
@@ -159,7 +169,8 @@ impl PlannerDesktopService {
         let event = PlannerDraftEvent::ResetRoute {
             route_serial: state.next_serial,
         };
-        self.commit_event(&mut state, event)
+        self.commit_event(&mut state, event)?;
+        route_view(&state)
     }
 
     fn add_point(&self, input: PlannerPointInput) -> Result<PlannerRouteView, String> {
@@ -174,7 +185,8 @@ impl PlannerDesktopService {
             latitude: input.latitude,
             longitude: input.longitude,
         };
-        self.commit_event(&mut state, event)
+        self.commit_event(&mut state, event)?;
+        route_view(&state)
     }
 
     fn remove_point(&self, input: PointActionInput) -> Result<PlannerRouteView, String> {
@@ -188,7 +200,8 @@ impl PlannerDesktopService {
             PlannerDraftEvent::RemovePoint {
                 point_id: id.as_bytes(),
             },
-        )
+        )?;
+        route_view(&state)
     }
 
     fn reorder(&self, input: ReorderPointsInput) -> Result<PlannerRouteView, String> {
@@ -209,22 +222,35 @@ impl PlannerDesktopService {
             PlannerDraftEvent::ReorderPoints {
                 point_ids: order.into_iter().map(PointId::as_bytes).collect(),
             },
-        )
+        )?;
+        route_view(&state)
     }
 
-    fn set_vehicle_profile(
-        &self,
-        input: PlannerVehicleProfileInput,
-    ) -> Result<PlannerRouteView, String> {
-        profile_from_input(&input)?;
+    fn vehicle_pool(&self) -> Result<PlannerVehiclePoolView, String> {
+        let state = self
+            .inner
+            .lock()
+            .map_err(|_| "Planner state unavailable".to_owned())?;
+        Ok(vehicle_pool_view(&state))
+    }
+
+    fn add_vehicle(&self, input: PlannerVehicleInput) -> Result<PlannerVehiclePoolView, String> {
+        let name = input.name.trim();
+        if name.is_empty() {
+            return Err("Назва автомобіля обов’язкова".to_owned());
+        }
+        profile_from_input(&input.profile)?;
         let mut state = self
             .inner
             .lock()
             .map_err(|_| "Planner state unavailable".to_owned())?;
-        self.commit_event(
-            &mut state,
-            PlannerDraftEvent::SetVehicleProfile { profile: input },
-        )
+        let event = PlannerDraftEvent::AddVehicle {
+            vehicle_serial: state.next_serial,
+            name: name.to_owned(),
+            profile: input.profile,
+        };
+        self.commit_event(&mut state, event)?;
+        Ok(vehicle_pool_view(&state))
     }
 }
 
@@ -274,7 +300,6 @@ fn apply_event(state: &mut PlannerState, event: &PlannerDraftEvent) -> Result<()
             state.route = manual_working_route(route_id(*route_serial), &[])
                 .map_err(|error| format!("Could not recover manual route: {error:?}"))?;
             state.points.clear();
-            state.vehicle_profile = None;
         }
         PlannerDraftEvent::AddPoint {
             point_serial,
@@ -349,8 +374,25 @@ fn apply_event(state: &mut PlannerState, event: &PlannerDraftEvent) -> Result<()
             state.route = edit_manual_working_route(&state.route, &order)
                 .map_err(|error| format!("Planner rejected recovered point order: {error:?}"))?;
         }
-        PlannerDraftEvent::SetVehicleProfile { profile } => {
-            state.vehicle_profile = Some(profile_from_input(profile)?);
+        PlannerDraftEvent::AddVehicle {
+            vehicle_serial,
+            name,
+            profile,
+        } => {
+            if name.trim().is_empty() {
+                return Err("Planner journal contains an empty vehicle name".to_owned());
+            }
+            let routing_profile = profile_from_input(profile)?;
+            consume_serial(state, *vehicle_serial)?;
+            let id = vehicle_id(*vehicle_serial);
+            state.vehicles.insert(
+                id,
+                FleetVehicle {
+                    vehicle_id: id,
+                    name: name.trim().to_owned(),
+                    profile: routing_profile,
+                },
+            );
         }
     }
     Ok(())
@@ -481,6 +523,10 @@ fn point_id(serial: u64) -> PointId {
     PointId::from_bytes(id_bytes(0x50, serial)).expect("point id is non-nil")
 }
 
+fn vehicle_id(serial: u64) -> VehicleId {
+    VehicleId::from_bytes(id_bytes(0x56, serial)).expect("vehicle id is non-nil")
+}
+
 fn hex_id(bytes: [u8; 16]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
@@ -505,6 +551,20 @@ fn point_from_text(state: &PlannerState, value: &str) -> Result<PointId, String>
         .copied()
         .find(|id| hex_id(id.as_bytes()) == value)
         .ok_or_else(|| "Unknown point id".to_owned())
+}
+
+fn vehicle_pool_view(state: &PlannerState) -> PlannerVehiclePoolView {
+    PlannerVehiclePoolView {
+        vehicles: state
+            .vehicles
+            .values()
+            .map(|vehicle| PlannerVehicleView {
+                vehicle_id: hex_id(vehicle.vehicle_id.as_bytes()),
+                name: vehicle.name.clone(),
+                profile: profile_view(&vehicle.profile),
+            })
+            .collect(),
+    }
 }
 
 fn route_view(state: &PlannerState) -> Result<PlannerRouteView, String> {
@@ -542,7 +602,6 @@ fn route_view(state: &PlannerState) -> Result<PlannerRouteView, String> {
         revision: state.route.current_revision,
         state: state_name.to_owned(),
         points,
-        vehicle_profile: state.vehicle_profile.as_ref().map(profile_view),
     })
 }
 
@@ -583,11 +642,18 @@ fn planner_reorder_points(
 }
 
 #[tauri::command]
-fn planner_set_vehicle_profile(
-    input: PlannerVehicleProfileInput,
+fn planner_vehicle_pool(
     state: State<'_, PlannerDesktopService>,
-) -> Result<PlannerRouteView, String> {
-    state.set_vehicle_profile(input)
+) -> Result<PlannerVehiclePoolView, String> {
+    state.vehicle_pool()
+}
+
+#[tauri::command]
+fn planner_add_vehicle(
+    input: PlannerVehicleInput,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerVehiclePoolView, String> {
+    state.add_vehicle(input)
 }
 
 pub fn run() {
@@ -606,7 +672,8 @@ pub fn run() {
             planner_add_point,
             planner_remove_point,
             planner_reorder_points,
-            planner_set_vehicle_profile
+            planner_vehicle_pool,
+            planner_add_vehicle
         ])
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");
@@ -712,42 +779,57 @@ mod tests {
     }
 
     #[test]
-    fn vehicle_profile_requires_explicit_non_numeric_choices() {
+    fn vehicle_pool_requires_explicit_profile_and_is_not_reset_with_route() {
         let service = PlannerDesktopService::default();
-        let mut input = profile_input();
-        input.hazmat = None;
-        assert!(service.set_vehicle_profile(input).is_err());
-        assert!(service.status().expect("status").vehicle_profile.is_none());
+        let mut invalid = profile_input();
+        invalid.hazmat = None;
+        assert!(
+            service
+                .add_vehicle(PlannerVehicleInput {
+                    name: "Truck A".to_owned(),
+                    profile: invalid,
+                })
+                .is_err()
+        );
+        assert!(service.vehicle_pool().expect("pool").vehicles.is_empty());
 
-        let configured = service
-            .set_vehicle_profile(profile_input())
-            .expect("configured profile");
-        let profile = configured.vehicle_profile.expect("profile");
-        assert_eq!(profile.width_m, Some(2.45));
-        assert!(!profile.hazmat);
-        assert!(profile.hgv);
-        assert_eq!(profile.toll_preference, "prefer_avoid");
-        assert!(profile.warnings.contains(&"height_m".to_owned()));
+        let pool = service
+            .add_vehicle(PlannerVehicleInput {
+                name: "Truck A".to_owned(),
+                profile: profile_input(),
+            })
+            .expect("add vehicle");
+        assert_eq!(pool.vehicles.len(), 1);
+        let vehicle = &pool.vehicles[0];
+        assert_eq!(vehicle.name, "Truck A");
+        assert_eq!(vehicle.profile.width_m, Some(2.45));
+        assert!(!vehicle.profile.hazmat);
+        assert!(vehicle.profile.hgv);
+        assert_eq!(vehicle.profile.toll_preference, "prefer_avoid");
+
+        service.reset().expect("reset route");
+        let after_reset = service.vehicle_pool().expect("pool after reset");
+        assert_eq!(after_reset, pool);
     }
 
     #[test]
-    fn vehicle_profile_is_recovered_from_journal() {
-        let path = unique_journal("profile-recovery");
+    fn vehicle_pool_is_recovered_from_journal() {
+        let path = unique_journal("vehicle-pool-recovery");
         let service = PlannerDesktopService::open(path.clone()).expect("open journal");
-        service
-            .set_vehicle_profile(profile_input())
-            .expect("save profile");
+        let saved = service
+            .add_vehicle(PlannerVehicleInput {
+                name: "Truck A".to_owned(),
+                profile: profile_input(),
+            })
+            .expect("save vehicle");
         drop(service);
 
         let recovered = PlannerDesktopService::open(path.clone()).expect("recover");
-        let profile = recovered
-            .status()
-            .expect("status")
-            .vehicle_profile
-            .expect("profile");
-        assert_eq!(profile.gross_weight_t, Some(12.0));
-        assert_eq!(profile.axle_count, Some(2));
-        assert!(profile.exclude_unpaved);
+        let pool = recovered.vehicle_pool().expect("pool");
+        assert_eq!(pool, saved);
+        assert_eq!(pool.vehicles[0].profile.gross_weight_t, Some(12.0));
+        assert_eq!(pool.vehicles[0].profile.axle_count, Some(2));
+        assert!(pool.vehicles[0].profile.exclude_unpaved);
 
         let _ = fs::remove_file(path);
     }
