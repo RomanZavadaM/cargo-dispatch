@@ -176,6 +176,24 @@ impl PlannerDesktopService {
         route_view(&state)
     }
 
+    fn suggested_export_file_name(&self) -> Result<String, String> {
+        let state = self
+            .inner
+            .lock()
+            .map_err(|_| "Planner state unavailable".to_owned())?;
+        let suffix = hex_id(state.route.working_route_id.as_bytes())
+            .chars()
+            .take(12)
+            .collect::<String>();
+        let next_version = state
+            .last_export_version
+            .checked_add(1)
+            .ok_or("Planner trip version overflow")?;
+        Ok(format!(
+            "cargo-dispatch-trip-{suffix}-v{next_version}.zip"
+        ))
+    }
+
     fn reset(&self) -> Result<PlannerRouteView, String> {
         let mut state = self
             .inner
@@ -1162,9 +1180,7 @@ async fn planner_pick_export_path(
     app: AppHandle,
     state: State<'_, PlannerDesktopService>,
 ) -> Result<Option<String>, String> {
-    let route = state.status()?;
-    let suffix = route.working_route_id.chars().take(12).collect::<String>();
-    let file_name = format!("cargo-dispatch-trip-{suffix}.zip");
+    let file_name = state.suggested_export_file_name()?;
     tokio::task::spawn_blocking(move || {
         app.dialog()
             .file()
@@ -1608,6 +1624,46 @@ mod tests {
         );
 
         server.abort();
+    }
+
+    #[test]
+    fn package_export_file_name_tracks_next_trip_version() {
+        let journal = unique_journal("package-export-file-name");
+        let service = PlannerDesktopService::open(journal.clone()).expect("open Planner");
+        service
+            .add_point(point("Warehouse", 49.8393, 24.0296))
+            .expect("warehouse");
+
+        let first_name = service
+            .suggested_export_file_name()
+            .expect("first file name");
+        assert!(first_name.ends_with("-v1.zip"));
+
+        let package = journal.with_extension("trip-v1.zip");
+        service
+            .export_trip_package(PlannerPackageExportInput {
+                path: package.to_string_lossy().into_owned(),
+                vehicle_type: "truck".to_owned(),
+                cargos: vec![PlannerPackageCargoInput {
+                    title: "Synthetic cargo".to_owned(),
+                    weight_kg: None,
+                    pallets: None,
+                    pickup_point_id: None,
+                    unload_point_id: None,
+                }],
+                routing_profile: None,
+                routing_preview: None,
+            })
+            .expect("first export");
+
+        let second_name = service
+            .suggested_export_file_name()
+            .expect("second file name");
+        assert!(second_name.ends_with("-v2.zip"));
+
+        let _ = fs::remove_file(&package);
+        let _ = fs::remove_file(journal.with_extension("operator-id.bin"));
+        let _ = fs::remove_file(journal);
     }
 
     #[test]
