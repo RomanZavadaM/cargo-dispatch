@@ -97,6 +97,36 @@ pub struct UpdateSessionMetadataInput {
     pub vehicle_type: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutingTollPreference {
+    Allow,
+    PreferAvoid,
+    Avoid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DashboardVehicleRoutingProfile {
+    pub height_m: Option<f64>,
+    pub width_m: Option<f64>,
+    pub length_m: Option<f64>,
+    pub gross_weight_t: Option<f64>,
+    pub axle_load_t: Option<f64>,
+    pub axle_count: Option<u8>,
+    pub hazmat: bool,
+    pub hgv: bool,
+    pub exclude_unpaved: bool,
+    pub prefer_truck_routes: bool,
+    pub toll_preference: RoutingTollPreference,
+    pub max_speed_kmh: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct UpdateRoutingContextInput {
+    pub token: String,
+    pub profile: Option<DashboardVehicleRoutingProfile>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ControlUiStatus {
     pub listener: Option<ListenerStatus>,
@@ -182,13 +212,14 @@ pub struct DashboardPlanningBasis {
     pub cargos: Vec<DashboardPlanningCargo>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DashboardActualContext {
     pub display_name: Option<String>,
     pub endpoint_id: Option<String>,
     pub endpoint_label: Option<String>,
     pub vehicle_label: Option<String>,
     pub vehicle_type: Option<String>,
+    pub routing_profile: Option<DashboardVehicleRoutingProfile>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
