@@ -9,7 +9,6 @@
 - Product positioning не обмежується малотонажним парком або масою 7,5 т.
 - Control desktop підтримується для Windows, macOS і Linux.
 - Planner desktop також підтримується для Windows, macOS і Linux; перші compiled Planner test builds уже є в `preview.7`.
-- Поточний `main`: `a45034d498e961d244070ae1aaf185df595dd9ef`.
 - Planner manual draft у `main` уже durable:
   - add/remove/reorder;
   - navigation coordinates;
