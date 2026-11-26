@@ -917,7 +917,9 @@ pub fn run() {
 mod tests {
     use super::*;
     use cargo_dispatch_addressing_gateway::{GatewayState, router as gateway_router};
-    use cargo_dispatch_contracts::{TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion};
+    use cargo_dispatch_contracts::{
+        TripPackageHeader, TripPlanningBasis, TripPointKind, TripRoutePoint, TripVersion,
+    };
     use cargo_dispatch_domain::{OperatorId, PointId, TripId, WorkingRouteId};
     use cargo_dispatch_planner::PlannerTripExportDraft;
     use cargo_dispatch_trip_files::export_package;
@@ -941,6 +943,10 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([24; 16]).expect("operator"),
             ordered_point_ids: vec![point],
+            planning_basis: Some(TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            }),
             routing_profile: None,
             route_geometry: None,
         };
