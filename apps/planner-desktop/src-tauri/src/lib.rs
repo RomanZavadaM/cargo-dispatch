@@ -1877,7 +1877,13 @@ mod tests {
             .export_trip_package(PlannerPackageExportInput {
                 path: package.to_string_lossy().into_owned(),
                 vehicle_type: "truck".to_owned(),
-                cargos: Vec::new(),
+                cargos: vec![PlannerPackageCargoInput {
+                    title: "Synthetic cargo".to_owned(),
+                    weight_kg: None,
+                    pallets: None,
+                    pickup_point_id: None,
+                    unload_point_id: None,
+                }],
                 routing_profile: Some(profile),
                 routing_preview: Some(preview),
             })
