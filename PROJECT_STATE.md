@@ -17,6 +17,7 @@
   - restart recovery;
   - захист від незавершеного trailing journal record.
 - Control/Driver Browser, Addressing Gateway, Android Driver, iOS/iPadOS Driver і 8-language localization інтегровані.
+- Автоматичний Driver Browser acceptance інтегрований для двох прямих шляхів без Gateway: loopback і явний private-LAN bind. Він перевіряє реальний Control session, HTTP/state, snapshot і mutation; ручна візуальна responsive-перевірка та фізичний телефон у LAN/VPN лишаються окремим acceptance.
 - Control лишається authoritative source фактичного стану активного рейсу.
 - Planner/routing foundation має:
   - Valhalla adapter і real runtime HTTP transport;
