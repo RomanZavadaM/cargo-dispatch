@@ -189,9 +189,7 @@ impl PlannerDesktopService {
             .last_export_version
             .checked_add(1)
             .ok_or("Planner trip version overflow")?;
-        Ok(format!(
-            "cargo-dispatch-trip-{suffix}-v{next_version}.zip"
-        ))
+        Ok(format!("cargo-dispatch-trip-{suffix}-v{next_version}.zip"))
     }
 
     fn reset(&self) -> Result<PlannerRouteView, String> {
