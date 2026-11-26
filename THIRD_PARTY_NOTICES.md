@@ -15,7 +15,7 @@ cargo-dispatch може містити або розповсюджуватися
 - `tokio 1.54.1` — MIT, crates.io / upstream `tokio-rs/tokio`; TCP/runtime, async file streaming та graceful shutdown.
 - `futures-util 0.3.34` — MIT або Apache-2.0; використовується напряму для потокової передачі upload/download без завантаження всього відео/файла в RAM.
 - `tempfile 3.27.0` — MIT або Apache-2.0; уже використовувався файловим шаром, тепер також створює тимчасовий файл browser upload до атомарного приймання в trip folder.
-- Цей product slice не додає WebRTC/TURN/gateway runtime. Непрямі залежності цих crates фіксує `Cargo.lock` і перевіряє `cargo deny`.
+- Непрямі залежності цих crates фіксує `Cargo.lock` і перевіряє `cargo deny`.
 
 ### Control desktop UI
 - `tauri 2.12.7` — MIT або Apache-2.0; accepted desktop shell для Windows/macOS/Linux.
@@ -33,10 +33,24 @@ cargo-dispatch може містити або розповсюджуватися
 - Android native map використовує `org.maplibre.gl:android-sdk-opengl:13.7.1`, upstream `maplibre/maplibre-native`, BSD-2-Clause. Обрано stable OpenGL artifact для ширшої сумісності реальних пристроїв та Emulator.
 - MapLibre 13.7.1 HTTP implementation формує User-Agent з application package/version/code через `HttpIdentifier` перед MapLibre version, тому tile requests ідентифікують саме `com.romanzavada.cargodispatch.driver`, а не лише generic map library; це відповідає OSM native-app identification rule без окремого custom network client.
 - MapLibre є лише renderer/client map layer. Source of truth рейсу лишається Control API; route geometry, stop order і latest driver location не зберігаються в окремій map-базі.
+- `org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0` — Apache-2.0; розбір і запис JSON інтерфейсу Control в Android Driver.
 - Захоплення фото/відео викликає системний Android camera contract; окремий camera SDK не додається.
+- Непрямі залежності Android цим файлом ще не перелічені.
+- iOS/iPadOS Driver використовує лише системні бібліотеки Apple; сторонніх пакетів Swift немає.
+
+## Компоненти під MPL-2.0
+Настільні програми через залежності Tauri використовують без змін такі crates під [Mozilla Public License 2.0](https://www.mozilla.org/en-US/MPL/2.0/). Їхній вихідний код безкоштовно доступний на crates.io:
+
+- [`cssparser` 0.37.0](https://crates.io/crates/cssparser/0.37.0) і [0.38.0](https://crates.io/crates/cssparser/0.38.0);
+- [`cssparser-macros` 0.7.1](https://crates.io/crates/cssparser-macros/0.7.1);
+- [`dtoa-short` 0.3.5](https://crates.io/crates/dtoa-short/0.3.5);
+- [`selectors` 0.38.0](https://crates.io/crates/selectors/0.38.0) і [0.41.0](https://crates.io/crates/selectors/0.41.0);
+- [`option-ext` 0.2.0](https://crates.io/crates/option-ext/0.2.0).
+
+Ліцензія cargo-dispatch не обмежує права отримувача на вихідний код цих компонентів за MPL-2.0.
 
 ## Дані
-- Базова карта використовує стандартні raster tiles OpenStreetMap через `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; дані OpenStreetMap поширюються за ODbL і у Control, Driver Browser і native Android map показується атрибуція «© OpenStreetMap contributors». Це runtime network request до стороннього tile service: провайдер бачить IP клієнта та запитану область карти. Driver Browser використовує звичайний browser User-Agent + cross-origin origin Referer; Control webview ідентифікується як `CargoDispatchControl/0.1.0 (+https://github.com/RomanZavadaM/cargo-dispatch)`. Browser cache не обходиться, bulk/offline prefetch не виконується; недоступність tiles не повинна блокувати route/files/media.
+- Базова карта використовує стандартні raster tiles OpenStreetMap через `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; дані OpenStreetMap поширюються за ODbL і у Control, Driver Browser і native Android map показується атрибуція «© OpenStreetMap contributors». Це runtime network request до стороннього tile service: провайдер бачить IP клієнта та запитану область карти. Driver Browser використовує звичайний browser User-Agent + cross-origin origin Referer; головні вікна Control і Planner ідентифікуються як `CargoDispatchControl/0.1.0` та `CargoDispatchPlanner/0.1.0` (+https://github.com/RomanZavadaM/cargo-dispatch); окремі вікна рейсових сесій Control власного ідентифікатора поки не задають. Browser cache не обходиться, bulk/offline prefetch не виконується; недоступність tiles не повинна блокувати route/files/media.
 - Реальні дані користувачів (авто, водії, заявки, координати) у репозиторії не зберігаються.
 
 
@@ -47,6 +61,7 @@ cargo-dispatch може містити або розповсюджуватися
 - `dtolnay/rust-toolchain` — MIT; workflow зафіксовано на commit `df2a88e9fe4098bad09cb42c3dec7187f15861fc`.
 - `cargo-deny` — CI-only dependency/license/advisory checker, версія `0.21.0`; встановлюється з crates.io з `--locked`.
 - `cloudflared 2026.11.2` — Apache-2.0, CI-only; офіційний Linux amd64 binary завантажується з release `cloudflare/cloudflared` і перевіряється за SHA256 `56f13335143ec0e22772963290683a84a04114a35ec64cbc794a4d39ff9bb8cf`. Тимчасовий Quick Tunnel використовується лише для public HTTPS/NAT-style acceptance із синтетичним рейсом, не входить до продукту або release assets, не зберігає production secrets і припиняє існування після job.
-- `taiki-e/install-action` — MIT; Control UI workflow зафіксовано на commit `fe3acb53a98b62c772db35de75ce0e4595e7ca8c` і використовує його лише для встановлення exact `trunk@0.22.2` без зміни product MSRV.\n- `actions/upload-artifact` — MIT; Control UI workflow зафіксовано на commit `cf430e030ddbb5b0abf93d22962f4752f3646cd9` (лінія v7) і використовує його лише для короткоживучого Windows CI-артефакту ручного loopback-тесту; release не створюється.
+- `taiki-e/install-action` — MIT; Control UI workflow зафіксовано на commit `fe3acb53a98b62c772db35de75ce0e4595e7ca8c` і використовує його лише для встановлення exact `trunk@0.22.2` без зміни product MSRV.
+- `actions/upload-artifact` — MIT; Control UI workflow зафіксовано на commit `cf430e030ddbb5b0abf93d22962f4752f3646cd9` (лінія v7) і використовує його лише для короткоживучого Windows CI-артефакту ручного loopback-тесту; release не створюється.
 
 Зміна pin-ів є окремою чутливою зміною build supply chain і повинна проходити звичайний CI перед подальшим використанням.
