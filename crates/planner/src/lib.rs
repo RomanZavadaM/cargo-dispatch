@@ -1,8 +1,9 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_contracts::{
-    ContractError, ReplanRequest, TripGeometryContractError, TripPackageHeader, TripRoadGeometry,
-    TripRoadGeometryPoint, TripRoutingIdentity, TripVersion, validate_trip_road_geometry,
+    ContractError, ReplanRequest, TripGeometryContractError, TripPackageHeader, TripPlanningBasis,
+    TripRoadGeometry, TripRoadGeometryPoint, TripRoutingIdentity, TripVersion,
+    validate_trip_road_geometry,
 };
 use cargo_dispatch_domain::{
     AvailabilityState, CalculationId, CallTaskId, CandidateId, CargoId, CargoSummary, LoadRequest,
@@ -822,6 +823,7 @@ pub struct PlannerTripExportDraft {
     pub created_at_unix_ms: u64,
     pub created_by: OperatorId,
     pub ordered_point_ids: Vec<PointId>,
+    pub planning_basis: Option<TripPlanningBasis>,
     pub routing_profile: Option<VehicleRoutingProfile>,
     pub route_geometry: Option<TripRoadGeometry>,
 }
@@ -903,6 +905,7 @@ pub fn build_trip_export_draft(
     base_version: Option<TripVersion>,
     created_at_unix_ms: u64,
     created_by: OperatorId,
+    planning_basis: TripPlanningBasis,
 ) -> Result<PlannerTripExportDraft, PlannerExportError> {
     if route.state != WorkingRouteState::Ready {
         return Err(PlannerExportError::RouteNotReady(route.state));
@@ -925,6 +928,7 @@ pub fn build_trip_export_draft(
         created_at_unix_ms,
         created_by,
         ordered_point_ids: route.points.iter().map(|point| point.point_id).collect(),
+        planning_basis: Some(planning_basis),
         routing_profile: None,
         route_geometry: None,
     })
