@@ -1199,7 +1199,7 @@ impl ControlBrowserState {
         order: &[PointId],
     ) -> io::Result<LiveRerouteOutcome> {
         let trip = self.shared_trip(token)?;
-        let (displayed, request) = {
+        let (displayed, request, profile_fingerprint) = {
             let mut trip = trip
                 .lock()
                 .map_err(|_| io::Error::other("trip state unavailable"))?;
