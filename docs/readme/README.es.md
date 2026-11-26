@@ -48,9 +48,9 @@ Los datos, las acciones de ruta, los archivos y el backend son comunes; solo cam
 
 Control y Driver Browser ya incluyen un mapa base interactivo real con los puntos del viaje y la última posición aceptada del conductor.
 
-La rama `main` ya contiene una canalización versionada de geometría vial (schema 1.2): Planner puede transportar geometría derivada, Control la guarda y ambos mapas dibujan la línea solo mientras coincide con el orden actual de las paradas. Un reorder invalida inmediatamente la línea anterior.
+La rama `main` ya contiene una canalización versionada de geometría vial (schema 1.3): Planner transporta la geometría derivada junto con el perfil real de rutas del vehículo, mientras que los paquetes schema 1.0–1.2 siguen siendo legibles. Control guarda la geometría y, tras un reorder, recalcula la línea vial mediante el servicio Valhalla configurado en runtime. Una respuesta tardía del motor de rutas no puede sobrescribir un estado de viaje más nuevo.
 
-Todavía falta el **transporte HTTP real hacia Valhalla y el recálculo automático de la geometría**. El contrato y el renderizado ya existen; el motor de rutas externo aún no está conectado al runtime del producto.
+La dirección de Valhalla, el ID del conjunto de mapas y los tiempos de espera se configuran directamente en Desktop Control; la disponibilidad puede comprobarse mediante `/status` o se puede desactivar el routing de forma explícita. Si Valhalla no está configurado o está temporalmente no disponible, Control conserva igualmente el nuevo orden de puntos y la geometría derivada puede quedar ausente.
 
 ## Stable v0.1.0
 
@@ -78,7 +78,6 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 - ruta HTTPS/direccionamiento público;
 - validación completa del GPS del navegador mediante HTTPS;
 - pruebas de campo en distintas redes/NAT/CGNAT;
-- transporte HTTP real de Valhalla y recálculo de geometría tras reorder;
 
 
 ## Idiomas de la interfaz
