@@ -48,9 +48,9 @@ Driver Browser は電話版と desktop 版に分かれた製品ではなく、**
 
 Control と Driver Browser には、運行地点と最後に受理されたドライバー位置を表示する実際のインタラクティブなベースマップがあります。
 
-`main` には現在、バージョン付き道路形状パイプライン（schema 1.2）が統合されています。Planner は派生 geometry を渡せ、Control が保存し、両方の地図は現在の地点順序と一致する間だけ道路線を表示します。Reorder 後は古い線を直ちに無効化します。
+`main` には現在、バージョン付き道路 geometry パイプライン（schema 1.3）が統合されています。Planner は派生 geometry と実際の車両 routing profile を一緒に渡し、schema 1.0–1.2 のパッケージも引き続き読み込めます。Control は geometry を保存し、地点順の変更後は設定された runtime Valhalla を使って道路線を再計算します。遅れて届いた routing 応答が、より新しい運行状態を上書きすることはありません。
 
-残っているのは **Valhalla への実 HTTP transport と geometry の自動再計算**です。契約と表示は実装済みですが、外部ルーティングエンジンはまだ product runtime に接続されていません。
+Valhalla アドレス、地図データセット ID、timeout は Desktop Control で直接設定し、`/status` で利用可否を確認するか routing を明示的に無効化できます。Valhalla が未設定または一時的に利用できない場合でも、新しい地点順は Control に保存され、派生 geometry だけが存在しない状態になります。
 
 ## Stable v0.1.0
 
@@ -78,7 +78,6 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 - HTTPS/public addressing path;
 - HTTPS 経由での browser GPS 完全受け入れ;
 - 異なるネットワーク/NAT/CGNAT でのフィールドテスト;
-- 実 Valhalla HTTP transport と reorder 後の geometry 再計算;
 
 
 ## インターフェース言語

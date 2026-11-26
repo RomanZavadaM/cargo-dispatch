@@ -48,9 +48,9 @@ Daten, Routenaktionen, Dateien und Backend sind gemeinsam; nur das Layout passt 
 
 Control und Driver Browser enthalten jetzt eine echte interaktive Basiskarte mit den Tourpunkten und der zuletzt akzeptierten Fahrerposition.
 
-In `main` ist jetzt eine versionierte Road-Geometry-Pipeline (Schema 1.2) integriert: Planner kann abgeleitete Geometrie mitgeben, Control speichert sie, und beide Karten zeigen die Straßenlinie nur solange sie zur aktuellen Stopp-Reihenfolge passt. Nach einem Reorder wird die alte Linie sofort ungültig.
+In `main` ist jetzt eine versionierte Road-Geometry-Pipeline (Schema 1.3) integriert: Planner übergibt abgeleitete Geometrie zusammen mit dem tatsächlichen Fahrzeug-Routingprofil; Pakete der Schemas 1.0–1.2 bleiben lesbar. Control speichert die Geometrie und berechnet nach einem Reorder die Straßenlinie über den konfigurierten Valhalla-Runtime-Dienst neu. Eine verspätete Routing-Antwort kann keinen neueren Tourzustand überschreiben.
 
-Noch fehlt der **Live-HTTP-Transport zu Valhalla und die automatische Neuberechnung der Geometrie**. Vertrag und Darstellung sind vorhanden; der externe Routing-Engine-Pfad ist noch nicht in die Product-Runtime eingebunden.
+Valhalla-Adresse, Karten-Dataset-ID und Timeouts werden direkt in Desktop Control eingestellt; die Verfügbarkeit lässt sich über `/status` prüfen oder das Routing ausdrücklich deaktivieren. Ist Valhalla nicht konfiguriert oder vorübergehend nicht verfügbar, speichert Control die neue Punktreihenfolge trotzdem; die abgeleitete Geometrie kann dann fehlen.
 
 ## Stable v0.1.0
 
@@ -78,7 +78,6 @@ Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/Te
 - HTTPS-/Public-Addressing-Pfad;
 - vollständige Browser-GPS-Abnahme über HTTPS;
 - Feldtests über verschiedene Netze/NAT/CGNAT;
-- Live-Valhalla-HTTP-Transport und Neuberechnung der Geometrie nach Reorder;
 
 
 ## Sprachen der Benutzeroberfläche
