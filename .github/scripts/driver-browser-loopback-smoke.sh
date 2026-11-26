@@ -168,7 +168,19 @@ python3 - <<'PY'
 import json
 from pathlib import Path
 
-trip = json.loads(Path("driver-browser-loopback-results/upload-response.json").read_text())
+document = json.loads(Path("driver-browser-loopback-results/upload-response.json").read_text())
+assert document["document_id"] == "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+assert document["direction"] == "from_driver"
+assert document["original_name"] == "driver-upload.txt"
+print("Driver upload response: PASS")
+PY
+
+curl --fail --silent --show-error "$BASE/api/trip/$TOKEN" > driver-browser-loopback-results/upload-snapshot.json
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+trip = json.loads(Path("driver-browser-loopback-results/upload-snapshot.json").read_text())
 matches = [
     d for d in trip["documents"]
     if d["document_id"] == "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
@@ -176,7 +188,7 @@ matches = [
 assert len(matches) == 1
 assert matches[0]["direction"] == "from_driver"
 assert matches[0]["original_name"] == "driver-upload.txt"
-print("Driver upload metadata: PASS")
+print("Driver upload + refresh: PASS")
 PY
 
 curl --fail --silent --show-error   "$BASE/api/trip/$TOKEN/documents/$DRIVER_DOC_ID"   > driver-browser-loopback-results/driver-download.txt
