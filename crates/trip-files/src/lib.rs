@@ -731,12 +731,8 @@ impl ManualTripFile {
         if let Some(basis) = &planning_basis {
             validate_trip_planning_basis(basis, &route_points).map_err(invalid)?;
         }
-        let header = TripPackageHeader::new(
-            trip_id,
-            TripVersion::new(1).map_err(invalid)?,
-            None,
-        )
-        .map_err(invalid)?;
+        let header = TripPackageHeader::new(trip_id, TripVersion::new(1).map_err(invalid)?, None)
+            .map_err(invalid)?;
         let hash = Sha256::digest(serde_json::to_vec(self)?);
         Ok(TripImportCandidate {
             header,
@@ -1203,7 +1199,11 @@ impl TripFolder {
         let trip = match event {
             Change::Import(manifest) => manifest.candidate()?.header.trip_id,
             Change::ManualCreate(file) => file.candidate()?.header.trip_id,
-            _ => return Err(invalid("trip history must start with import or manual create")),
+            _ => {
+                return Err(invalid(
+                    "trip history must start with import or manual create",
+                ));
+            }
         };
         Self::open(path, trip)
     }
