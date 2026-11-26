@@ -74,7 +74,7 @@ pub struct ListenerStatus {
     pub address: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SessionStatus {
     pub trip_id: String,
     pub token: String,
@@ -83,6 +83,7 @@ pub struct SessionStatus {
     pub endpoint_label: Option<String>,
     pub vehicle_label: Option<String>,
     pub vehicle_type: Option<String>,
+    pub routing_profile: Option<DashboardVehicleRoutingProfile>,
     pub driver_url: Option<String>,
     pub public_driver_url: Option<String>,
 }
@@ -127,7 +128,7 @@ pub struct UpdateRoutingContextInput {
     pub profile: Option<DashboardVehicleRoutingProfile>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ControlUiStatus {
     pub listener: Option<ListenerStatus>,
     pub gateway: Option<GatewayStatus>,
