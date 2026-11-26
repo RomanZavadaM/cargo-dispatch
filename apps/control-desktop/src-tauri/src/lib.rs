@@ -199,12 +199,8 @@ fn dashboard(
                     title: cargo.title,
                     weight_kg: cargo.weight_kg,
                     pallets: cargo.pallets,
-                    pickup_point_id: cargo
-                        .pickup_point_id
-                        .map(|point| id_hex(point.as_bytes())),
-                    unload_point_id: cargo
-                        .unload_point_id
-                        .map(|point| id_hex(point.as_bytes())),
+                    pickup_point_id: cargo.pickup_point_id.map(|point| id_hex(point.as_bytes())),
+                    unload_point_id: cargo.unload_point_id.map(|point| id_hex(point.as_bytes())),
                 })
                 .collect(),
         }),
