@@ -612,18 +612,30 @@ impl DesktopControlService {
             .lock()
             .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?
             .values()
-            .map(|session| SessionStatus {
-                trip_id: session.trip_id.clone(),
-                token: session.token.clone(),
-                display_name: session_display_name(session),
-                endpoint_id: session.endpoint_id.map(|id| id_hex(id.as_bytes())),
-                endpoint_label: session.endpoint_label.clone(),
-                vehicle_label: session.vehicle_label.clone(),
-                vehicle_type: session.vehicle_type.clone(),
-                driver_url: address.map(|address| driver_url(address, &session.token)),
-                public_driver_url: public_driver_urls.get(&session.token).cloned(),
+            .map(|session| {
+                let routing_profile = self
+                    .browser
+                    .session_active_routing_profile(&session.token)
+                    .map_err(|error| {
+                        format!(
+                            "Не вдалося прочитати routing context сесії {}: {error}",
+                            session_display_name(session)
+                        )
+                    })?;
+                Ok(SessionStatus {
+                    trip_id: session.trip_id.clone(),
+                    token: session.token.clone(),
+                    display_name: session_display_name(session),
+                    endpoint_id: session.endpoint_id.map(|id| id_hex(id.as_bytes())),
+                    endpoint_label: session.endpoint_label.clone(),
+                    vehicle_label: session.vehicle_label.clone(),
+                    vehicle_type: session.vehicle_type.clone(),
+                    routing_profile: routing_profile.as_ref().map(routing_profile_view),
+                    driver_url: address.map(|address| driver_url(address, &session.token)),
+                    public_driver_url: public_driver_urls.get(&session.token).cloned(),
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, String>>()?;
 
         Ok(ControlUiStatus {
             listener,
