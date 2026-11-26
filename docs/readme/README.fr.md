@@ -22,7 +22,7 @@ Le principal langage de développement est **Rust**.
 - fichiers, photos et vidéos **Driver Browser → Control** avec sauvegarde locale ;
 - deux clients navigateur simultanés pour un même trajet et reconnexion sans base navigateur séparée ;
 - carte interactive OpenStreetMap dans Control et Driver Browser ;
-- modes loopback et LAN explicite pour les tests et l’utilisation locale.
+- modes loopback et LAN explicite pour les tests et l’utilisation locale.\n- l’acceptation automatisée du Driver Browser vérifie une vraie session Control séparément en loopback et via un bind LAN privé explicite.
 
 ## Applications Driver natives
 
@@ -96,7 +96,7 @@ Les packages Android et Apple ne sont pas encore signés pour les stores. App St
 
 ## Étapes restantes
 
-- validation manuelle locale dans le navigateur ;
+- validation visuelle manuelle du navigateur local pour narrow phone / tablet / wide desktop, y compris pan/zoom/fit de la carte ;
 - test du même Driver Browser sur un vrai téléphone dans le même LAN ;
 - chemin HTTPS/adressage public ;
 - validation GPS complète du navigateur via HTTPS ;
