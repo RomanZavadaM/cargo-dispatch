@@ -4,7 +4,10 @@ mod i18n;
 
 use crate::i18n::{UiLocale, strings};
 use cargo_dispatch_planner_ui_contracts::{
-    PlannerPointInput, PlannerRouteView, PointActionInput, ReorderPointsInput,
+    PlannerPointInput, PlannerRouteView, PlannerRoutingAvailabilityState,
+    PlannerRoutingConfigInput, PlannerRoutingPreviewInput, PlannerRoutingPreviewState,
+    PlannerRoutingPreviewView, PlannerRoutingProbeResult, PlannerRoutingProfileInput,
+    PlannerRoutingStatus, PlannerTollPreference, PointActionInput, ReorderPointsInput,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -39,8 +42,10 @@ let plannerMapState = {
   dragCenterX: 0,
   dragCenterY: 0,
   points: [],
+  geometry: [],
   routeId: null,
-  pointSetKey: ""
+  pointSetKey: "",
+  geometryKey: ""
 };
 
 function clampPlannerLat(latitude) {
@@ -148,6 +153,25 @@ function plannerMapRender() {
     }
   }
 
+  if (plannerMapState.geometry.length > 1) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "map-route");
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+    svg.setAttribute("preserveAspectRatio", "none");
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    line.setAttribute(
+      "points",
+      plannerMapState.geometry
+        .map(point => {
+          const shown = plannerProject(point.latitude, point.longitude, zoom);
+          return (shown.x - left) + "," + (shown.y - top);
+        })
+        .join(" ")
+    );
+    svg.append(line);
+    overlayLayer.append(svg);
+  }
+
   for (const point of plannerMapState.points) {
     const shown = plannerProject(point.latitude, point.longitude, zoom);
     const marker = document.createElement("div");
@@ -163,7 +187,10 @@ function plannerMapRender() {
 function plannerMapFit() {
   const host = plannerMapHost();
   const points = plannerMapState.points;
-  if (!host || points.length === 0) {
+  const fitPoints = plannerMapState.geometry.length > 0
+    ? [...points, ...plannerMapState.geometry]
+    : points;
+  if (!host || fitPoints.length === 0) {
     plannerMapState.zoom = 6;
     plannerMapState.centerLat = 49.0;
     plannerMapState.centerLon = 31.0;
@@ -175,13 +202,13 @@ function plannerMapFit() {
   const width = Math.max(1, host.clientWidth - 72);
   const height = Math.max(1, host.clientHeight - 72);
   let chosenZoom = 3;
-  let center = {latitude: points[0].latitude, longitude: points[0].longitude};
+  let center = {latitude: fitPoints[0].latitude, longitude: fitPoints[0].longitude};
 
-  if (points.length === 1) {
+  if (fitPoints.length === 1) {
     chosenZoom = 14;
   } else {
     for (let zoom = 18; zoom >= 3; zoom--) {
-      const shown = points.map(point => plannerProject(point.latitude, point.longitude, zoom));
+      const shown = fitPoints.map(point => plannerProject(point.latitude, point.longitude, zoom));
       const xs = shown.map(item => item.x);
       const ys = shown.map(item => item.y);
       const minX = Math.min(...xs);
@@ -203,17 +230,22 @@ function plannerMapFit() {
   plannerMapRender();
 }
 
-export function cargoPlannerMapRender(routeId, pointsJson) {
+export function cargoPlannerMapRender(routeId, pointsJson, geometryJson) {
   const points = JSON.parse(pointsJson);
+  const geometry = JSON.parse(geometryJson);
   const pointSetKey = points.map(point => point.point_id).sort().join("|");
+  const geometryKey = geometryJson;
   const shouldFit =
     !plannerMapState.initialized ||
     plannerMapState.routeId !== routeId ||
-    plannerMapState.pointSetKey !== pointSetKey;
+    plannerMapState.pointSetKey !== pointSetKey ||
+    plannerMapState.geometryKey !== geometryKey;
 
   plannerMapState.routeId = routeId;
   plannerMapState.pointSetKey = pointSetKey;
+  plannerMapState.geometryKey = geometryKey;
   plannerMapState.points = points;
+  plannerMapState.geometry = geometry;
 
   if (!plannerMapHost()) {
     window.setTimeout(() => {
@@ -244,7 +276,7 @@ extern "C" {
     #[wasm_bindgen(js_name = cargoPlannerSetLocale)]
     fn cargo_planner_set_locale(locale: &str);
     #[wasm_bindgen(js_name = cargoPlannerMapRender)]
-    fn cargo_planner_map_render(route_id: &str, points_json: &str);
+    fn cargo_planner_map_render(route_id: &str, points_json: &str, geometry_json: &str);
     #[wasm_bindgen(js_name = cargoPlannerMapZoom)]
     fn cargo_planner_map_zoom(delta: i32);
     #[wasm_bindgen(js_name = cargoPlannerMapFit)]
@@ -265,6 +297,129 @@ async fn invoke<T: DeserializeOwned, A: Serialize>(command: &str, args: &A) -> R
         .as_string()
         .ok_or_else(|| "Planner returned an unexpected response".to_owned())?;
     serde_json::from_str(&json).map_err(|error| format!("response decode failed: {error}"))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RoutingDraftError {
+    InvalidNumber,
+    ChoiceRequired,
+}
+
+#[derive(Debug, Clone, Default)]
+struct RoutingProfileDraft {
+    height_m: String,
+    width_m: String,
+    length_m: String,
+    gross_weight_t: String,
+    axle_load_t: String,
+    axle_count: String,
+    hazmat: String,
+    hgv: String,
+    exclude_unpaved: String,
+    prefer_truck_routes: String,
+    toll_preference: String,
+    max_speed_kmh: String,
+}
+
+impl RoutingProfileDraft {
+    fn optional_positive_f64(value: &str) -> Result<Option<f64>, RoutingDraftError> {
+        let value = value.trim();
+        if value.is_empty() {
+            return Ok(None);
+        }
+        let parsed = value
+            .parse::<f64>()
+            .map_err(|_| RoutingDraftError::InvalidNumber)?;
+        if !parsed.is_finite() || parsed <= 0.0 {
+            return Err(RoutingDraftError::InvalidNumber);
+        }
+        Ok(Some(parsed))
+    }
+
+    fn optional_positive_u8(value: &str) -> Result<Option<u8>, RoutingDraftError> {
+        let value = value.trim();
+        if value.is_empty() {
+            return Ok(None);
+        }
+        let parsed = value
+            .parse::<u8>()
+            .map_err(|_| RoutingDraftError::InvalidNumber)?;
+        if parsed == 0 {
+            return Err(RoutingDraftError::InvalidNumber);
+        }
+        Ok(Some(parsed))
+    }
+
+    fn explicit_bool(value: &str) -> Result<bool, RoutingDraftError> {
+        match value {
+            "yes" => Ok(true),
+            "no" => Ok(false),
+            _ => Err(RoutingDraftError::ChoiceRequired),
+        }
+    }
+
+    fn input(&self) -> Result<PlannerRoutingProfileInput, RoutingDraftError> {
+        let toll_preference = match self.toll_preference.as_str() {
+            "allow" => PlannerTollPreference::Allow,
+            "prefer_avoid" => PlannerTollPreference::PreferAvoid,
+            "avoid" => PlannerTollPreference::Avoid,
+            _ => return Err(RoutingDraftError::ChoiceRequired),
+        };
+        Ok(PlannerRoutingProfileInput {
+            height_m: Self::optional_positive_f64(&self.height_m)?,
+            width_m: Self::optional_positive_f64(&self.width_m)?,
+            length_m: Self::optional_positive_f64(&self.length_m)?,
+            gross_weight_t: Self::optional_positive_f64(&self.gross_weight_t)?,
+            axle_load_t: Self::optional_positive_f64(&self.axle_load_t)?,
+            axle_count: Self::optional_positive_u8(&self.axle_count)?,
+            hazmat: Self::explicit_bool(&self.hazmat)?,
+            hgv: Self::explicit_bool(&self.hgv)?,
+            exclude_unpaved: Self::explicit_bool(&self.exclude_unpaved)?,
+            prefer_truck_routes: Self::explicit_bool(&self.prefer_truck_routes)?,
+            toll_preference,
+            max_speed_kmh: Self::optional_positive_f64(&self.max_speed_kmh)?,
+        })
+    }
+}
+
+fn probe_message(state: PlannerRoutingAvailabilityState, locale: UiLocale) -> &'static str {
+    let text = strings(locale);
+    match state {
+        PlannerRoutingAvailabilityState::NotConfigured => text.routing_not_configured,
+        PlannerRoutingAvailabilityState::Ok => text.routing_available,
+        PlannerRoutingAvailabilityState::Timeout => text.routing_timeout,
+        PlannerRoutingAvailabilityState::EngineUnavailable => text.routing_unavailable,
+        PlannerRoutingAvailabilityState::DatasetMissing => text.routing_dataset_missing,
+        PlannerRoutingAvailabilityState::EngineError => text.routing_error,
+    }
+}
+
+fn preview_message(state: PlannerRoutingPreviewState, locale: UiLocale) -> &'static str {
+    let text = strings(locale);
+    match state {
+        PlannerRoutingPreviewState::Ok => text.preview_updated,
+        PlannerRoutingPreviewState::NotConfigured => text.routing_not_configured,
+        PlannerRoutingPreviewState::NoRoute => text.preview_no_route,
+        PlannerRoutingPreviewState::Timeout => text.preview_timeout,
+        PlannerRoutingPreviewState::EngineUnavailable => text.preview_unavailable,
+        PlannerRoutingPreviewState::DatasetMissing => text.preview_dataset_missing,
+        PlannerRoutingPreviewState::EngineError => text.preview_error,
+        PlannerRoutingPreviewState::StaleDraft => text.preview_stale,
+    }
+}
+
+fn warning_label(code: &str, locale: UiLocale) -> String {
+    let text = strings(locale);
+    match code {
+        "missing_height_m" => text.height_m,
+        "missing_width_m" => text.width_m,
+        "missing_length_m" => text.length_m,
+        "missing_gross_weight_t" => text.gross_weight_t,
+        "missing_axle_load_t" => text.axle_load_t,
+        "missing_axle_count" => text.axle_count,
+        _ => code,
+    }
+    .to_owned()
 }
 
 fn main() {
