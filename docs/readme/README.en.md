@@ -47,11 +47,13 @@ Trip data, route actions, files, and backend calls are shared; only layout chang
 
 ## Map
 
-Control and Driver Browser now contain a real interactive basemap with trip points and the latest accepted driver position.
+Control and Driver Browser already contain a real interactive basemap with trip points and the latest accepted driver position.
 
-The `main` branch now contains a versioned road-geometry pipeline (schema 1.3): Planner carries derived geometry together with the actual vehicle routing profile, while schema 1.0–1.2 packages remain readable. Control stores geometry and, after a reorder, recalculates the road line through the configured runtime Valhalla service. A late routing response cannot overwrite a newer trip state.
+The current `main` uses schema 1.4 with an immutable planning basis; older schemas remain readable. A Planner routing profile is only the input for a particular planning calculation, not a permanent trip-to-vehicle binding. After import, Control maintains a separate mutable actual routing context for the active session.
 
-The Valhalla address, map dataset ID and timeouts are configured directly in Desktop Control; availability can be checked through `/status`, or routing can be explicitly disabled. If Valhalla is not configured or is temporarily unavailable, the new point order is still stored by Control and derived geometry may simply be absent.
+Control keeps derived geometry and recalculates the road line through its configured runtime Valhalla service after a reorder. A late routing response cannot overwrite newer trip state. If Valhalla is not configured or is temporarily unavailable, the new point order is still stored and derived geometry may be absent.
+
+Planner desktop now has its own runtime Valhalla preview: the operator supplies the Valhalla address, map dataset ID and timeouts, probes `/status`, and `/route` is calculated only from an explicitly supplied planning profile. Unknown numeric constraints are not invented. A successful result draws the real road polyline over OSM; no fake straight connector is drawn without a route result. The preview is derived from route/revision/profile: editing the draft or planning profile clears the old line, and a late response is rejected. Routing failure does not mutate the Planner draft.
 
 ## Test v0.1.0-preview.7
 
@@ -92,7 +94,7 @@ Android and Apple packages are not yet store-signed. App Store/TestFlight/Google
 
 ## What is still ahead
 
-- Planner map/routing preview, followed by package-export preparation from the Planner UI;
+- package export from the Planner UI through the existing versioned trip package;
 
 - manual local-browser acceptance;
 - testing the same Driver Browser on a real phone in the same LAN;
