@@ -32,7 +32,8 @@ use std::{
     sync::Mutex,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tauri::{Manager, State};
+use tauri::{AppHandle, Manager, State};
+use tauri_plugin_dialog::DialogExt;
 
 const PLANNER_JOURNAL_SCHEMA: u32 = 1;
 const PLANNER_JOURNAL_FILE: &str = "planner-draft-v1.jsonl";
@@ -1081,8 +1082,38 @@ fn planner_export_package(
     state.export_trip_package(input)
 }
 
+#[tauri::command]
+async fn planner_pick_export_path(
+    app: AppHandle,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<Option<String>, String> {
+    let route = state.status()?;
+    let suffix = route
+        .working_route_id
+        .chars()
+        .take(12)
+        .collect::<String>();
+    let file_name = format!("cargo-dispatch-trip-{suffix}.zip");
+    tokio::task::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .set_file_name(file_name)
+            .blocking_save_file()
+            .map(|value| {
+                value
+                    .into_path()
+                    .map(|path| path.to_string_lossy().into_owned())
+                    .map_err(|error| format!("Could not read selected package path: {error}"))
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|error| format!("Could not open package save dialog: {error}"))?
+}
+
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
             fs::create_dir_all(&app_data_dir)?;
@@ -1102,7 +1133,8 @@ pub fn run() {
             planner_disable_routing,
             planner_test_routing,
             planner_preview_route,
-            planner_export_package
+            planner_export_package,
+            planner_pick_export_path
         ])
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");
