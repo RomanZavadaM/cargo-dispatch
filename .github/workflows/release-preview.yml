@@ -442,12 +442,11 @@ jobs:
           - native Android та iOS/iPadOS Driver source і test builds з того самого release commit;
           - Addressing Gateway server для публічного зв'язку Control ↔ Driver без зберігання рейсу на сервері.
 
-          ### Ще не stable
+          ### Що ще попереду
           - real phone/iPhone LAN та background tracking acceptance;
           - HTTPS/public addressing;
           - NAT/CGNAT field path;
           - production mobile signing/TestFlight/Google Play;
-          - stable release.
 
           Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
           macOS: розпакувати universal ZIP і відкрити Cargo Dispatch Control.app; підпис/notarization буде пізніше.
