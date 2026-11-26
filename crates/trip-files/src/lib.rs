@@ -1,16 +1,17 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_contracts::{
-    CURRENT_SCHEMA_VERSION, PackageContentFingerprint, ReplanRequest, TRIP_PACKAGE_SCHEMA_NAME,
-    TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoadGeometry,
-    TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity, TripVersion, validate_route_points,
+    CURRENT_SCHEMA_VERSION, PackageContentFingerprint, PlannedCargoBasis, ReplanRequest,
+    TRIP_PACKAGE_SCHEMA_NAME, TripNavigationTarget, TripPackageHeader, TripPlanningBasis,
+    TripPointKind, TripRoadGeometry, TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity,
+    TripVersion, validate_route_points, validate_trip_planning_basis,
     validate_trip_road_geometry,
 };
 use cargo_dispatch_control::{
     ImportResult, InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft,
     RouteGeometryUpdateError, StoredTripPlan, TripImportCandidate,
 };
-use cargo_dispatch_domain::{DocumentId, PointId, TripId};
+use cargo_dispatch_domain::{CargoId, DocumentId, PointId, TripId};
 use cargo_dispatch_geo::VehicleRoutingProfile;
 use cargo_dispatch_planner::PlannerTripExportDraft;
 use serde::{Deserialize, Serialize};
@@ -548,6 +549,80 @@ fn points(rows: &[Point]) -> io::Result<Vec<TripRoutePoint>> {
         .collect()
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PlannedCargoBasisFile {
+    cargo_id: [u8; 16],
+    title: String,
+    weight_kg: Option<u32>,
+    pallets: Option<u16>,
+    pickup_point_id: Option<[u8; 16]>,
+    unload_point_id: Option<[u8; 16]>,
+}
+
+impl PlannedCargoBasisFile {
+    fn typed(&self) -> io::Result<PlannedCargoBasis> {
+        Ok(PlannedCargoBasis {
+            cargo_id: CargoId::from_bytes(self.cargo_id).map_err(invalid)?,
+            title: self.title.clone(),
+            weight_kg: self.weight_kg,
+            pallets: self.pallets,
+            pickup_point_id: self
+                .pickup_point_id
+                .map(PointId::from_bytes)
+                .transpose()
+                .map_err(invalid)?,
+            unload_point_id: self
+                .unload_point_id
+                .map(PointId::from_bytes)
+                .transpose()
+                .map_err(invalid)?,
+        })
+    }
+}
+
+impl From<&PlannedCargoBasis> for PlannedCargoBasisFile {
+    fn from(cargo: &PlannedCargoBasis) -> Self {
+        Self {
+            cargo_id: cargo.cargo_id.as_bytes(),
+            title: cargo.title.clone(),
+            weight_kg: cargo.weight_kg,
+            pallets: cargo.pallets,
+            pickup_point_id: cargo.pickup_point_id.map(PointId::as_bytes),
+            unload_point_id: cargo.unload_point_id.map(PointId::as_bytes),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PlanningBasisFile {
+    vehicle_type: String,
+    cargos: Vec<PlannedCargoBasisFile>,
+}
+
+impl PlanningBasisFile {
+    fn typed(&self) -> io::Result<TripPlanningBasis> {
+        Ok(TripPlanningBasis {
+            vehicle_type: self.vehicle_type.clone(),
+            cargos: self
+                .cargos
+                .iter()
+                .map(PlannedCargoBasisFile::typed)
+                .collect::<io::Result<Vec<_>>>()?,
+        })
+    }
+}
+
+impl From<&TripPlanningBasis> for PlanningBasisFile {
+    fn from(basis: &TripPlanningBasis) -> Self {
+        Self {
+            vehicle_type: basis.vehicle_type.clone(),
+            cargos: basis.cargos.iter().map(PlannedCargoBasisFile::from).collect(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Manifest {
@@ -562,12 +637,32 @@ struct Manifest {
     operator: [u8; 16],
     points: Vec<Point>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    planning_basis: Option<PlanningBasisFile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     routing_profile: Option<VehicleRoutingProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     road_geometry: Option<RoadGeometryFile>,
 }
 
 impl Manifest {
+    fn validated_planning_basis(
+        &self,
+        route_points: &[TripRoutePoint],
+    ) -> io::Result<Option<TripPlanningBasis>> {
+        let Some(file) = &self.planning_basis else {
+            if self.schema_version[1] >= 4 {
+                return Err(invalid("trip package schema 1.4 requires planning basis"));
+            }
+            return Ok(None);
+        };
+        if self.schema_version[1] < 4 {
+            return Err(invalid("planning basis requires trip package schema 1.4"));
+        }
+        let basis = file.typed()?;
+        validate_trip_planning_basis(&basis, route_points).map_err(invalid)?;
+        Ok(Some(basis))
+    }
+
     fn validated_routing_profile(&self) -> io::Result<Option<VehicleRoutingProfile>> {
         let Some(profile) = self.routing_profile.clone() else {
             return Ok(None);
@@ -605,6 +700,7 @@ impl Manifest {
         );
         let route_points = points(&self.points)?;
         validate_route_points(&route_points).map_err(invalid)?;
+        self.validated_planning_basis(&route_points)?;
         self.validated_routing_profile()?;
         let route_geometry = self.road_geometry.as_ref().map(TripRoadGeometry::from);
         if let Some(geometry) = &route_geometry {
@@ -653,6 +749,12 @@ pub fn export_package(
     if draft.routing_profile.is_some() && h.schema_version.minor < 3 {
         return Err(invalid("routing profile requires trip package schema 1.3"));
     }
+    if draft.planning_basis.is_some() && h.schema_version.minor < 4 {
+        return Err(invalid("planning basis requires trip package schema 1.4"));
+    }
+    if h.schema_version.minor >= 4 && draft.planning_basis.is_none() {
+        return Err(invalid("trip package schema 1.4 requires planning basis"));
+    }
     let manifest = Manifest {
         schema: h.schema_name.clone(),
         schema_version: [h.schema_version.major, h.schema_version.minor],
@@ -664,6 +766,7 @@ pub fn export_package(
         created_at_unix_ms: draft.created_at_unix_ms,
         operator: draft.created_by.as_bytes(),
         points: route.iter().map(Point::from).collect(),
+        planning_basis: draft.planning_basis.as_ref().map(PlanningBasisFile::from),
         routing_profile: draft.routing_profile.clone(),
         road_geometry: draft.route_geometry.as_ref().map(RoadGeometryFile::from),
     };
