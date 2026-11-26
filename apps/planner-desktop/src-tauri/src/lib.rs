@@ -1,11 +1,17 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_domain::{PointId, WorkingRouteId};
+use cargo_dispatch_geo::{
+    GeoPoint, NormalizedStatus, RouteRequest, TollPreference, VehicleRoutingProfile,
+    valhalla_http::{ValhallaHttpClient, ValhallaHttpError, ValhallaRuntimeConfig},
+};
 use cargo_dispatch_planner::{
     WorkingRoute, WorkingRouteState, edit_manual_working_route, manual_working_route,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    PlannerPointInput, PlannerPointView, PlannerRouteView, PointActionInput, ReorderPointsInput,
+    PlannerGeometryPointView, PlannerPointInput, PlannerPointView, PlannerRoutePreviewInput,
+    PlannerRoutePreviewView, PlannerRouteView, PlannerRoutingConfigInput, PlannerRoutingConfigView,
+    PlannerRoutingProbeView, PlannerVehicleProfileInput, PointActionInput, ReorderPointsInput,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,6 +20,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     sync::Mutex,
+    time::Duration,
 };
 use tauri::{Manager, State};
 
@@ -74,6 +81,7 @@ struct PlannerJournalRecord {
 struct PlannerDesktopService {
     inner: Mutex<PlannerState>,
     journal_path: Option<PathBuf>,
+    routing: Mutex<Option<ValhallaRuntimeConfig>>,
 }
 
 impl Default for PlannerDesktopService {
@@ -81,6 +89,7 @@ impl Default for PlannerDesktopService {
         Self {
             inner: Mutex::new(PlannerState::default()),
             journal_path: None,
+            routing: Mutex::new(None),
         }
     }
 }
@@ -91,6 +100,7 @@ impl PlannerDesktopService {
         Ok(Self {
             inner: Mutex::new(state),
             journal_path: Some(journal_path),
+            routing: Mutex::new(None),
         })
     }
 
@@ -204,6 +214,286 @@ impl PlannerDesktopService {
             },
         )
     }
+
+    fn routing_status(&self) -> Result<PlannerRoutingConfigView, String> {
+        let routing = self
+            .routing
+            .lock()
+            .map_err(|_| "Налаштування маршрутизації тимчасово недоступні".to_owned())?;
+        Ok(match routing.as_ref() {
+            Some(config) => PlannerRoutingConfigView {
+                configured: true,
+                base_url: Some(config.base_url().to_string()),
+                map_dataset_id: Some(config.map_dataset_id().to_owned()),
+                connect_timeout_ms: Some(config.connect_timeout().as_millis() as u64),
+                request_timeout_ms: Some(config.request_timeout().as_millis() as u64),
+            },
+            None => PlannerRoutingConfigView {
+                configured: false,
+                base_url: None,
+                map_dataset_id: None,
+                connect_timeout_ms: None,
+                request_timeout_ms: None,
+            },
+        })
+    }
+
+    fn configure_routing(
+        &self,
+        input: PlannerRoutingConfigInput,
+    ) -> Result<PlannerRoutingConfigView, String> {
+        let base_url = input.base_url.trim();
+        let map_dataset_id = input.map_dataset_id.trim();
+        if base_url.is_empty() {
+            return Err("Потрібно вказати адресу Valhalla".to_owned());
+        }
+        if map_dataset_id.is_empty() {
+            return Err("Потрібно вказати ідентифікатор набору карт".to_owned());
+        }
+        if !(100..=30_000).contains(&input.connect_timeout_ms) {
+            return Err("Таймаут підключення має бути 100–30000 мс".to_owned());
+        }
+        if !(250..=120_000).contains(&input.request_timeout_ms)
+            || input.request_timeout_ms < input.connect_timeout_ms
+        {
+            return Err(
+                "Таймаут запиту має бути 250–120000 мс і не меншим за таймаут підключення"
+                    .to_owned(),
+            );
+        }
+
+        let config = ValhallaRuntimeConfig::new(
+            base_url,
+            map_dataset_id,
+            Duration::from_millis(input.connect_timeout_ms),
+            Duration::from_millis(input.request_timeout_ms),
+        )
+        .map_err(|error| format!("Некоректні налаштування Valhalla: {error}"))?;
+
+        *self
+            .routing
+            .lock()
+            .map_err(|_| "Налаштування маршрутизації тимчасово недоступні".to_owned())? =
+            Some(config);
+        self.routing_status()
+    }
+
+    fn disable_routing(&self) -> Result<PlannerRoutingConfigView, String> {
+        *self
+            .routing
+            .lock()
+            .map_err(|_| "Налаштування маршрутизації тимчасово недоступні".to_owned())? = None;
+        self.routing_status()
+    }
+
+    fn routing_client(&self) -> Result<Option<ValhallaHttpClient>, String> {
+        let config = self
+            .routing
+            .lock()
+            .map_err(|_| "Налаштування маршрутизації тимчасово недоступні".to_owned())?
+            .clone();
+        config
+            .map(ValhallaHttpClient::new)
+            .transpose()
+            .map_err(|error| format!("Не вдалося підготувати клієнт Valhalla: {error}"))
+    }
+
+    async fn test_routing(&self) -> Result<PlannerRoutingProbeView, String> {
+        let Some(client) = self.routing_client()? else {
+            return Ok(PlannerRoutingProbeView {
+                state: "not_configured".to_owned(),
+                engine_version: None,
+                tileset_last_modified: None,
+            });
+        };
+        let availability = client
+            .availability()
+            .await
+            .map_err(|error| format!("Не вдалося перевірити Valhalla: {error}"))?;
+        Ok(PlannerRoutingProbeView {
+            state: normalized_status_name(availability.status).to_owned(),
+            engine_version: availability.engine_version,
+            tileset_last_modified: availability.tileset_last_modified,
+        })
+    }
+
+    fn route_snapshot(
+        &self,
+        based_on_revision: u64,
+    ) -> Result<(u64, Vec<GeoPoint>), String> {
+        let state = self
+            .inner
+            .lock()
+            .map_err(|_| "Planner state unavailable".to_owned())?;
+        if state.route.current_revision != based_on_revision {
+            return Err("Чернетка маршруту вже змінилася; оновіть перегляд".to_owned());
+        }
+        if state.route.points.len() < 2 {
+            return Err("Для дорожнього маршруту потрібно щонайменше дві точки".to_owned());
+        }
+
+        let points = state
+            .route
+            .points
+            .iter()
+            .map(|route_point| {
+                let point = state
+                    .points
+                    .get(&route_point.point_id)
+                    .ok_or_else(|| "У Planner відсутні координати точки".to_owned())?;
+                GeoPoint::new(point.latitude, point.longitude)
+                    .map_err(|error| format!("Некоректні координати точки: {error}"))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+
+        Ok((state.route.current_revision, points))
+    }
+
+    async fn preview_route(
+        &self,
+        input: PlannerRoutePreviewInput,
+    ) -> Result<PlannerRoutePreviewView, String> {
+        let Some(client) = self.routing_client()? else {
+            return Ok(empty_preview(
+                input.based_on_revision,
+                "not_configured",
+                None,
+                None,
+            ));
+        };
+
+        let profile = vehicle_profile(input.profile)?;
+        let (revision, points) = self.route_snapshot(input.based_on_revision)?;
+        let request = RouteRequest::new(points, profile)
+            .map_err(|error| format!("Не вдалося підготувати запит маршруту: {error}"))?;
+
+        let result = match client.route(&request).await {
+            Ok(result) => result,
+            Err(ValhallaHttpError::Unavailable(status)) => {
+                return Ok(empty_preview(
+                    revision,
+                    normalized_status_name(status),
+                    None,
+                    Some(client.config().map_dataset_id().to_owned()),
+                ));
+            }
+            Err(error) => return Err(format!("Не вдалося отримати маршрут Valhalla: {error}")),
+        };
+
+        let current_revision = self
+            .inner
+            .lock()
+            .map_err(|_| "Planner state unavailable".to_owned())?
+            .route
+            .current_revision;
+        if current_revision != revision {
+            return Ok(empty_preview(revision, "stale", None, None));
+        }
+
+        let engine_version = Some(result.identity.engine_version().to_owned());
+        let map_dataset_id = Some(result.identity.map_dataset_id().to_owned());
+        if result.status != NormalizedStatus::Ok {
+            return Ok(empty_preview(
+                revision,
+                normalized_status_name(result.status),
+                engine_version,
+                map_dataset_id,
+            ));
+        }
+
+        Ok(PlannerRoutePreviewView {
+            based_on_revision: revision,
+            state: "ok".to_owned(),
+            engine_version,
+            map_dataset_id,
+            distance_m: result.distance_m,
+            duration_s: result.duration_s,
+            geometry: result
+                .geometry
+                .into_iter()
+                .map(|point| PlannerGeometryPointView {
+                    latitude: point.lat(),
+                    longitude: point.lon(),
+                })
+                .collect(),
+        })
+    }
+}
+
+fn normalized_status_name(status: NormalizedStatus) -> &'static str {
+    match status {
+        NormalizedStatus::Ok => "ok",
+        NormalizedStatus::NoRoute => "no_route",
+        NormalizedStatus::InvalidPoint => "invalid_point",
+        NormalizedStatus::InvalidProfile => "invalid_profile",
+        NormalizedStatus::EngineUnavailable => "engine_unavailable",
+        NormalizedStatus::Timeout => "timeout",
+        NormalizedStatus::DatasetMissing => "dataset_missing",
+        NormalizedStatus::EngineError => "engine_error",
+    }
+}
+
+fn empty_preview(
+    revision: u64,
+    state: &str,
+    engine_version: Option<String>,
+    map_dataset_id: Option<String>,
+) -> PlannerRoutePreviewView {
+    PlannerRoutePreviewView {
+        based_on_revision: revision,
+        state: state.to_owned(),
+        engine_version,
+        map_dataset_id,
+        distance_m: None,
+        duration_s: None,
+        geometry: Vec::new(),
+    }
+}
+
+fn vehicle_profile(input: PlannerVehicleProfileInput) -> Result<VehicleRoutingProfile, String> {
+    if !input.confirmed {
+        return Err(
+            "Підтвердіть параметри автомобіля перед розрахунком дорожнього маршруту".to_owned(),
+        );
+    }
+
+    let hazmat = input
+        .hazmat
+        .ok_or_else(|| "Вкажіть, чи перевозиться небезпечний вантаж".to_owned())?;
+    let hgv = input
+        .hgv
+        .ok_or_else(|| "Вкажіть, чи є автомобіль вантажним HGV".to_owned())?;
+    let exclude_unpaved = input
+        .exclude_unpaved
+        .ok_or_else(|| "Вкажіть політику щодо ґрунтових доріг".to_owned())?;
+    let prefer_truck_routes = input
+        .prefer_truck_routes
+        .ok_or_else(|| "Вкажіть, чи надавати перевагу вантажним маршрутам".to_owned())?;
+    let toll_preference = match input.toll_preference.as_deref() {
+        Some("allow") => TollPreference::Allow,
+        Some("prefer_avoid") => TollPreference::PreferAvoid,
+        Some("avoid") => TollPreference::Avoid,
+        _ => return Err("Вкажіть політику щодо платних доріг".to_owned()),
+    };
+
+    let profile = VehicleRoutingProfile {
+        height_m: input.height_m,
+        width_m: input.width_m,
+        length_m: input.length_m,
+        gross_weight_t: input.gross_weight_t,
+        axle_load_t: input.axle_load_t,
+        axle_count: input.axle_count,
+        hazmat,
+        hgv,
+        exclude_unpaved,
+        prefer_truck_routes,
+        toll_preference,
+        max_speed_kmh: input.max_speed_kmh,
+    };
+    profile
+        .validate()
+        .map_err(|error| format!("Некоректні параметри автомобіля: {error}"))?;
+    Ok(profile)
 }
 
 fn recover_journal(path: &Path) -> Result<PlannerState, String> {
@@ -456,6 +746,43 @@ fn planner_reorder_points(
     state.reorder(input)
 }
 
+#[tauri::command]
+fn planner_routing_status(
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerRoutingConfigView, String> {
+    state.routing_status()
+}
+
+#[tauri::command]
+fn planner_configure_routing(
+    input: PlannerRoutingConfigInput,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerRoutingConfigView, String> {
+    state.configure_routing(input)
+}
+
+#[tauri::command]
+fn planner_disable_routing(
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerRoutingConfigView, String> {
+    state.disable_routing()
+}
+
+#[tauri::command]
+async fn planner_test_routing(
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerRoutingProbeView, String> {
+    state.test_routing().await
+}
+
+#[tauri::command]
+async fn planner_preview_route(
+    input: PlannerRoutePreviewInput,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerRoutePreviewView, String> {
+    state.preview_route(input).await
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -471,7 +798,12 @@ pub fn run() {
             planner_reset_route,
             planner_add_point,
             planner_remove_point,
-            planner_reorder_points
+            planner_reorder_points,
+            planner_routing_status,
+            planner_configure_routing,
+            planner_disable_routing,
+            planner_test_routing,
+            planner_preview_route
         ])
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");
@@ -557,6 +889,45 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["C", "B"]
         );
+    }
+
+    fn routing_profile_input() -> PlannerVehicleProfileInput {
+        PlannerVehicleProfileInput {
+            height_m: None,
+            width_m: Some(2.4),
+            length_m: Some(8.5),
+            gross_weight_t: Some(12.0),
+            axle_load_t: None,
+            axle_count: Some(2),
+            hazmat: Some(false),
+            hgv: Some(true),
+            exclude_unpaved: Some(true),
+            prefer_truck_routes: Some(true),
+            toll_preference: Some("allow".to_owned()),
+            max_speed_kmh: None,
+            confirmed: true,
+        }
+    }
+
+    #[test]
+    fn routing_profile_preserves_unknown_dimensions_without_defaults() {
+        let profile = vehicle_profile(routing_profile_input()).expect("profile");
+        assert_eq!(profile.height_m, None);
+        assert_eq!(profile.axle_load_t, None);
+        assert_eq!(profile.width_m, Some(2.4));
+        assert!(profile.hgv);
+        assert!(profile.exclude_unpaved);
+    }
+
+    #[test]
+    fn routing_profile_requires_explicit_confirmation_and_boolean_choices() {
+        let mut unconfirmed = routing_profile_input();
+        unconfirmed.confirmed = false;
+        assert!(vehicle_profile(unconfirmed).is_err());
+
+        let mut unknown_hgv = routing_profile_input();
+        unknown_hgv.hgv = None;
+        assert!(vehicle_profile(unknown_hgv).is_err());
     }
 
     #[test]
