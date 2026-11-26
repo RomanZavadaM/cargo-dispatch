@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · **🇨🇳 简体中文**
 
-> **状态：** 正在积极开发。当前稳定版本为 **v0.1.0**。当前测试 prerelease 为 **v0.1.0-preview.7**，已经包含面向 Windows、macOS 和 Linux 的独立 Planner。完整的 8 语言本地化已集成。
+> **状态：** 正在积极开发。当前稳定版本为 **v0.1.0**。当前测试 prerelease 为 **v0.1.0-preview.8**，已经包含面向 Windows、macOS 和 Linux 的独立 Planner。完整的 8 语言本地化已集成。
 
 ## 产品简介
 
@@ -57,11 +57,11 @@ Planner desktop 现在拥有自己的 runtime Valhalla preview：操作员设置
 
 Planner desktop 现在还可以通过原生 Save As 将现有 versioned trip package 导出为 schema 1.4。Package 包含明确的 planning basis（车辆类型/级别与货物）、站点顺序，以及在存在时仅包含与本次计算匹配的 planning routing profile/Valhalla geometry snapshot。同一草稿的 TripId 保持稳定，TripVersion 可跨重启继续递增，CargoId 不依赖行位置，并且绝不会覆盖已有 ZIP。
 
-## Test v0.1.0-preview.7
+## Test v0.1.0-preview.8
 
-[打开 Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7)。
+[打开 Test v0.1.0-preview.8](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8)。
 
-这是 **prerelease**，不是 Stable。这是第一个从同一精确源码同时发布独立桌面 Planner 与其他产品组件的集成 preview。
+这是 **prerelease**，不是 Stable。它是从同一精确源码构建的当前产品集成测试版本。
 
 Release 包含：
 - Windows Control x64 ZIP；
@@ -75,7 +75,7 @@ Release 包含：
 - Linux Addressing Gateway x64 package；
 - SHA256SUMS。
 
-第一个 Planner slice 支持手动路线草稿和站点编辑。在 preview.7 中，Planner 草稿尚不能在重启后保留；这是下一阶段。
+preview.8 已包含 durable Planner 草稿、真实 Valhalla 道路预览、带 planning basis 的 versioned schema 1.4 ZIP export，以及无需 Planner ZIP 即可在 Control 中手动创建活动行程。Planner profile 不是行程→车辆的永久绑定；真实车辆/设备 context 由 Control 单独维护。
 
 ## Stable v0.1.0
 
