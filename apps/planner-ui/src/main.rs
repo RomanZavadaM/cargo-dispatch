@@ -41,9 +41,14 @@ fn js_error(value: JsValue) -> String {
 }
 
 async fn invoke<T: DeserializeOwned, A: Serialize>(command: &str, args: &A) -> Result<T, String> {
-    let args_json = serde_json::to_string(args).map_err(|error| format!("command encode failed: {error}"))?;
-    let value = JsFuture::from(cargo_planner_invoke(command, &args_json)).await.map_err(js_error)?;
-    let json = value.as_string().ok_or_else(|| "Planner returned an unexpected response".to_owned())?;
+    let args_json =
+        serde_json::to_string(args).map_err(|error| format!("command encode failed: {error}"))?;
+    let value = JsFuture::from(cargo_planner_invoke(command, &args_json))
+        .await
+        .map_err(js_error)?;
+    let json = value
+        .as_string()
+        .ok_or_else(|| "Planner returned an unexpected response".to_owned())?;
     serde_json::from_str(&json).map_err(|error| format!("response decode failed: {error}"))
 }
 
@@ -67,88 +72,159 @@ fn PlannerApp() -> impl IntoView {
         spawn_local(async move {
             match invoke::<PlannerRouteView, _>("planner_status", &serde_json::json!({})).await {
                 Ok(current) => route.set(Some(current)),
-                Err(problem) => { message.set(problem); error.set(true); }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
             }
         });
     });
 
     let add_point = move |_| {
-        if busy.get_untracked() { return; }
+        if busy.get_untracked() {
+            return;
+        }
         let name = title.get_untracked().trim().to_owned();
         let lat = latitude.get_untracked().trim().parse::<f64>();
         let lon = longitude.get_untracked().trim().parse::<f64>();
         let (Ok(lat), Ok(lon)) = (lat, lon) else {
-            message.set(strings(locale.get_untracked()).invalid_coordinates.to_owned());
+            message.set(
+                strings(locale.get_untracked())
+                    .invalid_coordinates
+                    .to_owned(),
+            );
             error.set(true);
             return;
         };
         if name.is_empty() || !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lon) {
-            message.set(strings(locale.get_untracked()).invalid_coordinates.to_owned());
+            message.set(
+                strings(locale.get_untracked())
+                    .invalid_coordinates
+                    .to_owned(),
+            );
             error.set(true);
             return;
         }
         busy.set(true);
         spawn_local(async move {
-            let input = PlannerPointInput { title: name, latitude: lat, longitude: lon };
-            match invoke::<PlannerRouteView, _>("planner_add_point", &serde_json::json!({ "input": input })).await {
+            let input = PlannerPointInput {
+                title: name,
+                latitude: lat,
+                longitude: lon,
+            };
+            match invoke::<PlannerRouteView, _>(
+                "planner_add_point",
+                &serde_json::json!({ "input": input }),
+            )
+            .await
+            {
                 Ok(current) => {
                     route.set(Some(current));
-                    title.set(String::new()); latitude.set(String::new()); longitude.set(String::new());
-                    message.set(strings(locale.get_untracked()).added.to_owned()); error.set(false);
+                    title.set(String::new());
+                    latitude.set(String::new());
+                    longitude.set(String::new());
+                    message.set(strings(locale.get_untracked()).added.to_owned());
+                    error.set(false);
                 }
-                Err(problem) => { message.set(problem); error.set(true); }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
             }
             busy.set(false);
         });
     };
 
     let reset = move |_| {
-        if busy.get_untracked() { return; }
+        if busy.get_untracked() {
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
-            match invoke::<PlannerRouteView, _>("planner_reset_route", &serde_json::json!({})).await {
+            match invoke::<PlannerRouteView, _>("planner_reset_route", &serde_json::json!({})).await
+            {
                 Ok(current) => {
                     route.set(Some(current));
-                    message.set(strings(locale.get_untracked()).reset_done.to_owned()); error.set(false);
+                    message.set(strings(locale.get_untracked()).reset_done.to_owned());
+                    error.set(false);
                 }
-                Err(problem) => { message.set(problem); error.set(true); }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
             }
             busy.set(false);
         });
     };
 
     let remove_point = move |point_id: String| {
-        if busy.get_untracked() { return; }
+        if busy.get_untracked() {
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
             let input = PointActionInput { point_id };
-            match invoke::<PlannerRouteView, _>("planner_remove_point", &serde_json::json!({ "input": input })).await {
+            match invoke::<PlannerRouteView, _>(
+                "planner_remove_point",
+                &serde_json::json!({ "input": input }),
+            )
+            .await
+            {
                 Ok(current) => {
                     route.set(Some(current));
-                    message.set(strings(locale.get_untracked()).removed.to_owned()); error.set(false);
+                    message.set(strings(locale.get_untracked()).removed.to_owned());
+                    error.set(false);
                 }
-                Err(problem) => { message.set(problem); error.set(true); }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
             }
             busy.set(false);
         });
     };
 
     let move_point = move |point_id: String, delta: isize| {
-        let Some(current) = route.get_untracked() else { return; };
-        let Some(index) = current.points.iter().position(|point| point.point_id == point_id) else { return; };
-        let Some(target) = index.checked_add_signed(delta) else { return; };
-        if target >= current.points.len() { return; }
-        let mut ids = current.points.iter().map(|point| point.point_id.clone()).collect::<Vec<_>>();
+        let Some(current) = route.get_untracked() else {
+            return;
+        };
+        let Some(index) = current
+            .points
+            .iter()
+            .position(|point| point.point_id == point_id)
+        else {
+            return;
+        };
+        let Some(target) = index.checked_add_signed(delta) else {
+            return;
+        };
+        if target >= current.points.len() {
+            return;
+        }
+        let mut ids = current
+            .points
+            .iter()
+            .map(|point| point.point_id.clone())
+            .collect::<Vec<_>>();
         ids.swap(index, target);
         busy.set(true);
         spawn_local(async move {
             let input = ReorderPointsInput { point_ids: ids };
-            match invoke::<PlannerRouteView, _>("planner_reorder_points", &serde_json::json!({ "input": input })).await {
+            match invoke::<PlannerRouteView, _>(
+                "planner_reorder_points",
+                &serde_json::json!({ "input": input }),
+            )
+            .await
+            {
                 Ok(current) => {
                     route.set(Some(current));
-                    message.set(strings(locale.get_untracked()).reordered.to_owned()); error.set(false);
+                    message.set(strings(locale.get_untracked()).reordered.to_owned());
+                    error.set(false);
                 }
-                Err(problem) => { message.set(problem); error.set(true); }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
             }
             busy.set(false);
         });
