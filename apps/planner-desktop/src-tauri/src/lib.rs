@@ -16,7 +16,8 @@ use cargo_dispatch_planner::{
     manual_working_route,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    PlannerPackageExportInput, PlannerPackageExportResult, PlannerPointInput, PlannerPointView,
+    PlannerPackageCargoInput, PlannerPackageExportInput, PlannerPackageExportResult,
+    PlannerPointInput, PlannerPointView,
     PlannerRoadGeometryPoint, PlannerRouteView, PlannerRoutingAvailabilityState,
     PlannerRoutingConfigInput, PlannerRoutingPreviewInput, PlannerRoutingPreviewState,
     PlannerRoutingPreviewView, PlannerRoutingProbeResult, PlannerRoutingProfileInput,
@@ -36,7 +37,6 @@ use tauri::{Manager, State};
 
 const PLANNER_JOURNAL_SCHEMA: u32 = 1;
 const PLANNER_JOURNAL_FILE: &str = "planner-draft-v1.jsonl";
-const PLANNER_OPERATOR_ID_FILE: &str = "planner-operator-id.bin";
 
 #[derive(Debug, Clone)]
 struct ManualPoint {
@@ -833,7 +833,7 @@ fn id_bytes(kind: u8, serial: u64) -> [u8; 16] {
 }
 
 fn load_or_create_operator_id(journal_path: &Path) -> Result<OperatorId, String> {
-    let path = journal_path.with_file_name(PLANNER_OPERATOR_ID_FILE);
+    let path = journal_path.with_extension("operator-id.bin");
     if path
         .try_exists()
         .map_err(|error| format!("Could not inspect Planner operator id: {error}"))?
