@@ -36,7 +36,6 @@ pub struct ReorderPointsInput {
     pub point_ids: Vec<String>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PlannerRoutingConfigInput {
     pub base_url: String,
