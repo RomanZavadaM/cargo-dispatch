@@ -49,9 +49,11 @@ Driver Browser は電話版と desktop 版に分かれた製品ではなく、**
 
 Control と Driver Browser には、運行地点と最後に受理されたドライバー位置を表示する実際のインタラクティブなベースマップがあります。
 
-`main` には現在、バージョン付き道路 geometry パイプライン（schema 1.3）が統合されています。Planner は派生 geometry と実際の車両 routing profile を一緒に渡し、schema 1.0–1.2 のパッケージも引き続き読み込めます。Control は geometry を保存し、地点順の変更後は設定された runtime Valhalla を使って道路線を再計算します。遅れて届いた routing 応答が、より新しい運行状態を上書きすることはありません。
+現在の `main` は不変の planning basis を持つ schema 1.4 を使用し、旧 schema も引き続き読み込めます。Planner routing profile は特定の計画計算の入力にすぎず、運行を車両へ恒久的に結び付けるものではありません。Import 後は Control がアクティブセッションの実際の mutable routing context を別に管理します。
 
-Valhalla アドレス、地図データセット ID、timeout は Desktop Control で直接設定し、`/status` で利用可否を確認するか routing を明示的に無効化できます。Valhalla が未設定または一時的に利用できない場合でも、新しい地点順は Control に保存され、派生 geometry だけが存在しない状態になります。
+Control は派生 geometry を保持し、地点順変更後に設定済み runtime Valhalla で道路線を再計算します。遅れて届いた routing 応答が新しい運行状態を上書きすることはありません。Valhalla が未設定または一時的に利用できない場合も新しい地点順は保存され、派生 geometry だけがない状態になれます。
+
+Planner desktop には独自の runtime Valhalla preview が追加されています。オペレーターが Valhalla アドレス、地図データセット ID、timeout を指定し、`/status` を確認し、`/route` は明示的に入力された planning profile だけで計算されます。不明な数値制約を推測しません。成功時は OSM 上に実際の道路 polyline を描画し、結果がない場合は仮の直線を描きません。Preview は route/revision/profile から派生するため、下書きまたは planning profile が変わると古い線を消し、遅れた応答も拒否します。Routing 失敗は Planner の下書きを変更しません。
 
 ## Test v0.1.0-preview.7
 
@@ -92,7 +94,7 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 
 ## 今後の作業
 
-- Planner の地図/routing preview、その後 Planner UI からの package export 準備;
+- 既存の versioned trip package を使用した Planner UI からの package export;
 
 - ローカル browser の手動受け入れ;
 - 同じ Driver Browser を実機の電話で同一 LAN 内テスト;
