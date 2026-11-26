@@ -69,6 +69,9 @@ pub struct PlannerStrings {
     pub reordered: &'static str,
     pub reset_done: &'static str,
     pub invalid_coordinates: &'static str,
+    pub map_title: &'static str,
+    pub map_note: &'static str,
+    pub map_fit: &'static str,
 }
 
 static UK: PlannerStrings = PlannerStrings {
@@ -92,6 +95,9 @@ static UK: PlannerStrings = PlannerStrings {
     reordered: "Порядок точок змінено.",
     reset_done: "Створено нову чернетку маршруту.",
     invalid_coordinates: "Перевірте назву та координати точки.",
+    map_title: "Карта чернетки",
+    map_note: "Карта показує розташування та поточний порядок точок. Дорожній маршрут тут ще не намальований; реальну геометрію дороги буде розраховано через Valhalla окремим наступним кроком.",
+    map_fit: "Показати всі",
 };
 static EN: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -114,6 +120,9 @@ static EN: PlannerStrings = PlannerStrings {
     reordered: "Point order changed.",
     reset_done: "A new route draft was created.",
     invalid_coordinates: "Check the point name and coordinates.",
+    map_title: "Draft map",
+    map_note: "This map shows point locations and current order only. It does not draw a road route yet; real road geometry will be calculated through Valhalla in the next step.",
+    map_fit: "Fit all",
 };
 static DE: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -136,6 +145,9 @@ static DE: PlannerStrings = PlannerStrings {
     reordered: "Punktreihenfolge geändert.",
     reset_done: "Ein neuer Routenentwurf wurde erstellt.",
     invalid_coordinates: "Punktname und Koordinaten prüfen.",
+    map_title: "Karte des Entwurfs",
+    map_note: "Diese Karte zeigt nur die Positionen und die aktuelle Reihenfolge der Punkte. Eine Straßenroute wird hier noch nicht gezeichnet; die echte Straßengeometrie wird im nächsten Schritt über Valhalla berechnet.",
+    map_fit: "Alle zeigen",
 };
 static FR: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -158,6 +170,9 @@ static FR: PlannerStrings = PlannerStrings {
     reordered: "Ordre des points modifié.",
     reset_done: "Un nouveau brouillon a été créé.",
     invalid_coordinates: "Vérifiez le nom et les coordonnées du point.",
+    map_title: "Carte du brouillon",
+    map_note: "Cette carte montre uniquement la position et l’ordre actuel des points. Elle ne trace pas encore un itinéraire routier ; la géométrie réelle sera calculée via Valhalla à l’étape suivante.",
+    map_fit: "Tout afficher",
 };
 static ES: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -180,6 +195,9 @@ static ES: PlannerStrings = PlannerStrings {
     reordered: "Orden de puntos cambiado.",
     reset_done: "Se creó un nuevo borrador.",
     invalid_coordinates: "Revisa el nombre y las coordenadas del punto.",
+    map_title: "Mapa del borrador",
+    map_note: "Este mapa solo muestra la ubicación y el orden actual de los puntos. Todavía no dibuja una ruta por carretera; la geometría real se calculará mediante Valhalla en el siguiente paso.",
+    map_fit: "Mostrar todo",
 };
 static KO: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -202,6 +220,9 @@ static KO: PlannerStrings = PlannerStrings {
     reordered: "지점 순서를 변경했습니다.",
     reset_done: "새 경로 초안을 만들었습니다.",
     invalid_coordinates: "지점 이름과 좌표를 확인하세요.",
+    map_title: "초안 지도",
+    map_note: "이 지도는 지점 위치와 현재 순서만 보여 줍니다. 아직 도로 경로를 그리지 않으며 실제 도로 geometry는 다음 단계에서 Valhalla로 계산합니다.",
+    map_fit: "전체 보기",
 };
 static JA: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -224,6 +245,9 @@ static JA: PlannerStrings = PlannerStrings {
     reordered: "地点順を変更しました。",
     reset_done: "新しいルート下書きを作成しました。",
     invalid_coordinates: "地点名と座標を確認してください。",
+    map_title: "下書き地図",
+    map_note: "この地図は地点の位置と現在の順序だけを表示します。道路ルートはまだ描画せず、実際の道路 geometry は次の段階で Valhalla により計算します。",
+    map_fit: "全体を表示",
 };
 static ZH: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -246,6 +270,9 @@ static ZH: PlannerStrings = PlannerStrings {
     reordered: "已更改站点顺序。",
     reset_done: "已创建新的路线草稿。",
     invalid_coordinates: "请检查站点名称和坐标。",
+    map_title: "草稿地图",
+    map_note: "此地图只显示站点位置和当前顺序，暂不绘制道路路线；真实道路 geometry 将在下一阶段通过 Valhalla 计算。",
+    map_fit: "显示全部",
 };
 
 pub fn strings(locale: UiLocale) -> &'static PlannerStrings {
