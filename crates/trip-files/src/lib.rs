@@ -1882,6 +1882,48 @@ mod tests {
     }
 
     #[test]
+    fn stored_profile_with_unsupported_max_speed_stays_readable() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package = tmp.path().join("stored-speed.zip");
+        let folder = tmp.path().join("stored-speed-trip");
+        let trip = TripId::from_bytes([91; 16]).unwrap();
+        let route = vec![TripRoutePoint {
+            point_id: PointId::from_bytes([92; 16]).unwrap(),
+            sequence: 1,
+            kind: TripPointKind::Load,
+            title: "A".to_owned(),
+            navigation: None,
+        }];
+        let mut profile = routing_profile_fixture();
+        profile.max_speed_kmh = Some(300.0);
+        let draft = PlannerTripExportDraft {
+            header: TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap(),
+            working_route_id: WorkingRouteId::from_bytes([93; 16]).unwrap(),
+            working_route_revision: 1,
+            created_at_unix_ms: 1,
+            created_by: OperatorId::from_bytes([94; 16]).unwrap(),
+            ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            planning_basis: Some(TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            }),
+            routing_profile: Some(profile.clone()),
+            route_geometry: None,
+        };
+
+        export_package(&package, &draft, &route)?;
+        let mut imported = TripFolder::import(&folder, &package)?;
+        assert_eq!(imported.routing_profile(), Some(&profile));
+        imported.set_active_routing_profile(Some(profile.clone()))?;
+        drop(imported);
+
+        let reopened = TripFolder::open(&folder, trip)?;
+        assert_eq!(reopened.routing_profile(), Some(&profile));
+        assert_eq!(reopened.active_routing_profile(), Some(&profile));
+        Ok(())
+    }
+
+    #[test]
     fn active_routing_profile_is_durable_and_invalidates_planner_geometry() -> io::Result<()> {
         let tmp = tempfile::tempdir()?;
         let package = tmp.path().join("active-routing-profile.zip");

@@ -1,6 +1,6 @@
 use crate::{
     GeoContractError, GeoPoint, GeoWarning, NormalizedStatus, RouteRequest, RouteResult,
-    RoutingIdentity,
+    RoutingIdentity, TollPreference,
 };
 use core::fmt;
 use serde_json::{Map, Value, json};
@@ -185,8 +185,27 @@ fn truck_options(request: &RouteRequest) -> Value {
             0.0
         }),
     );
+    truck.insert(
+        "use_tolls".to_owned(),
+        json!(use_tolls(profile.toll_preference)),
+    );
+    // Without an explicit value the engine keeps its own truck default.
+    // Valhalla works with whole km/h and drops any fraction.
+    insert_optional_f64(&mut truck, "top_speed", profile.max_speed_kmh);
 
     Value::Object(truck)
+}
+
+/// Valhalla `use_tolls` is a willingness factor within 0..=1, where 0.5 means no
+/// preference. It only changes route cost: even 0 does not guarantee a route
+/// without toll roads. The hard exclusion `exclude_tolls` is experimental and
+/// ignored unless the server allows it, so it is not used.
+const fn use_tolls(preference: TollPreference) -> f64 {
+    match preference {
+        TollPreference::Allow => 0.5,
+        TollPreference::PreferAvoid => 0.25,
+        TollPreference::Avoid => 0.0,
+    }
 }
 
 fn insert_optional_f64(target: &mut Map<String, Value>, key: &str, value: Option<f64>) {
@@ -310,7 +329,7 @@ fn decode_component(bytes: &[u8], index: &mut usize) -> Result<i64, PolylineDeco
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{TollPreference, VehicleRoutingProfile};
+    use crate::VehicleRoutingProfile;
 
     fn profile() -> VehicleRoutingProfile {
         VehicleRoutingProfile {
@@ -363,6 +382,43 @@ mod tests {
         assert!(
             incomplete_payload["costing_options"]["truck"]
                 .get("height")
+                .is_none()
+        );
+    }
+
+    fn payload_for(profile: VehicleRoutingProfile) -> Value {
+        let request = RouteRequest::new(request().points().to_vec(), profile)
+            .expect("routable profile");
+        route_payload(&request)
+    }
+
+    #[test]
+    fn toll_preference_is_sent_as_use_tolls() {
+        for (preference, expected) in [
+            (TollPreference::Allow, 0.5),
+            (TollPreference::PreferAvoid, 0.25),
+            (TollPreference::Avoid, 0.0),
+        ] {
+            let mut chosen = profile();
+            chosen.toll_preference = preference;
+            let payload = payload_for(chosen);
+
+            assert_eq!(payload["costing_options"]["truck"]["use_tolls"], expected);
+        }
+    }
+
+    #[test]
+    fn max_speed_is_sent_as_top_speed_only_when_given() {
+        let mut limited = profile();
+        limited.max_speed_kmh = Some(85.0);
+        assert_eq!(
+            payload_for(limited)["costing_options"]["truck"]["top_speed"],
+            85.0
+        );
+
+        assert!(
+            payload_for(profile())["costing_options"]["truck"]
+                .get("top_speed")
                 .is_none()
         );
     }

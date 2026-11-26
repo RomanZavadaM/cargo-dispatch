@@ -70,6 +70,16 @@ pub struct PlannerRoutingProbeResult {
     pub tileset_last_modified: Option<u64>,
 }
 
+/// Range of `max_speed_kmh` accepted for a new routing calculation. The desktop
+/// backend enforces the same bounds through the geo contract.
+pub const MIN_ROUTING_MAX_SPEED_KMH: f64 = 10.0;
+pub const MAX_ROUTING_MAX_SPEED_KMH: f64 = 252.0;
+
+#[must_use]
+pub fn is_supported_max_speed_kmh(value: f64) -> bool {
+    (MIN_ROUTING_MAX_SPEED_KMH..=MAX_ROUTING_MAX_SPEED_KMH).contains(&value)
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PlannerTollPreference {

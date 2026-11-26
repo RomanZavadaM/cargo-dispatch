@@ -1250,8 +1250,14 @@ impl ControlBrowserState {
                     status: LiveRerouteStatus::NotEnoughPoints,
                 });
             }
-            let request = RouteRequest::new(points, profile)
-                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+            // The reorder above is already durable. A stored profile the engine
+            // cannot honour is a routing status, not a failed reorder.
+            let Ok(request) = RouteRequest::new(points, profile) else {
+                return Ok(LiveRerouteOutcome {
+                    snapshot: snapshot(&trip),
+                    status: LiveRerouteStatus::RouteStatus(NormalizedStatus::InvalidProfile),
+                });
+            };
             (displayed, request, profile_fingerprint)
         };
 
@@ -2273,6 +2279,46 @@ mod tests {
         let recovered = TripFolder::open(&folder_path, trip_id)?;
         assert!(recovered.state().route_geometry.is_some());
         assert_eq!(recovered.state().local_route_revision, 1);
+
+        server.abort();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn stored_unsupported_max_speed_keeps_reorder_and_never_reaches_valhalla()
+    -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (_trip_id, route, folder) = create_trip(tmp.path(), "speed-trip", 96, 100)?;
+        let state = ControlBrowserState::new();
+        let token = "unsupported-speed-token-0001";
+        state.register_trip(token, folder).expect("register trip");
+
+        let mut profile = routing_profile();
+        profile.max_speed_kmh = Some(300.0);
+        state.set_session_active_routing_profile(token, Some(profile))?;
+
+        let (base_url, mock, server) = spawn_mock_valhalla(false).await?;
+        state
+            .configure_valhalla(
+                ValhallaRuntimeConfig::new(
+                    &base_url,
+                    "fixture-europe-2026-11",
+                    std::time::Duration::from_millis(250),
+                    std::time::Duration::from_secs(2),
+                )
+                .expect("Valhalla config"),
+            )
+            .expect("configure Valhalla");
+
+        let order = [route[2].point_id, route[0].point_id, route[1].point_id];
+        let outcome = state.reorder_session_route_live(token, 0, &order).await?;
+        assert_eq!(
+            outcome.status,
+            LiveRerouteStatus::RouteStatus(NormalizedStatus::InvalidProfile)
+        );
+        assert_eq!(outcome.snapshot.local_route_revision, 1);
+        assert!(outcome.snapshot.road_geometry.is_none());
+        assert!(mock.requests.lock().expect("request log").is_empty());
 
         server.abort();
         Ok(())

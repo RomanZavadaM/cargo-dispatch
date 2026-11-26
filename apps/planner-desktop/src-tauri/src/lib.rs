@@ -701,7 +701,7 @@ fn routing_profile(input: PlannerRoutingProfileInput) -> Result<VehicleRoutingPr
         max_speed_kmh: input.max_speed_kmh,
     };
     profile
-        .validate()
+        .validate_for_routing()
         .map_err(|error| format!("Invalid Planner routing profile: {error}"))?;
     Ok(profile)
 }
@@ -1286,6 +1286,27 @@ mod tests {
         }
     }
 
+    #[test]
+    fn planner_profile_refuses_unsupported_max_speed() {
+        let mut input = routing_profile_input();
+        input.max_speed_kmh = Some(300.0);
+
+        let error = routing_profile(input).expect_err("speed refused");
+        assert!(error.contains("max_speed_kmh"), "{error}");
+    }
+
+    #[test]
+    fn planner_ui_speed_range_matches_geo_contract() {
+        assert_eq!(
+            cargo_dispatch_planner_ui_contracts::MIN_ROUTING_MAX_SPEED_KMH,
+            cargo_dispatch_geo::MIN_MAX_SPEED_KMH
+        );
+        assert_eq!(
+            cargo_dispatch_planner_ui_contracts::MAX_ROUTING_MAX_SPEED_KMH,
+            cargo_dispatch_geo::MAX_MAX_SPEED_KMH
+        );
+    }
+
     async fn status_ok() -> Json<Value> {
         Json(json!({
             "version": "3.9.2",
@@ -1556,6 +1577,11 @@ mod tests {
             "unknown vehicle height must not be invented"
         );
         assert_eq!(payload["costing_options"]["truck"]["width"], json!(2.55));
+        assert_eq!(payload["costing_options"]["truck"]["use_tolls"], json!(0.5));
+        assert_eq!(
+            payload["costing_options"]["truck"]["top_speed"],
+            json!(90.0)
+        );
         drop(requests);
 
         server.abort();

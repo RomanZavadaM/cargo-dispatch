@@ -11,7 +11,7 @@ use cargo_dispatch_control_ui_contracts::{
     OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
     RoutingAvailabilityState, RoutingProbeResult, RoutingTollPreference, SaveDocumentInput,
     SessionInput, StartGatewayInput, StartLanInput, TripDashboard, UpdateRoutingContextInput,
-    UpdateSessionMetadataInput,
+    UpdateSessionMetadataInput, is_supported_max_speed_kmh,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -557,6 +557,15 @@ impl RoutingProfileDraft {
         Ok(Some(parsed))
     }
 
+    fn optional_max_speed_kmh(value: &str) -> Result<Option<f64>, RoutingDraftError> {
+        match Self::optional_positive_f64(value)? {
+            Some(speed) if !is_supported_max_speed_kmh(speed) => {
+                Err(RoutingDraftError::InvalidNumber)
+            }
+            speed => Ok(speed),
+        }
+    }
+
     fn optional_positive_u8(value: &str) -> Result<Option<u8>, RoutingDraftError> {
         let value = value.trim();
         if value.is_empty() {
@@ -598,7 +607,7 @@ impl RoutingProfileDraft {
             exclude_unpaved: Self::explicit_bool(&self.exclude_unpaved)?,
             prefer_truck_routes: Self::explicit_bool(&self.prefer_truck_routes)?,
             toll_preference,
-            max_speed_kmh: Self::optional_positive_f64(&self.max_speed_kmh)?,
+            max_speed_kmh: Self::optional_max_speed_kmh(&self.max_speed_kmh)?,
         })
     }
 }
@@ -1922,7 +1931,7 @@ fn ControlApp() -> impl IntoView {
                                             </label>
                                             <label>
                                                 {move || strings(locale.get()).max_speed_kmh}
-                                                <input type="number" step="0.1" min="0"
+                                                <input type="number" step="0.1" min="10" max="252"
                                                     prop:value=move || edit_routing_profile.get().max_speed_kmh
                                                     on:input=move |event| edit_routing_profile.update(|draft| draft.max_speed_kmh = event_target_value(&event))
                                                 />

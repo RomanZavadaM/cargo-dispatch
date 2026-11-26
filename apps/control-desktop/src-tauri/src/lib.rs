@@ -210,7 +210,7 @@ fn routing_profile_from_view(
         max_speed_kmh: profile.max_speed_kmh,
     };
     profile
-        .validate()
+        .validate_for_routing()
         .map_err(|error| format!("Некоректний routing profile: {error}"))?;
     Ok(profile)
 }
@@ -1637,6 +1637,17 @@ mod tests {
         );
         assert!(dashboard.road_geometry.is_none());
 
+        let mut unsupported = profile.clone();
+        unsupported.max_speed_kmh = Some(300.0);
+        let error = service
+            .update_routing_context(UpdateRoutingContextInput {
+                token: token.to_owned(),
+                profile: Some(unsupported),
+            })
+            .await
+            .expect_err("unsupported speed is refused");
+        assert!(error.contains("max_speed_kmh"), "{error}");
+
         drop(service);
         let recovered = DesktopControlService::default();
         let status = recovered
@@ -1653,6 +1664,18 @@ mod tests {
         assert_eq!(dashboard.actual_context.routing_profile, Some(profile));
 
         Ok(())
+    }
+
+    #[test]
+    fn control_ui_speed_range_matches_geo_contract() {
+        assert_eq!(
+            cargo_dispatch_control_ui_contracts::MIN_ROUTING_MAX_SPEED_KMH,
+            cargo_dispatch_geo::MIN_MAX_SPEED_KMH
+        );
+        assert_eq!(
+            cargo_dispatch_control_ui_contracts::MAX_ROUTING_MAX_SPEED_KMH,
+            cargo_dispatch_geo::MAX_MAX_SPEED_KMH
+        );
     }
 
     #[tokio::test]
