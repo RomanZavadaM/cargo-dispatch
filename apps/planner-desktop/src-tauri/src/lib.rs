@@ -514,9 +514,11 @@ impl PlannerDesktopService {
                         .as_deref()
                         .map(|value| point_from_text(&state, value))
                         .transpose()?;
-                    let cargo_id =
-                        CargoId::from_bytes(cargo_id_bytes(state.route.working_route_id, cargo.row_id))
-                            .map_err(|error| format!("Could not create cargo id: {error}"))?;
+                    let cargo_id = CargoId::from_bytes(cargo_id_bytes(
+                        state.route.working_route_id,
+                        cargo.row_id,
+                    ))
+                    .map_err(|error| format!("Could not create cargo id: {error}"))?;
                     Ok(PlannedCargoBasis {
                         cargo_id,
                         title: title.to_owned(),
