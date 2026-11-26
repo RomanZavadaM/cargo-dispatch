@@ -51,9 +51,11 @@ Driver Browser — **один продукт**, а не окремі телеф�
 
 У Control і Driver Browser вже є справжня інтерактивна базова карта з точками рейсу та останньою прийнятою позицією водія.
 
-У `main` уже інтегровано versioned road-geometry pipeline (schema 1.3): Planner передає похідну geometry разом із фактичним профілем авто, а пакети schema 1.0–1.2 залишаються читабельними. Control зберігає geometry й після reorder через налаштований runtime Valhalla перераховує дорожню лінію. Запізніла відповідь маршрутизатора не може перезаписати новіший стан рейсу.
+У поточному `main` використовується schema 1.4 з immutable planning basis; старі schema залишаються читабельними. Planner routing profile — це лише параметри конкретного планового розрахунку, а не постійна прив'язка рейсу до автомобіля. Після імпорту Control веде окремий mutable actual routing context для активної сесії.
 
-Адресу Valhalla, ідентифікатор набору карт і таймаути оператор задає прямо в Desktop Control; доступність можна перевірити через `/status` або routing явно вимкнути. Якщо Valhalla не налаштована чи тимчасово недоступна, новий порядок точок усе одно зберігається в Control, а похідна geometry може бути відсутня.
+Control зберігає derived geometry й після reorder через налаштований runtime Valhalla перераховує дорожню лінію. Запізніла відповідь маршрутизатора не може перезаписати новіший стан рейсу. Якщо Valhalla не налаштована чи тимчасово недоступна, новий порядок точок усе одно зберігається, а derived geometry може бути відсутня.
+
+Planner desktop тепер має власний runtime Valhalla preview: оператор задає адресу Valhalla, ID набору карт і таймаути, перевіряє `/status`, а `/route` рахується тільки з явно заданим planning profile. Невідомі числові параметри не вигадуються. Успішний розрахунок малює реальну дорожню polyline поверх OSM; без результату умовна пряма не малюється. Preview є похідним від route/revision/profile: зміна чернетки або planning profile прибирає стару лінію, а запізніла відповідь не приймається. Невдалий routing не змінює Planner draft.
 
 ## Test v0.1.0-preview.7
 
@@ -94,7 +96,7 @@ Android та Apple пакети поки не підписані для мага
 
 ## Що ще попереду
 
-- map/routing preview у Planner, далі підготовка package export із Planner UI;
+- package export із Planner UI через наявний versioned trip package;
 
 - ручне local browser acceptance;
 - перевірка того самого Driver Browser на реальному телефоні в LAN;
