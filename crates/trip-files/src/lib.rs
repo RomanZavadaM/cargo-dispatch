@@ -889,7 +889,7 @@ impl TripFolder {
     pub fn open_detected(path: &Path) -> io::Result<Self> {
         let first = path.join("00000000000000000001.json");
         let event: Change = serde_json::from_slice(&bounded(File::open(first)?)?)?;
-        let Change::Import(Box::new(manifest)) = event else {
+        let Change::Import(manifest) = event else {
             return Err(invalid("trip history must start with import"));
         };
         let trip = manifest.candidate()?.header.trip_id;
@@ -906,7 +906,7 @@ impl TripFolder {
         let trip = plan.candidate()?.header.trip_id;
         fs::create_dir_all(path)?;
         let mut this = Self::load(path, trip)?;
-        this.record(Change::Import(plan))?;
+        this.record(Change::Import(Box::new(plan)))?;
         Ok(this)
     }
 
