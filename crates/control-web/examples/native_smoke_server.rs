@@ -61,12 +61,29 @@ async fn main() -> io::Result<()> {
         )?;
     }
 
-    let server = LoopbackControlServer::start(state).await?;
+    let lan_bind = env::var("CARGO_DISPATCH_SMOKE_LAN_BIND")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    let lan_mode = lan_bind.is_some();
+    let server = if let Some(value) = lan_bind {
+        let address = value.parse().map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("invalid CARGO_DISPATCH_SMOKE_LAN_BIND: {error}"),
+            )
+        })?;
+        LoopbackControlServer::start_lan(state, address).await?
+    } else {
+        LoopbackControlServer::start(state).await?
+    };
     let address = server.address();
     let local_url = format!("http://{address}/driver/{token}");
     let android_url = format!("http://10.0.2.2:{}/driver/{token}", address.port());
 
     println!("CARGO_DISPATCH_SMOKE_LOCAL_URL={local_url}");
+    if lan_mode {
+        println!("CARGO_DISPATCH_SMOKE_LAN_URL={local_url}");
+    }
     println!("CARGO_DISPATCH_SMOKE_ANDROID_URL={android_url}");
     println!("CARGO_DISPATCH_SMOKE_ACTIVE_TRIP={}", active_trip.display());
     io::stdout().flush()?;
