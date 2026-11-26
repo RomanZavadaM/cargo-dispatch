@@ -825,7 +825,21 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use axum::{
+        Json, Router,
+        extract::State as AxumState,
+        routing::{get, post},
+    };
+    use serde_json::{Value, json};
+    use std::{
+        sync::Arc,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+    use tokio::{
+        net::TcpListener,
+        sync::Notify,
+        task::JoinHandle,
+    };
 
     fn point(title: &str, latitude: f64, longitude: f64) -> PlannerPointInput {
         PlannerPointInput {
@@ -844,6 +858,79 @@ mod tests {
             "cargo-dispatch-planner-{name}-{}-{nonce}.jsonl",
             std::process::id()
         ))
+    }
+
+    fn routing_profile_input() -> PlannerRoutingProfileInput {
+        PlannerRoutingProfileInput {
+            height_m: None,
+            width_m: Some(2.55),
+            length_m: Some(16.5),
+            gross_weight_t: Some(40.0),
+            axle_load_t: None,
+            axle_count: Some(5),
+            hazmat: false,
+            hgv: true,
+            exclude_unpaved: true,
+            prefer_truck_routes: true,
+            toll_preference: PlannerTollPreference::Allow,
+            max_speed_kmh: Some(90.0),
+        }
+    }
+
+    async fn status_ok() -> Json<Value> {
+        Json(json!({
+            "version": "3.9.2",
+            "tileset_last_modified": 1_795_550_000_u64
+        }))
+    }
+
+    async fn route_ok(Json(_payload): Json<Value>) -> Json<Value> {
+        Json(json!({
+            "trip": {
+                "summary": {"length": 2.75, "time": 240.0},
+                "legs": [
+                    {"shape": "gk}`~A_ysyl@gfF_oK"},
+                    {"shape": "orda~A_i`zl@wvInnT"}
+                ]
+            }
+        }))
+    }
+
+    async fn spawn_mock_valhalla(app: Router) -> (String, JoinHandle<()>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .expect("bind mock Valhalla");
+        let address = listener.local_addr().expect("mock address");
+        let task = tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("mock Valhalla");
+        });
+        (format!("http://{address}/"), task)
+    }
+
+    fn configure_mock(service: &PlannerDesktopService, base_url: &str) {
+        service
+            .configure_routing(PlannerRoutingConfigInput {
+                base_url: base_url.to_owned(),
+                map_dataset_id: "fixture-europe-2026-11".to_owned(),
+                connect_timeout_ms: 250,
+                request_timeout_ms: 2_000,
+            })
+            .expect("configure mock Valhalla");
+    }
+
+    #[derive(Debug)]
+    struct DelayedRoute {
+        started: Notify,
+        release: Notify,
+    }
+
+    async fn delayed_route(
+        AxumState(delay): AxumState<Arc<DelayedRoute>>,
+        Json(_payload): Json<Value>,
+    ) -> Json<Value> {
+        delay.started.notify_one();
+        delay.release.notified().await;
+        route_ok(Json(json!({}))).await
     }
 
     #[test]
@@ -956,6 +1043,120 @@ mod tests {
         );
 
         let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn real_valhalla_preview_does_not_mutate_planner_draft() {
+        let service = PlannerDesktopService::default();
+        service
+            .add_point(point("Warehouse", 49.8393, 24.0296))
+            .expect("first point");
+        let before = service
+            .add_point(point("Customer", 49.8430, 24.0360))
+            .expect("second point");
+
+        let app = Router::new()
+            .route("/status", get(status_ok))
+            .route("/route", post(route_ok));
+        let (base_url, server) = spawn_mock_valhalla(app).await;
+        configure_mock(&service, &base_url);
+
+        let probe = service.test_routing().await.expect("routing probe");
+        assert_eq!(probe.state, PlannerRoutingAvailabilityState::Ok);
+        assert_eq!(probe.engine_version.as_deref(), Some("3.9.2"));
+
+        let preview = service
+            .preview_route(PlannerRoutingPreviewInput {
+                profile: routing_profile_input(),
+            })
+            .await
+            .expect("road preview");
+        assert_eq!(preview.state, PlannerRoutingPreviewState::Ok);
+        assert_eq!(preview.working_route_id, before.working_route_id);
+        assert_eq!(preview.revision, before.revision);
+        assert_eq!(preview.distance_m, Some(2_750.0));
+        assert_eq!(preview.duration_s, Some(240.0));
+        assert!(!preview.geometry.is_empty());
+        assert_eq!(preview.profile_fingerprint.len(), 64);
+
+        let after = service.status().expect("draft after preview");
+        assert_eq!(after, before);
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn missing_valhalla_keeps_draft_unchanged() {
+        let service = PlannerDesktopService::default();
+        service
+            .add_point(point("A", 49.8393, 24.0296))
+            .expect("first point");
+        let before = service
+            .add_point(point("B", 49.8430, 24.0360))
+            .expect("second point");
+
+        let preview = service
+            .preview_route(PlannerRoutingPreviewInput {
+                profile: routing_profile_input(),
+            })
+            .await
+            .expect("unconfigured preview");
+        assert_eq!(
+            preview.state,
+            PlannerRoutingPreviewState::NotConfigured
+        );
+        assert!(preview.geometry.is_empty());
+        assert_eq!(service.status().expect("draft after failure"), before);
+    }
+
+    #[tokio::test]
+    async fn late_valhalla_preview_is_rejected_after_draft_change() {
+        let service = Arc::new(PlannerDesktopService::default());
+        service
+            .add_point(point("A", 49.8393, 24.0296))
+            .expect("first point");
+        service
+            .add_point(point("B", 49.8430, 24.0360))
+            .expect("second point");
+
+        let delay = Arc::new(DelayedRoute {
+            started: Notify::new(),
+            release: Notify::new(),
+        });
+        let app = Router::new()
+            .route("/status", get(status_ok))
+            .route("/route", post(delayed_route))
+            .with_state(delay.clone());
+        let (base_url, server) = spawn_mock_valhalla(app).await;
+        configure_mock(&service, &base_url);
+
+        let running_service = service.clone();
+        let running = tokio::spawn(async move {
+            running_service
+                .preview_route(PlannerRoutingPreviewInput {
+                    profile: routing_profile_input(),
+                })
+                .await
+        });
+
+        delay.started.notified().await;
+        let changed = service
+            .add_point(point("C", 49.8500, 24.0500))
+            .expect("draft changes while routing");
+        delay.release.notify_one();
+
+        let preview = running
+            .await
+            .expect("preview task")
+            .expect("preview result");
+        assert_eq!(preview.state, PlannerRoutingPreviewState::StaleDraft);
+        assert!(preview.geometry.is_empty());
+        assert!(preview.revision < changed.revision);
+        assert_eq!(
+            service.status().expect("current draft").revision,
+            changed.revision
+        );
+
+        server.abort();
     }
 
     #[test]
