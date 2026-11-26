@@ -136,18 +136,24 @@ cat > driver-browser-loopback-results/location.json <<'JSON'
 }
 JSON
 
-curl --fail --silent --show-error   -X POST   -H 'Content-Type: application/json'   --data-binary @driver-browser-loopback-results/location.json   "$BASE/api/trip/$TOKEN/location"   > driver-browser-loopback-results/location-response.json
+curl --fail --silent --show-error   -X POST   -H 'Content-Type: application/json'   --data-binary @driver-browser-loopback-results/location.json   "$BASE/api/trip/$TOKEN/location"   > driver-browser-loopback-results/location-accepted.json
+curl --fail --silent --show-error "$BASE/api/trip/$TOKEN" > driver-browser-loopback-results/location-snapshot.json
 
 python3 - <<'PY'
 import json
 from pathlib import Path
 
-trip = json.loads(Path("driver-browser-loopback-results/location-response.json").read_text())
+accepted = json.loads(Path("driver-browser-loopback-results/location-accepted.json").read_text())
+assert abs(accepted["latitude"] - 49.8393) < 1e-6
+assert abs(accepted["longitude"] - 24.0296) < 1e-6
+assert abs(accepted["accuracy_m"] - 4.5) < 1e-6
+
+trip = json.loads(Path("driver-browser-loopback-results/location-snapshot.json").read_text())
 loc = trip["latest_location"]
 assert abs(loc["latitude"] - 49.8393) < 1e-6
 assert abs(loc["longitude"] - 24.0296) < 1e-6
 assert abs(loc["accuracy_m"] - 4.5) < 1e-6
-print("Location update: PASS")
+print("Location update + refresh: PASS")
 PY
 
 OPERATOR_DOC_ID="$(cat driver-browser-loopback-results/operator-document-id.txt)"
