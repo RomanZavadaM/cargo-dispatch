@@ -1,11 +1,20 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_domain::{PointId, WorkingRouteId};
+use cargo_dispatch_geo::{
+    GeoPoint, GeoWarning, NormalizedStatus, RouteRequest, TollPreference, VehicleDimension,
+    VehicleRoutingProfile,
+    valhalla_http::{ValhallaHttpClient, ValhallaHttpError, ValhallaRuntimeConfig},
+};
 use cargo_dispatch_planner::{
     WorkingRoute, WorkingRouteState, edit_manual_working_route, manual_working_route,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    PlannerPointInput, PlannerPointView, PlannerRouteView, PointActionInput, ReorderPointsInput,
+    PlannerPointInput, PlannerPointView, PlannerRoadGeometryPoint, PlannerRouteView,
+    PlannerRoutingAvailabilityState, PlannerRoutingConfigInput, PlannerRoutingPreviewInput,
+    PlannerRoutingPreviewState, PlannerRoutingPreviewView, PlannerRoutingProbeResult,
+    PlannerRoutingProfileInput, PlannerRoutingStatus, PlannerTollPreference, PointActionInput,
+    ReorderPointsInput,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,6 +23,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     sync::Mutex,
+    time::Duration,
 };
 use tauri::{Manager, State};
 
@@ -74,6 +84,7 @@ struct PlannerJournalRecord {
 struct PlannerDesktopService {
     inner: Mutex<PlannerState>,
     journal_path: Option<PathBuf>,
+    routing: Mutex<Option<ValhallaRuntimeConfig>>,
 }
 
 impl Default for PlannerDesktopService {
@@ -81,6 +92,7 @@ impl Default for PlannerDesktopService {
         Self {
             inner: Mutex::new(PlannerState::default()),
             journal_path: None,
+            routing: Mutex::new(None),
         }
     }
 }
@@ -91,6 +103,7 @@ impl PlannerDesktopService {
         Ok(Self {
             inner: Mutex::new(state),
             journal_path: Some(journal_path),
+            routing: Mutex::new(None),
         })
     }
 
@@ -203,6 +216,297 @@ impl PlannerDesktopService {
                 point_ids: order.into_iter().map(PointId::as_bytes).collect(),
             },
         )
+    }
+
+
+    fn routing_status(&self) -> Result<Option<PlannerRoutingStatus>, String> {
+        let routing = self
+            .routing
+            .lock()
+            .map_err(|_| "Planner routing state unavailable".to_owned())?;
+        Ok(routing.as_ref().map(|config| PlannerRoutingStatus {
+            base_url: config.base_url().to_string(),
+            map_dataset_id: config.map_dataset_id().to_owned(),
+            connect_timeout_ms: config.connect_timeout().as_millis() as u64,
+            request_timeout_ms: config.request_timeout().as_millis() as u64,
+        }))
+    }
+
+    fn configure_routing(
+        &self,
+        input: PlannerRoutingConfigInput,
+    ) -> Result<PlannerRoutingStatus, String> {
+        let base_url = input.base_url.trim();
+        let map_dataset_id = input.map_dataset_id.trim();
+        if base_url.is_empty() {
+            return Err("Valhalla address is required".to_owned());
+        }
+        if map_dataset_id.is_empty() {
+            return Err("Valhalla map dataset id is required".to_owned());
+        }
+        if !(100..=30_000).contains(&input.connect_timeout_ms) {
+            return Err("Connect timeout must be 100–30000 ms".to_owned());
+        }
+        if !(250..=120_000).contains(&input.request_timeout_ms)
+            || input.request_timeout_ms < input.connect_timeout_ms
+        {
+            return Err(
+                "Request timeout must be 250–120000 ms and not shorter than connect timeout"
+                    .to_owned(),
+            );
+        }
+        let config = ValhallaRuntimeConfig::new(
+            base_url,
+            map_dataset_id,
+            Duration::from_millis(input.connect_timeout_ms),
+            Duration::from_millis(input.request_timeout_ms),
+        )
+        .map_err(|error| format!("Invalid Valhalla configuration: {error}"))?;
+        let status = PlannerRoutingStatus {
+            base_url: config.base_url().to_string(),
+            map_dataset_id: config.map_dataset_id().to_owned(),
+            connect_timeout_ms: config.connect_timeout().as_millis() as u64,
+            request_timeout_ms: config.request_timeout().as_millis() as u64,
+        };
+        *self
+            .routing
+            .lock()
+            .map_err(|_| "Planner routing state unavailable".to_owned())? = Some(config);
+        Ok(status)
+    }
+
+    fn disable_routing(&self) -> Result<(), String> {
+        *self
+            .routing
+            .lock()
+            .map_err(|_| "Planner routing state unavailable".to_owned())? = None;
+        Ok(())
+    }
+
+    async fn test_routing(&self) -> Result<PlannerRoutingProbeResult, String> {
+        let config = self
+            .routing
+            .lock()
+            .map_err(|_| "Planner routing state unavailable".to_owned())?
+            .clone();
+        let Some(config) = config else {
+            return Ok(PlannerRoutingProbeResult {
+                state: PlannerRoutingAvailabilityState::NotConfigured,
+                engine_version: None,
+                tileset_last_modified: None,
+            });
+        };
+        let availability = ValhallaHttpClient::new(config)
+            .map_err(|error| format!("Could not create Valhalla client: {error}"))?
+            .availability()
+            .await
+            .map_err(|error| format!("Could not test Valhalla: {error}"))?;
+        Ok(PlannerRoutingProbeResult {
+            state: routing_availability_state(availability.status),
+            engine_version: availability.engine_version,
+            tileset_last_modified: availability.tileset_last_modified,
+        })
+    }
+
+    async fn preview_route(
+        &self,
+        input: PlannerRoutingPreviewInput,
+    ) -> Result<PlannerRoutingPreviewView, String> {
+        let profile = routing_profile(input.profile)?;
+        let profile_fingerprint = profile.profile_fingerprint();
+        let (working_route_id, revision, points) = {
+            let state = self
+                .inner
+                .lock()
+                .map_err(|_| "Planner state unavailable".to_owned())?;
+            if state.route.points.len() < 2 {
+                return Err("Route preview needs at least two ordered points".to_owned());
+            }
+            let points = state
+                .route
+                .points
+                .iter()
+                .map(|route_point| {
+                    let point = state
+                        .points
+                        .get(&route_point.point_id)
+                        .ok_or_else(|| "Planner point metadata is missing".to_owned())?;
+                    GeoPoint::new(point.latitude, point.longitude)
+                        .map_err(|error| format!("Invalid Planner point: {error}"))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            (
+                hex_id(state.route.working_route_id.as_bytes()),
+                state.route.current_revision,
+                points,
+            )
+        };
+
+        let config = self
+            .routing
+            .lock()
+            .map_err(|_| "Planner routing state unavailable".to_owned())?
+            .clone();
+        let Some(config) = config else {
+            return Ok(empty_preview(
+                working_route_id,
+                revision,
+                PlannerRoutingPreviewState::NotConfigured,
+                profile_fingerprint,
+                None,
+                None,
+            ));
+        };
+        let map_dataset_id = config.map_dataset_id().to_owned();
+        let request = RouteRequest::new(points, profile)
+            .map_err(|error| format!("Invalid routing preview request: {error}"))?;
+        let client = ValhallaHttpClient::new(config)
+            .map_err(|error| format!("Could not create Valhalla client: {error}"))?;
+        let result = match client.route(&request).await {
+            Ok(result) => result,
+            Err(ValhallaHttpError::Unavailable(status)) => {
+                return Ok(empty_preview(
+                    working_route_id,
+                    revision,
+                    preview_state(status),
+                    profile_fingerprint,
+                    None,
+                    Some(map_dataset_id),
+                ));
+            }
+            Err(error) => return Err(format!("Valhalla preview failed: {error}")),
+        };
+
+        {
+            let state = self
+                .inner
+                .lock()
+                .map_err(|_| "Planner state unavailable".to_owned())?;
+            if hex_id(state.route.working_route_id.as_bytes()) != working_route_id
+                || state.route.current_revision != revision
+            {
+                return Ok(empty_preview(
+                    working_route_id,
+                    revision,
+                    PlannerRoutingPreviewState::StaleDraft,
+                    profile_fingerprint,
+                    Some(result.identity.engine_version().to_owned()),
+                    Some(result.identity.map_dataset_id().to_owned()),
+                ));
+            }
+        }
+
+        let state = preview_state(result.status);
+        let geometry = if state == PlannerRoutingPreviewState::Ok {
+            result
+                .geometry
+                .iter()
+                .map(|point| PlannerRoadGeometryPoint {
+                    latitude: point.lat(),
+                    longitude: point.lon(),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        Ok(PlannerRoutingPreviewView {
+            working_route_id,
+            revision,
+            state,
+            engine_version: Some(result.identity.engine_version().to_owned()),
+            map_dataset_id: Some(result.identity.map_dataset_id().to_owned()),
+            profile_fingerprint,
+            distance_m: result.distance_m,
+            duration_s: result.duration_s,
+            geometry,
+            warnings: result.warnings.into_iter().map(warning_code).collect(),
+        })
+    }
+}
+
+fn routing_profile(input: PlannerRoutingProfileInput) -> Result<VehicleRoutingProfile, String> {
+    let profile = VehicleRoutingProfile {
+        height_m: input.height_m,
+        width_m: input.width_m,
+        length_m: input.length_m,
+        gross_weight_t: input.gross_weight_t,
+        axle_load_t: input.axle_load_t,
+        axle_count: input.axle_count,
+        hazmat: input.hazmat,
+        hgv: input.hgv,
+        exclude_unpaved: input.exclude_unpaved,
+        prefer_truck_routes: input.prefer_truck_routes,
+        toll_preference: match input.toll_preference {
+            PlannerTollPreference::Allow => TollPreference::Allow,
+            PlannerTollPreference::PreferAvoid => TollPreference::PreferAvoid,
+            PlannerTollPreference::Avoid => TollPreference::Avoid,
+        },
+        max_speed_kmh: input.max_speed_kmh,
+    };
+    profile
+        .validate()
+        .map_err(|error| format!("Invalid Planner routing profile: {error}"))?;
+    Ok(profile)
+}
+
+fn routing_availability_state(status: NormalizedStatus) -> PlannerRoutingAvailabilityState {
+    match status {
+        NormalizedStatus::Ok => PlannerRoutingAvailabilityState::Ok,
+        NormalizedStatus::Timeout => PlannerRoutingAvailabilityState::Timeout,
+        NormalizedStatus::EngineUnavailable => PlannerRoutingAvailabilityState::EngineUnavailable,
+        NormalizedStatus::DatasetMissing => PlannerRoutingAvailabilityState::DatasetMissing,
+        NormalizedStatus::EngineError
+        | NormalizedStatus::NoRoute
+        | NormalizedStatus::InvalidPoint
+        | NormalizedStatus::InvalidProfile => PlannerRoutingAvailabilityState::EngineError,
+    }
+}
+
+fn preview_state(status: NormalizedStatus) -> PlannerRoutingPreviewState {
+    match status {
+        NormalizedStatus::Ok => PlannerRoutingPreviewState::Ok,
+        NormalizedStatus::NoRoute => PlannerRoutingPreviewState::NoRoute,
+        NormalizedStatus::Timeout => PlannerRoutingPreviewState::Timeout,
+        NormalizedStatus::EngineUnavailable => PlannerRoutingPreviewState::EngineUnavailable,
+        NormalizedStatus::DatasetMissing => PlannerRoutingPreviewState::DatasetMissing,
+        NormalizedStatus::EngineError
+        | NormalizedStatus::InvalidPoint
+        | NormalizedStatus::InvalidProfile => PlannerRoutingPreviewState::EngineError,
+    }
+}
+
+fn warning_code(warning: GeoWarning) -> String {
+    match warning {
+        GeoWarning::MissingVehicleDimension(VehicleDimension::Height) => "missing_height_m",
+        GeoWarning::MissingVehicleDimension(VehicleDimension::Width) => "missing_width_m",
+        GeoWarning::MissingVehicleDimension(VehicleDimension::Length) => "missing_length_m",
+        GeoWarning::MissingVehicleDimension(VehicleDimension::GrossWeight) => "missing_gross_weight_t",
+        GeoWarning::MissingVehicleDimension(VehicleDimension::AxleLoad) => "missing_axle_load_t",
+        GeoWarning::MissingVehicleDimension(VehicleDimension::AxleCount) => "missing_axle_count",
+        GeoWarning::ApproximateEstimate => "approximate_estimate",
+    }
+    .to_owned()
+}
+
+fn empty_preview(
+    working_route_id: String,
+    revision: u64,
+    state: PlannerRoutingPreviewState,
+    profile_fingerprint: String,
+    engine_version: Option<String>,
+    map_dataset_id: Option<String>,
+) -> PlannerRoutingPreviewView {
+    PlannerRoutingPreviewView {
+        working_route_id,
+        revision,
+        state,
+        engine_version,
+        map_dataset_id,
+        profile_fingerprint,
+        distance_m: None,
+        duration_s: None,
+        geometry: Vec::new(),
+        warnings: Vec::new(),
     }
 }
 
@@ -456,6 +760,42 @@ fn planner_reorder_points(
     state.reorder(input)
 }
 
+
+#[tauri::command]
+fn planner_routing_status(
+    state: State<'_, PlannerDesktopService>,
+) -> Result<Option<PlannerRoutingStatus>, String> {
+    state.routing_status()
+}
+
+#[tauri::command]
+fn planner_configure_routing(
+    input: PlannerRoutingConfigInput,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerRoutingStatus, String> {
+    state.configure_routing(input)
+}
+
+#[tauri::command]
+fn planner_disable_routing(state: State<'_, PlannerDesktopService>) -> Result<(), String> {
+    state.disable_routing()
+}
+
+#[tauri::command]
+async fn planner_test_routing(
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerRoutingProbeResult, String> {
+    state.test_routing().await
+}
+
+#[tauri::command]
+async fn planner_preview_route(
+    input: PlannerRoutingPreviewInput,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerRoutingPreviewView, String> {
+    state.preview_route(input).await
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -471,7 +811,12 @@ pub fn run() {
             planner_reset_route,
             planner_add_point,
             planner_remove_point,
-            planner_reorder_points
+            planner_reorder_points,
+            planner_routing_status,
+            planner_configure_routing,
+            planner_disable_routing,
+            planner_test_routing,
+            planner_preview_route
         ])
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");
