@@ -252,6 +252,160 @@ jobs:
           path: Cargo-Dispatch-Control-*-Linux-x64.tar.gz
           if-no-files-found: error
 
+
+  macos-planner-preview:
+    name: Build macOS Planner preview
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+
+      - name: Add both macOS Rust targets
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+
+      - name: Install pinned Trunk
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: trunk@0.22.2
+          fallback: none
+
+      - name: Build Planner frontend
+        working-directory: apps/planner-ui
+        run: trunk build --release=true
+
+      - name: Test Planner service
+        run: cargo test --locked -p cargo-dispatch-planner-desktop --all-targets
+
+      - name: Build universal macOS Planner executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked -p cargo-dispatch-planner-desktop --release --target x86_64-apple-darwin
+          cargo build --locked -p cargo-dispatch-planner-desktop --release --target aarch64-apple-darwin
+          lipo -create             target/x86_64-apple-darwin/release/cargo-dispatch-planner-desktop             target/aarch64-apple-darwin/release/cargo-dispatch-planner-desktop             -output Cargo-Dispatch-Planner
+          chmod +x Cargo-Dispatch-Planner
+          lipo -info Cargo-Dispatch-Planner
+
+      - name: Stage macOS Planner app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="$(tr -d '\r\n' < .release-preview)"
+          PACKAGE="Cargo-Dispatch-Planner-$TAG-macOS-universal"
+          APP="$PACKAGE/Cargo Dispatch Planner.app"
+          mkdir -p "$APP/Contents/MacOS"
+          cp Cargo-Dispatch-Planner "$APP/Contents/MacOS/Cargo-Dispatch-Planner"
+          cp THIRD_PARTY_NOTICES.md "$PACKAGE/THIRD_PARTY_NOTICES.md"
+
+          python3 - "$APP/Contents/Info.plist" "$TAG" <<'PY'
+          import plistlib, sys
+          path, tag = sys.argv[1:]
+          info = {
+              "CFBundleDevelopmentRegion": "uk",
+              "CFBundleDisplayName": "Cargo Dispatch Planner",
+              "CFBundleExecutable": "Cargo-Dispatch-Planner",
+              "CFBundleIdentifier": "ua.cargodispatch.planner",
+              "CFBundleInfoDictionaryVersion": "6.0",
+              "CFBundleName": "Cargo Dispatch Planner",
+              "CFBundlePackageType": "APPL",
+              "CFBundleShortVersionString": tag.removeprefix("v"),
+              "CFBundleVersion": "1",
+              "LSMinimumSystemVersion": "12.0",
+              "NSHighResolutionCapable": True,
+          }
+          with open(path, "wb") as handle:
+              plistlib.dump(info, handle)
+          PY
+
+          cat > "$PACKAGE/README-TEST.txt" <<'EOF'
+          Cargo Dispatch Planner — macOS universal preview
+
+          First Planner desktop slice: manual route draft with point add/remove/reorder,
+          navigation coordinates, core-owned revision and 8 UI languages.
+
+          This test build keeps the draft in process memory only. Durable Planner draft
+          persistence, routing preview and package export are later slices.
+          EOF
+
+          ditto -c -k --sequesterRsrc --keepParent "$PACKAGE" "$PACKAGE.zip"
+
+      - name: Upload macOS Planner release asset
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: Cargo-Dispatch-Preview-Planner-macOS
+          path: Cargo-Dispatch-Planner-*-macOS-universal.zip
+          if-no-files-found: error
+
+  linux-planner-preview:
+    name: Build Linux Planner preview
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          targets: wasm32-unknown-unknown
+
+      - name: Install Linux Tauri dependencies
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends             libwebkit2gtk-4.1-dev             libappindicator3-dev             librsvg2-dev             patchelf             xdg-utils
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
+
+      - name: Install pinned Trunk
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: trunk@0.22.2
+          fallback: none
+
+      - name: Build Planner frontend
+        working-directory: apps/planner-ui
+        run: trunk build --release=true
+
+      - name: Test Planner service
+        run: cargo test --locked -p cargo-dispatch-planner-desktop --all-targets
+
+      - name: Build Linux Planner executable
+        run: cargo build --locked -p cargo-dispatch-planner-desktop --release
+
+      - name: Stage Linux Planner package
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="$(tr -d '\r\n' < .release-preview)"
+          PACKAGE="Cargo-Dispatch-Planner-$TAG-Linux-x64"
+          mkdir -p "$PACKAGE"
+          cp target/release/cargo-dispatch-planner-desktop "$PACKAGE/Cargo-Dispatch-Planner"
+          chmod +x "$PACKAGE/Cargo-Dispatch-Planner"
+          cp THIRD_PARTY_NOTICES.md "$PACKAGE/THIRD_PARTY_NOTICES.md"
+          cat > "$PACKAGE/README-TEST.txt" <<'EOF'
+          Cargo Dispatch Planner — Linux x64 preview
+
+          First Planner desktop slice: manual route draft with point add/remove/reorder,
+          navigation coordinates, core-owned revision and 8 UI languages.
+
+          This test build keeps the draft in process memory only. Durable Planner draft
+          persistence, routing preview and package export are later slices.
+          EOF
+          tar -czf "$PACKAGE.tar.gz" "$PACKAGE"
+
+      - name: Upload Linux Planner release asset
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: Cargo-Dispatch-Preview-Planner-Linux
+          path: Cargo-Dispatch-Planner-*-Linux-x64.tar.gz
+          if-no-files-found: error
+
   gateway-preview:
     name: Build Linux Addressing Gateway preview
     runs-on: ubuntu-latest
@@ -298,6 +452,8 @@ jobs:
       - apple-preview
       - macos-preview
       - linux-control-preview
+      - macos-planner-preview
+      - linux-planner-preview
       - gateway-preview
     runs-on: windows-latest
     steps:
@@ -327,6 +483,16 @@ jobs:
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
+          name: Cargo-Dispatch-Preview-Planner-macOS
+          path: planner-assets
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: Cargo-Dispatch-Preview-Planner-Linux
+          path: planner-assets
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
           name: Cargo-Dispatch-Preview-Gateway
           path: server-assets
 
@@ -350,6 +516,16 @@ jobs:
 
       - name: Build Control Windows executable
         run: cargo build --locked -p cargo-dispatch-control-desktop --release
+
+      - name: Build Planner frontend
+        working-directory: apps/planner-ui
+        run: trunk build --release=true
+
+      - name: Test Planner service
+        run: cargo test --locked -p cargo-dispatch-planner-desktop --all-targets
+
+      - name: Build Planner Windows executable
+        run: cargo build --locked -p cargo-dispatch-planner-desktop --release
 
       - name: Create synthetic acceptance data
         run: cargo run --locked -p cargo-dispatch-trip-files --example local_browser_fixture -- local-browser-test-data
@@ -393,12 +569,30 @@ jobs:
           $windowsZip = "$packageName.zip"
           Compress-Archive -Path "$packageName/*" -DestinationPath $windowsZip -CompressionLevel Optimal
 
+          $plannerPackage = "Cargo-Dispatch-Planner-$env:TAG-Windows-x64"
+          New-Item -ItemType Directory -Force $plannerPackage | Out-Null
+          Copy-Item "target/release/cargo-dispatch-planner-desktop.exe" "$plannerPackage/Cargo-Dispatch-Planner.exe"
+          Copy-Item "THIRD_PARTY_NOTICES.md" "$plannerPackage/THIRD_PARTY_NOTICES.md"
+          @"
+          Cargo Dispatch Planner $env:TAG — Windows preview
+
+          First Planner desktop slice: manual route draft with point add/remove/reorder,
+          navigation coordinates, core-owned revision and 8 UI languages.
+
+          This test build keeps the draft in process memory only. Durable Planner draft
+          persistence, routing preview and package export are later slices.
+          "@ | Set-Content -Encoding UTF8 "$plannerPackage/README-TEST.txt"
+          $plannerWindowsZip = "$plannerPackage.zip"
+          Compress-Archive -Path "$plannerPackage/*" -DestinationPath $plannerWindowsZip -CompressionLevel Optimal
+
           $android = Get-ChildItem "mobile-assets/Cargo-Dispatch-Driver-*-Android-debug.apk" | Select-Object -First 1
           $apple = Get-ChildItem "mobile-assets/Cargo-Dispatch-Driver-*-iOS-Simulator.zip" | Select-Object -First 1
           $macos = Get-ChildItem "desktop-assets/Cargo-Dispatch-Control-*-macOS-universal.zip" | Select-Object -First 1
           $linux = Get-ChildItem "desktop-assets/Cargo-Dispatch-Control-*-Linux-x64.tar.gz" | Select-Object -First 1
           $gateway = Get-ChildItem "server-assets/Cargo-Dispatch-Gateway-*-Linux-x64.tar.gz" | Select-Object -First 1
-          if (-not $android -or -not $apple -or -not $macos -or -not $linux -or -not $gateway) {
+          $plannerMacos = Get-ChildItem "planner-assets/Cargo-Dispatch-Planner-*-macOS-universal.zip" | Select-Object -First 1
+          $plannerLinux = Get-ChildItem "planner-assets/Cargo-Dispatch-Planner-*-Linux-x64.tar.gz" | Select-Object -First 1
+          if (-not $android -or -not $apple -or -not $macos -or -not $linux -or -not $gateway -or -not $plannerMacos -or -not $plannerLinux) {
             throw "Required release assets are missing"
           }
           Copy-Item $android.FullName $android.Name
@@ -406,8 +600,10 @@ jobs:
           Copy-Item $macos.FullName $macos.Name
           Copy-Item $linux.FullName $linux.Name
           Copy-Item $gateway.FullName $gateway.Name
+          Copy-Item $plannerMacos.FullName $plannerMacos.Name
+          Copy-Item $plannerLinux.FullName $plannerLinux.Name
 
-          @($windowsZip, $macos.Name, $linux.Name, $android.Name, $apple.Name, $gateway.Name) | ForEach-Object {
+          @($windowsZip, $plannerWindowsZip, $macos.Name, $linux.Name, $plannerMacos.Name, $plannerLinux.Name, $android.Name, $apple.Name, $gateway.Name) | ForEach-Object {
             $hash = (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower()
             "$hash  $_"
           } | Set-Content -Encoding ASCII SHA256SUMS.txt
@@ -424,6 +620,9 @@ jobs:
           - Windows Control x64 ZIP;
           - macOS Control universal ZIP (Intel + Apple Silicon);
           - Linux Control x64 tar.gz;
+          - Windows Planner x64 ZIP;
+          - macOS Planner universal ZIP (Intel + Apple Silicon);
+          - Linux Planner x64 tar.gz;
           - Android Driver debug APK для тестового встановлення;
           - iOS/iPadOS Driver Simulator ZIP для тестування в Apple Simulator;
           - Linux Addressing Gateway x64 tar.gz із Docker/Compose deployment files.
@@ -432,6 +631,8 @@ jobs:
 
           ### Уже в цьому preview
           - Control desktop на Rust/Tauri + Leptos;
+          - окремий Planner desktop на Rust/Tauri + Leptos для Windows/macOS/Linux;
+          - Planner manual route draft: add/remove/reorder, navigation coordinates, core revision, 8 мов;
           - durable активний рейс і відновлення після перезапуску;
           - адаптивний Driver Browser для phone / tablet / wide desktop;
           - зміна порядку відкритих точок;
@@ -448,9 +649,12 @@ jobs:
           - NAT/CGNAT field path;
           - production mobile signing/TestFlight/Google Play;
 
-          Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
-          macOS: розпакувати universal ZIP і відкрити Cargo Dispatch Control.app; підпис/notarization буде пізніше.
-          Linux: розпакувати tar.gz і запустити ./Cargo-Dispatch-Control у desktop Linux session.
+          Control Windows: розпакувати ZIP і запустити Cargo-Dispatch-Control.exe.
+          Control macOS: розпакувати universal ZIP і відкрити Cargo Dispatch Control.app; підпис/notarization буде пізніше.
+          Control Linux: розпакувати tar.gz і запустити ./Cargo-Dispatch-Control у desktop Linux session.
+          Planner Windows: розпакувати Planner ZIP і запустити Cargo-Dispatch-Planner.exe.
+          Planner macOS: розпакувати Planner universal ZIP і відкрити Cargo Dispatch Planner.app.
+          Planner Linux: розпакувати Planner tar.gz і запустити ./Cargo-Dispatch-Planner.
           Android: встановити debug APK вручну на тестовий пристрій.
           Apple: Simulator ZIP призначений для Apple Simulator, не для фізичного iPhone/iPad.
           Gateway: розпакувати Linux tar.gz або використати Docker/Compose files; HTTPS ставиться reverse proxy перед gateway.
@@ -466,6 +670,8 @@ jobs:
           $macos = (Get-ChildItem "Cargo-Dispatch-Control-*-macOS-universal.zip" | Select-Object -First 1).Name
           $linux = (Get-ChildItem "Cargo-Dispatch-Control-*-Linux-x64.tar.gz" | Select-Object -First 1).Name
           $gateway = (Get-ChildItem "Cargo-Dispatch-Gateway-*-Linux-x64.tar.gz" | Select-Object -First 1).Name
+          $plannerMacos = (Get-ChildItem "Cargo-Dispatch-Planner-*-macOS-universal.zip" | Select-Object -First 1).Name
+          $plannerLinux = (Get-ChildItem "Cargo-Dispatch-Planner-*-Linux-x64.tar.gz" | Select-Object -First 1).Name
           gh release create "$env:TAG" `
             --repo "${{ github.repository }}" `
             --target "$env:GITHUB_SHA" `
@@ -473,8 +679,11 @@ jobs:
             --notes-file RELEASE_NOTES.md `
             --prerelease `
             "Cargo-Dispatch-Control-$env:TAG-Windows-x64.zip" `
+            "Cargo-Dispatch-Planner-$env:TAG-Windows-x64.zip" `
             "$macos" `
             "$linux" `
+            "$plannerMacos" `
+            "$plannerLinux" `
             "$android" `
             "$apple" `
             "$gateway" `
