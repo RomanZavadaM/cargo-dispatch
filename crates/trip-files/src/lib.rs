@@ -707,7 +707,7 @@ impl From<&TripPlanningBasis> for PlanningBasisFile {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ManualTripFile {
     trip: [u8; 16],
@@ -1956,6 +1956,108 @@ mod tests {
         assert_eq!(reopened.routing_profile(), Some(&planner_profile));
         assert_eq!(reopened.active_routing_profile(), Some(&current_profile));
         assert!(reopened.state().route_geometry.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn manual_trip_creation_is_durable_without_invented_planning_basis() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let folder = tmp.path().join("manual-control-trip");
+        let trip_id = TripId::from_bytes([71; 16]).unwrap();
+        let first_point = PointId::from_bytes([72; 16]).unwrap();
+        let second_point = PointId::from_bytes([73; 16]).unwrap();
+        let route = vec![
+            TripRoutePoint {
+                point_id: first_point,
+                sequence: 1,
+                kind: TripPointKind::Custom("manual".to_owned()),
+                title: "Warehouse".to_owned(),
+                navigation: Some(TripNavigationTarget {
+                    latitude_e7: 498_393_000,
+                    longitude_e7: 240_296_000,
+                    address: None,
+                }),
+            },
+            TripRoutePoint {
+                point_id: second_point,
+                sequence: 2,
+                kind: TripPointKind::Custom("manual".to_owned()),
+                title: "Customer".to_owned(),
+                navigation: Some(TripNavigationTarget {
+                    latitude_e7: 498_430_000,
+                    longitude_e7: 240_360_000,
+                    address: None,
+                }),
+            },
+        ];
+
+        let created = TripFolder::create_manual(
+            &folder,
+            ManualTripCreateDraft {
+                trip_id,
+                route_points: route.clone(),
+                planning_basis: None,
+            },
+        )?;
+        assert_eq!(created.trip_id(), trip_id);
+        assert_eq!(created.state().current_version.get(), 1);
+        assert_eq!(created.state().route_points, route);
+        assert!(created.planning_basis().is_none());
+        drop(created);
+
+        let reopened = TripFolder::open_detected(&folder)?;
+        assert_eq!(reopened.trip_id(), trip_id);
+        assert_eq!(reopened.state().current_version.get(), 1);
+        assert_eq!(reopened.state().route_points, route);
+        assert!(reopened.planning_basis().is_none());
+        assert_eq!(reopened.state().local_route_revision, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn manual_trip_creation_preserves_explicit_planning_basis() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let folder = tmp.path().join("manual-control-trip-with-basis");
+        let trip_id = TripId::from_bytes([74; 16]).unwrap();
+        let point_id = PointId::from_bytes([75; 16]).unwrap();
+        let cargo_id = CargoId::from_bytes([76; 16]).unwrap();
+        let route = vec![TripRoutePoint {
+            point_id,
+            sequence: 1,
+            kind: TripPointKind::Custom("manual".to_owned()),
+            title: "Manual stop".to_owned(),
+            navigation: Some(TripNavigationTarget {
+                latitude_e7: 498_393_000,
+                longitude_e7: 240_296_000,
+                address: None,
+            }),
+        }];
+        let basis = TripPlanningBasis {
+            vehicle_type: "operator-entered truck class".to_owned(),
+            cargos: vec![PlannedCargoBasis {
+                cargo_id,
+                title: "Operator-entered cargo".to_owned(),
+                weight_kg: Some(2_000),
+                pallets: None,
+                pickup_point_id: Some(point_id),
+                unload_point_id: None,
+            }],
+        };
+
+        let created = TripFolder::create_manual(
+            &folder,
+            ManualTripCreateDraft {
+                trip_id,
+                route_points: route.clone(),
+                planning_basis: Some(basis.clone()),
+            },
+        )?;
+        assert_eq!(created.planning_basis(), Some(&basis));
+        drop(created);
+
+        let reopened = TripFolder::open_detected(&folder)?;
+        assert_eq!(reopened.state().route_points, route);
+        assert_eq!(reopened.planning_basis(), Some(&basis));
         Ok(())
     }
 
