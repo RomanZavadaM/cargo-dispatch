@@ -1056,7 +1056,9 @@ impl ControlBrowserState {
             .map(|client| client.config().clone()))
     }
 
-    pub async fn valhalla_availability(&self) -> io::Result<Option<cargo_dispatch_geo::valhalla_http::ValhallaAvailability>> {
+    pub async fn valhalla_availability(
+        &self,
+    ) -> io::Result<Option<cargo_dispatch_geo::valhalla_http::ValhallaAvailability>> {
         let Some(client) = self.valhalla_client()? else {
             return Ok(None);
         };
