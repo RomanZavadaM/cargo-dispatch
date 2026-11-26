@@ -496,9 +496,18 @@ impl RoutingProfileDraft {
             return Self::default();
         };
         Self {
-            height_m: profile.height_m.map(|value| value.to_string()).unwrap_or_default(),
-            width_m: profile.width_m.map(|value| value.to_string()).unwrap_or_default(),
-            length_m: profile.length_m.map(|value| value.to_string()).unwrap_or_default(),
+            height_m: profile
+                .height_m
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            width_m: profile
+                .width_m
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            length_m: profile
+                .length_m
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
             gross_weight_t: profile
                 .gross_weight_t
                 .map(|value| value.to_string())
@@ -514,7 +523,12 @@ impl RoutingProfileDraft {
             hazmat: if profile.hazmat { "yes" } else { "no" }.to_owned(),
             hgv: if profile.hgv { "yes" } else { "no" }.to_owned(),
             exclude_unpaved: if profile.exclude_unpaved { "yes" } else { "no" }.to_owned(),
-            prefer_truck_routes: if profile.prefer_truck_routes { "yes" } else { "no" }.to_owned(),
+            prefer_truck_routes: if profile.prefer_truck_routes {
+                "yes"
+            } else {
+                "no"
+            }
+            .to_owned(),
             toll_preference: match profile.toll_preference {
                 RoutingTollPreference::Allow => "allow",
                 RoutingTollPreference::PreferAvoid => "prefer_avoid",
@@ -622,12 +636,20 @@ fn routing_profile_summary(profile: &DashboardVehicleRoutingProfile, locale: UiL
     parts.push(format!(
         "{}: {}",
         text.exclude_unpaved,
-        if profile.exclude_unpaved { text.yes } else { text.no }
+        if profile.exclude_unpaved {
+            text.yes
+        } else {
+            text.no
+        }
     ));
     parts.push(format!(
         "{}: {}",
         text.prefer_truck_routes,
-        if profile.prefer_truck_routes { text.yes } else { text.no }
+        if profile.prefer_truck_routes {
+            text.yes
+        } else {
+            text.no
+        }
     ));
     let toll = match profile.toll_preference {
         RoutingTollPreference::Allow => text.toll_allow,
@@ -665,7 +687,11 @@ fn submit_routing_context(
                 if let Ok(current_status) = load_status().await {
                     status.set(Some(current_status));
                 }
-                message.set(strings(locale.get_untracked()).routing_context_saved.to_owned());
+                message.set(
+                    strings(locale.get_untracked())
+                        .routing_context_saved
+                        .to_owned(),
+                );
                 error.set(false);
             }
             Err(problem) => {
