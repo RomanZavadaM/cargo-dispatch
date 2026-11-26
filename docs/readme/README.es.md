@@ -22,7 +22,9 @@ El lenguaje principal de desarrollo es **Rust**.
 - archivos, fotos y vídeos **Driver Browser → Control** con guardado local;
 - dos clientes de navegador simultáneos para un mismo viaje y reconexión sin una base de datos separada del navegador;
 - mapa interactivo OpenStreetMap en Control y Driver Browser;
-- modos loopback y LAN explícito para pruebas y trabajo local.\n- la aceptación automatizada de Driver Browser verifica una sesión real de Control por separado mediante loopback y un bind LAN privado explícito.
+- modos loopback y LAN explícito para pruebas y trabajo local;
+- la aceptación automatizada de Driver Browser verifica una sesión real de Control por separado mediante loopback y un bind LAN privado explícito;
+- la aceptación automatizada del Gateway HTTPS público verifica la cadena real `Control ↔ public HTTPS Gateway ↔ Driver Browser`: Control solo saliente, shell/snapshot/ubicación del navegador y archivos bidireccionales;
 
 ## Driver Apps nativas
 
@@ -100,9 +102,8 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 
 - validación visual manual del navegador local para narrow phone / tablet / wide desktop, incluido pan/zoom/fit del mapa;
 - prueba del mismo Driver Browser en un teléfono real dentro de la misma LAN;
-- ruta HTTPS/direccionamiento público;
-- validación completa del GPS del navegador mediante HTTPS;
-- pruebas de campo en distintas redes/NAT/CGNAT;
+- aceptación HTTPS en dispositivo real desde una red separada y NAT/CGNAT móvil;
+- validación completa del GPS del navegador mediante HTTPS en un dispositivo real;
 
 
 ## Idiomas de la interfaz
