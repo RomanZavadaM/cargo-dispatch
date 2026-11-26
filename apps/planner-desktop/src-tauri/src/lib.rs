@@ -17,11 +17,11 @@ use cargo_dispatch_planner::{
 };
 use cargo_dispatch_planner_ui_contracts::{
     PlannerPackageCargoInput, PlannerPackageExportInput, PlannerPackageExportResult,
-    PlannerPointInput, PlannerPointView,
-    PlannerRoadGeometryPoint, PlannerRouteView, PlannerRoutingAvailabilityState,
-    PlannerRoutingConfigInput, PlannerRoutingPreviewInput, PlannerRoutingPreviewState,
-    PlannerRoutingPreviewView, PlannerRoutingProbeResult, PlannerRoutingProfileInput,
-    PlannerRoutingStatus, PlannerTollPreference, PointActionInput, ReorderPointsInput,
+    PlannerPointInput, PlannerPointView, PlannerRoadGeometryPoint, PlannerRouteView,
+    PlannerRoutingAvailabilityState, PlannerRoutingConfigInput, PlannerRoutingPreviewInput,
+    PlannerRoutingPreviewState, PlannerRoutingPreviewView, PlannerRoutingProbeResult,
+    PlannerRoutingProfileInput, PlannerRoutingStatus, PlannerTollPreference, PointActionInput,
+    ReorderPointsInput,
 };
 use cargo_dispatch_trip_files::export_package as write_trip_package;
 use serde::{Deserialize, Serialize};
@@ -450,7 +450,10 @@ impl PlannerDesktopService {
         {
             return Err("Package path already exists".to_owned());
         }
-        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
             fs::create_dir_all(parent)
                 .map_err(|error| format!("Could not create package folder: {error}"))?;
         }
@@ -480,11 +483,9 @@ impl PlannerDesktopService {
                         .as_deref()
                         .map(|value| point_from_text(&state, value))
                         .transpose()?;
-                    let cargo_id = CargoId::from_bytes(cargo_id_bytes(
-                        state.route.working_route_id,
-                        index,
-                    ))
-                    .map_err(|error| format!("Could not create cargo id: {error}"))?;
+                    let cargo_id =
+                        CargoId::from_bytes(cargo_id_bytes(state.route.working_route_id, index))
+                            .map_err(|error| format!("Could not create cargo id: {error}"))?;
                     Ok(PlannedCargoBasis {
                         cargo_id,
                         title: title.to_owned(),
@@ -528,10 +529,7 @@ impl PlannerDesktopService {
             route_geometry: None,
         };
 
-        let profile = input
-            .routing_profile
-            .map(routing_profile)
-            .transpose()?;
+        let profile = input.routing_profile.map(routing_profile).transpose()?;
         if let Some(profile) = profile.clone() {
             draft = draft
                 .with_routing_profile(profile)
@@ -546,7 +544,9 @@ impl PlannerDesktopService {
                 || preview.revision != revision
                 || preview.profile_fingerprint != profile.profile_fingerprint()
             {
-                return Err("Routing preview is stale or does not match this Planner draft".to_owned());
+                return Err(
+                    "Routing preview is stale or does not match this Planner draft".to_owned(),
+                );
             }
             let engine_version = preview
                 .engine_version
@@ -847,9 +847,7 @@ fn load_or_create_operator_id(journal_path: &Path) -> Result<OperatorId, String>
             .map_err(|error| format!("Planner operator id is invalid: {error}"));
     }
 
-    let serial = unix_time_ms()?
-        ^ (u64::from(std::process::id()) << 32)
-        ^ 0x504c_414e_4e45_5201;
+    let serial = unix_time_ms()? ^ (u64::from(std::process::id()) << 32) ^ 0x504c_414e_4e45_5201;
     let operator = OperatorId::from_bytes(id_bytes(0x4f, serial.max(1)))
         .map_err(|error| format!("Could not create Planner operator id: {error}"))?;
     if let Some(parent) = path.parent() {
@@ -887,9 +885,7 @@ fn trip_id_bytes(route_id: WorkingRouteId) -> [u8; 16] {
 fn cargo_id_bytes(route_id: WorkingRouteId, index: usize) -> [u8; 16] {
     let mut bytes = route_id.as_bytes();
     bytes[0] = 0x43;
-    let discriminator = u64::try_from(index)
-        .unwrap_or(u64::MAX)
-        .saturating_add(1);
+    let discriminator = u64::try_from(index).unwrap_or(u64::MAX).saturating_add(1);
     let mut tail = [0_u8; 8];
     tail.copy_from_slice(&bytes[8..]);
     let mixed = u64::from_be_bytes(tail).rotate_left(17) ^ discriminator;
@@ -1572,16 +1568,12 @@ mod tests {
         assert_eq!(basis.cargos[0].title, "Synthetic cargo");
         assert_eq!(basis.cargos[0].weight_kg, Some(12_500));
         assert_eq!(basis.cargos[0].pallets, Some(18));
-        assert_eq!(basis.cargos[0].pickup_point_id, Some(first.points[0].point_id.as_str()).and_then(|value| {
-            route
-                .points
-                .iter()
-                .find(|point| point.point_id == value)
-                .and_then(|_| point_from_text(
-                    &service.inner.lock().expect("Planner state"),
-                    value
-                ).ok())
-        }));
+        let (expected_pickup, expected_unload) = {
+            let state = service.inner.lock().expect("Planner state");
+            (state.route.points[0].point_id, state.route.points[1].point_id)
+        };
+        assert_eq!(basis.cargos[0].pickup_point_id, Some(expected_pickup));
+        assert_eq!(basis.cargos[0].unload_point_id, Some(expected_unload));
         assert_eq!(
             imported
                 .routing_profile()
