@@ -13,7 +13,7 @@
 ## Що вже є в поточному продукті
 
 - окремий desktop **Control** на Tauri/Leptos;
-- окремий desktop **Planner** на Tauri/Leptos: ручна чернетка маршруту, додавання/видалення/перестановка точок, координати навігації та revision через Planner core;
+- окремий desktop **Planner** на Tauri/Leptos: ручна чернетка маршруту, додавання/видалення/перестановка точок, координати навігації та revision через Planner core; чернетка зберігається у versioned append-only journal в app-data і відновлюється після перезапуску;
 - постійне локальне збереження активного рейсу та відновлення після перезапуску;
 - versioned trip package між Planner і Control;
 - один адаптивний **Driver Browser** для телефона, планшета та ноутбука/desktop browser;
@@ -94,7 +94,7 @@ Android та Apple пакети поки не підписані для мага
 
 ## Що ще попереду
 
-- постійне збереження чернетки Planner між перезапусками, далі map/routing preview і підготовка package export;
+- map/routing preview у Planner, далі підготовка package export із Planner UI;
 
 - ручне local browser acceptance;
 - перевірка того самого Driver Browser на реальному телефоні в LAN;
