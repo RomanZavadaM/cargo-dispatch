@@ -9,16 +9,15 @@ use cargo_dispatch_control_ui_contracts::{
     DashboardRoutingIdentity, DashboardVehicleRoutingProfile, GatewayStatus, ListenerMode,
     ListenerStatus, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
     RoutingAvailabilityState, RoutingProbeResult, RoutingStatus, RoutingTollPreference,
-    SaveDocumentInput, SessionInput, SessionStatus, StartGatewayInput, StartLanInput, TripDashboard,
-    UpdateRoutingContextInput, UpdateSessionMetadataInput,
+    SaveDocumentInput, SessionInput, SessionStatus, StartGatewayInput, StartLanInput,
+    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput,
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
 };
 use cargo_dispatch_domain::{DocumentId, DriverEndpointId, PointId};
 use cargo_dispatch_geo::{
-    NormalizedStatus, TollPreference, VehicleRoutingProfile,
-    valhalla_http::ValhallaRuntimeConfig,
+    NormalizedStatus, TollPreference, VehicleRoutingProfile, valhalla_http::ValhallaRuntimeConfig,
 };
 use cargo_dispatch_trip_files::{
     ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, TripFolder,
@@ -265,9 +264,7 @@ fn dashboard(
             endpoint_label: actual_context.endpoint_label,
             vehicle_label: actual_context.vehicle_label,
             vehicle_type: actual_context.vehicle_type,
-            routing_profile: active_routing_profile
-                .as_ref()
-                .map(routing_profile_view),
+            routing_profile: active_routing_profile.as_ref().map(routing_profile_view),
         },
         points: snapshot
             .points
