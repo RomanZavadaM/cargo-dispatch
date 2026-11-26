@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · **🇪🇸 Español** · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Estado:** desarrollo activo. La versión estable actual es **v0.1.0**. El prerelease de prueba actual es **v0.1.0-preview.7**, que ya incluye un Planner separado para Windows, macOS y Linux. La localización completa en 8 idiomas está integrada.
+> **Estado:** desarrollo activo. La versión estable actual es **v0.1.0**. El prerelease de prueba actual es **v0.1.0-preview.8**, que ya incluye un Planner separado para Windows, macOS y Linux. La localización completa en 8 idiomas está integrada.
 
 ## Acerca del producto
 
@@ -57,13 +57,13 @@ Planner desktop dispone ahora de su propio preview Valhalla runtime: el operador
 
 Planner desktop ahora también exporta el package de viaje versionado existente como schema 1.4 mediante un diálogo nativo «Guardar como». El package incluye una planning basis explícita (tipo/clase de vehículo y cargas), el orden de puntos y, cuando existe, solo el snapshot coincidente del planning routing profile y la geometría Valhalla. TripId se mantiene estable para un borrador, TripVersion continúa tras reinicios, CargoId no depende de la posición de la fila y un ZIP existente nunca se sobrescribe.
 
-## Test v0.1.0-preview.7
+## Test v0.1.0-preview.8
 
-[Abrir Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
+[Abrir Test v0.1.0-preview.8](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8).
 
-Es un **prerelease**, no Stable. Es el primer preview integrado que publica un Planner desktop separado junto con el resto del producto desde una misma fuente exacta.
+Es un **prerelease**, no Stable. Es una compilación de prueba integrada del producto actual desde una única fuente exacta.
 
-El release contiene:
+El release incluye:
 - Windows Control x64 ZIP;
 - macOS Control universal ZIP — Intel + Apple Silicon;
 - Linux Control x64 tar.gz;
@@ -75,7 +75,7 @@ El release contiene:
 - Linux Addressing Gateway x64 package;
 - SHA256SUMS.
 
-preview.7 fue la primera versión con un Planner compilado separado. El main actual ya está mucho más avanzado: borrador Planner persistente, vista previa vial real con Valhalla, exportación ZIP schema 1.4 y creación manual de un viaje activo en Control llegarán en el siguiente preview.
+preview.8 ya incluye el borrador durable de Planner, la vista previa real de carretera con Valhalla, la exportación ZIP versionada schema 1.4 con planning basis y la creación manual de un viaje activo en Control sin ZIP de Planner. El perfil de Planner no es una vinculación permanente viaje→vehículo; el contexto real de vehículo/dispositivo se mantiene por separado en Control.
 
 ## Stable v0.1.0
 
