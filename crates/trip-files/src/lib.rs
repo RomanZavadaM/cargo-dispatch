@@ -1017,11 +1017,12 @@ fn apply(
                 profile.validate().map_err(invalid)?;
             }
             *active_routing_profile = profile.clone();
-            reg.invalidate_route_geometry(trip).map_err(|error| match error {
-                RouteGeometryUpdateError::TripNotFound => invalid("missing trip"),
-                RouteGeometryUpdateError::StaleView => invalid("stale route geometry state"),
-                RouteGeometryUpdateError::InvalidGeometry(error) => invalid(error),
-            })?;
+            reg.invalidate_route_geometry(trip)
+                .map_err(|error| match error {
+                    RouteGeometryUpdateError::TripNotFound => invalid("missing trip"),
+                    RouteGeometryUpdateError::StaleView => invalid("stale route geometry state"),
+                    RouteGeometryUpdateError::InvalidGeometry(error) => invalid(error),
+                })?;
         }
     }
     Ok(())
