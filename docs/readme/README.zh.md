@@ -55,6 +55,8 @@ Control 保存派生 geometry，并在站点顺序变化后通过已配置的 ru
 
 Planner desktop 现在拥有自己的 runtime Valhalla preview：操作员设置 Valhalla 地址、地图数据集 ID 和 timeout，通过 `/status` 检查可用性，`/route` 只使用明确提供的 planning profile 计算。未知的数值约束不会被猜测。成功结果会在 OSM 上绘制真实道路 polyline；没有结果时不会绘制虚假的直线。Preview 由 route/revision/profile 派生：草稿或 planning profile 改变后旧线路会被清除，延迟响应也会被拒绝。Routing 失败不会修改 Planner 草稿。
 
+Planner desktop 现在还可以通过原生 Save As 将现有 versioned trip package 导出为 schema 1.4。Package 包含明确的 planning basis（车辆类型/级别与货物）、站点顺序，以及在存在时仅包含与本次计算匹配的 planning routing profile/Valhalla geometry snapshot。同一草稿的 TripId 保持稳定，TripVersion 可跨重启继续递增，CargoId 不依赖行位置，并且绝不会覆盖已有 ZIP。
+
 ## Test v0.1.0-preview.7
 
 [打开 Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7)。
@@ -94,7 +96,7 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 
 ## 后续工作
 
-- 通过现有 versioned trip package 从 Planner UI 导出 package；
+- 没有 Planner ZIP 时直接在 Control 中创建新的行程；
 
 - 本地浏览器手动验收；
 - 在同一 LAN 中用真实手机测试相同的 Driver Browser；
