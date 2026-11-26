@@ -20,6 +20,6 @@ members = [
 
 [workspace.package]
 edition = "2024"
-license = "BUSL-1.1"
+license-file = "LICENSE.md"
 rust-version = "1.91"
 version = "0.1.0"
