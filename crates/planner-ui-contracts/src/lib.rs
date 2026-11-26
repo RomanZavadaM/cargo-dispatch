@@ -134,6 +134,7 @@ pub struct PlannerRoutingPreviewView {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PlannerPackageCargoInput {
+    pub row_id: u64,
     pub title: String,
     pub weight_kg: Option<u32>,
     pub pallets: Option<u16>,
