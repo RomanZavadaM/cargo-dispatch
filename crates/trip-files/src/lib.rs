@@ -4,8 +4,7 @@ use cargo_dispatch_contracts::{
     CURRENT_SCHEMA_VERSION, PackageContentFingerprint, PlannedCargoBasis, ReplanRequest,
     TRIP_PACKAGE_SCHEMA_NAME, TripNavigationTarget, TripPackageHeader, TripPlanningBasis,
     TripPointKind, TripRoadGeometry, TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity,
-    TripVersion, validate_route_points, validate_trip_planning_basis,
-    validate_trip_road_geometry,
+    TripVersion, validate_route_points, validate_trip_planning_basis, validate_trip_road_geometry,
 };
 use cargo_dispatch_control::{
     ImportResult, InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft,
@@ -618,7 +617,11 @@ impl From<&TripPlanningBasis> for PlanningBasisFile {
     fn from(basis: &TripPlanningBasis) -> Self {
         Self {
             vehicle_type: basis.vehicle_type.clone(),
-            cargos: basis.cargos.iter().map(PlannedCargoBasisFile::from).collect(),
+            cargos: basis
+                .cargos
+                .iter()
+                .map(PlannedCargoBasisFile::from)
+                .collect(),
         }
     }
 }
