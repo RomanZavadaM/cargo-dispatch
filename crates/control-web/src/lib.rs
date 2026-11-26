@@ -1050,6 +1050,25 @@ impl ControlBrowserState {
             .map_err(|_| io::Error::other("Valhalla runtime state unavailable"))
     }
 
+    pub fn valhalla_config(&self) -> io::Result<Option<ValhallaRuntimeConfig>> {
+        Ok(self
+            .valhalla_client()?
+            .map(|client| client.config().clone()))
+    }
+
+    pub async fn valhalla_availability(
+        &self,
+    ) -> io::Result<Option<cargo_dispatch_geo::valhalla_http::ValhallaAvailability>> {
+        let Some(client) = self.valhalla_client()? else {
+            return Ok(None);
+        };
+        client
+            .availability()
+            .await
+            .map(Some)
+            .map_err(|error| io::Error::other(error.to_string()))
+    }
+
     pub fn register_trip(
         &self,
         token: impl Into<String>,

@@ -2,16 +2,18 @@
 
 use cargo_dispatch_control_gateway_client::{ControlGatewayClient, GatewayRelayConfig};
 use cargo_dispatch_control_ui_contracts::{
-    ControlUiStatus, DashboardDocument, DashboardDocumentDirection, DashboardLocation,
-    DashboardNavigation, DashboardPoint, DashboardRoadGeometry, DashboardRoadGeometryPoint,
-    DashboardRoutingIdentity, GatewayStatus, ListenerMode, ListenerStatus, OperatorDocumentInput,
-    PickedFile, RegisterTripInput, ReorderRouteInput, SaveDocumentInput, SessionInput,
+    ConfigureRoutingInput, ControlUiStatus, DashboardDocument, DashboardDocumentDirection,
+    DashboardLocation, DashboardNavigation, DashboardPoint, DashboardRoadGeometry,
+    DashboardRoadGeometryPoint, DashboardRoutingIdentity, GatewayStatus, ListenerMode,
+    ListenerStatus, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
+    RoutingAvailabilityState, RoutingProbeResult, RoutingStatus, SaveDocumentInput, SessionInput,
     SessionStatus, StartGatewayInput, StartLanInput, TripDashboard,
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
 };
 use cargo_dispatch_domain::{DocumentId, PointId};
+use cargo_dispatch_geo::{NormalizedStatus, valhalla_http::ValhallaRuntimeConfig};
 use cargo_dispatch_trip_files::{DocumentDirection, DocumentStoreDraft, TripFolder};
 use std::{
     collections::BTreeMap,
@@ -19,6 +21,7 @@ use std::{
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
     sync::Mutex,
+    time::Duration,
 };
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
@@ -460,6 +463,17 @@ impl DesktopControlService {
             }
         };
 
+        let routing = self
+            .browser
+            .valhalla_config()
+            .map_err(|error| format!("Не вдалося прочитати налаштування маршрутизації: {error}"))?
+            .map(|config| RoutingStatus {
+                base_url: config.base_url().to_string(),
+                map_dataset_id: config.map_dataset_id().to_owned(),
+                connect_timeout_ms: config.connect_timeout().as_millis() as u64,
+                request_timeout_ms: config.request_timeout().as_millis() as u64,
+            });
+
         let sessions = self
             .sessions
             .lock()
@@ -476,7 +490,81 @@ impl DesktopControlService {
         Ok(ControlUiStatus {
             listener,
             gateway: gateway_status,
+            routing,
             sessions,
+        })
+    }
+
+    async fn configure_routing(
+        &self,
+        input: ConfigureRoutingInput,
+    ) -> Result<ControlUiStatus, String> {
+        let base_url = input.base_url.trim();
+        let map_dataset_id = input.map_dataset_id.trim();
+        if base_url.is_empty() {
+            return Err("Потрібно вказати адресу Valhalla".to_owned());
+        }
+        if map_dataset_id.is_empty() {
+            return Err("Потрібно вказати ідентифікатор набору карт".to_owned());
+        }
+        if !(100..=30_000).contains(&input.connect_timeout_ms) {
+            return Err("Таймаут підключення має бути 100–30000 мс".to_owned());
+        }
+        if !(250..=120_000).contains(&input.request_timeout_ms)
+            || input.request_timeout_ms < input.connect_timeout_ms
+        {
+            return Err(
+                "Таймаут запиту має бути 250–120000 мс і не меншим за таймаут підключення"
+                    .to_owned(),
+            );
+        }
+        let config = ValhallaRuntimeConfig::new(
+            base_url,
+            map_dataset_id,
+            Duration::from_millis(input.connect_timeout_ms),
+            Duration::from_millis(input.request_timeout_ms),
+        )
+        .map_err(|error| format!("Некоректні налаштування Valhalla: {error}"))?;
+        self.browser
+            .configure_valhalla(config)
+            .map_err(|error| format!("Не вдалося налаштувати Valhalla: {error}"))?;
+        self.status().await
+    }
+
+    async fn disable_routing(&self) -> Result<ControlUiStatus, String> {
+        self.browser
+            .clear_valhalla()
+            .map_err(|error| format!("Не вдалося вимкнути Valhalla: {error}"))?;
+        self.status().await
+    }
+
+    async fn test_routing(&self) -> Result<RoutingProbeResult, String> {
+        let availability = self
+            .browser
+            .valhalla_availability()
+            .await
+            .map_err(|error| format!("Не вдалося перевірити Valhalla: {error}"))?;
+        let Some(availability) = availability else {
+            return Ok(RoutingProbeResult {
+                state: RoutingAvailabilityState::NotConfigured,
+                engine_version: None,
+                tileset_last_modified: None,
+            });
+        };
+        let state = match availability.status {
+            NormalizedStatus::Ok => RoutingAvailabilityState::Ok,
+            NormalizedStatus::Timeout => RoutingAvailabilityState::Timeout,
+            NormalizedStatus::EngineUnavailable => RoutingAvailabilityState::EngineUnavailable,
+            NormalizedStatus::DatasetMissing => RoutingAvailabilityState::DatasetMissing,
+            NormalizedStatus::EngineError
+            | NormalizedStatus::NoRoute
+            | NormalizedStatus::InvalidPoint
+            | NormalizedStatus::InvalidProfile => RoutingAvailabilityState::EngineError,
+        };
+        Ok(RoutingProbeResult {
+            state,
+            engine_version: availability.engine_version,
+            tileset_last_modified: availability.tileset_last_modified,
         })
     }
 
@@ -685,6 +773,28 @@ async fn stop_browser_server(
 }
 
 #[tauri::command]
+async fn configure_routing(
+    input: ConfigureRoutingInput,
+    state: State<'_, DesktopControlService>,
+) -> Result<ControlUiStatus, String> {
+    state.configure_routing(input).await
+}
+
+#[tauri::command]
+async fn test_routing(
+    state: State<'_, DesktopControlService>,
+) -> Result<RoutingProbeResult, String> {
+    state.test_routing().await
+}
+
+#[tauri::command]
+async fn disable_routing(
+    state: State<'_, DesktopControlService>,
+) -> Result<ControlUiStatus, String> {
+    state.disable_routing().await
+}
+
+#[tauri::command]
 async fn start_gateway(
     input: StartGatewayInput,
     state: State<'_, DesktopControlService>,
@@ -707,6 +817,9 @@ pub fn run() {
             start_loopback,
             start_lan,
             stop_browser_server,
+            configure_routing,
+            test_routing,
+            disable_routing,
             start_gateway,
             stop_gateway,
             pick_trip_folder,
@@ -884,6 +997,119 @@ mod tests {
 
         gateway.abort();
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn desktop_service_configures_tests_and_disables_valhalla() -> std::io::Result<()> {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+        let address = listener.local_addr()?;
+        let app = axum::Router::new().route(
+            "/status",
+            axum::routing::get(|| async {
+                r#"{"version":"3.9.2","tileset_last_modified":1795550000}"#
+            }),
+        );
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("mock Valhalla");
+        });
+
+        let service = DesktopControlService::default();
+        let configured = service
+            .configure_routing(ConfigureRoutingInput {
+                base_url: format!("http://{address}"),
+                map_dataset_id: "fixture-europe-2026-11".to_owned(),
+                connect_timeout_ms: 500,
+                request_timeout_ms: 2_000,
+            })
+            .await
+            .expect("routing config");
+        let routing = configured.routing.expect("routing status");
+        assert_eq!(routing.map_dataset_id, "fixture-europe-2026-11");
+        assert_eq!(routing.connect_timeout_ms, 500);
+        assert_eq!(routing.request_timeout_ms, 2_000);
+
+        let probe = service.test_routing().await.expect("routing probe");
+        assert_eq!(probe.state, RoutingAvailabilityState::Ok);
+        assert_eq!(probe.engine_version.as_deref(), Some("3.9.2"));
+        assert_eq!(probe.tileset_last_modified, Some(1_795_550_000));
+
+        let disabled = service.disable_routing().await.expect("disable routing");
+        assert!(disabled.routing.is_none());
+        let probe = service.test_routing().await.expect("disabled probe");
+        assert_eq!(probe.state, RoutingAvailabilityState::NotConfigured);
+
+        server.abort();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn failed_routing_probe_keeps_runtime_configuration() -> std::io::Result<()> {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+        let address = listener.local_addr()?;
+        let app = axum::Router::new().route(
+            "/status",
+            axum::routing::get(|| async {
+                (
+                    axum::http::StatusCode::SERVICE_UNAVAILABLE,
+                    r#"{"status":"down"}"#,
+                )
+            }),
+        );
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app)
+                .await
+                .expect("mock unavailable Valhalla");
+        });
+
+        let service = DesktopControlService::default();
+        service
+            .configure_routing(ConfigureRoutingInput {
+                base_url: format!("http://{address}"),
+                map_dataset_id: "fixture-europe-2026-11".to_owned(),
+                connect_timeout_ms: 500,
+                request_timeout_ms: 2_000,
+            })
+            .await
+            .expect("routing config");
+
+        let probe = service.test_routing().await.expect("routing probe");
+        assert_eq!(probe.state, RoutingAvailabilityState::EngineUnavailable);
+        let status = service.status().await.expect("status");
+        assert!(
+            status.routing.is_some(),
+            "failed probe must not erase config"
+        );
+
+        server.abort();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn desktop_service_rejects_unbounded_routing_timeouts() {
+        let service = DesktopControlService::default();
+        assert!(
+            service
+                .configure_routing(ConfigureRoutingInput {
+                    base_url: "http://127.0.0.1:8002".to_owned(),
+                    map_dataset_id: "fixture".to_owned(),
+                    connect_timeout_ms: 99,
+                    request_timeout_ms: 2_000,
+                })
+                .await
+                .is_err()
+        );
+        assert!(
+            service
+                .configure_routing(ConfigureRoutingInput {
+                    base_url: "http://127.0.0.1:8002".to_owned(),
+                    map_dataset_id: "fixture".to_owned(),
+                    connect_timeout_ms: 2_000,
+                    request_timeout_ms: 1_000,
+                })
+                .await
+                .is_err()
+        );
+        assert!(service.status().await.expect("status").routing.is_none());
     }
 
     #[tokio::test]

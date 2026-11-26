@@ -14,6 +14,7 @@ cargo-dispatch-control-gateway-client = { path = "../../../crates/control-gatewa
 cargo-dispatch-control-ui-contracts = { path = "../../../crates/control-ui-contracts" }
 cargo-dispatch-control-web = { path = "../../../crates/control-web" }
 cargo-dispatch-domain = { path = "../../../crates/domain" }
+cargo-dispatch-geo = { path = "../../../crates/geo" }
 cargo-dispatch-trip-files = { path = "../../../crates/trip-files" }
 serde = { version = "1", features = ["derive"] }
 tauri = "=2.12.7"

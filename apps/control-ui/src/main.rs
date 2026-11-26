@@ -6,9 +6,10 @@ mod i18n;
 // The same eight-language set is enforced by .github/scripts/check-localizations.py.
 use crate::i18n::{UiLocale, localize_problem, strings};
 use cargo_dispatch_control_ui_contracts::{
-    ControlUiStatus, DashboardDocumentDirection, DashboardPoint, ListenerMode,
-    OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput, SaveDocumentInput,
-    SessionInput, StartGatewayInput, StartLanInput, TripDashboard,
+    ConfigureRoutingInput, ControlUiStatus, DashboardDocumentDirection, DashboardPoint,
+    ListenerMode, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
+    RoutingAvailabilityState, RoutingProbeResult, SaveDocumentInput, SessionInput,
+    StartGatewayInput, StartLanInput, TripDashboard,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -442,6 +443,10 @@ fn ControlApp() -> impl IntoView {
     let lan_port = RwSignal::new("8080".to_owned());
     let gateway_url = RwSignal::new(String::new());
     let gateway_secret = RwSignal::new(String::new());
+    let routing_url = RwSignal::new(String::new());
+    let routing_dataset = RwSignal::new(String::new());
+    let routing_connect_timeout = RwSignal::new("1500".to_owned());
+    let routing_request_timeout = RwSignal::new("10000".to_owned());
     let status = RwSignal::new(None::<ControlUiStatus>);
     let selected_token = RwSignal::new(String::new());
     let dashboard = RwSignal::new(None::<TripDashboard>);
@@ -461,6 +466,12 @@ fn ControlApp() -> impl IntoView {
                     && let Some(first) = current.sessions.first()
                 {
                     selected_token.set(first.token.clone());
+                }
+                if let Some(routing) = current.routing.as_ref() {
+                    routing_url.set(routing.base_url.clone());
+                    routing_dataset.set(routing.map_dataset_id.clone());
+                    routing_connect_timeout.set(routing.connect_timeout_ms.to_string());
+                    routing_request_timeout.set(routing.request_timeout_ms.to_string());
                 }
                 status.set(Some(current));
             }
@@ -664,6 +675,136 @@ fn ControlApp() -> impl IntoView {
         spawn_local(async move {
             let result = invoke("stop_browser_server", &serde_json::json!({})).await;
             set_status_result(result, strings(locale.get_untracked()).broadcast_stopped);
+        });
+    };
+
+    let configure_routing = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let base_url = routing_url.get_untracked().trim().to_owned();
+        let map_dataset_id = routing_dataset.get_untracked().trim().to_owned();
+        if base_url.is_empty() {
+            message.set(
+                strings(locale.get_untracked())
+                    .routing_url_required
+                    .to_owned(),
+            );
+            error.set(true);
+            return;
+        }
+        if map_dataset_id.is_empty() {
+            message.set(
+                strings(locale.get_untracked())
+                    .routing_dataset_required
+                    .to_owned(),
+            );
+            error.set(true);
+            return;
+        }
+        let connect_timeout_ms = match routing_connect_timeout
+            .get_untracked()
+            .trim()
+            .parse::<u64>()
+        {
+            Ok(value) if (100..=30_000).contains(&value) => value,
+            _ => {
+                message.set(
+                    strings(locale.get_untracked())
+                        .invalid_routing_timeout
+                        .to_owned(),
+                );
+                error.set(true);
+                return;
+            }
+        };
+        let request_timeout_ms = match routing_request_timeout
+            .get_untracked()
+            .trim()
+            .parse::<u64>()
+        {
+            Ok(value) if (250..=120_000).contains(&value) && value >= connect_timeout_ms => value,
+            _ => {
+                message.set(
+                    strings(locale.get_untracked())
+                        .invalid_routing_timeout
+                        .to_owned(),
+                );
+                error.set(true);
+                return;
+            }
+        };
+        busy.set(true);
+        let input = ConfigureRoutingInput {
+            base_url,
+            map_dataset_id,
+            connect_timeout_ms,
+            request_timeout_ms,
+        };
+        spawn_local(async move {
+            let result = invoke("configure_routing", &serde_json::json!({ "input": input })).await;
+            set_status_result(result, strings(locale.get_untracked()).routing_configured);
+        });
+    };
+
+    let test_routing = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            match invoke::<RoutingProbeResult, _>("test_routing", &serde_json::json!({})).await {
+                Ok(probe) => {
+                    let text = match probe.state {
+                        RoutingAvailabilityState::NotConfigured => strings(locale.get_untracked())
+                            .routing_not_configured
+                            .to_owned(),
+                        RoutingAvailabilityState::Ok => {
+                            let version = probe
+                                .engine_version
+                                .as_deref()
+                                .map(|value| format!(" · Valhalla {value}"))
+                                .unwrap_or_default();
+                            format!(
+                                "{}{version}",
+                                strings(locale.get_untracked()).routing_available
+                            )
+                        }
+                        RoutingAvailabilityState::Timeout => {
+                            strings(locale.get_untracked()).routing_timeout.to_owned()
+                        }
+                        RoutingAvailabilityState::EngineUnavailable => {
+                            strings(locale.get_untracked())
+                                .routing_unavailable
+                                .to_owned()
+                        }
+                        RoutingAvailabilityState::DatasetMissing => strings(locale.get_untracked())
+                            .routing_dataset_missing
+                            .to_owned(),
+                        RoutingAvailabilityState::EngineError => {
+                            strings(locale.get_untracked()).routing_error.to_owned()
+                        }
+                    };
+                    error.set(probe.state != RoutingAvailabilityState::Ok);
+                    message.set(text);
+                }
+                Err(problem) => {
+                    message.set(localize_problem(locale.get_untracked(), &problem));
+                    error.set(true);
+                }
+            }
+            busy.set(false);
+        });
+    };
+
+    let disable_routing = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            let result = invoke("disable_routing", &serde_json::json!({})).await;
+            set_status_result(result, strings(locale.get_untracked()).routing_disabled);
         });
     };
 
@@ -872,6 +1013,82 @@ fn ControlApp() -> impl IntoView {
                     </button>
                 </div>
                 <p class="note">{move || strings(locale.get()).gateway_note}</p>
+                <h3>{move || strings(locale.get()).routing_engine}</h3>
+                <div class="grid">
+                    <label>
+                        {move || strings(locale.get()).valhalla_address}
+                        <input
+                            id="routing-url"
+                            type="url"
+                            placeholder="http://127.0.0.1:8002"
+                            prop:value=move || routing_url.get()
+                            on:input=move |event| routing_url.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).map_dataset}
+                        <input
+                            id="routing-dataset"
+                            type="text"
+                            placeholder="europe-2026-11"
+                            prop:value=move || routing_dataset.get()
+                            on:input=move |event| routing_dataset.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).connect_timeout_ms}
+                        <input
+                            id="routing-connect-timeout"
+                            type="number"
+                            min="100"
+                            max="30000"
+                            prop:value=move || routing_connect_timeout.get()
+                            on:input=move |event| routing_connect_timeout.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).request_timeout_ms}
+                        <input
+                            id="routing-request-timeout"
+                            type="number"
+                            min="250"
+                            max="120000"
+                            prop:value=move || routing_request_timeout.get()
+                            on:input=move |event| routing_request_timeout.set(event_target_value(&event))
+                        />
+                    </label>
+                </div>
+                <div class="actions">
+                    <button class="primary" type="button" on:click=configure_routing disabled=move || busy.get()>
+                        {move || strings(locale.get()).configure_routing}
+                    </button>
+                    <button type="button" on:click=test_routing disabled=move || busy.get()>
+                        {move || strings(locale.get()).check_routing}
+                    </button>
+                    <button type="button" on:click=disable_routing disabled=move || busy.get()>
+                        {move || strings(locale.get()).disable_routing}
+                    </button>
+                </div>
+                <div class="status">
+                    {move || {
+                        status
+                            .get()
+                            .and_then(|current| current.routing)
+                            .map(|routing| {
+                                format!(
+                                    "{} · {} · {} / {} ms",
+                                    routing.base_url,
+                                    routing.map_dataset_id,
+                                    routing.connect_timeout_ms,
+                                    routing.request_timeout_ms
+                                )
+                            })
+                            .unwrap_or_else(|| {
+                                strings(locale.get()).routing_not_configured.to_owned()
+                            })
+                    }}
+                </div>
+                <p class="note">{move || strings(locale.get()).routing_note}</p>
             </section>
 
             <section>
