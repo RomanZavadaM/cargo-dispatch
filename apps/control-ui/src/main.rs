@@ -441,7 +441,6 @@ fn submit_reorder(
     });
 }
 
-
 fn submit_session_metadata(
     input: UpdateSessionMetadataInput,
     status: RwSignal<Option<ControlUiStatus>>,
