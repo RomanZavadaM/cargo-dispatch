@@ -488,17 +488,18 @@ impl DesktopControlService {
         dashboard(snapshot)
     }
 
-    fn reorder_route(&self, input: ReorderRouteInput) -> Result<TripDashboard, String> {
+    async fn reorder_route(&self, input: ReorderRouteInput) -> Result<TripDashboard, String> {
         let order = input
             .open_point_ids
             .iter()
             .map(|value| point_id(value))
             .collect::<Result<Vec<_>, _>>()?;
-        let snapshot = self
+        let outcome = self
             .browser
-            .reorder_session_route(&input.token, input.based_on_revision, &order)
+            .reorder_session_route_live(&input.token, input.based_on_revision, &order)
+            .await
             .map_err(|error| format!("Control не прийняв нову черговість: {error}"))?;
-        dashboard(snapshot)
+        dashboard(outcome.snapshot)
     }
 
     async fn add_operator_document(
@@ -631,11 +632,11 @@ fn trip_dashboard(
 }
 
 #[tauri::command]
-fn reorder_trip_route(
+async fn reorder_trip_route(
     input: ReorderRouteInput,
     state: State<'_, DesktopControlService>,
 ) -> Result<TripDashboard, String> {
-    state.reorder_route(input)
+    state.reorder_route(input).await
 }
 
 #[tauri::command]
