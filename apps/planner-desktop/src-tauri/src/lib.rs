@@ -1570,7 +1570,10 @@ mod tests {
         assert_eq!(basis.cargos[0].pallets, Some(18));
         let (expected_pickup, expected_unload) = {
             let state = service.inner.lock().expect("Planner state");
-            (state.route.points[0].point_id, state.route.points[1].point_id)
+            (
+                state.route.points[0].point_id,
+                state.route.points[1].point_id,
+            )
         };
         assert_eq!(basis.cargos[0].pickup_point_id, Some(expected_pickup));
         assert_eq!(basis.cargos[0].unload_point_id, Some(expected_unload));
