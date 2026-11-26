@@ -26,6 +26,215 @@ export function cargoPlannerSetLocale(locale) {
   localStorage.setItem("cargo-dispatch-planner-locale", locale);
   document.documentElement.lang = locale;
 }
+
+let plannerMapState = {
+  zoom: 6,
+  centerLat: 49.0,
+  centerLon: 31.0,
+  initialized: false,
+  bound: false,
+  dragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  dragCenterX: 0,
+  dragCenterY: 0,
+  points: [],
+  routeId: null,
+  pointSetKey: ""
+};
+
+function clampPlannerLat(latitude) {
+  return Math.max(-85.05112878, Math.min(85.05112878, latitude));
+}
+
+function plannerWorldSize(zoom) {
+  return 256 * Math.pow(2, zoom);
+}
+
+function plannerProject(latitude, longitude, zoom) {
+  const size = plannerWorldSize(zoom);
+  const lat = clampPlannerLat(latitude) * Math.PI / 180;
+  const sin = Math.sin(lat);
+  return {
+    x: (longitude + 180) / 360 * size,
+    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * size
+  };
+}
+
+function plannerUnproject(x, y, zoom) {
+  const size = plannerWorldSize(zoom);
+  const longitude = x / size * 360 - 180;
+  const mercator = Math.PI * (1 - 2 * y / size);
+  const latitude = Math.atan(Math.sinh(mercator)) * 180 / Math.PI;
+  return {latitude: clampPlannerLat(latitude), longitude};
+}
+
+function plannerMapHost() {
+  const host = document.getElementById("planner-map");
+  if (!host || plannerMapState.bound) return host;
+  host.addEventListener("wheel", event => {
+    event.preventDefault();
+    cargoPlannerMapZoom(event.deltaY < 0 ? 1 : -1);
+  }, {passive: false});
+  host.addEventListener("pointerdown", event => {
+    if (event.target.closest("button,a")) return;
+    const center = plannerProject(
+      plannerMapState.centerLat,
+      plannerMapState.centerLon,
+      plannerMapState.zoom
+    );
+    plannerMapState.dragging = true;
+    plannerMapState.dragStartX = event.clientX;
+    plannerMapState.dragStartY = event.clientY;
+    plannerMapState.dragCenterX = center.x;
+    plannerMapState.dragCenterY = center.y;
+    host.setPointerCapture(event.pointerId);
+  });
+  host.addEventListener("pointermove", event => {
+    if (!plannerMapState.dragging) return;
+    const x = plannerMapState.dragCenterX - (event.clientX - plannerMapState.dragStartX);
+    const y = plannerMapState.dragCenterY - (event.clientY - plannerMapState.dragStartY);
+    const center = plannerUnproject(x, y, plannerMapState.zoom);
+    plannerMapState.centerLat = center.latitude;
+    plannerMapState.centerLon = center.longitude;
+    plannerMapRender();
+  });
+  host.addEventListener("pointerup", event => {
+    plannerMapState.dragging = false;
+    if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId);
+  });
+  host.addEventListener("pointercancel", () => {
+    plannerMapState.dragging = false;
+  });
+  window.addEventListener("resize", plannerMapRender);
+  plannerMapState.bound = true;
+  return host;
+}
+
+function plannerMapRender() {
+  const host = plannerMapHost();
+  if (!host) return;
+  const width = Math.max(1, host.clientWidth);
+  const height = Math.max(1, host.clientHeight);
+  const zoom = plannerMapState.zoom;
+  const center = plannerProject(plannerMapState.centerLat, plannerMapState.centerLon, zoom);
+  const left = center.x - width / 2;
+  const top = center.y - height / 2;
+  const tileLayer = host.querySelector(".map-tiles");
+  const overlayLayer = host.querySelector(".map-overlays");
+  if (!tileLayer || !overlayLayer) return;
+  tileLayer.replaceChildren();
+  overlayLayer.replaceChildren();
+
+  const tileMinX = Math.floor(left / 256) - 1;
+  const tileMaxX = Math.floor((left + width) / 256) + 1;
+  const tileMinY = Math.floor(top / 256) - 1;
+  const tileMaxY = Math.floor((top + height) / 256) + 1;
+  const tileCount = Math.pow(2, zoom);
+
+  for (let tileX = tileMinX; tileX <= tileMaxX; tileX++) {
+    const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
+    for (let tileY = tileMinY; tileY <= tileMaxY; tileY++) {
+      if (tileY < 0 || tileY >= tileCount) continue;
+      const image = document.createElement("img");
+      image.alt = "";
+      image.draggable = false;
+      image.loading = "lazy";
+      image.src = "https://tile.openstreetmap.org/" + zoom + "/" + wrappedX + "/" + tileY + ".png";
+      image.style.left = (tileX * 256 - left) + "px";
+      image.style.top = (tileY * 256 - top) + "px";
+      image.addEventListener("error", () => image.remove());
+      tileLayer.append(image);
+    }
+  }
+
+  for (const point of plannerMapState.points) {
+    const shown = plannerProject(point.latitude, point.longitude, zoom);
+    const marker = document.createElement("div");
+    marker.className = "map-marker";
+    marker.style.left = (shown.x - left) + "px";
+    marker.style.top = (shown.y - top) + "px";
+    marker.title = point.title;
+    marker.textContent = String(point.sequence);
+    overlayLayer.append(marker);
+  }
+}
+
+function plannerMapFit() {
+  const host = plannerMapHost();
+  const points = plannerMapState.points;
+  if (!host || points.length === 0) {
+    plannerMapState.zoom = 6;
+    plannerMapState.centerLat = 49.0;
+    plannerMapState.centerLon = 31.0;
+    plannerMapState.initialized = true;
+    plannerMapRender();
+    return;
+  }
+
+  const width = Math.max(1, host.clientWidth - 72);
+  const height = Math.max(1, host.clientHeight - 72);
+  let chosenZoom = 3;
+  let center = {latitude: points[0].latitude, longitude: points[0].longitude};
+
+  if (points.length === 1) {
+    chosenZoom = 14;
+  } else {
+    for (let zoom = 18; zoom >= 3; zoom--) {
+      const shown = points.map(point => plannerProject(point.latitude, point.longitude, zoom));
+      const xs = shown.map(item => item.x);
+      const ys = shown.map(item => item.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      if (maxX - minX <= width && maxY - minY <= height) {
+        chosenZoom = zoom;
+        center = plannerUnproject((minX + maxX) / 2, (minY + maxY) / 2, zoom);
+        break;
+      }
+    }
+  }
+
+  plannerMapState.zoom = chosenZoom;
+  plannerMapState.centerLat = center.latitude;
+  plannerMapState.centerLon = center.longitude;
+  plannerMapState.initialized = true;
+  plannerMapRender();
+}
+
+export function cargoPlannerMapRender(routeId, pointsJson) {
+  const points = JSON.parse(pointsJson);
+  const pointSetKey = points.map(point => point.point_id).sort().join("|");
+  const shouldFit =
+    !plannerMapState.initialized ||
+    plannerMapState.routeId !== routeId ||
+    plannerMapState.pointSetKey !== pointSetKey;
+
+  plannerMapState.routeId = routeId;
+  plannerMapState.pointSetKey = pointSetKey;
+  plannerMapState.points = points;
+
+  if (!plannerMapHost()) {
+    window.setTimeout(() => {
+      if (shouldFit) plannerMapFit();
+      else plannerMapRender();
+    }, 0);
+    return;
+  }
+  if (shouldFit) plannerMapFit();
+  else plannerMapRender();
+}
+
+export function cargoPlannerMapZoom(delta) {
+  plannerMapState.zoom = Math.max(3, Math.min(18, plannerMapState.zoom + delta));
+  plannerMapState.initialized = true;
+  plannerMapRender();
+}
+
+export function cargoPlannerMapFit() {
+  plannerMapFit();
+}
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = cargoPlannerInvoke)]
@@ -34,6 +243,12 @@ extern "C" {
     fn cargo_planner_initial_locale() -> String;
     #[wasm_bindgen(js_name = cargoPlannerSetLocale)]
     fn cargo_planner_set_locale(locale: &str);
+    #[wasm_bindgen(js_name = cargoPlannerMapRender)]
+    fn cargo_planner_map_render(route_id: &str, points_json: &str);
+    #[wasm_bindgen(js_name = cargoPlannerMapZoom)]
+    fn cargo_planner_map_zoom(delta: i32);
+    #[wasm_bindgen(js_name = cargoPlannerMapFit)]
+    fn cargo_planner_map_fit();
 }
 
 fn js_error(value: JsValue) -> String {
@@ -78,6 +293,14 @@ fn PlannerApp() -> impl IntoView {
                 }
             }
         });
+    });
+
+    Effect::new(move |_| {
+        if let Some(current) = route.get()
+            && let Ok(points_json) = serde_json::to_string(&current.points)
+        {
+            cargo_planner_map_render(&current.working_route_id, &points_json);
+        }
     });
 
     let add_point = move |_| {
@@ -269,6 +492,26 @@ fn PlannerApp() -> impl IntoView {
                 <div class="actions">
                     <button class="primary" type="button" on:click=add_point disabled=move || busy.get()>{move || strings(locale.get()).add_point}</button>
                     <button type="button" on:click=reset disabled=move || busy.get()>{move || strings(locale.get()).reset_route}</button>
+                </div>
+            </section>
+
+            <section>
+                <h2>{move || strings(locale.get()).map_title}</h2>
+                <p class="note">{move || strings(locale.get()).map_note}</p>
+                <div id="planner-map" class="trip-map">
+                    <div class="map-tiles"></div>
+                    <div class="map-overlays"></div>
+                    <div class="map-controls">
+                        <button type="button" aria-label=move || strings(locale.get()).map_zoom_in on:click=move |_| cargo_planner_map_zoom(1)>"+"</button>
+                        <button type="button" aria-label=move || strings(locale.get()).map_zoom_out on:click=move |_| cargo_planner_map_zoom(-1)>"−"</button>
+                        <button type="button" on:click=move |_| cargo_planner_map_fit()>{move || strings(locale.get()).map_fit}</button>
+                    </div>
+                    <a
+                        class="map-attribution"
+                        href="https://www.openstreetmap.org/copyright"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >"© OpenStreetMap"</a>
                 </div>
             </section>
 

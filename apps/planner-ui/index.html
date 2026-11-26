@@ -30,12 +30,21 @@
     .point-title { font-weight: 700; }
     .coords { color: #5f6670; font-size: 13px; margin-top: 3px; }
     .language { min-width: 170px; }
+    .trip-map { position: relative; height: 420px; overflow: hidden; border: 1px solid #c8d0d8; border-radius: 10px; background: #e7ecef; touch-action: none; }
+    .map-tiles, .map-overlays { position: absolute; inset: 0; overflow: hidden; }
+    .map-tiles img { position: absolute; width: 256px; height: 256px; max-width: none; user-select: none; pointer-events: none; }
+    .map-overlays { pointer-events: none; z-index: 2; }
+    .map-marker { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid #fff; border-radius: 999px; background: #1769aa; color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 1px 5px #0006; }
+    .map-controls { position: absolute; top: 10px; right: 10px; z-index: 4; display: flex; gap: 6px; }
+    .map-controls button { min-width: 42px; background: #fff; }
+    .map-attribution { position: absolute; right: 4px; bottom: 3px; z-index: 4; padding: 2px 5px; border-radius: 4px; background: #ffffffe6; color: #345; font-size: 11px; text-decoration: none; }
     @media (max-width: 760px) {
       main { padding: 12px; }
       header { display: grid; }
       .grid { grid-template-columns: 1fr; }
       .route-item { grid-template-columns: 42px 1fr; }
       .route-item .actions { grid-column: 1 / -1; }
+      .trip-map { height: 300px; }
     }
   </style>
 </head>
