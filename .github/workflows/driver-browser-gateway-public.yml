@@ -1,0 +1,76 @@
+name: Driver Browser public Gateway acceptance через HTTPS
+
+on:
+  push:
+    branches:
+      - "test/**"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "THIRD_PARTY_NOTICES.md"
+      - "crates/addressing-gateway/**"
+      - "crates/control-gateway-client/**"
+      - "crates/control-web/**"
+      - ".github/scripts/driver-browser-gateway-public-smoke.sh"
+      - ".github/workflows/driver-browser-gateway-public.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "THIRD_PARTY_NOTICES.md"
+      - "crates/addressing-gateway/**"
+      - "crates/control-gateway-client/**"
+      - "crates/control-web/**"
+      - ".github/scripts/driver-browser-gateway-public-smoke.sh"
+      - ".github/workflows/driver-browser-gateway-public.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: driver-browser-public-gateway-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public-https:
+    name: Control ↔ public HTTPS Gateway ↔ Driver Browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          components: rustfmt, clippy
+
+      - name: Перевірити зафіксований lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
+
+      - name: Перевірити формат
+        run: cargo fmt --all -- --check
+
+      - name: Перевірити Gateway і синтетичний Control
+        run: |
+          cargo check --locked -p cargo-dispatch-addressing-gateway --all-targets
+          cargo check --locked -p cargo-dispatch-control-gateway-client --all-targets
+          cargo check --locked -p cargo-dispatch-control-web --all-targets
+
+      - name: Перевірити Clippy
+        run: |
+          cargo clippy --locked -p cargo-dispatch-addressing-gateway --all-targets -- -D warnings
+          cargo clippy --locked -p cargo-dispatch-control-gateway-client --all-targets -- -D warnings
+          cargo clippy --locked -p cargo-dispatch-control-web --all-targets -- -D warnings
+
+      - name: Виконати public HTTPS Gateway acceptance
+        run: bash .github/scripts/driver-browser-gateway-public-smoke.sh
+
+      - name: Зберегти діагностику acceptance
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: driver-browser-public-gateway-diagnostics
+          path: |
+            driver-browser-gateway-public-results/
+          if-no-files-found: warn
+          retention-days: 7

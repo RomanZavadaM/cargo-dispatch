@@ -19,4 +19,5 @@ tempfile = "=3.27.0"
 tokio = { version = "=1.54.1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "sync"] }
 
 [dev-dependencies]
+cargo-dispatch-control-gateway-client = { path = "../control-gateway-client" }
 cargo-dispatch-planner = { path = "../planner" }

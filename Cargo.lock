@@ -493,6 +493,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "cargo-dispatch-contracts",
+ "cargo-dispatch-control-gateway-client",
  "cargo-dispatch-domain",
  "cargo-dispatch-geo",
  "cargo-dispatch-planner",
