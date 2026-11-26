@@ -359,6 +359,25 @@ impl RoutingProfileDraft {
         }
     }
 
+    fn is_empty(&self) -> bool {
+        [
+            self.height_m.as_str(),
+            self.width_m.as_str(),
+            self.length_m.as_str(),
+            self.gross_weight_t.as_str(),
+            self.axle_load_t.as_str(),
+            self.axle_count.as_str(),
+            self.hazmat.as_str(),
+            self.hgv.as_str(),
+            self.exclude_unpaved.as_str(),
+            self.prefer_truck_routes.as_str(),
+            self.toll_preference.as_str(),
+            self.max_speed_kmh.as_str(),
+        ]
+        .iter()
+        .all(|value| value.trim().is_empty())
+    }
+
     fn input(&self) -> Result<PlannerRoutingProfileInput, RoutingDraftError> {
         let toll_preference = match self.toll_preference.as_str() {
             "allow" => PlannerTollPreference::Allow,
@@ -980,7 +999,32 @@ fn PlannerApp() -> impl IntoView {
             error.set(true);
             return;
         }
-        let routing_profile_input = routing_profile.get_untracked().input().ok();
+        let routing_profile_draft = routing_profile.get_untracked();
+        let routing_profile_input = if routing_profile_draft.is_empty() {
+            None
+        } else {
+            match routing_profile_draft.input() {
+                Ok(profile) => Some(profile),
+                Err(RoutingDraftError::InvalidNumber) => {
+                    message.set(
+                        strings(locale.get_untracked())
+                            .invalid_profile_value
+                            .to_owned(),
+                    );
+                    error.set(true);
+                    return;
+                }
+                Err(RoutingDraftError::ChoiceRequired) => {
+                    message.set(
+                        strings(locale.get_untracked())
+                            .routing_choice_required
+                            .to_owned(),
+                    );
+                    error.set(true);
+                    return;
+                }
+            }
+        };
         let routing_preview = if routing_profile_input.is_some() {
             preview.get_untracked().filter(|value| {
                 value.state == PlannerRoutingPreviewState::Ok
