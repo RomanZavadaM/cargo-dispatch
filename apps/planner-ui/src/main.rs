@@ -483,6 +483,11 @@ fn PlannerApp() -> impl IntoView {
     });
 
     Effect::new(move |_| {
+        let _ = routing_profile.get();
+        preview.set(None);
+    });
+
+    Effect::new(move |_| {
         if let Some(current) = route.get()
             && let Ok(points_json) = serde_json::to_string(&current.points)
         {
