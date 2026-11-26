@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use core::fmt;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub mod valhalla;
@@ -35,7 +35,7 @@ impl GeoPoint {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TollPreference {
     Allow,
@@ -43,7 +43,8 @@ pub enum TollPreference {
     Avoid,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VehicleRoutingProfile {
     pub height_m: Option<f64>,
     pub width_m: Option<f64>,
