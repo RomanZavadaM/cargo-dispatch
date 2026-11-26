@@ -13,7 +13,7 @@ Die Hauptentwicklungssprache ist **Rust**.
 ## Bereits vorhanden
 
 - separate Desktop-Anwendung **Control** auf Basis von Tauri/Leptos;
-- eine separate Desktop-**Planner**-Anwendung auf Tauri/Leptos: manueller Routenentwurf, Punkte hinzufügen/entfernen/neu ordnen, Navigationskoordinaten und Revision über den Planner-Core;
+- eine separate Desktop-**Planner**-Anwendung auf Tauri/Leptos: manueller Routenentwurf, Punkte hinzufügen/entfernen/neu ordnen, Navigationskoordinaten und Revision über den Planner-Core; der Entwurf wird in einem versionierten Append-only-Journal in den App-Daten gespeichert und nach einem Neustart wiederhergestellt;
 - dauerhafte lokale Speicherung der aktiven Tour und Wiederherstellung nach Neustart;
 - versioniertes Trip-Paket zwischen Planner und Control;
 - ein adaptiver **Driver Browser** für Telefon, Tablet, Laptop und Desktop-Browser;
@@ -92,7 +92,7 @@ Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/Te
 
 ## Was noch fehlt
 
-- dauerhafte Speicherung des Planner-Entwurfs über Neustarts hinweg, danach Karten-/Routing-Vorschau und Vorbereitung des Package-Exports;
+- Karten-/Routing-Vorschau im Planner, danach Vorbereitung des Package-Exports aus der Planner-UI;
 
 - manuelle lokale Browser-Abnahme;
 - Test desselben Driver Browser auf einem echten Telefon im selben LAN;
