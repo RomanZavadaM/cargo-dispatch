@@ -2059,6 +2059,13 @@ mod tests {
         CargoId::from_bytes([byte; 16]).expect("fixture cargo id")
     }
 
+    fn planning_basis() -> TripPlanningBasis {
+        TripPlanningBasis {
+            vehicle_type: "synthetic truck".to_owned(),
+            cargos: Vec::new(),
+        }
+    }
+
     fn point_id(byte: u8) -> PointId {
         PointId::from_bytes([byte; 16]).expect("fixture point id")
     }
@@ -3648,6 +3655,7 @@ mod tests {
             None,
             1_800_000_000_000,
             operator_id(10),
+            planning_basis(),
         )
         .expect("export draft");
 
@@ -3672,6 +3680,7 @@ mod tests {
             None,
             1,
             operator_id(17),
+            planning_basis(),
         )
         .expect("export");
 
@@ -3716,6 +3725,7 @@ mod tests {
             Some(TripVersion::new(2).expect("base version")),
             1_800_000_010_000,
             operator_id(11),
+            planning_basis(),
         )
         .expect("export draft");
 
@@ -3737,6 +3747,7 @@ mod tests {
                 None,
                 1_800_000_020_000,
                 operator_id(12),
+            planning_basis(),
             ),
             Err(PlannerExportError::RouteNotReady(WorkingRouteState::Draft))
         );
@@ -3751,6 +3762,7 @@ mod tests {
                 None,
                 1_800_000_020_000,
                 operator_id(12),
+            planning_basis(),
             ),
             Err(PlannerExportError::Contract(
                 ContractError::LaterVersionRequiresBase
@@ -3775,6 +3787,7 @@ mod tests {
             Some(TripVersion::new(1).expect("base version")),
             1_800_000_100_000,
             operator_id(13),
+            planning_basis(),
         )
         .expect("export draft");
 
@@ -3825,6 +3838,7 @@ mod tests {
             None,
             1,
             operator_id(14),
+            planning_basis(),
         )
         .expect("first export");
         route.current_revision = 2;
@@ -3835,6 +3849,7 @@ mod tests {
             Some(TripVersion::new(1).expect("base version")),
             2,
             operator_id(14),
+            planning_basis(),
         )
         .expect("second export");
 
@@ -3883,6 +3898,7 @@ mod tests {
             None,
             1,
             operator_id(15),
+            planning_basis(),
         )
         .expect("export");
 
@@ -4167,6 +4183,7 @@ mod tests {
             None,
             1,
             operator_id(16),
+            planning_basis(),
         )
         .expect("export");
         let record = PlannerTripExportRecord::from(&draft);
