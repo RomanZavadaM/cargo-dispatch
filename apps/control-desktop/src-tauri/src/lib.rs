@@ -1161,6 +1161,25 @@ mod tests {
             Some("BC 9999 AA")
         );
 
+        drop(service);
+        let recovered_service = DesktopControlService::default();
+        let recovered = recovered_service
+            .register_trip(RegisterTripInput {
+                folder_path: folder.to_string_lossy().into_owned(),
+                token: "desktop-session-metadata-0002".to_owned(),
+            })
+            .await
+            .expect("trip re-registers after restart");
+        assert_eq!(recovered.sessions[0].display_name, "Швеція 01");
+        assert_eq!(
+            recovered.sessions[0].endpoint_label.as_deref(),
+            Some("Cab tablet")
+        );
+        assert_eq!(
+            recovered.sessions[0].vehicle_label.as_deref(),
+            Some("BC 9999 AA")
+        );
+
         Ok(())
     }
 
