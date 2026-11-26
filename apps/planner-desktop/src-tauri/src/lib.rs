@@ -870,7 +870,9 @@ fn apply_event(state: &mut PlannerState, event: &PlannerDraftEvent) -> Result<()
             working_route_revision,
         } => {
             if *working_route_revision != state.route.current_revision {
-                return Err("Planner journal export revision does not match current draft".to_owned());
+                return Err(
+                    "Planner journal export revision does not match current draft".to_owned(),
+                );
             }
             let expected = state
                 .last_export_version
@@ -1681,14 +1683,12 @@ mod tests {
         assert_eq!(second.trip_id, first.trip_id);
         assert_eq!(second.trip_version, 2);
 
-        let imported =
-            cargo_dispatch_trip_files::TripFolder::import(&imported_path, &package_v1)
-                .expect("import v1");
+        let imported = cargo_dispatch_trip_files::TripFolder::import(&imported_path, &package_v1)
+            .expect("import v1");
         assert_eq!(imported.state().current_version.get(), 1);
         drop(imported);
-        let imported =
-            cargo_dispatch_trip_files::TripFolder::import(&imported_path, &package_v2)
-                .expect("import v2");
+        let imported = cargo_dispatch_trip_files::TripFolder::import(&imported_path, &package_v2)
+            .expect("import v2");
         assert_eq!(imported.state().current_version.get(), 2);
 
         let _ = fs::remove_file(&package_v1);
