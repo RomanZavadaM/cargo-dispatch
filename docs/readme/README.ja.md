@@ -22,7 +22,9 @@
 - ファイル・写真・動画 **Driver Browser → Control** とローカル保存;
 - 同一運行の 2 つの同時 browser client と、別 browser DB を使わない reconnect;
 - Control と Driver Browser のインタラクティブ OpenStreetMap;
-- テストとローカル運用用の loopback および明示的 LAN モード.\n- 自動 Driver Browser acceptance は実際の Control session を loopback と明示的な private-LAN bind で個別に検証します.
+- テストとローカル運用用の loopback および明示的 LAN モード;
+- 自動 Driver Browser acceptance は実際の Control session を loopback と明示的な private-LAN bind で個別に検証します;
+- 自動 public HTTPS Gateway acceptance は実際の `Control ↔ public HTTPS Gateway ↔ Driver Browser` チェーン、outbound-only Control、Browser shell/snapshot/location、双方向ファイルを検証します.
 
 ## ネイティブ Driver App
 
@@ -98,9 +100,8 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 
 - narrow phone / tablet / wide desktop で地図の pan/zoom/fit を含むローカル browser の手動ビジュアル受け入れ;
 - 同じ Driver Browser を実機の電話で同一 LAN 内テスト;
-- HTTPS/public addressing path;
-- HTTPS 経由での browser GPS 完全受け入れ;
-- 異なるネットワーク/NAT/CGNAT でのフィールドテスト;
+- 別ネットワークおよびモバイル NAT/CGNAT での実機 HTTPS フィールド受け入れ;
+- 実機での HTTPS 経由 browser GPS 完全受け入れ;
 
 
 ## インターフェース言語
