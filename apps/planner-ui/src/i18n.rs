@@ -72,6 +72,8 @@ pub struct PlannerStrings {
     pub map_title: &'static str,
     pub map_note: &'static str,
     pub map_fit: &'static str,
+    pub map_zoom_in: &'static str,
+    pub map_zoom_out: &'static str,
 }
 
 static UK: PlannerStrings = PlannerStrings {
@@ -98,6 +100,8 @@ static UK: PlannerStrings = PlannerStrings {
     map_title: "Карта чернетки",
     map_note: "Карта показує розташування та поточний порядок точок. Дорожній маршрут тут ще не намальований; реальну геометрію дороги буде розраховано через Valhalla окремим наступним кроком.",
     map_fit: "Показати всі",
+    map_zoom_in: "Збільшити карту",
+    map_zoom_out: "Зменшити карту",
 };
 static EN: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -123,6 +127,8 @@ static EN: PlannerStrings = PlannerStrings {
     map_title: "Draft map",
     map_note: "This map shows point locations and current order only. It does not draw a road route yet; real road geometry will be calculated through Valhalla in the next step.",
     map_fit: "Fit all",
+    map_zoom_in: "Zoom in",
+    map_zoom_out: "Zoom out",
 };
 static DE: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -148,6 +154,8 @@ static DE: PlannerStrings = PlannerStrings {
     map_title: "Karte des Entwurfs",
     map_note: "Diese Karte zeigt nur die Positionen und die aktuelle Reihenfolge der Punkte. Eine Straßenroute wird hier noch nicht gezeichnet; die echte Straßengeometrie wird im nächsten Schritt über Valhalla berechnet.",
     map_fit: "Alle zeigen",
+    map_zoom_in: "Karte vergrößern",
+    map_zoom_out: "Karte verkleinern",
 };
 static FR: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -173,6 +181,8 @@ static FR: PlannerStrings = PlannerStrings {
     map_title: "Carte du brouillon",
     map_note: "Cette carte montre uniquement la position et l’ordre actuel des points. Elle ne trace pas encore un itinéraire routier ; la géométrie réelle sera calculée via Valhalla à l’étape suivante.",
     map_fit: "Tout afficher",
+    map_zoom_in: "Agrandir la carte",
+    map_zoom_out: "Réduire la carte",
 };
 static ES: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -198,6 +208,8 @@ static ES: PlannerStrings = PlannerStrings {
     map_title: "Mapa del borrador",
     map_note: "Este mapa solo muestra la ubicación y el orden actual de los puntos. Todavía no dibuja una ruta por carretera; la geometría real se calculará mediante Valhalla en el siguiente paso.",
     map_fit: "Mostrar todo",
+    map_zoom_in: "Acercar mapa",
+    map_zoom_out: "Alejar mapa",
 };
 static KO: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -223,6 +235,8 @@ static KO: PlannerStrings = PlannerStrings {
     map_title: "초안 지도",
     map_note: "이 지도는 지점 위치와 현재 순서만 보여 줍니다. 아직 도로 경로를 그리지 않으며 실제 도로 geometry는 다음 단계에서 Valhalla로 계산합니다.",
     map_fit: "전체 보기",
+    map_zoom_in: "지도 확대",
+    map_zoom_out: "지도 축소",
 };
 static JA: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -248,6 +262,8 @@ static JA: PlannerStrings = PlannerStrings {
     map_title: "下書き地図",
     map_note: "この地図は地点の位置と現在の順序だけを表示します。道路ルートはまだ描画せず、実際の道路 geometry は次の段階で Valhalla により計算します。",
     map_fit: "全体を表示",
+    map_zoom_in: "地図を拡大",
+    map_zoom_out: "地図を縮小",
 };
 static ZH: PlannerStrings = PlannerStrings {
     app_title: "Cargo Dispatch — Planner",
@@ -273,6 +289,8 @@ static ZH: PlannerStrings = PlannerStrings {
     map_title: "草稿地图",
     map_note: "此地图只显示站点位置和当前顺序，暂不绘制道路路线；真实道路 geometry 将在下一阶段通过 Valhalla 计算。",
     map_fit: "显示全部",
+    map_zoom_in: "放大地图",
+    map_zoom_out: "缩小地图",
 };
 
 pub fn strings(locale: UiLocale) -> &'static PlannerStrings {
