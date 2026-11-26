@@ -96,8 +96,6 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 
 ## 后续工作
 
-- 没有 Planner ZIP 时直接在 Control 中创建新的行程；
-
 - 本地浏览器手动验收；
 - 在同一 LAN 中用真实手机测试相同的 Driver Browser；
 - HTTPS/公共寻址路径；
