@@ -387,8 +387,8 @@ mod tests {
     }
 
     fn payload_for(profile: VehicleRoutingProfile) -> Value {
-        let request = RouteRequest::new(request().points().to_vec(), profile)
-            .expect("routable profile");
+        let request =
+            RouteRequest::new(request().points().to_vec(), profile).expect("routable profile");
         route_payload(&request)
     }
 
