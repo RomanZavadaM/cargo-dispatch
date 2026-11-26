@@ -19,18 +19,19 @@
 - Control/Driver Browser, Addressing Gateway, Android Driver, iOS/iPadOS Driver і 8-language localization інтегровані.
 - Control лишається authoritative source фактичного стану активного рейсу.
 - Planner/routing foundation має:
-  - Valhalla adapter;
-  - schema 1.3 derived road geometry + actual VehicleRoutingProfile; legacy 1.0–1.2 readable;
-  - real runtime HTTP transport;
+  - Valhalla adapter і real runtime HTTP transport;
+  - schema 1.4 planning basis; legacy schema залишаються читабельними;
+  - Planner planning profile використовується лише для конкретного розрахунку і не є постійною прив'язкою рейсу до авто;
+  - Control має окремий mutable actual routing context активної сесії;
   - runtime endpoint + map dataset id + bounded connect/request timeouts у Desktop Control;
-  - Valhalla `/status` availability + live engine version;
-  - `/route` POST;
+  - Valhalla `/status` availability + `/route` POST;
   - normalized timeout/unavailable/dataset-missing/error states;
   - live geometry recalculation після operator/driver reorder;
-  - stale response protection;
+  - stale response protection і для Control, і для Planner preview;
   - невідомі параметри автомобіля не підставляються;
-  - відмова routing не скасовує reorder.
-- Наступний великий функціональний етап: **map/routing preview у Planner desktop UI**, після нього package export із Planner UI.
+  - відмова routing не скасовує Control reorder і не змінює Planner draft;
+  - Planner desktop показує real road geometry поверх OSM через власний runtime Valhalla preview.
+- Наступний великий функціональний етап: **package export із Planner UI** через наявний versioned trip package.
 - Користувацькі compiled test/stable builds мають публікуватися в GitHub Releases, не залишатися тільки в Actions artifacts.
 
 Для продовження: `START_HERE.md` → private module logs → live GitHub.

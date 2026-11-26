@@ -49,9 +49,11 @@ Driver Browser는 전화용과 데스크톱용으로 나뉜 별도 제품이 아
 
 Control과 Driver Browser에는 운행 지점과 마지막으로 승인된 운전자 위치를 보여 주는 실제 인터랙티브 기본 지도가 있습니다.
 
-`main`에는 이제 버전 관리되는 도로 geometry 파이프라인(schema 1.3)이 통합되어 있습니다. Planner는 파생 geometry와 실제 차량 routing profile을 함께 전달하며 schema 1.0–1.2 패키지도 계속 읽을 수 있습니다. Control은 geometry를 저장하고 지점 순서가 바뀌면 설정된 runtime Valhalla를 통해 도로 선을 다시 계산합니다. 늦게 도착한 routing 응답은 더 최신 운행 상태를 덮어쓸 수 없습니다.
+현재 `main`은 변경되지 않는 planning basis를 포함하는 schema 1.4를 사용하며 이전 schema도 계속 읽을 수 있습니다. Planner routing profile은 특정 계획 계산의 입력일 뿐 운행을 차량에 영구적으로 묶지 않습니다. Import 이후 Control은 활성 세션의 실제 mutable routing context를 별도로 관리합니다.
 
-Valhalla 주소, 지도 데이터셋 ID, timeout은 Desktop Control에서 직접 설정하며 `/status`로 사용 가능 여부를 확인하거나 routing을 명시적으로 끌 수 있습니다. Valhalla가 설정되지 않았거나 일시적으로 사용할 수 없어도 새 지점 순서는 Control에 저장되고 파생 geometry만 없을 수 있습니다.
+Control은 파생 geometry를 유지하고 지점 순서 변경 후 설정된 runtime Valhalla를 통해 도로 선을 다시 계산합니다. 늦게 도착한 routing 응답은 더 최신 운행 상태를 덮어쓸 수 없습니다. Valhalla가 설정되지 않았거나 일시적으로 사용할 수 없어도 새 지점 순서는 저장되고 파생 geometry만 없을 수 있습니다.
+
+Planner desktop에는 이제 자체 runtime Valhalla preview가 있습니다. 운영자가 Valhalla 주소, 지도 데이터셋 ID, timeout을 지정하고 `/status`를 확인하며, `/route`는 명시적으로 입력한 planning profile만으로 계산됩니다. 알 수 없는 숫자 제약값은 추정하지 않습니다. 성공한 결과는 OSM 위에 실제 도로 polyline을 그리며 결과가 없을 때 가짜 직선을 그리지 않습니다. Preview는 route/revision/profile에서 파생되므로 초안이나 planning profile이 바뀌면 이전 선을 지우고 늦은 응답도 거부합니다. Routing 실패는 Planner 초안을 변경하지 않습니다.
 
 ## Test v0.1.0-preview.7
 
@@ -92,7 +94,7 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 
 ## 앞으로 필요한 작업
 
-- Planner 지도/routing preview, 이후 Planner UI에서 package export 준비;
+- 기존 versioned trip package를 이용한 Planner UI package export;
 
 - 로컬 브라우저 수동 검수;
 - 동일한 Driver Browser를 실제 휴대폰에서 같은 LAN으로 테스트;

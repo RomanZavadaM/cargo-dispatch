@@ -49,9 +49,11 @@ Los datos, las acciones de ruta, los archivos y el backend son comunes; solo cam
 
 Control y Driver Browser ya incluyen un mapa base interactivo real con los puntos del viaje y la última posición aceptada del conductor.
 
-La rama `main` ya contiene una canalización versionada de geometría vial (schema 1.3): Planner transporta la geometría derivada junto con el perfil real de rutas del vehículo, mientras que los paquetes schema 1.0–1.2 siguen siendo legibles. Control guarda la geometría y, tras un reorder, recalcula la línea vial mediante el servicio Valhalla configurado en runtime. Una respuesta tardía del motor de rutas no puede sobrescribir un estado de viaje más nuevo.
+El `main` actual usa schema 1.4 con una base de planificación inmutable; los schemas anteriores siguen siendo legibles. Un perfil de routing de Planner solo es la entrada de un cálculo de planificación concreto y no crea una vinculación permanente entre el viaje y un vehículo. Tras la importación, Control mantiene por separado el contexto real y mutable de routing de la sesión activa.
 
-La dirección de Valhalla, el ID del conjunto de mapas y los tiempos de espera se configuran directamente en Desktop Control; la disponibilidad puede comprobarse mediante `/status` o se puede desactivar el routing de forma explícita. Si Valhalla no está configurado o está temporalmente no disponible, Control conserva igualmente el nuevo orden de puntos y la geometría derivada puede quedar ausente.
+Control conserva la geometría derivada y recalcula la línea vial mediante el servicio Valhalla runtime configurado después de un cambio de orden. Una respuesta tardía de routing no puede sobrescribir un estado de viaje más nuevo. Si Valhalla no está configurado o está temporalmente no disponible, el nuevo orden de puntos se guarda igualmente y la geometría derivada puede quedar ausente.
+
+Planner desktop dispone ahora de su propio preview Valhalla runtime: el operador indica la dirección de Valhalla, el ID del conjunto de mapas y los tiempos de espera, comprueba `/status`, y `/route` se calcula solo con un perfil de planificación proporcionado explícitamente. No se inventan restricciones numéricas desconocidas. Un resultado correcto dibuja la polyline real de carretera sobre OSM; sin resultado no se dibuja una línea recta ficticia. El preview se deriva de ruta/revisión/perfil: cambiar el borrador o el perfil de planificación elimina la línea anterior y una respuesta tardía se rechaza. Un fallo de routing no modifica el borrador de Planner.
 
 ## Test v0.1.0-preview.7
 
@@ -92,7 +94,7 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 
 ## Qué falta
 
-- vista previa de mapa/routing en Planner y después preparación del package export desde la UI de Planner;
+- package export desde la UI de Planner mediante el package de viaje versionado existente;
 
 - validación manual local en navegador;
 - prueba del mismo Driver Browser en un teléfono real dentro de la misma LAN;
