@@ -544,10 +544,7 @@ mod tests {
         let result = client.route(&request()).await.expect("normalized timeout");
         assert_eq!(result.status, NormalizedStatus::Timeout);
         assert_eq!(result.identity.engine_version(), "3.9.2");
-        assert_eq!(
-            result.identity.map_dataset_id(),
-            "fixture-europe-2026-11"
-        );
+        assert_eq!(result.identity.map_dataset_id(), "fixture-europe-2026-11");
         assert!(result.geometry.is_empty());
         assert_eq!(result.distance_m, None);
 
