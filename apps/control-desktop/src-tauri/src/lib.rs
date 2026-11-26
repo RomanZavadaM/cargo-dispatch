@@ -13,10 +13,7 @@ use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
 };
 use cargo_dispatch_domain::{DocumentId, PointId};
-use cargo_dispatch_geo::{
-    NormalizedStatus,
-    valhalla_http::ValhallaRuntimeConfig,
-};
+use cargo_dispatch_geo::{NormalizedStatus, valhalla_http::ValhallaRuntimeConfig};
 use cargo_dispatch_trip_files::{DocumentDirection, DocumentStoreDraft, TripFolder};
 use std::{
     collections::BTreeMap,
