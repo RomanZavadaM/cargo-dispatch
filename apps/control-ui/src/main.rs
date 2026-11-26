@@ -685,7 +685,11 @@ fn ControlApp() -> impl IntoView {
         let base_url = routing_url.get_untracked().trim().to_owned();
         let map_dataset_id = routing_dataset.get_untracked().trim().to_owned();
         if base_url.is_empty() {
-            message.set(strings(locale.get_untracked()).routing_url_required.to_owned());
+            message.set(
+                strings(locale.get_untracked())
+                    .routing_url_required
+                    .to_owned(),
+            );
             error.set(true);
             return;
         }
@@ -719,11 +723,7 @@ fn ControlApp() -> impl IntoView {
             .trim()
             .parse::<u64>()
         {
-            Ok(value)
-                if (250..=120_000).contains(&value) && value >= connect_timeout_ms =>
-            {
-                value
-            }
+            Ok(value) if (250..=120_000).contains(&value) && value >= connect_timeout_ms => value,
             _ => {
                 message.set(
                     strings(locale.get_untracked())
@@ -756,9 +756,9 @@ fn ControlApp() -> impl IntoView {
             match invoke::<RoutingProbeResult, _>("test_routing", &serde_json::json!({})).await {
                 Ok(probe) => {
                     let text = match probe.state {
-                        RoutingAvailabilityState::NotConfigured => {
-                            strings(locale.get_untracked()).routing_not_configured.to_owned()
-                        }
+                        RoutingAvailabilityState::NotConfigured => strings(locale.get_untracked())
+                            .routing_not_configured
+                            .to_owned(),
                         RoutingAvailabilityState::Ok => {
                             let version = probe
                                 .engine_version
@@ -774,11 +774,13 @@ fn ControlApp() -> impl IntoView {
                             strings(locale.get_untracked()).routing_timeout.to_owned()
                         }
                         RoutingAvailabilityState::EngineUnavailable => {
-                            strings(locale.get_untracked()).routing_unavailable.to_owned()
+                            strings(locale.get_untracked())
+                                .routing_unavailable
+                                .to_owned()
                         }
-                        RoutingAvailabilityState::DatasetMissing => {
-                            strings(locale.get_untracked()).routing_dataset_missing.to_owned()
-                        }
+                        RoutingAvailabilityState::DatasetMissing => strings(locale.get_untracked())
+                            .routing_dataset_missing
+                            .to_owned(),
                         RoutingAvailabilityState::EngineError => {
                             strings(locale.get_untracked()).routing_error.to_owned()
                         }
