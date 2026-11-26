@@ -39,6 +39,7 @@
   - Control зберігає окремий mutable actual routing context для активної сесії;
   - runtime URL / map dataset id / bounded connect + request timeout у Desktop Control;
   - Control `/status` availability + live geometry recalculation після operator/driver reorder;
+  - запит передає `use_tolls` і заданий `top_speed` (новий розрахунок: 10–252 км/год); у `main`, але не в `preview.8`;
   - stale/late Valhalla response не може перезаписати новіший active-trip state;
   - Planner desktop має власний runtime Valhalla preview: `/status`, real `/route`, explicit planning profile, реальна дорожня polyline поверх OSM;
   - невдала або застаріла відповідь Planner routing не змінює manual draft чи його revision;
@@ -50,5 +51,6 @@
 3. `v0.1.0-preview.8` опублікований у GitHub Releases; publisher SUCCESS, усі 10 assets доступні.
 4. Автоматичний Driver Browser acceptance уже підтверджує реальний Control session окремо через loopback і явний private-LAN bind без Gateway.
 5. Окремий автоматичний public Gateway acceptance підтверджує `Control ↔ public HTTPS Gateway ↔ Driver Browser` через тимчасову публічну HTTPS-адресу без inbound-порту Control. Наступний етап — ручна візуальна перевірка narrow phone / tablet / wide desktop, карта pan/zoom/fit, реальний телефон у LAN/VPN і польова HTTPS-перевірка з окремих мереж/мобільного CGNAT.
+6. Наступний крок коду: реальний транспорт Valhalla `/sources_to_targets` для матриці відстаней і часу.
 
 Продовження: `START_HERE.md` → private HANDOFF/PROJECT_STATE → Planner STATE/WORKLOG → live GitHub.

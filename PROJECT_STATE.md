@@ -27,6 +27,7 @@
   - Control має окремий mutable actual routing context активної сесії;
   - runtime endpoint + map dataset id + bounded connect/request timeouts у Desktop Control;
   - Valhalla `/status` availability + `/route` POST;
+  - у `main` після `preview.8` (ще не в релізі): вибір щодо платних доріг передається як `use_tolls` (це перевага, а не гарантія), задана максимальна швидкість — як `top_speed`; новий розрахунок приймає 10–252 км/год, збережені дані читаються без змін;
   - normalized timeout/unavailable/dataset-missing/error states;
   - live geometry recalculation після operator/driver reorder;
   - stale response protection і для Control, і для Planner preview;
