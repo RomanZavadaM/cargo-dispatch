@@ -9,7 +9,7 @@ use cargo_dispatch_control_ui_contracts::{
     ConfigureRoutingInput, ControlUiStatus, DashboardDocumentDirection, DashboardPoint,
     ListenerMode, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
     RoutingAvailabilityState, RoutingProbeResult, SaveDocumentInput, SessionInput,
-    StartGatewayInput, StartLanInput, TripDashboard,
+    StartGatewayInput, StartLanInput, TripDashboard, UpdateSessionMetadataInput,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -419,6 +419,33 @@ fn submit_reorder(
         {
             Ok(current) => {
                 dashboard.set(Some(current));
+                error.set(false);
+            }
+            Err(problem) => {
+                message.set(localize_problem(locale.get_untracked(), &problem));
+                error.set(true);
+            }
+        }
+    });
+}
+
+
+fn submit_session_metadata(
+    input: UpdateSessionMetadataInput,
+    status: RwSignal<Option<ControlUiStatus>>,
+    message: RwSignal<String>,
+    error: RwSignal<bool>,
+    locale: RwSignal<UiLocale>,
+) {
+    spawn_local(async move {
+        match invoke::<ControlUiStatus, _>(
+            "update_session_metadata",
+            &serde_json::json!({ "input": input }),
+        )
+        .await
+        {
+            Ok(current) => {
+                status.set(Some(current));
                 error.set(false);
             }
             Err(problem) => {
@@ -1135,8 +1162,32 @@ fn ControlApp() -> impl IntoView {
                             let dashboard_token = session.token.clone();
                             let local_url = session.driver_url.clone();
                             let public_url = session.public_driver_url.clone();
+                            let display_name = session.display_name.clone();
+                            let endpoint_label = session.endpoint_label.clone();
+                            let vehicle_label = session.vehicle_label.clone();
+                            let vehicle_type = session.vehicle_type.clone();
+                            let edit_display_name = RwSignal::new(session.display_name.clone());
+                            let edit_endpoint_id =
+                                RwSignal::new(session.endpoint_id.clone().unwrap_or_default());
+                            let edit_endpoint_label =
+                                RwSignal::new(session.endpoint_label.clone().unwrap_or_default());
+                            let edit_vehicle_label =
+                                RwSignal::new(session.vehicle_label.clone().unwrap_or_default());
+                            let edit_vehicle_type =
+                                RwSignal::new(session.vehicle_type.clone().unwrap_or_default());
+                            let edit_token = session.token.clone();
                             view! {
                                 <li>
+                                    <div><strong>{display_name}</strong></div>
+                                    {vehicle_label.map(|value| view! {
+                                        <div><strong>{move || format!("{}: ", strings(locale.get()).vehicle_label)}</strong>{value}</div>
+                                    })}
+                                    {vehicle_type.map(|value| view! {
+                                        <div><strong>{move || format!("{}: ", strings(locale.get()).vehicle_type)}</strong>{value}</div>
+                                    })}
+                                    {endpoint_label.map(|value| view! {
+                                        <div><strong>{move || format!("{}: ", strings(locale.get()).endpoint_label)}</strong>{value}</div>
+                                    })}
                                     <div><strong>{move || format!("{}: ", strings(locale.get()).trip)}</strong><code>{trip}</code></div>
                                     {public_url.map(|driver_url| {
                                         let href = driver_url.clone();
@@ -1182,6 +1233,69 @@ fn ControlApp() -> impl IntoView {
                                     })}
                                     <details>
                                         <summary>{move || strings(locale.get()).technical_data}</summary>
+                                        <label>
+                                            {move || strings(locale.get()).session_display_name}
+                                            <input
+                                                type="text"
+                                                prop:value=move || edit_display_name.get()
+                                                on:input=move |event| edit_display_name.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).endpoint_id}
+                                            <input
+                                                type="text"
+                                                maxlength="32"
+                                                prop:value=move || edit_endpoint_id.get()
+                                                on:input=move |event| edit_endpoint_id.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).endpoint_label}
+                                            <input
+                                                type="text"
+                                                prop:value=move || edit_endpoint_label.get()
+                                                on:input=move |event| edit_endpoint_label.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).vehicle_label}
+                                            <input
+                                                type="text"
+                                                prop:value=move || edit_vehicle_label.get()
+                                                on:input=move |event| edit_vehicle_label.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).vehicle_type}
+                                            <input
+                                                type="text"
+                                                prop:value=move || edit_vehicle_type.get()
+                                                on:input=move |event| edit_vehicle_type.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <button
+                                            type="button"
+                                            on:click=move |_| {
+                                                let endpoint = edit_endpoint_id.get_untracked();
+                                                submit_session_metadata(
+                                                    UpdateSessionMetadataInput {
+                                                        token: edit_token.clone(),
+                                                        display_name: edit_display_name.get_untracked(),
+                                                        endpoint_id: (!endpoint.trim().is_empty()).then_some(endpoint),
+                                                        endpoint_label: Some(edit_endpoint_label.get_untracked()),
+                                                        vehicle_label: Some(edit_vehicle_label.get_untracked()),
+                                                        vehicle_type: Some(edit_vehicle_type.get_untracked()),
+                                                    },
+                                                    status,
+                                                    message,
+                                                    error,
+                                                    locale,
+                                                );
+                                            }
+                                        >
+                                            {move || strings(locale.get()).save}
+                                        </button>
                                         <div><strong>{move || format!("{}: ", strings(locale.get()).token)}</strong><code>{session_token}</code></div>
                                     </details>
                                     <button
