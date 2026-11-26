@@ -1088,11 +1088,7 @@ async fn planner_pick_export_path(
     state: State<'_, PlannerDesktopService>,
 ) -> Result<Option<String>, String> {
     let route = state.status()?;
-    let suffix = route
-        .working_route_id
-        .chars()
-        .take(12)
-        .collect::<String>();
+    let suffix = route.working_route_id.chars().take(12).collect::<String>();
     let file_name = format!("cargo-dispatch-trip-{suffix}.zip");
     tokio::task::spawn_blocking(move || {
         app.dialog()
