@@ -22,7 +22,9 @@
 - файли, фото й відео **Driver Browser → Control** з локальним збереженням;
 - два одночасні browser clients одного рейсу та reconnect без окремої browser-бази;
 - інтерактивна карта OpenStreetMap у Control і Driver Browser;
-- loopback і явний LAN-режим для тестування та локальної роботи;\n- автоматичний Driver Browser acceptance перевіряє реальний Control session окремо через loopback і явний private-LAN bind;
+- loopback і явний LAN-режим для тестування та локальної роботи;
+- автоматичний Driver Browser acceptance перевіряє реальний Control session окремо через loopback і явний private-LAN bind;
+- автоматичний public HTTPS Gateway acceptance перевіряє реальний ланцюг `Control ↔ public HTTPS Gateway ↔ Driver Browser`: outbound-only Control, Browser shell/snapshot/location та двосторонні файли;
 - нативний **Android Driver App**: route/complete/reorder, foreground location, files/photo/video, restart recovery, native MapLibre map, system camera, Emulator smoke;
 - нативний **iOS/iPadOS Driver App**: route/complete/reorder, CoreLocation foreground location, files/photo/video, restart recovery, native MapKit, system camera, Simulator smoke.
 
@@ -100,9 +102,8 @@ Android та Apple пакети поки не підписані для мага
 
 - ручне візуальне local browser acceptance для narrow phone / tablet / wide desktop, включно з pan/zoom/fit карти;
 - перевірка того самого Driver Browser на реальному телефоні в LAN;
-- HTTPS/public addressing path;
-- повний browser GPS acceptance через HTTPS;
-- польова перевірка через різні мережі/NAT/CGNAT;
+- польова HTTPS-перевірка з реальним телефоном/планшетом в окремій мережі та мобільному NAT/CGNAT;
+- повний browser GPS acceptance через HTTPS на реальному пристрої;
 
 ## Мови інтерфейсу
 
