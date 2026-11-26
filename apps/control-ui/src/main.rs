@@ -9,7 +9,7 @@ use cargo_dispatch_control_ui_contracts::{
     ConfigureRoutingInput, ControlUiStatus, DashboardDocumentDirection, DashboardPoint,
     ListenerMode, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
     RoutingAvailabilityState, RoutingProbeResult, SaveDocumentInput, SessionInput,
-    StartGatewayInput, StartLanInput, TripDashboard,
+    StartGatewayInput, StartLanInput, TripDashboard, UpdateSessionMetadataInput,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -48,6 +48,12 @@ export function cargoControlSetLocale(locale) {
   localStorage.setItem("cargo-dispatch-control-locale", locale);
   document.documentElement.lang = locale;
 }
+export function cargoControlWindowSessionToken() {
+  return new URLSearchParams(window.location.search).get("session") || "";
+}
+export function cargoControlSetSessionWindowMode(enabled) {
+  document.body.classList.toggle("session-window", enabled);
+}
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = cargoControlInvoke)]
@@ -70,6 +76,12 @@ extern "C" {
 
     #[wasm_bindgen(js_name = cargoControlSetLocale)]
     fn cargo_control_set_locale(locale: &str);
+
+    #[wasm_bindgen(js_name = cargoControlWindowSessionToken)]
+    fn cargo_control_window_session_token() -> String;
+
+    #[wasm_bindgen(js_name = cargoControlSetSessionWindowMode)]
+    fn cargo_control_set_session_window_mode(enabled: bool);
 }
 
 #[wasm_bindgen(inline_js = r#"
@@ -429,6 +441,32 @@ fn submit_reorder(
     });
 }
 
+fn submit_session_metadata(
+    input: UpdateSessionMetadataInput,
+    status: RwSignal<Option<ControlUiStatus>>,
+    message: RwSignal<String>,
+    error: RwSignal<bool>,
+    locale: RwSignal<UiLocale>,
+) {
+    spawn_local(async move {
+        match invoke::<ControlUiStatus, _>(
+            "update_session_metadata",
+            &serde_json::json!({ "input": input }),
+        )
+        .await
+        {
+            Ok(current) => {
+                status.set(Some(current));
+                error.set(false);
+            }
+            Err(problem) => {
+                message.set(localize_problem(locale.get_untracked(), &problem));
+                error.set(true);
+            }
+        }
+    });
+}
+
 fn main() {
     console_error_panic_hook::set_once();
     leptos::mount::mount_to_body(ControlApp);
@@ -449,6 +487,12 @@ fn ControlApp() -> impl IntoView {
     let routing_request_timeout = RwSignal::new("10000".to_owned());
     let status = RwSignal::new(None::<ControlUiStatus>);
     let selected_token = RwSignal::new(String::new());
+    let window_session_token = cargo_control_window_session_token();
+    let session_window = !window_session_token.is_empty();
+    if session_window {
+        selected_token.set(window_session_token);
+        cargo_control_set_session_window_mode(true);
+    }
     let dashboard = RwSignal::new(None::<TripDashboard>);
     let picked_file = RwSignal::new(None::<PickedFile>);
     let attachment_point = RwSignal::new(String::new());
@@ -907,7 +951,7 @@ fn ControlApp() -> impl IntoView {
                 <p class="note">{move || strings(locale.get()).subtitle}</p>
             </header>
 
-            <section>
+            <section class="manager-only">
                 <h2>{move || strings(locale.get()).connect_trip}</h2>
                 <div class="grid">
                     <label>
@@ -941,7 +985,7 @@ fn ControlApp() -> impl IntoView {
                 </div>
             </section>
 
-            <section>
+            <section class="manager-only">
                 <h2>{move || strings(locale.get()).broadcast}</h2>
                 <div class="actions">
                     <button type="button" on:click=start_loopback disabled=move || busy.get()>
@@ -1091,7 +1135,7 @@ fn ControlApp() -> impl IntoView {
                 <p class="note">{move || strings(locale.get()).routing_note}</p>
             </section>
 
-            <section>
+            <section class="manager-only">
                 <h2>{move || strings(locale.get()).browser_sessions}</h2>
                 <div class="status">
                     {move || {
@@ -1135,8 +1179,32 @@ fn ControlApp() -> impl IntoView {
                             let dashboard_token = session.token.clone();
                             let local_url = session.driver_url.clone();
                             let public_url = session.public_driver_url.clone();
+                            let display_name = session.display_name.clone();
+                            let endpoint_label = session.endpoint_label.clone();
+                            let vehicle_label = session.vehicle_label.clone();
+                            let vehicle_type = session.vehicle_type.clone();
+                            let edit_display_name = RwSignal::new(session.display_name.clone());
+                            let edit_endpoint_id =
+                                RwSignal::new(session.endpoint_id.clone().unwrap_or_default());
+                            let edit_endpoint_label =
+                                RwSignal::new(session.endpoint_label.clone().unwrap_or_default());
+                            let edit_vehicle_label =
+                                RwSignal::new(session.vehicle_label.clone().unwrap_or_default());
+                            let edit_vehicle_type =
+                                RwSignal::new(session.vehicle_type.clone().unwrap_or_default());
+                            let edit_token = session.token.clone();
                             view! {
                                 <li>
+                                    <div><strong>{display_name}</strong></div>
+                                    {vehicle_label.map(|value| view! {
+                                        <div><strong>{move || format!("{}: ", strings(locale.get()).vehicle_label)}</strong>{value}</div>
+                                    })}
+                                    {vehicle_type.map(|value| view! {
+                                        <div><strong>{move || format!("{}: ", strings(locale.get()).vehicle_type)}</strong>{value}</div>
+                                    })}
+                                    {endpoint_label.map(|value| view! {
+                                        <div><strong>{move || format!("{}: ", strings(locale.get()).endpoint_label)}</strong>{value}</div>
+                                    })}
                                     <div><strong>{move || format!("{}: ", strings(locale.get()).trip)}</strong><code>{trip}</code></div>
                                     {public_url.map(|driver_url| {
                                         let href = driver_url.clone();
@@ -1182,6 +1250,69 @@ fn ControlApp() -> impl IntoView {
                                     })}
                                     <details>
                                         <summary>{move || strings(locale.get()).technical_data}</summary>
+                                        <label>
+                                            {move || strings(locale.get()).session_display_name}
+                                            <input
+                                                type="text"
+                                                prop:value=move || edit_display_name.get()
+                                                on:input=move |event| edit_display_name.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).endpoint_id}
+                                            <input
+                                                type="text"
+                                                maxlength="32"
+                                                prop:value=move || edit_endpoint_id.get()
+                                                on:input=move |event| edit_endpoint_id.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).endpoint_label}
+                                            <input
+                                                type="text"
+                                                prop:value=move || edit_endpoint_label.get()
+                                                on:input=move |event| edit_endpoint_label.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).vehicle_label}
+                                            <input
+                                                type="text"
+                                                prop:value=move || edit_vehicle_label.get()
+                                                on:input=move |event| edit_vehicle_label.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).vehicle_type}
+                                            <input
+                                                type="text"
+                                                prop:value=move || edit_vehicle_type.get()
+                                                on:input=move |event| edit_vehicle_type.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <button
+                                            type="button"
+                                            on:click=move |_| {
+                                                let endpoint = edit_endpoint_id.get_untracked();
+                                                submit_session_metadata(
+                                                    UpdateSessionMetadataInput {
+                                                        token: edit_token.clone(),
+                                                        display_name: edit_display_name.get_untracked(),
+                                                        endpoint_id: (!endpoint.trim().is_empty()).then_some(endpoint),
+                                                        endpoint_label: Some(edit_endpoint_label.get_untracked()),
+                                                        vehicle_label: Some(edit_vehicle_label.get_untracked()),
+                                                        vehicle_type: Some(edit_vehicle_type.get_untracked()),
+                                                    },
+                                                    status,
+                                                    message,
+                                                    error,
+                                                    locale,
+                                                );
+                                            }
+                                        >
+                                            {move || strings(locale.get()).save}
+                                        </button>
                                         <div><strong>{move || format!("{}: ", strings(locale.get()).token)}</strong><code>{session_token}</code></div>
                                     </details>
                                     <button
@@ -1199,6 +1330,30 @@ fn ControlApp() -> impl IntoView {
                                         }
                                     >
                                         {move || strings(locale.get()).open_dashboard}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        on:click=move |_| {
+                                            let token = session.token.clone();
+                                            spawn_local(async move {
+                                                let result = invoke::<(), _>(
+                                                    "open_session_window",
+                                                    &serde_json::json!({
+                                                        "input": SessionInput { token }
+                                                    }),
+                                                )
+                                                .await;
+                                                if let Err(problem) = result {
+                                                    message.set(localize_problem(
+                                                        locale.get_untracked(),
+                                                        &problem,
+                                                    ));
+                                                    error.set(true);
+                                                }
+                                            });
+                                        }
+                                    >
+                                        {move || strings(locale.get()).open_session_window}
                                     </button>
                                 </li>
                             }

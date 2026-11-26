@@ -1,16 +1,16 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_contracts::{
-    CURRENT_SCHEMA_VERSION, PackageContentFingerprint, ReplanRequest, TRIP_PACKAGE_SCHEMA_NAME,
-    TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoadGeometry,
-    TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity, TripVersion, validate_route_points,
-    validate_trip_road_geometry,
+    CURRENT_SCHEMA_VERSION, PackageContentFingerprint, PlannedCargoBasis, ReplanRequest,
+    TRIP_PACKAGE_SCHEMA_NAME, TripNavigationTarget, TripPackageHeader, TripPlanningBasis,
+    TripPointKind, TripRoadGeometry, TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity,
+    TripVersion, validate_route_points, validate_trip_planning_basis, validate_trip_road_geometry,
 };
 use cargo_dispatch_control::{
     ImportResult, InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft,
     RouteGeometryUpdateError, StoredTripPlan, TripImportCandidate,
 };
-use cargo_dispatch_domain::{DocumentId, PointId, TripId};
+use cargo_dispatch_domain::{CargoId, DocumentId, DriverEndpointId, PointId, TripId};
 use cargo_dispatch_geo::VehicleRoutingProfile;
 use cargo_dispatch_planner::PlannerTripExportDraft;
 use serde::{Deserialize, Serialize};
@@ -65,6 +65,80 @@ pub struct DriverLocationSample {
     pub longitude_e7: i32,
     pub accuracy_cm: Option<u32>,
     pub observed_at_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ActiveTripSessionMetadata {
+    pub display_name: Option<String>,
+    pub endpoint_id: Option<DriverEndpointId>,
+    pub endpoint_label: Option<String>,
+    pub vehicle_label: Option<String>,
+    pub vehicle_type: Option<String>,
+}
+
+fn validate_session_text(value: &Option<String>, field: &str) -> io::Result<()> {
+    if let Some(value) = value {
+        if value.trim().is_empty() {
+            return Err(invalid(format!("{field} must not be empty")));
+        }
+        if value.chars().count() > 128 {
+            return Err(invalid(format!("{field} is too long")));
+        }
+        if value.chars().any(char::is_control) {
+            return Err(invalid(format!("{field} contains control characters")));
+        }
+    }
+    Ok(())
+}
+
+impl ActiveTripSessionMetadata {
+    pub fn validate(&self) -> io::Result<()> {
+        validate_session_text(&self.display_name, "display_name")?;
+        validate_session_text(&self.endpoint_label, "endpoint_label")?;
+        validate_session_text(&self.vehicle_label, "vehicle_label")?;
+        validate_session_text(&self.vehicle_type, "vehicle_type")?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SessionMetadataFile {
+    display_name: Option<String>,
+    endpoint_id: Option<[u8; 16]>,
+    endpoint_label: Option<String>,
+    vehicle_label: Option<String>,
+    vehicle_type: Option<String>,
+}
+
+impl SessionMetadataFile {
+    fn typed(&self) -> io::Result<ActiveTripSessionMetadata> {
+        let metadata = ActiveTripSessionMetadata {
+            display_name: self.display_name.clone(),
+            endpoint_id: self
+                .endpoint_id
+                .map(DriverEndpointId::from_bytes)
+                .transpose()
+                .map_err(invalid)?,
+            endpoint_label: self.endpoint_label.clone(),
+            vehicle_label: self.vehicle_label.clone(),
+            vehicle_type: self.vehicle_type.clone(),
+        };
+        metadata.validate()?;
+        Ok(metadata)
+    }
+}
+
+impl From<&ActiveTripSessionMetadata> for SessionMetadataFile {
+    fn from(metadata: &ActiveTripSessionMetadata) -> Self {
+        Self {
+            display_name: metadata.display_name.clone(),
+            endpoint_id: metadata.endpoint_id.map(DriverEndpointId::as_bytes),
+            endpoint_label: metadata.endpoint_label.clone(),
+            vehicle_label: metadata.vehicle_label.clone(),
+            vehicle_type: metadata.vehicle_type.clone(),
+        }
+    }
 }
 
 impl DriverLocationSample {
@@ -548,6 +622,84 @@ fn points(rows: &[Point]) -> io::Result<Vec<TripRoutePoint>> {
         .collect()
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PlannedCargoBasisFile {
+    cargo_id: [u8; 16],
+    title: String,
+    weight_kg: Option<u32>,
+    pallets: Option<u16>,
+    pickup_point_id: Option<[u8; 16]>,
+    unload_point_id: Option<[u8; 16]>,
+}
+
+impl PlannedCargoBasisFile {
+    fn typed(&self) -> io::Result<PlannedCargoBasis> {
+        Ok(PlannedCargoBasis {
+            cargo_id: CargoId::from_bytes(self.cargo_id).map_err(invalid)?,
+            title: self.title.clone(),
+            weight_kg: self.weight_kg,
+            pallets: self.pallets,
+            pickup_point_id: self
+                .pickup_point_id
+                .map(PointId::from_bytes)
+                .transpose()
+                .map_err(invalid)?,
+            unload_point_id: self
+                .unload_point_id
+                .map(PointId::from_bytes)
+                .transpose()
+                .map_err(invalid)?,
+        })
+    }
+}
+
+impl From<&PlannedCargoBasis> for PlannedCargoBasisFile {
+    fn from(cargo: &PlannedCargoBasis) -> Self {
+        Self {
+            cargo_id: cargo.cargo_id.as_bytes(),
+            title: cargo.title.clone(),
+            weight_kg: cargo.weight_kg,
+            pallets: cargo.pallets,
+            pickup_point_id: cargo.pickup_point_id.map(PointId::as_bytes),
+            unload_point_id: cargo.unload_point_id.map(PointId::as_bytes),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PlanningBasisFile {
+    vehicle_type: String,
+    cargos: Vec<PlannedCargoBasisFile>,
+}
+
+impl PlanningBasisFile {
+    fn typed(&self) -> io::Result<TripPlanningBasis> {
+        Ok(TripPlanningBasis {
+            vehicle_type: self.vehicle_type.clone(),
+            cargos: self
+                .cargos
+                .iter()
+                .map(PlannedCargoBasisFile::typed)
+                .collect::<io::Result<Vec<_>>>()?,
+        })
+    }
+}
+
+impl From<&TripPlanningBasis> for PlanningBasisFile {
+    fn from(basis: &TripPlanningBasis) -> Self {
+        Self {
+            vehicle_type: basis.vehicle_type.clone(),
+            cargos: basis
+                .cargos
+                .iter()
+                .map(PlannedCargoBasisFile::from)
+                .collect(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Manifest {
@@ -562,12 +714,32 @@ struct Manifest {
     operator: [u8; 16],
     points: Vec<Point>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    planning_basis: Option<PlanningBasisFile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     routing_profile: Option<VehicleRoutingProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     road_geometry: Option<RoadGeometryFile>,
 }
 
 impl Manifest {
+    fn validated_planning_basis(
+        &self,
+        route_points: &[TripRoutePoint],
+    ) -> io::Result<Option<TripPlanningBasis>> {
+        let Some(file) = &self.planning_basis else {
+            if self.schema_version[1] >= 4 {
+                return Err(invalid("trip package schema 1.4 requires planning basis"));
+            }
+            return Ok(None);
+        };
+        if self.schema_version[1] < 4 {
+            return Err(invalid("planning basis requires trip package schema 1.4"));
+        }
+        let basis = file.typed()?;
+        validate_trip_planning_basis(&basis, route_points).map_err(invalid)?;
+        Ok(Some(basis))
+    }
+
     fn validated_routing_profile(&self) -> io::Result<Option<VehicleRoutingProfile>> {
         let Some(profile) = self.routing_profile.clone() else {
             return Ok(None);
@@ -605,6 +777,7 @@ impl Manifest {
         );
         let route_points = points(&self.points)?;
         validate_route_points(&route_points).map_err(invalid)?;
+        self.validated_planning_basis(&route_points)?;
         self.validated_routing_profile()?;
         let route_geometry = self.road_geometry.as_ref().map(TripRoadGeometry::from);
         if let Some(geometry) = &route_geometry {
@@ -653,6 +826,12 @@ pub fn export_package(
     if draft.routing_profile.is_some() && h.schema_version.minor < 3 {
         return Err(invalid("routing profile requires trip package schema 1.3"));
     }
+    if draft.planning_basis.is_some() && h.schema_version.minor < 4 {
+        return Err(invalid("planning basis requires trip package schema 1.4"));
+    }
+    if h.schema_version.minor >= 4 && draft.planning_basis.is_none() {
+        return Err(invalid("trip package schema 1.4 requires planning basis"));
+    }
     let manifest = Manifest {
         schema: h.schema_name.clone(),
         schema_version: [h.schema_version.major, h.schema_version.minor],
@@ -664,6 +843,7 @@ pub fn export_package(
         created_at_unix_ms: draft.created_at_unix_ms,
         operator: draft.created_by.as_bytes(),
         points: route.iter().map(Point::from).collect(),
+        planning_basis: draft.planning_basis.as_ref().map(PlanningBasisFile::from),
         routing_profile: draft.routing_profile.clone(),
         road_geometry: draft.route_geometry.as_ref().map(RoadGeometryFile::from),
     };
@@ -718,21 +898,35 @@ enum Change {
     },
     DocumentStored(DocumentEntry),
     DriverLocation(DriverLocationSample),
+    SessionMetadata(SessionMetadataFile),
+}
+
+struct ApplyAux<'a> {
+    planning_basis: &'a mut Option<TripPlanningBasis>,
+    routing_profile: &'a mut Option<VehicleRoutingProfile>,
+    session_metadata: &'a mut ActiveTripSessionMetadata,
 }
 
 fn apply(
     reg: &mut InMemoryTripRegistry,
-    routing_profile: &mut Option<VehicleRoutingProfile>,
+    aux: ApplyAux<'_>,
     documents: &mut std::collections::BTreeMap<DocumentId, StoredDocument>,
     locations: &mut Vec<DriverLocationSample>,
     trip: TripId,
     event: &Change,
 ) -> io::Result<()> {
+    let ApplyAux {
+        planning_basis,
+        routing_profile,
+        session_metadata,
+    } = aux;
     match event {
         Change::Import(m) => {
             if m.trip != trip.as_bytes() {
                 return Err(invalid("different trip"));
             }
+            let route_points = points(&m.points)?;
+            let incoming_basis = m.validated_planning_basis(&route_points)?;
             let incoming_profile = m.validated_routing_profile()?;
             let result = reg.import(m.candidate()?).map_err(invalid)?;
             if matches!(
@@ -741,6 +935,7 @@ fn apply(
                     | ImportResult::AppliedNewerVersion { .. }
                     | ImportResult::IdempotentSameVersion
             ) {
+                *planning_basis = incoming_basis;
                 *routing_profile = incoming_profile;
             }
         }
@@ -811,6 +1006,9 @@ fn apply(
                 locations.push(sample);
             }
         }
+        Change::SessionMetadata(file) => {
+            *session_metadata = file.typed()?;
+        }
     }
     Ok(())
 }
@@ -821,7 +1019,9 @@ pub struct TripFolder {
     cursor: u64,
     plan_version_count: u64,
     registry: InMemoryTripRegistry,
+    planning_basis: Option<TripPlanningBasis>,
     routing_profile: Option<VehicleRoutingProfile>,
+    session_metadata: ActiveTripSessionMetadata,
     documents: std::collections::BTreeMap<DocumentId, StoredDocument>,
     locations: Vec<DriverLocationSample>,
 }
@@ -842,7 +1042,9 @@ impl TripFolder {
             cursor: 0,
             plan_version_count: 0,
             registry: InMemoryTripRegistry::default(),
+            planning_basis: None,
             routing_profile: None,
+            session_metadata: ActiveTripSessionMetadata::default(),
             documents: std::collections::BTreeMap::new(),
             locations: Vec::new(),
         };
@@ -855,7 +1057,11 @@ impl TripFolder {
             let is_import = matches!(&event, Change::Import(_));
             apply(
                 &mut this.registry,
-                &mut this.routing_profile,
+                ApplyAux {
+                    planning_basis: &mut this.planning_basis,
+                    routing_profile: &mut this.routing_profile,
+                    session_metadata: &mut this.session_metadata,
+                },
                 &mut this.documents,
                 &mut this.locations,
                 trip,
@@ -917,8 +1123,18 @@ impl TripFolder {
     }
 
     #[must_use]
+    pub fn planning_basis(&self) -> Option<&TripPlanningBasis> {
+        self.planning_basis.as_ref()
+    }
+
+    #[must_use]
     pub fn routing_profile(&self) -> Option<&VehicleRoutingProfile> {
         self.routing_profile.as_ref()
+    }
+
+    #[must_use]
+    pub const fn session_metadata(&self) -> &ActiveTripSessionMetadata {
+        &self.session_metadata
     }
 
     #[must_use]
@@ -1008,13 +1224,19 @@ impl TripFolder {
             return Err(invalid("trip changed; reopen folder"));
         }
         let mut updated = self.registry.clone();
+        let mut updated_planning_basis = self.planning_basis.clone();
         let mut updated_routing_profile = self.routing_profile.clone();
+        let mut updated_session_metadata = self.session_metadata.clone();
         let mut updated_documents = self.documents.clone();
         let mut updated_locations = self.locations.clone();
         let is_import = matches!(&event, Change::Import(_));
         apply(
             &mut updated,
-            &mut updated_routing_profile,
+            ApplyAux {
+                planning_basis: &mut updated_planning_basis,
+                routing_profile: &mut updated_routing_profile,
+                session_metadata: &mut updated_session_metadata,
+            },
             &mut updated_documents,
             &mut updated_locations,
             self.trip,
@@ -1022,7 +1244,9 @@ impl TripFolder {
         )?;
         let registry_changed = updated.get(self.trip) != self.registry.get(self.trip);
         if !registry_changed
+            && updated_planning_basis == self.planning_basis
             && updated_routing_profile == self.routing_profile
+            && updated_session_metadata == self.session_metadata
             && updated_documents == self.documents
             && updated_locations == self.locations
         {
@@ -1036,7 +1260,9 @@ impl TripFolder {
         file.write_all(&bytes)?;
         publish(file, &path)?;
         self.registry = updated;
+        self.planning_basis = updated_planning_basis;
         self.routing_profile = updated_routing_profile;
+        self.session_metadata = updated_session_metadata;
         self.documents = updated_documents;
         self.locations = updated_locations;
         if is_import && registry_changed {
@@ -1085,6 +1311,16 @@ impl TripFolder {
             local_route_revision: displayed.local_route_revision,
             geometry: RoadGeometryFile::from(geometry),
         })
+    }
+
+    pub fn set_session_metadata(&mut self, metadata: ActiveTripSessionMetadata) -> io::Result<()> {
+        metadata.validate()?;
+        if self.session_metadata == metadata {
+            return Ok(());
+        }
+        self.record(Change::SessionMetadata(SessionMetadataFile::from(
+            &metadata,
+        )))
     }
 
     pub fn record_location(&mut self, sample: DriverLocationSample) -> io::Result<()> {
@@ -1306,6 +1542,10 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            planning_basis: Some(TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            }),
             routing_profile: None,
             route_geometry: None,
         };
@@ -1338,6 +1578,7 @@ mod tests {
             created_at_unix_ms: 1,
             operator: OperatorId::from_bytes([4; 16]).unwrap().as_bytes(),
             points: vec![decoded],
+            planning_basis: None,
             routing_profile: None,
             road_geometry: None,
         };
@@ -1379,6 +1620,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([35; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            planning_basis: None,
             routing_profile: None,
             route_geometry: Some(TripRoadGeometry {
                 routing: TripRoutingIdentity {
@@ -1462,13 +1704,16 @@ mod tests {
             },
         ];
         let profile = routing_profile_fixture();
+        let mut header = TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap();
+        header.schema_version = SchemaVersion::new(1, 3);
         let draft = PlannerTripExportDraft {
-            header: TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap(),
+            header,
             working_route_id: WorkingRouteId::from_bytes([44; 16]).unwrap(),
             working_route_revision: 1,
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([45; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            planning_basis: None,
             routing_profile: Some(profile.clone()),
             route_geometry: None,
         };
@@ -1479,6 +1724,62 @@ mod tests {
         drop(imported);
         let reopened = TripFolder::open(&folder, trip)?;
         assert_eq!(reopened.routing_profile(), Some(&profile));
+        Ok(())
+    }
+
+    #[test]
+    fn schema_1_4_roundtrips_vehicle_type_and_cargo_planning_basis() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package = tmp.path().join("planning-basis.zip");
+        let folder = tmp.path().join("planning-basis-trip");
+        let trip = TripId::from_bytes([46; 16]).unwrap();
+        let pickup = PointId::from_bytes([47; 16]).unwrap();
+        let unload = PointId::from_bytes([48; 16]).unwrap();
+        let route = vec![
+            TripRoutePoint {
+                point_id: pickup,
+                sequence: 1,
+                kind: TripPointKind::Load,
+                title: "Pickup".to_owned(),
+                navigation: None,
+            },
+            TripRoutePoint {
+                point_id: unload,
+                sequence: 2,
+                kind: TripPointKind::Unload,
+                title: "Unload".to_owned(),
+                navigation: None,
+            },
+        ];
+        let basis = TripPlanningBasis {
+            vehicle_type: "tractor + semi-trailer".to_owned(),
+            cargos: vec![PlannedCargoBasis {
+                cargo_id: CargoId::from_bytes([49; 16]).unwrap(),
+                title: "Steel coils".to_owned(),
+                weight_kg: Some(20_000),
+                pallets: None,
+                pickup_point_id: Some(pickup),
+                unload_point_id: Some(unload),
+            }],
+        };
+        let draft = PlannerTripExportDraft {
+            header: TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap(),
+            working_route_id: WorkingRouteId::from_bytes([50; 16]).unwrap(),
+            working_route_revision: 1,
+            created_at_unix_ms: 1,
+            created_by: OperatorId::from_bytes([51; 16]).unwrap(),
+            ordered_point_ids: vec![pickup, unload],
+            planning_basis: Some(basis.clone()),
+            routing_profile: None,
+            route_geometry: None,
+        };
+
+        export_package(&package, &draft, &route)?;
+        let imported = TripFolder::import(&folder, &package)?;
+        assert_eq!(imported.planning_basis(), Some(&basis));
+        drop(imported);
+        let reopened = TripFolder::open(&folder, trip)?;
+        assert_eq!(reopened.planning_basis(), Some(&basis));
         Ok(())
     }
 
@@ -1549,6 +1850,10 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([3; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|p| p.point_id).collect(),
+            planning_basis: Some(TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            }),
             routing_profile: None,
             route_geometry: None,
         };
@@ -1612,6 +1917,10 @@ mod tests {
             None,
             1,
             operator,
+            TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            },
         )
         .expect("first trip export");
         let mut history = InMemoryTripExportHistory::default();
@@ -1664,6 +1973,10 @@ mod tests {
             Some(TripVersion::new(1).unwrap()),
             4,
             operator,
+            TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            },
         )
         .expect("second trip export");
         history

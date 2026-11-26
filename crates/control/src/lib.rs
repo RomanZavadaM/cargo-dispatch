@@ -180,6 +180,18 @@ impl InMemoryTripRegistry {
         Ok(())
     }
 
+    pub fn invalidate_route_geometry(
+        &mut self,
+        trip_id: TripId,
+    ) -> Result<(), RouteGeometryUpdateError> {
+        let current = self
+            .trips
+            .get_mut(&trip_id)
+            .ok_or(RouteGeometryUpdateError::TripNotFound)?;
+        current.route_geometry = None;
+        Ok(())
+    }
+
     pub fn import(&mut self, candidate: TripImportCandidate) -> Result<ImportResult, ImportError> {
         validate_route_points(&candidate.route_points).map_err(ImportError::InvalidRoute)?;
 

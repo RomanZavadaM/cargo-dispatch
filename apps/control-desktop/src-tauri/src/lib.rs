@@ -7,14 +7,16 @@ use cargo_dispatch_control_ui_contracts::{
     DashboardRoadGeometryPoint, DashboardRoutingIdentity, GatewayStatus, ListenerMode,
     ListenerStatus, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
     RoutingAvailabilityState, RoutingProbeResult, RoutingStatus, SaveDocumentInput, SessionInput,
-    SessionStatus, StartGatewayInput, StartLanInput, TripDashboard,
+    SessionStatus, StartGatewayInput, StartLanInput, TripDashboard, UpdateSessionMetadataInput,
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
 };
-use cargo_dispatch_domain::{DocumentId, PointId};
+use cargo_dispatch_domain::{DocumentId, DriverEndpointId, PointId};
 use cargo_dispatch_geo::{NormalizedStatus, valhalla_http::ValhallaRuntimeConfig};
-use cargo_dispatch_trip_files::{DocumentDirection, DocumentStoreDraft, TripFolder};
+use cargo_dispatch_trip_files::{
+    ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, TripFolder,
+};
 use std::{
     collections::BTreeMap,
     fs,
@@ -23,7 +25,7 @@ use std::{
     sync::Mutex,
     time::Duration,
 };
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 use tokio::{
     sync::{Mutex as AsyncMutex, watch},
@@ -34,6 +36,11 @@ use tokio::{
 struct RegisteredSession {
     trip_id: String,
     token: String,
+    operator_display_name: Option<String>,
+    endpoint_id: Option<DriverEndpointId>,
+    endpoint_label: Option<String>,
+    vehicle_label: Option<String>,
+    vehicle_type: Option<String>,
 }
 
 struct GatewayRelayTask {
@@ -71,6 +78,15 @@ fn driver_url(address: SocketAddr, token: &str) -> String {
     format!("http://{address}/driver/{token}")
 }
 
+fn session_window_label(token: &str) -> String {
+    let suffix = token
+        .chars()
+        .filter(|value| value.is_ascii_alphanumeric())
+        .take(40)
+        .collect::<String>();
+    format!("trip-session-{suffix}")
+}
+
 fn parse_id_bytes(value: &str, label: &str) -> Result<[u8; 16], String> {
     if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(format!("{label} має містити рівно 32 hex-символи"));
@@ -92,6 +108,31 @@ fn point_id(value: &str) -> Result<PointId, String> {
 fn document_id(value: &str) -> Result<DocumentId, String> {
     DocumentId::from_bytes(parse_id_bytes(value, "Document ID")?)
         .map_err(|error| format!("Некоректний Document ID: {error:?}"))
+}
+
+fn driver_endpoint_id(value: &str) -> Result<DriverEndpointId, String> {
+    DriverEndpointId::from_bytes(parse_id_bytes(value, "Driver endpoint ID")?)
+        .map_err(|error| format!("Некоректний Driver endpoint ID: {error:?}"))
+}
+
+fn id_hex(bytes: [u8; 16]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn optional_text(value: Option<String>) -> Option<String> {
+    value.and_then(|value| {
+        let trimmed = value.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_owned())
+    })
+}
+
+fn session_display_name(session: &RegisteredSession) -> String {
+    session
+        .operator_display_name
+        .clone()
+        .or_else(|| session.vehicle_label.clone())
+        .or_else(|| session.endpoint_label.clone())
+        .unwrap_or_else(|| format!("trip-{}", &session.trip_id[..8.min(session.trip_id.len())]))
 }
 
 fn mime_for_path(path: &Path) -> String {
@@ -214,6 +255,7 @@ impl DesktopControlService {
             .await
             .map_err(|error| format!("Не вдалося відкрити задачу читання рейсу: {error}"))?
             .map_err(|error| format!("Не вдалося відкрити папку рейсу: {error}"))?;
+        let persisted_metadata = folder.session_metadata().clone();
         let trip_id_text = folder
             .trip_id()
             .as_bytes()
@@ -246,6 +288,11 @@ impl DesktopControlService {
                 RegisteredSession {
                     trip_id: trip_id_text,
                     token,
+                    operator_display_name: persisted_metadata.display_name,
+                    endpoint_id: persisted_metadata.endpoint_id,
+                    endpoint_label: persisted_metadata.endpoint_label,
+                    vehicle_label: persisted_metadata.vehicle_label,
+                    vehicle_type: persisted_metadata.vehicle_type,
                 },
             );
 
@@ -482,6 +529,11 @@ impl DesktopControlService {
             .map(|session| SessionStatus {
                 trip_id: session.trip_id.clone(),
                 token: session.token.clone(),
+                display_name: session_display_name(session),
+                endpoint_id: session.endpoint_id.map(|id| id_hex(id.as_bytes())),
+                endpoint_label: session.endpoint_label.clone(),
+                vehicle_label: session.vehicle_label.clone(),
+                vehicle_type: session.vehicle_type.clone(),
                 driver_url: address.map(|address| driver_url(address, &session.token)),
                 public_driver_url: public_driver_urls.get(&session.token).cloned(),
             })
@@ -493,6 +545,67 @@ impl DesktopControlService {
             routing,
             sessions,
         })
+    }
+
+    async fn update_session_metadata(
+        &self,
+        input: UpdateSessionMetadataInput,
+    ) -> Result<ControlUiStatus, String> {
+        let endpoint_id = input
+            .endpoint_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(driver_endpoint_id)
+            .transpose()?;
+        let operator_display_name = {
+            let value = input.display_name.trim();
+            (!value.is_empty()).then(|| value.to_owned())
+        };
+        let endpoint_label = optional_text(input.endpoint_label);
+        let vehicle_label = optional_text(input.vehicle_label);
+        let vehicle_type = optional_text(input.vehicle_type);
+        let token = input.token.trim().to_owned();
+
+        self.browser
+            .set_session_metadata(
+                &token,
+                ActiveTripSessionMetadata {
+                    display_name: operator_display_name.clone(),
+                    endpoint_id,
+                    endpoint_label: endpoint_label.clone(),
+                    vehicle_label: vehicle_label.clone(),
+                    vehicle_type: vehicle_type.clone(),
+                },
+            )
+            .map_err(|error| format!("Не вдалося зберегти дані сесії: {error}"))?;
+
+        {
+            let mut sessions = self
+                .sessions
+                .lock()
+                .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
+            let session = sessions
+                .get_mut(&token)
+                .ok_or_else(|| "Сесію не знайдено".to_owned())?;
+            session.operator_display_name = operator_display_name;
+            session.endpoint_id = endpoint_id;
+            session.endpoint_label = endpoint_label;
+            session.vehicle_label = vehicle_label;
+            session.vehicle_type = vehicle_type;
+        }
+        self.status().await
+    }
+
+    fn session_window_details(&self, token: &str) -> Result<(String, String), String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
+        let session = sessions
+            .get(token)
+            .ok_or_else(|| "Сесію не знайдено".to_owned())?;
+        Ok((session_display_name(session), session.token.clone()))
     }
 
     async fn configure_routing(
@@ -751,6 +864,51 @@ async fn register_trip(
 }
 
 #[tauri::command]
+async fn update_session_metadata(
+    input: UpdateSessionMetadataInput,
+    state: State<'_, DesktopControlService>,
+) -> Result<ControlUiStatus, String> {
+    state.update_session_metadata(input).await
+}
+
+#[tauri::command]
+async fn open_session_window(
+    input: SessionInput,
+    app: AppHandle,
+    state: State<'_, DesktopControlService>,
+) -> Result<(), String> {
+    let (display_name, token) = state.session_window_details(input.token.trim())?;
+    let label = session_window_label(&token);
+    let title = format!("Cargo Dispatch Control — {display_name}");
+
+    if let Some(window) = app.get_webview_window(&label) {
+        window
+            .set_title(&title)
+            .map_err(|error| format!("Не вдалося оновити назву вікна: {error}"))?;
+        window
+            .show()
+            .map_err(|error| format!("Не вдалося показати вікно: {error}"))?;
+        window
+            .set_focus()
+            .map_err(|error| format!("Не вдалося активувати вікно: {error}"))?;
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(
+        &app,
+        label,
+        WebviewUrl::App(format!("index.html?session={token}").into()),
+    )
+    .title(title)
+    .inner_size(1080.0, 760.0)
+    .min_inner_size(760.0, 520.0)
+    .resizable(true)
+    .build()
+    .map_err(|error| format!("Не вдалося відкрити вікно сесії: {error}"))?;
+    Ok(())
+}
+
+#[tauri::command]
 async fn start_loopback(
     state: State<'_, DesktopControlService>,
 ) -> Result<ControlUiStatus, String> {
@@ -814,6 +972,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             control_status,
             register_trip,
+            update_session_metadata,
+            open_session_window,
             start_loopback,
             start_lan,
             stop_browser_server,
@@ -837,7 +997,9 @@ pub fn run() {
 mod tests {
     use super::*;
     use cargo_dispatch_addressing_gateway::{GatewayState, router as gateway_router};
-    use cargo_dispatch_contracts::{TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion};
+    use cargo_dispatch_contracts::{
+        TripPackageHeader, TripPlanningBasis, TripPointKind, TripRoutePoint, TripVersion,
+    };
     use cargo_dispatch_domain::{OperatorId, PointId, TripId, WorkingRouteId};
     use cargo_dispatch_planner::PlannerTripExportDraft;
     use cargo_dispatch_trip_files::export_package;
@@ -861,6 +1023,10 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([24; 16]).expect("operator"),
             ordered_point_ids: vec![point],
+            planning_basis: Some(TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            }),
             routing_profile: None,
             route_geometry: None,
         };
@@ -937,6 +1103,84 @@ mod tests {
             .expect("stored document verifies before native save dialog");
         assert_eq!(verified.original_name, "operator-note.pdf");
         assert_eq!(std::fs::read(source)?, b"synthetic operator document");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn desktop_session_metadata_keeps_endpoint_and_current_vehicle_separate()
+    -> std::io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (_trip, folder) = create_trip(tmp.path())?;
+        let service = DesktopControlService::default();
+        let token = "desktop-session-metadata-0001";
+
+        let registered = service
+            .register_trip(RegisterTripInput {
+                folder_path: folder.to_string_lossy().into_owned(),
+                token: token.to_owned(),
+            })
+            .await
+            .expect("trip registers");
+        assert!(registered.sessions[0].display_name.starts_with("trip-"));
+        assert!(registered.sessions[0].endpoint_id.is_none());
+        assert!(registered.sessions[0].vehicle_label.is_none());
+
+        let updated = service
+            .update_session_metadata(UpdateSessionMetadataInput {
+                token: token.to_owned(),
+                display_name: String::new(),
+                endpoint_id: Some("31313131313131313131313131313131".to_owned()),
+                endpoint_label: Some("Cab tablet".to_owned()),
+                vehicle_label: Some("BC 1234 AB".to_owned()),
+                vehicle_type: Some("tractor + semi-trailer".to_owned()),
+            })
+            .await
+            .expect("metadata updates");
+        let session = &updated.sessions[0];
+        assert_eq!(session.display_name, "BC 1234 AB");
+        assert_eq!(session.endpoint_label.as_deref(), Some("Cab tablet"));
+        assert_eq!(session.vehicle_label.as_deref(), Some("BC 1234 AB"));
+        assert_eq!(
+            session.vehicle_type.as_deref(),
+            Some("tractor + semi-trailer")
+        );
+
+        let renamed = service
+            .update_session_metadata(UpdateSessionMetadataInput {
+                token: token.to_owned(),
+                display_name: "Швеція 01".to_owned(),
+                endpoint_id: session.endpoint_id.clone(),
+                endpoint_label: session.endpoint_label.clone(),
+                vehicle_label: Some("BC 9999 AA".to_owned()),
+                vehicle_type: session.vehicle_type.clone(),
+            })
+            .await
+            .expect("operator display name updates");
+        assert_eq!(renamed.sessions[0].display_name, "Швеція 01");
+        assert_eq!(
+            renamed.sessions[0].vehicle_label.as_deref(),
+            Some("BC 9999 AA")
+        );
+
+        drop(service);
+        let recovered_service = DesktopControlService::default();
+        let recovered = recovered_service
+            .register_trip(RegisterTripInput {
+                folder_path: folder.to_string_lossy().into_owned(),
+                token: "desktop-session-metadata-0002".to_owned(),
+            })
+            .await
+            .expect("trip re-registers after restart");
+        assert_eq!(recovered.sessions[0].display_name, "Швеція 01");
+        assert_eq!(
+            recovered.sessions[0].endpoint_label.as_deref(),
+            Some("Cab tablet")
+        );
+        assert_eq!(
+            recovered.sessions[0].vehicle_label.as_deref(),
+            Some("BC 9999 AA")
+        );
 
         Ok(())
     }

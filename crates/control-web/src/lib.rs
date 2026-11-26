@@ -18,7 +18,8 @@ use cargo_dispatch_geo::{
     valhalla_http::{ValhallaHttpClient, ValhallaHttpError, ValhallaRuntimeConfig},
 };
 use cargo_dispatch_trip_files::{
-    DocumentDirection, DocumentStoreDraft, DriverLocationSample, StoredDocument, TripFolder,
+    ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, DriverLocationSample,
+    StoredDocument, TripFolder,
 };
 use futures_util::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
@@ -1116,6 +1117,26 @@ impl ControlBrowserState {
         Ok(snapshot(&trip))
     }
 
+    pub fn session_metadata(&self, token: &str) -> io::Result<ActiveTripSessionMetadata> {
+        let trip = self.shared_trip(token)?;
+        let trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        Ok(trip.session_metadata().clone())
+    }
+
+    pub fn set_session_metadata(
+        &self,
+        token: &str,
+        metadata: ActiveTripSessionMetadata,
+    ) -> io::Result<()> {
+        let trip = self.shared_trip(token)?;
+        let mut trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.set_session_metadata(metadata)
+    }
+
     pub fn reorder_session_route(
         &self,
         token: &str,
@@ -1923,7 +1944,8 @@ impl Drop for LoopbackControlServer {
 mod tests {
     use super::*;
     use cargo_dispatch_contracts::{
-        TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoutePoint, TripVersion,
+        TripNavigationTarget, TripPackageHeader, TripPlanningBasis, TripPointKind, TripRoutePoint,
+        TripVersion,
     };
     use cargo_dispatch_domain::{OperatorId, TripId, WorkingRouteId};
     use cargo_dispatch_geo::{TollPreference, VehicleRoutingProfile};
@@ -1984,6 +2006,10 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).expect("operator"),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            planning_basis: Some(TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            }),
             routing_profile: Some(routing_profile()),
             route_geometry: None,
         };

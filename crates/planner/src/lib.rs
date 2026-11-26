@@ -1,8 +1,9 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_contracts::{
-    ContractError, ReplanRequest, TripGeometryContractError, TripPackageHeader, TripRoadGeometry,
-    TripRoadGeometryPoint, TripRoutingIdentity, TripVersion, validate_trip_road_geometry,
+    ContractError, ReplanRequest, TripGeometryContractError, TripPackageHeader, TripPlanningBasis,
+    TripRoadGeometry, TripRoadGeometryPoint, TripRoutingIdentity, TripVersion,
+    validate_trip_road_geometry,
 };
 use cargo_dispatch_domain::{
     AvailabilityState, CalculationId, CallTaskId, CandidateId, CargoId, CargoSummary, LoadRequest,
@@ -822,6 +823,7 @@ pub struct PlannerTripExportDraft {
     pub created_at_unix_ms: u64,
     pub created_by: OperatorId,
     pub ordered_point_ids: Vec<PointId>,
+    pub planning_basis: Option<TripPlanningBasis>,
     pub routing_profile: Option<VehicleRoutingProfile>,
     pub route_geometry: Option<TripRoadGeometry>,
 }
@@ -903,6 +905,7 @@ pub fn build_trip_export_draft(
     base_version: Option<TripVersion>,
     created_at_unix_ms: u64,
     created_by: OperatorId,
+    planning_basis: TripPlanningBasis,
 ) -> Result<PlannerTripExportDraft, PlannerExportError> {
     if route.state != WorkingRouteState::Ready {
         return Err(PlannerExportError::RouteNotReady(route.state));
@@ -925,6 +928,7 @@ pub fn build_trip_export_draft(
         created_at_unix_ms,
         created_by,
         ordered_point_ids: route.points.iter().map(|point| point.point_id).collect(),
+        planning_basis: Some(planning_basis),
         routing_profile: None,
         route_geometry: None,
     })
@@ -2053,6 +2057,13 @@ mod tests {
 
     fn cargo_id(byte: u8) -> CargoId {
         CargoId::from_bytes([byte; 16]).expect("fixture cargo id")
+    }
+
+    fn planning_basis() -> TripPlanningBasis {
+        TripPlanningBasis {
+            vehicle_type: "synthetic truck".to_owned(),
+            cargos: Vec::new(),
+        }
     }
 
     fn point_id(byte: u8) -> PointId {
@@ -3644,6 +3655,7 @@ mod tests {
             None,
             1_800_000_000_000,
             operator_id(10),
+            planning_basis(),
         )
         .expect("export draft");
 
@@ -3668,6 +3680,7 @@ mod tests {
             None,
             1,
             operator_id(17),
+            planning_basis(),
         )
         .expect("export");
 
@@ -3712,6 +3725,7 @@ mod tests {
             Some(TripVersion::new(2).expect("base version")),
             1_800_000_010_000,
             operator_id(11),
+            planning_basis(),
         )
         .expect("export draft");
 
@@ -3733,6 +3747,7 @@ mod tests {
                 None,
                 1_800_000_020_000,
                 operator_id(12),
+                planning_basis(),
             ),
             Err(PlannerExportError::RouteNotReady(WorkingRouteState::Draft))
         );
@@ -3747,6 +3762,7 @@ mod tests {
                 None,
                 1_800_000_020_000,
                 operator_id(12),
+                planning_basis(),
             ),
             Err(PlannerExportError::Contract(
                 ContractError::LaterVersionRequiresBase
@@ -3771,6 +3787,7 @@ mod tests {
             Some(TripVersion::new(1).expect("base version")),
             1_800_000_100_000,
             operator_id(13),
+            planning_basis(),
         )
         .expect("export draft");
 
@@ -3821,6 +3838,7 @@ mod tests {
             None,
             1,
             operator_id(14),
+            planning_basis(),
         )
         .expect("first export");
         route.current_revision = 2;
@@ -3831,6 +3849,7 @@ mod tests {
             Some(TripVersion::new(1).expect("base version")),
             2,
             operator_id(14),
+            planning_basis(),
         )
         .expect("second export");
 
@@ -3879,6 +3898,7 @@ mod tests {
             None,
             1,
             operator_id(15),
+            planning_basis(),
         )
         .expect("export");
 
@@ -4163,6 +4183,7 @@ mod tests {
             None,
             1,
             operator_id(16),
+            planning_basis(),
         )
         .expect("export");
         let record = PlannerTripExportRecord::from(&draft);

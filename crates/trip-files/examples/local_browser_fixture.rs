@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_contracts::{
-    TripNavigationTarget, TripPackageHeader, TripPointKind, TripRoadGeometry,
+    TripNavigationTarget, TripPackageHeader, TripPlanningBasis, TripPointKind, TripRoadGeometry,
     TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity, TripVersion,
 };
 use cargo_dispatch_domain::{OperatorId, PointId, TripId, WorkingRouteId};
@@ -101,6 +101,10 @@ fn main() -> io::Result<()> {
         created_at_unix_ms: 1_795_550_000_000,
         created_by: OperatorId::from_bytes([0x43; 16]).expect("synthetic operator id"),
         ordered_point_ids: route.iter().map(|item| item.point_id).collect(),
+        planning_basis: Some(TripPlanningBasis {
+            vehicle_type: "synthetic truck".to_owned(),
+            cargos: Vec::new(),
+        }),
         routing_profile: None,
         route_geometry: Some(TripRoadGeometry {
             routing: TripRoutingIdentity {
