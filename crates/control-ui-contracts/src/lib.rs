@@ -8,6 +8,24 @@ pub struct RegisterTripInput {
     pub token: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CreateManualTripPointInput {
+    pub point_id: String,
+    pub title: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub address: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CreateManualTripInput {
+    pub folder_path: String,
+    pub token: String,
+    pub trip_id: String,
+    pub display_name: Option<String>,
+    pub points: Vec<CreateManualTripPointInput>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StartLanInput {
     pub ip: String,
