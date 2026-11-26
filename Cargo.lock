@@ -534,6 +534,7 @@ dependencies = [
  "cargo-dispatch-contracts",
  "cargo-dispatch-control",
  "cargo-dispatch-domain",
+ "cargo-dispatch-geo",
  "cargo-dispatch-planner",
  "serde",
  "serde_json",
