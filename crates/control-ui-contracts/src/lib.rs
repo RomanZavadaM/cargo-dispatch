@@ -310,6 +310,76 @@ pub struct PickedFile {
     pub mime_type: String,
 }
 
+/// One step of the "what to do next" helper in the Control access area.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccessStep {
+    Connect,
+    AddTrip,
+    ShareLink,
+}
+
+/// Order of the helper steps and which of them are already done.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AccessGuide {
+    pub order: [AccessStep; 3],
+    pub connected: bool,
+    pub has_trip: bool,
+}
+
+impl AccessGuide {
+    /// The Gateway refuses to start without a trip and refuses new trips while it
+    /// runs, so over the internet trips come first. Locally sharing comes first.
+    #[must_use]
+    pub fn new(
+        through_internet: bool,
+        has_trip: bool,
+        listener_on: bool,
+        gateway_on: bool,
+    ) -> Self {
+        let (order, connected) = if through_internet {
+            (
+                [
+                    AccessStep::AddTrip,
+                    AccessStep::Connect,
+                    AccessStep::ShareLink,
+                ],
+                gateway_on,
+            )
+        } else {
+            (
+                [
+                    AccessStep::Connect,
+                    AccessStep::AddTrip,
+                    AccessStep::ShareLink,
+                ],
+                listener_on,
+            )
+        };
+        Self {
+            order,
+            connected,
+            has_trip,
+        }
+    }
+
+    #[must_use]
+    pub fn is_done(&self, step: AccessStep) -> bool {
+        match step {
+            AccessStep::Connect => self.connected,
+            AccessStep::AddTrip => self.has_trip,
+            AccessStep::ShareLink => false,
+        }
+    }
+
+    #[must_use]
+    pub fn current(&self) -> AccessStep {
+        self.order
+            .into_iter()
+            .find(|step| !self.is_done(*step))
+            .unwrap_or(AccessStep::ShareLink)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,5 +415,36 @@ mod tests {
         let mut renamed = session();
         renamed.vehicle_label = Some("synthetic truck".to_owned());
         assert_ne!(before.card_key(), renamed.card_key());
+    }
+
+    #[test]
+    fn local_access_switches_sharing_on_before_adding_a_trip() {
+        let start = AccessGuide::new(false, false, false, false);
+        assert_eq!(start.current(), AccessStep::Connect);
+        assert_eq!(
+            AccessGuide::new(false, false, true, false).current(),
+            AccessStep::AddTrip
+        );
+        assert_eq!(
+            AccessGuide::new(false, true, true, false).current(),
+            AccessStep::ShareLink
+        );
+    }
+
+    #[test]
+    fn internet_access_adds_trips_before_the_gateway() {
+        assert_eq!(
+            AccessGuide::new(true, false, false, false).current(),
+            AccessStep::AddTrip
+        );
+        // Local sharing does not count as an internet connection.
+        assert_eq!(
+            AccessGuide::new(true, true, true, false).current(),
+            AccessStep::Connect
+        );
+        assert_eq!(
+            AccessGuide::new(true, true, false, true).current(),
+            AccessStep::ShareLink
+        );
     }
 }

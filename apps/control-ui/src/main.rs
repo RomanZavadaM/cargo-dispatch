@@ -4,14 +4,15 @@ mod i18n;
 
 // UI language is selected at runtime and persisted in the desktop webview.
 // The same eight-language set is enforced by .github/scripts/check-localizations.py.
-use crate::i18n::{UiLocale, localize_problem, strings};
+use crate::i18n::{ControlStrings, UiLocale, localize_problem, strings};
 use cargo_dispatch_control_ui_contracts::{
-    ConfigureRoutingInput, ControlUiStatus, CreateManualTripInput, CreateManualTripPointInput,
-    DashboardDocumentDirection, DashboardPoint, DashboardVehicleRoutingProfile, ListenerMode,
-    OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
-    RoutingAvailabilityState, RoutingProbeResult, RoutingTollPreference, SaveDocumentInput,
-    SessionInput, StartGatewayInput, StartLanInput, TripDashboard, UpdateRoutingContextInput,
-    UpdateSessionMetadataInput, is_supported_max_speed_kmh,
+    AccessGuide, AccessStep, ConfigureRoutingInput, ControlUiStatus, CreateManualTripInput,
+    CreateManualTripPointInput, DashboardDocumentDirection, DashboardPoint,
+    DashboardVehicleRoutingProfile, ListenerMode, OperatorDocumentInput, PickedFile,
+    RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
+    RoutingTollPreference, SaveDocumentInput, SessionInput, StartGatewayInput, StartLanInput,
+    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput,
+    is_supported_max_speed_kmh,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -772,6 +773,37 @@ fn main() {
     leptos::mount::mount_to_body(ControlApp);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AccessDialog {
+    Add,
+    Connect,
+    Road,
+    Help,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConnectChoice {
+    Local,
+    Lan,
+    Internet,
+}
+
+fn access_step_title(step: AccessStep, text: &ControlStrings) -> &'static str {
+    match step {
+        AccessStep::Connect => text.broadcast,
+        AccessStep::AddTrip => text.connect_trip,
+        AccessStep::ShareLink => text.step_share,
+    }
+}
+
+fn access_step_hint(step: AccessStep, text: &ControlStrings) -> &'static str {
+    match step {
+        AccessStep::Connect => text.step_connect_hint,
+        AccessStep::AddTrip => text.step_add_hint,
+        AccessStep::ShareLink => text.step_share_hint,
+    }
+}
+
 #[component]
 fn ControlApp() -> impl IntoView {
     let locale = RwSignal::new(UiLocale::parse(&cargo_control_initial_locale()));
@@ -792,6 +824,9 @@ fn ControlApp() -> impl IntoView {
     let routing_request_timeout = RwSignal::new("10000".to_owned());
     let status = RwSignal::new(None::<ControlUiStatus>);
     let selected_token = RwSignal::new(String::new());
+    let dialog = RwSignal::new(None::<AccessDialog>);
+    let add_manual = RwSignal::new(false);
+    let connect_choice = RwSignal::new(ConnectChoice::Local);
     let window_session_token = cargo_control_window_session_token();
     let session_window = !window_session_token.is_empty();
     if session_window {
@@ -934,7 +969,11 @@ fn ControlApp() -> impl IntoView {
             token: token.get_untracked(),
         };
         spawn_local(async move {
-            let result = invoke("register_trip", &serde_json::json!({ "input": input })).await;
+            let result: Result<ControlUiStatus, String> =
+                invoke("register_trip", &serde_json::json!({ "input": input })).await;
+            if result.is_ok() {
+                dialog.set(None);
+            }
             set_status_result(result, strings(locale.get_untracked()).trip_registered);
         });
     };
@@ -1014,6 +1053,7 @@ fn ControlApp() -> impl IntoView {
                     manual_token.set(cargo_control_random_token());
                     manual_trip_id.set(cargo_control_random_id());
                     manual_points.set(vec![ManualPointDraft::new(), ManualPointDraft::new()]);
+                    dialog.set(None);
                     message.set(
                         strings(locale.get_untracked())
                             .manual_trip_created
@@ -1036,7 +1076,11 @@ fn ControlApp() -> impl IntoView {
         }
         busy.set(true);
         spawn_local(async move {
-            let result = invoke("start_loopback", &serde_json::json!({})).await;
+            let result: Result<ControlUiStatus, String> =
+                invoke("start_loopback", &serde_json::json!({})).await;
+            if result.is_ok() {
+                dialog.set(None);
+            }
             set_status_result(result, strings(locale.get_untracked()).loopback_started);
         });
     };
@@ -1059,7 +1103,11 @@ fn ControlApp() -> impl IntoView {
             port,
         };
         spawn_local(async move {
-            let result = invoke("start_lan", &serde_json::json!({ "input": input })).await;
+            let result: Result<ControlUiStatus, String> =
+                invoke("start_lan", &serde_json::json!({ "input": input })).await;
+            if result.is_ok() {
+                dialog.set(None);
+            }
             set_status_result(result, strings(locale.get_untracked()).lan_started);
         });
     };
@@ -1091,7 +1139,11 @@ fn ControlApp() -> impl IntoView {
             control_secret: secret,
         };
         spawn_local(async move {
-            let result = invoke("start_gateway", &serde_json::json!({ "input": input })).await;
+            let result: Result<ControlUiStatus, String> =
+                invoke("start_gateway", &serde_json::json!({ "input": input })).await;
+            if result.is_ok() {
+                dialog.set(None);
+            }
             set_status_result(result, strings(locale.get_untracked()).gateway_started);
         });
     };
@@ -1317,6 +1369,45 @@ fn ControlApp() -> impl IntoView {
         });
     };
 
+    let access_guide = move || {
+        let current = status.get();
+        let has_trip = current
+            .as_ref()
+            .is_some_and(|value| !value.sessions.is_empty());
+        let listener_on = current
+            .as_ref()
+            .is_some_and(|value| value.listener.is_some());
+        let gateway_on = current
+            .as_ref()
+            .is_some_and(|value| value.gateway.is_some());
+        let through_internet = gateway_on || connect_choice.get() == ConnectChoice::Internet;
+        AccessGuide::new(through_internet, has_trip, listener_on, gateway_on)
+    };
+
+    let access_status = move || {
+        let text = strings(locale.get());
+        let Some(current) = status.get() else {
+            return text.reading_state.to_owned();
+        };
+        let mut parts = Vec::new();
+        if let Some(listener) = current.listener {
+            let mode = match listener.mode {
+                ListenerMode::Loopback => text.mode_local,
+                ListenerMode::Lan => text.mode_lan,
+            };
+            parts.push(format!("{mode} ({})", listener.address));
+        }
+        if current.gateway.is_some() {
+            parts.push(text.mode_internet.to_owned());
+        }
+        let value = if parts.is_empty() {
+            text.access_off.to_owned()
+        } else {
+            parts.join(" + ")
+        };
+        format!("{}: {value}", text.access_status)
+    };
+
     view! {
         <main>
             <header>
@@ -1347,338 +1438,94 @@ fn ControlApp() -> impl IntoView {
                 <p class="note">{move || strings(locale.get()).subtitle}</p>
             </header>
 
-            <section class="manager-only">
-                <h2>{move || strings(locale.get()).connect_trip}</h2>
-                <h3>{move || strings(locale.get()).existing_trip}</h3>
-                <div class="grid">
-                    <label>
-                        {move || strings(locale.get()).trip_folder}
-                        <input
-                            id="trip-folder"
-                            type="text"
-                            placeholder=r"D:\CargoDispatch\active\trip-..."
-                            prop:value=move || folder.get()
-                            on:input=move |event| folder.set(event_target_value(&event))
-                        />
-                    </label>
-                    <label>
-                        {move || strings(locale.get()).session_token}
-                        <input
-                            id="session-token"
-                            type="text"
-                            minlength="16"
-                            prop:value=move || token.get()
-                            on:input=move |event| token.set(event_target_value(&event))
-                        />
-                    </label>
-                </div>
-                <div class="actions">
-                    <button type="button" on:click=pick_folder disabled=move || busy.get()>
-                        {move || strings(locale.get()).choose_folder}
-                    </button>
-                    <button class="primary" type="button" on:click=register disabled=move || busy.get()>
-                        {move || strings(locale.get()).connect}
-                    </button>
-                </div>
+            <div class="toolbar manager-only">
+                <button class="primary" type="button" on:click=move |_| dialog.set(Some(AccessDialog::Add))>
+                    {move || strings(locale.get()).connect_trip}
+                </button>
+                <button class="primary" type="button" on:click=move |_| dialog.set(Some(AccessDialog::Connect))>
+                    {move || strings(locale.get()).broadcast}
+                </button>
+                <button type="button" on:click=move |_| dialog.set(Some(AccessDialog::Road))>
+                    {move || strings(locale.get()).routing_engine}
+                </button>
+                <button type="button" on:click=move |_| dialog.set(Some(AccessDialog::Help))>
+                    {move || strings(locale.get()).help_title}
+                </button>
+            </div>
 
-                <h3>{move || strings(locale.get()).manual_trip}</h3>
-                <p class="note">{move || strings(locale.get()).manual_trip_note}</p>
-                <div class="grid">
-                    <label>
-                        {move || strings(locale.get()).trip_folder}
-                        <input
-                            type="text"
-                            placeholder=r"D:\CargoDispatch\active\manual-trip"
-                            prop:value=move || manual_folder.get()
-                            on:input=move |event| manual_folder.set(event_target_value(&event))
-                        />
-                    </label>
-                    <label>
-                        {move || strings(locale.get()).session_display_name}
-                        <input
-                            type="text"
-                            prop:value=move || manual_display_name.get()
-                            on:input=move |event| manual_display_name.set(event_target_value(&event))
-                        />
-                    </label>
-                    <label>
-                        {move || strings(locale.get()).session_token}
-                        <input
-                            type="text"
-                            minlength="16"
-                            prop:value=move || manual_token.get()
-                            on:input=move |event| manual_token.set(event_target_value(&event))
-                        />
-                    </label>
-                </div>
-                <div class="actions">
-                    <button type="button" on:click=pick_manual_folder disabled=move || busy.get()>
-                        {move || strings(locale.get()).choose_folder}
-                    </button>
-                </div>
-                <h4>{move || strings(locale.get()).manual_points}</h4>
-                <For
-                    each=move || manual_points.get()
-                    key=|point| point.point_id.clone()
-                    children=move |point| {
-                        let remove_id = point.point_id.clone();
-                        view! {
-                            <div class="manual-point">
-                                <div class="grid">
-                                    <label>
-                                        {move || strings(locale.get()).point_title}
-                                        <input
-                                            type="text"
-                                            prop:value=move || point.title.get()
-                                            on:input=move |event| point.title.set(event_target_value(&event))
-                                        />
-                                    </label>
-                                    <label>
-                                        {move || strings(locale.get()).latitude}
-                                        <input
-                                            type="number"
-                                            step="0.000001"
-                                            min="-90"
-                                            max="90"
-                                            prop:value=move || point.latitude.get()
-                                            on:input=move |event| point.latitude.set(event_target_value(&event))
-                                        />
-                                    </label>
-                                    <label>
-                                        {move || strings(locale.get()).longitude}
-                                        <input
-                                            type="number"
-                                            step="0.000001"
-                                            min="-180"
-                                            max="180"
-                                            prop:value=move || point.longitude.get()
-                                            on:input=move |event| point.longitude.set(event_target_value(&event))
-                                        />
-                                    </label>
-                                    <label>
-                                        {move || strings(locale.get()).address_optional}
-                                        <input
-                                            type="text"
-                                            prop:value=move || point.address.get()
-                                            on:input=move |event| point.address.set(event_target_value(&event))
-                                        />
-                                    </label>
-                                </div>
-                                <div class="actions">
-                                    <button
-                                        type="button"
-                                        on:click=move |_| {
-                                            manual_points.update(|rows| {
-                                                rows.retain(|row| row.point_id != remove_id);
-                                            });
-                                        }
-                                        disabled=move || busy.get()
-                                    >
-                                        {move || strings(locale.get()).remove_point}
-                                    </button>
-                                </div>
-                            </div>
-                        }
-                    }
-                />
+            <div class="access-line manager-only">
+                <strong>{access_status}</strong>
+                <button
+                    class="danger"
+                    type="button"
+                    class:hidden=move || status.get().and_then(|current| current.listener).is_none()
+                    on:click=stop
+                    disabled=move || busy.get()
+                >
+                    {move || strings(locale.get()).stop_broadcast}
+                </button>
+                <button
+                    class="danger"
+                    type="button"
+                    class:hidden=move || status.get().and_then(|current| current.gateway).is_none()
+                    on:click=stop_gateway
+                    disabled=move || busy.get()
+                >
+                    {move || strings(locale.get()).disable_gateway}
+                </button>
+            </div>
+
+            <section class="manager-only">
+                <h2>{move || strings(locale.get()).next_title}</h2>
+                <ol class="steps">
+                    {move || {
+                        let guide = access_guide();
+                        let text = strings(locale.get());
+                        guide
+                            .order
+                            .into_iter()
+                            .enumerate()
+                            .map(|(index, step)| {
+                                let class = if step == guide.current() {
+                                    "now"
+                                } else if guide.is_done(step) {
+                                    "done"
+                                } else {
+                                    ""
+                                };
+                                let mark = if guide.is_done(step) {
+                                    "✓".to_owned()
+                                } else {
+                                    format!("{}.", index + 1)
+                                };
+                                view! { <li class=class>{format!("{mark} {}", access_step_title(step, text))}</li> }
+                            })
+                            .collect_view()
+                    }}
+                </ol>
+                <p>{move || access_step_hint(access_guide().current(), strings(locale.get()))}</p>
                 <div class="actions">
                     <button
+                        class="primary"
                         type="button"
-                        on:click=move |_| manual_points.update(|rows| rows.push(ManualPointDraft::new()))
-                        disabled=move || busy.get()
+                        class:hidden=move || access_guide().current() == AccessStep::ShareLink
+                        on:click=move |_| {
+                            dialog.set(Some(match access_guide().current() {
+                                AccessStep::Connect => AccessDialog::Connect,
+                                AccessStep::AddTrip | AccessStep::ShareLink => AccessDialog::Add,
+                            }));
+                        }
                     >
-                        {move || strings(locale.get()).add_point}
-                    </button>
-                    <button class="primary" type="button" on:click=create_manual disabled=move || busy.get()>
-                        {move || strings(locale.get()).create_trip}
+                        {move || access_step_title(access_guide().current(), strings(locale.get()))}
                     </button>
                 </div>
-            </section>
-
-            <section class="manager-only">
-                <h2>{move || strings(locale.get()).broadcast}</h2>
-                <div class="actions">
-                    <button type="button" on:click=start_loopback disabled=move || busy.get()>
-                        {move || strings(locale.get()).local_loopback}
-                    </button>
-                </div>
-                <div class="grid">
-                    <label>
-                        {move || strings(locale.get()).lan_address}
-                        <input
-                            id="lan-ip"
-                            type="text"
-                            placeholder="192.168.1.25"
-                            prop:value=move || lan_ip.get()
-                            on:input=move |event| lan_ip.set(event_target_value(&event))
-                        />
-                    </label>
-                    <label>
-                        {move || strings(locale.get()).port}
-                        <input
-                            id="lan-port"
-                            type="number"
-                            min="1"
-                            max="65535"
-                            prop:value=move || lan_port.get()
-                            on:input=move |event| lan_port.set(event_target_value(&event))
-                        />
-                    </label>
-                </div>
-                <div class="actions">
-                    <button class="primary" type="button" on:click=start_lan disabled=move || busy.get()>
-                        {move || strings(locale.get()).enable_lan}
-                    </button>
-                    <button class="danger" type="button" on:click=stop disabled=move || busy.get()>
-                        {move || strings(locale.get()).stop_broadcast}
-                    </button>
-                </div>
-                <p class="note">{move || strings(locale.get()).lan_note}</p>
-                <h3>{move || strings(locale.get()).public_gateway}</h3>
-                <div class="grid">
-                    <label>
-                        {move || strings(locale.get()).gateway_address}
-                        <input
-                            id="gateway-url"
-                            type="url"
-                            placeholder="https://cargo.example.com"
-                            prop:value=move || gateway_url.get()
-                            on:input=move |event| gateway_url.set(event_target_value(&event))
-                        />
-                    </label>
-                    <label>
-                        {move || strings(locale.get()).control_secret}
-                        <input
-                            id="gateway-secret"
-                            type="password"
-                            minlength="32"
-                            autocomplete="off"
-                            prop:value=move || gateway_secret.get()
-                            on:input=move |event| gateway_secret.set(event_target_value(&event))
-                        />
-                    </label>
-                </div>
-                <div class="actions">
-                    <button class="primary" type="button" on:click=start_gateway disabled=move || busy.get()>
-                        {move || strings(locale.get()).enable_gateway}
-                    </button>
-                    <button type="button" on:click=stop_gateway disabled=move || busy.get()>
-                        {move || strings(locale.get()).disable_gateway}
-                    </button>
-                </div>
-                <p class="note">{move || strings(locale.get()).gateway_note}</p>
-                <h3>{move || strings(locale.get()).routing_engine}</h3>
-                <div class="grid">
-                    <label>
-                        {move || strings(locale.get()).valhalla_address}
-                        <input
-                            id="routing-url"
-                            type="url"
-                            placeholder="http://127.0.0.1:8002"
-                            prop:value=move || routing_url.get()
-                            on:input=move |event| routing_url.set(event_target_value(&event))
-                        />
-                    </label>
-                    <label>
-                        {move || strings(locale.get()).map_dataset}
-                        <input
-                            id="routing-dataset"
-                            type="text"
-                            placeholder="europe-2026-11"
-                            prop:value=move || routing_dataset.get()
-                            on:input=move |event| routing_dataset.set(event_target_value(&event))
-                        />
-                    </label>
-                    <label>
-                        {move || strings(locale.get()).connect_timeout_ms}
-                        <input
-                            id="routing-connect-timeout"
-                            type="number"
-                            min="100"
-                            max="30000"
-                            prop:value=move || routing_connect_timeout.get()
-                            on:input=move |event| routing_connect_timeout.set(event_target_value(&event))
-                        />
-                    </label>
-                    <label>
-                        {move || strings(locale.get()).request_timeout_ms}
-                        <input
-                            id="routing-request-timeout"
-                            type="number"
-                            min="250"
-                            max="120000"
-                            prop:value=move || routing_request_timeout.get()
-                            on:input=move |event| routing_request_timeout.set(event_target_value(&event))
-                        />
-                    </label>
-                </div>
-                <div class="actions">
-                    <button class="primary" type="button" on:click=configure_routing disabled=move || busy.get()>
-                        {move || strings(locale.get()).configure_routing}
-                    </button>
-                    <button type="button" on:click=test_routing disabled=move || busy.get()>
-                        {move || strings(locale.get()).check_routing}
-                    </button>
-                    <button type="button" on:click=disable_routing disabled=move || busy.get()>
-                        {move || strings(locale.get()).disable_routing}
-                    </button>
-                </div>
-                <div class="status">
-                    {move || {
-                        status
-                            .get()
-                            .and_then(|current| current.routing)
-                            .map(|routing| {
-                                format!(
-                                    "{} · {} · {} / {} ms",
-                                    routing.base_url,
-                                    routing.map_dataset_id,
-                                    routing.connect_timeout_ms,
-                                    routing.request_timeout_ms
-                                )
-                            })
-                            .unwrap_or_else(|| {
-                                strings(locale.get()).routing_not_configured.to_owned()
-                            })
-                    }}
-                </div>
-                <p class="note">{move || strings(locale.get()).routing_note}</p>
             </section>
 
             <section class="manager-only">
                 <h2>{move || strings(locale.get()).browser_sessions}</h2>
-                <div class="status">
-                    {move || {
-                        status.get().map(|current| {
-                            let local = match current.listener {
-                                Some(listener) => {
-                                    let mode = match listener.mode {
-                                        ListenerMode::Loopback => "loopback",
-                                        ListenerMode::Lan => "LAN",
-                                    };
-                                    format!(
-                                        "{}: {mode} · {}",
-                                        strings(locale.get()).listener,
-                                        listener.address
-                                    )
-                                }
-                                None => strings(locale.get()).listener_off.to_owned(),
-                            };
-                            let public = match current.gateway {
-                                Some(gateway) => format!(
-                                    "{}: {} · {} {}/{}",
-                                    strings(locale.get()).gateway,
-                                    gateway.base_url,
-                                    strings(locale.get()).active,
-                                    gateway.active_sessions,
-                                    gateway.total_sessions
-                                ),
-                                None => strings(locale.get()).gateway_off.to_owned(),
-                            };
-                            format!("{local} · {public}")
-                        }).unwrap_or_else(|| strings(locale.get()).reading_state.to_owned())
-                    }}
-                </div>
+                <p class="note" class:hidden=move || status.get().is_some_and(|current| !current.sessions.is_empty())>
+                    {move || strings(locale.get()).no_trips}
+                </p>
                 <ul>
                     <For
                         each=move || status.get().map(|current| current.sessions).unwrap_or_default()
@@ -1724,9 +1571,11 @@ fn ControlApp() -> impl IntoView {
                                     {public_url.map(|driver_url| {
                                         let href = driver_url.clone();
                                         let copy_url = driver_url.clone();
+                                        let shown_url = driver_url.clone();
                                         view! {
                                             <div>
                                                 <strong>{move || format!("{}: ", strings(locale.get()).public_driver_url)}</strong>
+                                                <code class="link-text">{shown_url}</code>
                                                 <div class="actions">
                                                     <a href=href target="_blank" rel="noopener">{move || strings(locale.get()).open}</a>
                                                     <button
@@ -1745,9 +1594,11 @@ fn ControlApp() -> impl IntoView {
                                     {local_url.map(|driver_url| {
                                         let href = driver_url.clone();
                                         let copy_url = driver_url.clone();
+                                        let shown_url = driver_url.clone();
                                         view! {
                                             <div>
                                                 <strong>{move || format!("{}: ", strings(locale.get()).local_driver_url)}</strong>
+                                                <code class="link-text">{shown_url}</code>
                                                 <div class="actions">
                                                     <a href=href target="_blank" rel="noopener">{move || strings(locale.get()).open}</a>
                                                     <button
@@ -2037,6 +1888,435 @@ fn ControlApp() -> impl IntoView {
                     />
                 </ul>
             </section>
+
+            <div class="access-dialog manager-only" class:open=move || dialog.get() == Some(AccessDialog::Add)>
+                <div class="access-box">
+                    <div class="access-head">
+                        <h2>{move || strings(locale.get()).connect_trip}</h2>
+                        <button type="button" on:click=move |_| dialog.set(None)>
+                            {move || strings(locale.get()).close}
+                        </button>
+                    </div>
+                    <div class="warn" class:hidden=move || status.get().and_then(|current| current.gateway).is_none()>
+                        <p>{move || strings(locale.get()).add_blocked}</p>
+                        <button type="button" on:click=stop_gateway disabled=move || busy.get()>
+                            {move || strings(locale.get()).disable_gateway}
+                        </button>
+                    </div>
+                    <label class="choice" class:selected=move || !add_manual.get()>
+                        <input type="radio" name="add-kind" prop:checked=move || !add_manual.get() on:change=move |_| add_manual.set(false) />
+                        <span><strong>{move || strings(locale.get()).existing_trip}</strong></span>
+                    </label>
+                    <label class="choice" class:selected=move || add_manual.get()>
+                        <input type="radio" name="add-kind" prop:checked=move || add_manual.get() on:change=move |_| add_manual.set(true) />
+                        <span><strong>{move || strings(locale.get()).manual_trip}</strong></span>
+                    </label>
+                <div class:hidden=move || add_manual.get()>
+                <div class="grid">
+                    <label>
+                        {move || strings(locale.get()).trip_folder}
+                        <input
+                            id="trip-folder"
+                            type="text"
+                            prop:value=move || folder.get()
+                            on:input=move |event| folder.set(event_target_value(&event))
+                        />
+                        <span class="hint">{move || format!("{} {}", strings(locale.get()).example_prefix, r"D:\CargoDispatch\active\trip-01")}</span>
+                    </label>
+                </div>
+                <details>
+                    <summary>{move || strings(locale.get()).advanced}</summary>
+                    <label>
+                        {move || strings(locale.get()).session_token}
+                        <input
+                            id="session-token"
+                            type="text"
+                            minlength="16"
+                            prop:value=move || token.get()
+                            on:input=move |event| token.set(event_target_value(&event))
+                        />
+                    </label>
+                </details>
+                <div class="actions">
+                    <button type="button" on:click=pick_folder disabled=move || busy.get()>
+                        {move || strings(locale.get()).choose_folder}
+                    </button>
+                    <button class="primary" type="button" on:click=register disabled=move || busy.get()>
+                        {move || strings(locale.get()).connect}
+                    </button>
+                </div>
+
+                </div>
+
+                <div class:hidden=move || !add_manual.get()>
+                <p class="note">{move || strings(locale.get()).manual_trip_note}</p>
+                <div class="grid">
+                    <label>
+                        {move || strings(locale.get()).trip_folder}
+                        <input
+                            type="text"
+                            prop:value=move || manual_folder.get()
+                            on:input=move |event| manual_folder.set(event_target_value(&event))
+                        />
+                        <span class="hint">{move || format!("{} {}", strings(locale.get()).example_prefix, r"D:\CargoDispatch\active\manual-trip")}</span>
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).session_display_name}
+                        <input
+                            type="text"
+                            prop:value=move || manual_display_name.get()
+                            on:input=move |event| manual_display_name.set(event_target_value(&event))
+                        />
+                    </label>
+                </div>
+                <details>
+                    <summary>{move || strings(locale.get()).advanced}</summary>
+                    <label>
+                        {move || strings(locale.get()).session_token}
+                        <input
+                            type="text"
+                            minlength="16"
+                            prop:value=move || manual_token.get()
+                            on:input=move |event| manual_token.set(event_target_value(&event))
+                        />
+                    </label>
+                </details>
+                <div class="actions">
+                    <button type="button" on:click=pick_manual_folder disabled=move || busy.get()>
+                        {move || strings(locale.get()).choose_folder}
+                    </button>
+                </div>
+                <h4>{move || strings(locale.get()).manual_points}</h4>
+                <For
+                    each=move || manual_points.get()
+                    key=|point| point.point_id.clone()
+                    children=move |point| {
+                        let remove_id = point.point_id.clone();
+                        view! {
+                            <div class="manual-point">
+                                <div class="grid">
+                                    <label>
+                                        {move || strings(locale.get()).point_title}
+                                        <input
+                                            type="text"
+                                            prop:value=move || point.title.get()
+                                            on:input=move |event| point.title.set(event_target_value(&event))
+                                        />
+                                    </label>
+                                    <label>
+                                        {move || strings(locale.get()).latitude}
+                                        <input
+                                            type="number"
+                                            step="0.000001"
+                                            min="-90"
+                                            max="90"
+                                            prop:value=move || point.latitude.get()
+                                            on:input=move |event| point.latitude.set(event_target_value(&event))
+                                        />
+                                    </label>
+                                    <label>
+                                        {move || strings(locale.get()).longitude}
+                                        <input
+                                            type="number"
+                                            step="0.000001"
+                                            min="-180"
+                                            max="180"
+                                            prop:value=move || point.longitude.get()
+                                            on:input=move |event| point.longitude.set(event_target_value(&event))
+                                        />
+                                    </label>
+                                    <label>
+                                        {move || strings(locale.get()).address_optional}
+                                        <input
+                                            type="text"
+                                            prop:value=move || point.address.get()
+                                            on:input=move |event| point.address.set(event_target_value(&event))
+                                        />
+                                    </label>
+                                </div>
+                                <div class="actions">
+                                    <button
+                                        type="button"
+                                        on:click=move |_| {
+                                            manual_points.update(|rows| {
+                                                rows.retain(|row| row.point_id != remove_id);
+                                            });
+                                        }
+                                        disabled=move || busy.get()
+                                    >
+                                        {move || strings(locale.get()).remove_point}
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    }
+                />
+                <div class="actions">
+                    <button
+                        type="button"
+                        on:click=move |_| manual_points.update(|rows| rows.push(ManualPointDraft::new()))
+                        disabled=move || busy.get()
+                    >
+                        {move || strings(locale.get()).add_point}
+                    </button>
+                    <button class="primary" type="button" on:click=create_manual disabled=move || busy.get()>
+                        {move || strings(locale.get()).create_trip}
+                    </button>
+                </div>
+                </div>
+                </div>
+            </div>
+
+
+            <div class="access-dialog manager-only" class:open=move || dialog.get() == Some(AccessDialog::Connect)>
+                <div class="access-box">
+                    <div class="access-head">
+                        <h2>{move || strings(locale.get()).broadcast}</h2>
+                        <button type="button" on:click=move |_| dialog.set(None)>
+                            {move || strings(locale.get()).close}
+                        </button>
+                    </div>
+                    <label class="choice" class:selected=move || connect_choice.get() == ConnectChoice::Local>
+                        <input type="radio" name="connect-choice" prop:checked=move || connect_choice.get() == ConnectChoice::Local on:change=move |_| connect_choice.set(ConnectChoice::Local) />
+                        <span><strong>{move || strings(locale.get()).mode_local}</strong><span class="hint">{move || strings(locale.get()).mode_local_hint}</span></span>
+                    </label>
+                    <label class="choice" class:selected=move || connect_choice.get() == ConnectChoice::Lan>
+                        <input type="radio" name="connect-choice" prop:checked=move || connect_choice.get() == ConnectChoice::Lan on:change=move |_| connect_choice.set(ConnectChoice::Lan) />
+                        <span><strong>{move || strings(locale.get()).mode_lan}</strong><span class="hint">{move || strings(locale.get()).mode_lan_hint}</span></span>
+                    </label>
+                    <label class="choice" class:selected=move || connect_choice.get() == ConnectChoice::Internet>
+                        <input type="radio" name="connect-choice" prop:checked=move || connect_choice.get() == ConnectChoice::Internet on:change=move |_| connect_choice.set(ConnectChoice::Internet) />
+                        <span><strong>{move || strings(locale.get()).mode_internet}</strong><span class="hint">{move || strings(locale.get()).mode_internet_hint}</span></span>
+                    </label>
+                <p class="note" class:hidden=move || status.get().and_then(|current| current.listener).is_none()>
+                    {move || strings(locale.get()).listener_busy}
+                </p>
+
+                <div class:hidden=move || connect_choice.get() != ConnectChoice::Local>
+                    <p class="note">{move || strings(locale.get()).no_fields}</p>
+                    <div class="actions">
+                        <button class="primary" type="button" on:click=start_loopback disabled=move || busy.get()>
+                            {move || strings(locale.get()).local_loopback}
+                        </button>
+                    </div>
+                </div>
+
+                <div class:hidden=move || connect_choice.get() != ConnectChoice::Lan>
+                    <div class="grid">
+                        <label>
+                            {move || strings(locale.get()).lan_address}
+                            <input
+                                id="lan-ip"
+                                type="text"
+                                prop:value=move || lan_ip.get()
+                                on:input=move |event| lan_ip.set(event_target_value(&event))
+                            />
+                            <span class="hint">{move || format!("{} {}", strings(locale.get()).example_prefix, r"192.168.1.25")}</span>
+                        </label>
+                        <label>
+                            {move || strings(locale.get()).port}
+                            <input
+                                id="lan-port"
+                                type="number"
+                                min="1"
+                                max="65535"
+                                prop:value=move || lan_port.get()
+                                on:input=move |event| lan_port.set(event_target_value(&event))
+                            />
+                        </label>
+                    </div>
+                    <p class="note">{move || strings(locale.get()).lan_note}</p>
+                    <div class="actions">
+                        <button class="primary" type="button" on:click=start_lan disabled=move || busy.get()>
+                            {move || strings(locale.get()).enable_lan}
+                        </button>
+                    </div>
+                </div>
+
+                <div class:hidden=move || connect_choice.get() != ConnectChoice::Internet>
+                    <h3>{move || strings(locale.get()).public_gateway}</h3>
+                    <p class="note">{move || strings(locale.get()).internet_order_note}</p>
+                    <div class="grid">
+                        <label>
+                            {move || strings(locale.get()).gateway_address}
+                            <input
+                                id="gateway-url"
+                                type="url"
+                                prop:value=move || gateway_url.get()
+                                on:input=move |event| gateway_url.set(event_target_value(&event))
+                            />
+                            <span class="hint">{move || format!("{} {}", strings(locale.get()).example_prefix, r"https://cargo.example.com")}</span>
+                        </label>
+                        <label>
+                            {move || strings(locale.get()).control_secret}
+                            <input
+                                id="gateway-secret"
+                                type="password"
+                                minlength="32"
+                                autocomplete="off"
+                                prop:value=move || gateway_secret.get()
+                                on:input=move |event| gateway_secret.set(event_target_value(&event))
+                            />
+                        </label>
+                    </div>
+                    <p class="note">{move || strings(locale.get()).gateway_note}</p>
+                    <div class="actions">
+                        <button class="primary" type="button" on:click=start_gateway disabled=move || busy.get()>
+                            {move || strings(locale.get()).enable_gateway}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="danger" type="button" on:click=stop disabled=move || busy.get()>
+                        {move || strings(locale.get()).stop_broadcast}
+                    </button>
+                    <button type="button" on:click=stop_gateway disabled=move || busy.get()>
+                        {move || strings(locale.get()).disable_gateway}
+                    </button>
+                </div>
+                <div class="status">
+                    {move || {
+                        status.get().map(|current| {
+                            let local = match current.listener {
+                                Some(listener) => {
+                                    let mode = match listener.mode {
+                                        ListenerMode::Loopback => "loopback",
+                                        ListenerMode::Lan => "LAN",
+                                    };
+                                    format!(
+                                        "{}: {mode} · {}",
+                                        strings(locale.get()).listener,
+                                        listener.address
+                                    )
+                                }
+                                None => strings(locale.get()).listener_off.to_owned(),
+                            };
+                            let public = match current.gateway {
+                                Some(gateway) => format!(
+                                    "{}: {} · {} {}/{}",
+                                    strings(locale.get()).gateway,
+                                    gateway.base_url,
+                                    strings(locale.get()).active,
+                                    gateway.active_sessions,
+                                    gateway.total_sessions
+                                ),
+                                None => strings(locale.get()).gateway_off.to_owned(),
+                            };
+                            format!("{local} · {public}")
+                        }).unwrap_or_else(|| strings(locale.get()).reading_state.to_owned())
+                    }}
+                </div>
+                </div>
+            </div>
+
+            <div class="access-dialog manager-only" class:open=move || dialog.get() == Some(AccessDialog::Road)>
+                <div class="access-box">
+                    <div class="access-head">
+                        <h2>{move || strings(locale.get()).routing_engine}</h2>
+                        <button type="button" on:click=move |_| dialog.set(None)>
+                            {move || strings(locale.get()).close}
+                        </button>
+                    </div>
+                <p>{move || strings(locale.get()).road_optional}</p>
+                <div class="grid">
+                    <label>
+                        {move || strings(locale.get()).valhalla_address}
+                        <input
+                            id="routing-url"
+                            type="url"
+                            prop:value=move || routing_url.get()
+                            on:input=move |event| routing_url.set(event_target_value(&event))
+                        />
+                        <span class="hint">{move || format!("{} {}", strings(locale.get()).example_prefix, r"http://127.0.0.1:8002")}</span>
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).map_dataset}
+                        <input
+                            id="routing-dataset"
+                            type="text"
+                            prop:value=move || routing_dataset.get()
+                            on:input=move |event| routing_dataset.set(event_target_value(&event))
+                        />
+                        <span class="hint">{move || format!("{} {}", strings(locale.get()).example_prefix, r"europe-2026-11")}</span>
+                    </label>
+                </div>
+                <details>
+                    <summary>{move || strings(locale.get()).advanced}</summary>
+                    <div class="grid">
+                    <label>
+                        {move || strings(locale.get()).connect_timeout_ms}
+                        <input
+                            id="routing-connect-timeout"
+                            type="number"
+                            min="100"
+                            max="30000"
+                            prop:value=move || routing_connect_timeout.get()
+                            on:input=move |event| routing_connect_timeout.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).request_timeout_ms}
+                        <input
+                            id="routing-request-timeout"
+                            type="number"
+                            min="250"
+                            max="120000"
+                            prop:value=move || routing_request_timeout.get()
+                            on:input=move |event| routing_request_timeout.set(event_target_value(&event))
+                        />
+                    </label>
+                    </div>
+                </details>
+                <div class="actions">
+                    <button class="primary" type="button" on:click=configure_routing disabled=move || busy.get()>
+                        {move || strings(locale.get()).configure_routing}
+                    </button>
+                    <button type="button" on:click=test_routing disabled=move || busy.get()>
+                        {move || strings(locale.get()).check_routing}
+                    </button>
+                    <button type="button" on:click=disable_routing disabled=move || busy.get()>
+                        {move || strings(locale.get()).disable_routing}
+                    </button>
+                </div>
+                <div class="status">
+                    {move || {
+                        status
+                            .get()
+                            .and_then(|current| current.routing)
+                            .map(|routing| {
+                                format!(
+                                    "{} · {} · {} / {} ms",
+                                    routing.base_url,
+                                    routing.map_dataset_id,
+                                    routing.connect_timeout_ms,
+                                    routing.request_timeout_ms
+                                )
+                            })
+                            .unwrap_or_else(|| {
+                                strings(locale.get()).routing_not_configured.to_owned()
+                            })
+                    }}
+                </div>
+                <p class="note">{move || strings(locale.get()).routing_note}</p>
+                </div>
+            </div>
+
+
+            <div class="access-dialog manager-only" class:open=move || dialog.get() == Some(AccessDialog::Help)>
+                <div class="access-box">
+                    <div class="access-head">
+                        <h2>{move || strings(locale.get()).help_title}</h2>
+                        <button type="button" on:click=move |_| dialog.set(None)>
+                            {move || strings(locale.get()).close}
+                        </button>
+                    </div>
+                    <p>{move || strings(locale.get()).help_local}</p>
+                    <p>{move || strings(locale.get()).help_internet}</p>
+                    <p>{move || strings(locale.get()).road_optional}</p>
+                    <p>{move || strings(locale.get()).help_restart}</p>
+                </div>
+            </div>
 
             <section id="control-map-section">
                 <h2>{move || strings(locale.get()).trip_map}</h2>
