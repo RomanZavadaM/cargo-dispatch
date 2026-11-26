@@ -2027,7 +2027,7 @@ mod tests {
         let marker = folder.join("keep.txt");
         fs::write(&marker, b"keep me")?;
 
-        let error = TripFolder::create_manual(
+        let error = match TripFolder::create_manual(
             &folder,
             ManualTripCreateDraft {
                 trip_id: TripId::from_bytes([77; 16]).unwrap(),
@@ -2044,8 +2044,10 @@ mod tests {
                 }],
                 planning_basis: None,
             },
-        )
-        .expect_err("non-empty folder must be rejected");
+        ) {
+            Ok(_) => panic!("non-empty folder must be rejected"),
+            Err(error) => error,
+        };
 
         assert_eq!(error.kind(), io::ErrorKind::InvalidData);
         assert_eq!(fs::read(marker)?, b"keep me");
