@@ -16,7 +16,7 @@
    - Driver iPhone/iPad Simulator build;
    - Addressing Gateway для Linux;
    - `SHA256SUMS.txt`.
-9. Поточний `main` уже випереджає `preview.7`: Planner manual draft зберігається у versioned append-only journal в app-data і відновлюється після перезапуску.
+9. Поточний `main` уже випереджає `preview.7`: Planner manual draft зберігається у versioned append-only journal в app-data і відновлюється після перезапуску; у поточному Planner-зрізі також є real Valhalla road preview з реальною дорожньою geometry поверх OSM.
 10. Control залишається єдиним джерелом фактичного стану активного рейсу. Gateway не зберігає trip DB, документи, медіа чи історію позицій.
 11. Повна локалізація 8 мовами інтегрована й захищена CI, включно з Planner UI.
-12. Наступний Planner етап — map/routing preview у Planner, далі package export із Planner UI.
+12. Наступний Planner етап після цього зрізу — package export із Planner UI через наявний versioned trip package; preview geometry лишається derived і не змінює чернетку при помилці routing.
