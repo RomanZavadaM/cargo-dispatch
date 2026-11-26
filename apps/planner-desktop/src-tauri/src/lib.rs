@@ -489,11 +489,17 @@ impl PlannerDesktopService {
                 .lock()
                 .map_err(|_| "Planner state unavailable".to_owned())?;
             let route = package_route_points(&state)?;
+            let mut cargo_row_ids = BTreeSet::new();
             let cargos = input
                 .cargos
                 .iter()
-                .enumerate()
-                .map(|(index, cargo)| {
+                .map(|cargo| {
+                    if cargo.row_id == 0 {
+                        return Err("Cargo row id must be positive".to_owned());
+                    }
+                    if !cargo_row_ids.insert(cargo.row_id) {
+                        return Err("Cargo row ids must be unique".to_owned());
+                    }
                     let title = cargo.title.trim();
                     if title.is_empty() {
                         return Err("Cargo title is required".to_owned());
@@ -509,7 +515,7 @@ impl PlannerDesktopService {
                         .map(|value| point_from_text(&state, value))
                         .transpose()?;
                     let cargo_id =
-                        CargoId::from_bytes(cargo_id_bytes(state.route.working_route_id, index))
+                        CargoId::from_bytes(cargo_id_bytes(state.route.working_route_id, cargo.row_id))
                             .map_err(|error| format!("Could not create cargo id: {error}"))?;
                     Ok(PlannedCargoBasis {
                         cargo_id,
@@ -974,10 +980,10 @@ fn trip_id_bytes(route_id: WorkingRouteId) -> [u8; 16] {
     bytes
 }
 
-fn cargo_id_bytes(route_id: WorkingRouteId, index: usize) -> [u8; 16] {
+fn cargo_id_bytes(route_id: WorkingRouteId, row_id: u64) -> [u8; 16] {
     let mut bytes = route_id.as_bytes();
     bytes[0] = 0x43;
-    let discriminator = u64::try_from(index).unwrap_or(u64::MAX).saturating_add(1);
+    let discriminator = row_id;
     let mut tail = [0_u8; 8];
     tail.copy_from_slice(&bytes[8..]);
     let mixed = u64::from_be_bytes(tail).rotate_left(17) ^ discriminator;
@@ -1644,6 +1650,7 @@ mod tests {
                 path: package.to_string_lossy().into_owned(),
                 vehicle_type: "truck".to_owned(),
                 cargos: vec![PlannerPackageCargoInput {
+                    row_id: 1,
                     title: "Synthetic cargo".to_owned(),
                     weight_kg: None,
                     pallets: None,
@@ -1661,6 +1668,84 @@ mod tests {
         assert!(second_name.ends_with("-v2.zip"));
 
         let _ = fs::remove_file(&package);
+        let _ = fs::remove_file(journal.with_extension("operator-id.bin"));
+        let _ = fs::remove_file(journal);
+    }
+
+    #[test]
+    fn cargo_id_survives_removing_an_earlier_cargo_row_between_versions() {
+        let journal = unique_journal("package-export-stable-cargo-id");
+        let package_v1 = journal.with_extension("stable-cargo-v1.zip");
+        let package_v2 = journal.with_extension("stable-cargo-v2.zip");
+        let imported_path = journal.with_extension("stable-cargo-import");
+
+        let service = PlannerDesktopService::open(journal.clone()).expect("open Planner");
+        service
+            .add_point(point("Warehouse", 49.8393, 24.0296))
+            .expect("warehouse");
+        let route = service
+            .add_point(point("Customer", 49.8430, 24.0360))
+            .expect("customer");
+
+        let first_cargo = PlannerPackageCargoInput {
+            row_id: 10,
+            title: "First cargo".to_owned(),
+            weight_kg: Some(1_000),
+            pallets: None,
+            pickup_point_id: Some(route.points[0].point_id.clone()),
+            unload_point_id: Some(route.points[1].point_id.clone()),
+        };
+        let stable_cargo = PlannerPackageCargoInput {
+            row_id: 20,
+            title: "Stable cargo".to_owned(),
+            weight_kg: Some(2_000),
+            pallets: Some(2),
+            pickup_point_id: Some(route.points[0].point_id.clone()),
+            unload_point_id: Some(route.points[1].point_id.clone()),
+        };
+
+        service
+            .export_trip_package(PlannerPackageExportInput {
+                path: package_v1.to_string_lossy().into_owned(),
+                vehicle_type: "truck".to_owned(),
+                cargos: vec![first_cargo, stable_cargo.clone()],
+                routing_profile: None,
+                routing_preview: None,
+            })
+            .expect("export v1");
+
+        service
+            .export_trip_package(PlannerPackageExportInput {
+                path: package_v2.to_string_lossy().into_owned(),
+                vehicle_type: "truck".to_owned(),
+                cargos: vec![stable_cargo],
+                routing_profile: None,
+                routing_preview: None,
+            })
+            .expect("export v2");
+
+        let imported = cargo_dispatch_trip_files::TripFolder::import(&imported_path, &package_v1)
+            .expect("import v1");
+        let stable_id = imported
+            .planning_basis()
+            .expect("v1 planning basis")
+            .cargos
+            .iter()
+            .find(|cargo| cargo.title == "Stable cargo")
+            .expect("stable cargo in v1")
+            .cargo_id;
+        drop(imported);
+
+        let imported = cargo_dispatch_trip_files::TripFolder::import(&imported_path, &package_v2)
+            .expect("import v2");
+        let basis = imported.planning_basis().expect("v2 planning basis");
+        assert_eq!(basis.cargos.len(), 1);
+        assert_eq!(basis.cargos[0].title, "Stable cargo");
+        assert_eq!(basis.cargos[0].cargo_id, stable_id);
+
+        let _ = fs::remove_file(&package_v1);
+        let _ = fs::remove_file(&package_v2);
+        let _ = fs::remove_dir_all(&imported_path);
         let _ = fs::remove_file(journal.with_extension("operator-id.bin"));
         let _ = fs::remove_file(journal);
     }
@@ -1706,6 +1791,7 @@ mod tests {
             .add_point(point("Customer", 49.8430, 24.0360))
             .expect("customer");
         let cargo = PlannerPackageCargoInput {
+            row_id: 1,
             title: "Synthetic cargo".to_owned(),
             weight_kg: Some(8_000),
             pallets: Some(10),
@@ -1786,6 +1872,7 @@ mod tests {
                 path: package.to_string_lossy().into_owned(),
                 vehicle_type: "current routing vehicle".to_owned(),
                 cargos: vec![PlannerPackageCargoInput {
+                    row_id: 1,
                     title: "Synthetic cargo".to_owned(),
                     weight_kg: Some(12_500),
                     pallets: Some(18),
@@ -1878,6 +1965,7 @@ mod tests {
                 path: package.to_string_lossy().into_owned(),
                 vehicle_type: "truck".to_owned(),
                 cargos: vec![PlannerPackageCargoInput {
+                    row_id: 1,
                     title: "Synthetic cargo".to_owned(),
                     weight_kg: None,
                     pallets: None,
