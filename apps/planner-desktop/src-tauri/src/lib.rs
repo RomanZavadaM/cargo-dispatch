@@ -1,21 +1,28 @@
 #![forbid(unsafe_code)]
 
-use cargo_dispatch_domain::{PointId, WorkingRouteId};
+use cargo_dispatch_contracts::{
+    CURRENT_SCHEMA_VERSION, PlannedCargoBasis, TripNavigationTarget, TripPackageHeader,
+    TripPlanningBasis, TripPointKind, TripRoadGeometry, TripRoadGeometryPoint, TripRoutePoint,
+    TripRoutingIdentity, TripVersion, validate_trip_planning_basis,
+};
+use cargo_dispatch_domain::{CargoId, OperatorId, PointId, TripId, WorkingRouteId};
 use cargo_dispatch_geo::{
     GeoPoint, GeoWarning, NormalizedStatus, RouteRequest, TollPreference, VehicleDimension,
     VehicleRoutingProfile,
     valhalla_http::{ValhallaHttpClient, ValhallaHttpError, ValhallaRuntimeConfig},
 };
 use cargo_dispatch_planner::{
-    WorkingRoute, WorkingRouteState, edit_manual_working_route, manual_working_route,
+    PlannerTripExportDraft, WorkingRoute, WorkingRouteState, edit_manual_working_route,
+    manual_working_route,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    PlannerPointInput, PlannerPointView, PlannerRoadGeometryPoint, PlannerRouteView,
-    PlannerRoutingAvailabilityState, PlannerRoutingConfigInput, PlannerRoutingPreviewInput,
-    PlannerRoutingPreviewState, PlannerRoutingPreviewView, PlannerRoutingProbeResult,
-    PlannerRoutingProfileInput, PlannerRoutingStatus, PlannerTollPreference, PointActionInput,
-    ReorderPointsInput,
+    PlannerPackageExportInput, PlannerPackageExportResult, PlannerPointInput, PlannerPointView,
+    PlannerRoadGeometryPoint, PlannerRouteView, PlannerRoutingAvailabilityState,
+    PlannerRoutingConfigInput, PlannerRoutingPreviewInput, PlannerRoutingPreviewState,
+    PlannerRoutingPreviewView, PlannerRoutingProbeResult, PlannerRoutingProfileInput,
+    PlannerRoutingStatus, PlannerTollPreference, PointActionInput, ReorderPointsInput,
 };
+use cargo_dispatch_trip_files::export_package as write_trip_package;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -23,12 +30,13 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     sync::Mutex,
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::{Manager, State};
 
 const PLANNER_JOURNAL_SCHEMA: u32 = 1;
 const PLANNER_JOURNAL_FILE: &str = "planner-draft-v1.jsonl";
+const PLANNER_OPERATOR_ID_FILE: &str = "planner-operator-id.bin";
 
 #[derive(Debug, Clone)]
 struct ManualPoint {
@@ -84,6 +92,7 @@ struct PlannerJournalRecord {
 struct PlannerDesktopService {
     inner: Mutex<PlannerState>,
     journal_path: Option<PathBuf>,
+    operator_id: OperatorId,
     routing: Mutex<Option<ValhallaRuntimeConfig>>,
 }
 
@@ -92,6 +101,8 @@ impl Default for PlannerDesktopService {
         Self {
             inner: Mutex::new(PlannerState::default()),
             journal_path: None,
+            operator_id: OperatorId::from_bytes(id_bytes(0x4f, 1))
+                .expect("default Planner operator id is non-nil"),
             routing: Mutex::new(None),
         }
     }
@@ -100,9 +111,11 @@ impl Default for PlannerDesktopService {
 impl PlannerDesktopService {
     fn open(journal_path: PathBuf) -> Result<Self, String> {
         let state = recover_journal(&journal_path)?;
+        let operator_id = load_or_create_operator_id(&journal_path)?;
         Ok(Self {
             inner: Mutex::new(state),
             journal_path: Some(journal_path),
+            operator_id,
             routing: Mutex::new(None),
         })
     }
@@ -421,6 +434,172 @@ impl PlannerDesktopService {
             warnings: result.warnings.into_iter().map(warning_code).collect(),
         })
     }
+
+    fn export_trip_package(
+        &self,
+        input: PlannerPackageExportInput,
+    ) -> Result<PlannerPackageExportResult, String> {
+        let target = input.path.trim();
+        if target.is_empty() {
+            return Err("Package path is required".to_owned());
+        }
+        let path = PathBuf::from(target);
+        if path
+            .try_exists()
+            .map_err(|error| format!("Could not inspect package path: {error}"))?
+        {
+            return Err("Package path already exists".to_owned());
+        }
+        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("Could not create package folder: {error}"))?;
+        }
+
+        let (working_route_id, revision, route, planning_basis) = {
+            let state = self
+                .inner
+                .lock()
+                .map_err(|_| "Planner state unavailable".to_owned())?;
+            let route = package_route_points(&state)?;
+            let cargos = input
+                .cargos
+                .iter()
+                .enumerate()
+                .map(|(index, cargo)| {
+                    let title = cargo.title.trim();
+                    if title.is_empty() {
+                        return Err("Cargo title is required".to_owned());
+                    }
+                    let pickup_point_id = cargo
+                        .pickup_point_id
+                        .as_deref()
+                        .map(|value| point_from_text(&state, value))
+                        .transpose()?;
+                    let unload_point_id = cargo
+                        .unload_point_id
+                        .as_deref()
+                        .map(|value| point_from_text(&state, value))
+                        .transpose()?;
+                    let cargo_id = CargoId::from_bytes(cargo_id_bytes(
+                        state.route.working_route_id,
+                        index,
+                    ))
+                    .map_err(|error| format!("Could not create cargo id: {error}"))?;
+                    Ok(PlannedCargoBasis {
+                        cargo_id,
+                        title: title.to_owned(),
+                        weight_kg: cargo.weight_kg,
+                        pallets: cargo.pallets,
+                        pickup_point_id,
+                        unload_point_id,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            let planning_basis = TripPlanningBasis {
+                vehicle_type: input.vehicle_type.trim().to_owned(),
+                cargos,
+            };
+            validate_trip_planning_basis(&planning_basis, &route)
+                .map_err(|error| format!("Invalid planning basis: {error:?}"))?;
+            (
+                state.route.working_route_id,
+                state.route.current_revision,
+                route,
+                planning_basis,
+            )
+        };
+
+        let trip_id = TripId::from_bytes(trip_id_bytes(working_route_id))
+            .map_err(|error| format!("Could not create trip id: {error}"))?;
+        let trip_version = TripVersion::new(1)
+            .map_err(|error| format!("Could not create trip version: {error:?}"))?;
+        let header = TripPackageHeader::new(trip_id, trip_version, None)
+            .map_err(|error| format!("Could not create package header: {error:?}"))?;
+        let created_at_unix_ms = unix_time_ms()?;
+        let mut draft = PlannerTripExportDraft {
+            header,
+            working_route_id,
+            working_route_revision: revision,
+            created_at_unix_ms,
+            created_by: self.operator_id,
+            ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            planning_basis: Some(planning_basis),
+            routing_profile: None,
+            route_geometry: None,
+        };
+
+        let profile = input
+            .routing_profile
+            .map(routing_profile)
+            .transpose()?;
+        if let Some(profile) = profile.clone() {
+            draft = draft
+                .with_routing_profile(profile)
+                .map_err(|error| format!("Could not attach routing profile: {error:?}"))?;
+        }
+        if let Some(preview) = input.routing_preview.as_ref() {
+            let Some(profile) = profile.as_ref() else {
+                return Err("Routing preview requires the matching planning profile".to_owned());
+            };
+            if preview.state != PlannerRoutingPreviewState::Ok
+                || preview.working_route_id != hex_id(working_route_id.as_bytes())
+                || preview.revision != revision
+                || preview.profile_fingerprint != profile.profile_fingerprint()
+            {
+                return Err("Routing preview is stale or does not match this Planner draft".to_owned());
+            }
+            let engine_version = preview
+                .engine_version
+                .as_deref()
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| "Routing preview engine version is missing".to_owned())?;
+            let map_dataset_id = preview
+                .map_dataset_id
+                .as_deref()
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| "Routing preview map dataset is missing".to_owned())?;
+            if preview.geometry.len() < 2 {
+                return Err("Routing preview geometry is incomplete".to_owned());
+            }
+            let geometry = TripRoadGeometry {
+                routing: TripRoutingIdentity {
+                    engine: "valhalla".to_owned(),
+                    engine_version: engine_version.to_owned(),
+                    map_dataset_id: map_dataset_id.to_owned(),
+                    profile_fingerprint: preview.profile_fingerprint.clone(),
+                },
+                points: preview
+                    .geometry
+                    .iter()
+                    .map(|point| {
+                        Ok(TripRoadGeometryPoint {
+                            latitude_e7: coordinate_e7(point.latitude, 90.0, "latitude")?,
+                            longitude_e7: coordinate_e7(point.longitude, 180.0, "longitude")?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+            };
+            draft = draft
+                .with_route_geometry(geometry)
+                .map_err(|error| format!("Could not attach route geometry: {error:?}"))?;
+        }
+
+        write_trip_package(&path, &draft, &route)
+            .map_err(|error| format!("Could not export trip package: {error}"))?;
+        Ok(PlannerPackageExportResult {
+            path: path.to_string_lossy().into_owned(),
+            trip_id: hex_id(trip_id.as_bytes()),
+            trip_version: trip_version.get(),
+            schema_major: CURRENT_SCHEMA_VERSION.major,
+            schema_minor: CURRENT_SCHEMA_VERSION.minor,
+            point_count: route.len(),
+            cargo_count: draft
+                .planning_basis
+                .as_ref()
+                .map_or(0, |basis| basis.cargos.len()),
+            geometry_included: draft.route_geometry.is_some(),
+        })
+    }
 }
 
 fn routing_profile(input: PlannerRoutingProfileInput) -> Result<VehicleRoutingProfile, String> {
@@ -653,6 +832,109 @@ fn id_bytes(kind: u8, serial: u64) -> [u8; 16] {
     bytes
 }
 
+fn load_or_create_operator_id(journal_path: &Path) -> Result<OperatorId, String> {
+    let path = journal_path.with_file_name(PLANNER_OPERATOR_ID_FILE);
+    if path
+        .try_exists()
+        .map_err(|error| format!("Could not inspect Planner operator id: {error}"))?
+    {
+        let bytes = fs::read(&path)
+            .map_err(|error| format!("Could not read Planner operator id: {error}"))?;
+        let bytes: [u8; 16] = bytes
+            .try_into()
+            .map_err(|_| "Planner operator id file is invalid".to_owned())?;
+        return OperatorId::from_bytes(bytes)
+            .map_err(|error| format!("Planner operator id is invalid: {error}"));
+    }
+
+    let serial = unix_time_ms()?
+        ^ (u64::from(std::process::id()) << 32)
+        ^ 0x504c_414e_4e45_5201;
+    let operator = OperatorId::from_bytes(id_bytes(0x4f, serial.max(1)))
+        .map_err(|error| format!("Could not create Planner operator id: {error}"))?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Could not create Planner data folder: {error}"))?;
+    }
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .map_err(|error| format!("Could not create Planner operator id: {error}"))?;
+    file.write_all(&operator.as_bytes())
+        .map_err(|error| format!("Could not write Planner operator id: {error}"))?;
+    file.flush()
+        .map_err(|error| format!("Could not flush Planner operator id: {error}"))?;
+    file.sync_data()
+        .map_err(|error| format!("Could not sync Planner operator id: {error}"))?;
+    Ok(operator)
+}
+
+fn unix_time_ms() -> Result<u64, String> {
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("System clock is before Unix epoch: {error}"))?
+        .as_millis();
+    u64::try_from(millis).map_err(|_| "System time does not fit package timestamp".to_owned())
+}
+
+fn trip_id_bytes(route_id: WorkingRouteId) -> [u8; 16] {
+    let mut bytes = route_id.as_bytes();
+    bytes[0] = 0x54;
+    bytes
+}
+
+fn cargo_id_bytes(route_id: WorkingRouteId, index: usize) -> [u8; 16] {
+    let mut bytes = route_id.as_bytes();
+    bytes[0] = 0x43;
+    let discriminator = u64::try_from(index)
+        .unwrap_or(u64::MAX)
+        .saturating_add(1);
+    let mut tail = [0_u8; 8];
+    tail.copy_from_slice(&bytes[8..]);
+    let mixed = u64::from_be_bytes(tail).rotate_left(17) ^ discriminator;
+    bytes[8..].copy_from_slice(&mixed.to_be_bytes());
+    bytes
+}
+
+fn coordinate_e7(value: f64, limit: f64, label: &str) -> Result<i32, String> {
+    if !value.is_finite() || !(-limit..=limit).contains(&value) {
+        return Err(format!("Invalid {label} in routing geometry"));
+    }
+    let scaled = (value * 10_000_000.0).round();
+    if scaled < f64::from(i32::MIN) || scaled > f64::from(i32::MAX) {
+        return Err(format!("{label} does not fit e7 coordinate"));
+    }
+    Ok(scaled as i32)
+}
+
+fn package_route_points(state: &PlannerState) -> Result<Vec<TripRoutePoint>, String> {
+    state
+        .route
+        .points
+        .iter()
+        .enumerate()
+        .map(|(index, route_point)| {
+            let point = state
+                .points
+                .get(&route_point.point_id)
+                .ok_or_else(|| "Planner point metadata is missing".to_owned())?;
+            Ok(TripRoutePoint {
+                point_id: point.point_id,
+                sequence: u32::try_from(index + 1)
+                    .map_err(|_| "Planner route contains too many points".to_owned())?,
+                kind: TripPointKind::Custom("manual".to_owned()),
+                title: point.title.clone(),
+                navigation: Some(TripNavigationTarget {
+                    latitude_e7: coordinate_e7(point.latitude, 90.0, "latitude")?,
+                    longitude_e7: coordinate_e7(point.longitude, 180.0, "longitude")?,
+                    address: None,
+                }),
+            })
+        })
+        .collect()
+}
+
 fn route_id(serial: u64) -> WorkingRouteId {
     WorkingRouteId::from_bytes(id_bytes(0x52, serial)).expect("route id is non-nil")
 }
@@ -796,6 +1078,14 @@ async fn planner_preview_route(
     state.preview_route(input).await
 }
 
+#[tauri::command]
+fn planner_export_package(
+    input: PlannerPackageExportInput,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerPackageExportResult, String> {
+    state.export_trip_package(input)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -816,7 +1106,8 @@ pub fn run() {
             planner_configure_routing,
             planner_disable_routing,
             planner_test_routing,
-            planner_preview_route
+            planner_preview_route,
+            planner_export_package
         ])
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");
