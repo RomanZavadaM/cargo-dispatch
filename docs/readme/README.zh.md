@@ -48,9 +48,9 @@ Driver Browser 是**一个产品**，不是分别开发的手机版和桌面版�
 
 Control 和 Driver Browser 已经包含真正的交互式基础地图，可显示行程站点和最后一次被接受的司机位置。
 
-`main` 现在已经集成版本化的道路几何管线（schema 1.2）：Planner 可以携带派生 geometry，Control 会保存它，两端地图只在 geometry 与当前站点顺序一致时显示道路线。重新排序后，旧线会立即失效。
+`main` 现在已经集成版本化的道路 geometry 管线（schema 1.3）：Planner 会把派生 geometry 与车辆的实际 routing profile 一起传递，同时仍可读取 schema 1.0–1.2 软件包。Control 保存 geometry，并在站点重新排序后通过已配置的 runtime Valhalla 重新计算道路线。延迟返回的 routing 响应不能覆盖更新的行程状态。
 
-仍待完成的是**连接 Valhalla 的真实 HTTP transport 和 geometry 自动重算**。数据契约与显示层已经存在，但外部路由引擎尚未接入 product runtime。
+Valhalla 地址、地图数据集 ID 和 timeout 可直接在 Desktop Control 中设置；可以通过 `/status` 检查可用性，也可以明确关闭 routing。即使 Valhalla 未配置或暂时不可用，Control 仍会保存新的站点顺序，只是派生 geometry 可以暂时不存在。
 
 ## Stable v0.1.0
 
@@ -78,7 +78,6 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 - HTTPS/公共寻址路径；
 - 通过 HTTPS 完成浏览器 GPS 验收；
 - 不同网络/NAT/CGNAT 的现场测试；
-- 真实 Valhalla HTTP transport，以及重新排序后的 geometry 重算；
 
 
 ## 界面语言
