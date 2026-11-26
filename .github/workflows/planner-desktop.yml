@@ -75,6 +75,11 @@ jobs:
             libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
       - name: Verify committed lockfile
         run: cargo metadata --locked --format-version 1 --no-deps
+      - name: Prepare frontend path for Tauri compile checks
+        shell: bash
+        run: |
+          mkdir -p apps/planner-ui/dist
+          printf '<!doctype html><title>Planner compile check</title>' > apps/planner-ui/dist/index.html
       - name: Format
         run: cargo fmt --all -- --check
       - name: Check Planner shell
