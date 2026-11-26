@@ -1425,6 +1425,10 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            planning_basis: Some(TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            }),
             routing_profile: None,
             route_geometry: None,
         };
@@ -1457,6 +1461,7 @@ mod tests {
             created_at_unix_ms: 1,
             operator: OperatorId::from_bytes([4; 16]).unwrap().as_bytes(),
             points: vec![decoded],
+            planning_basis: None,
             routing_profile: None,
             road_geometry: None,
         };
@@ -1498,6 +1503,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([35; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            planning_basis: None,
             routing_profile: None,
             route_geometry: Some(TripRoadGeometry {
                 routing: TripRoutingIdentity {
@@ -1581,13 +1587,16 @@ mod tests {
             },
         ];
         let profile = routing_profile_fixture();
+        let mut header = TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap();
+        header.schema_version = SchemaVersion::new(1, 3);
         let draft = PlannerTripExportDraft {
-            header: TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap(),
+            header,
             working_route_id: WorkingRouteId::from_bytes([44; 16]).unwrap(),
             working_route_revision: 1,
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([45; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            planning_basis: None,
             routing_profile: Some(profile.clone()),
             route_geometry: None,
         };
@@ -1598,6 +1607,62 @@ mod tests {
         drop(imported);
         let reopened = TripFolder::open(&folder, trip)?;
         assert_eq!(reopened.routing_profile(), Some(&profile));
+        Ok(())
+    }
+
+    #[test]
+    fn schema_1_4_roundtrips_vehicle_type_and_cargo_planning_basis() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package = tmp.path().join("planning-basis.zip");
+        let folder = tmp.path().join("planning-basis-trip");
+        let trip = TripId::from_bytes([46; 16]).unwrap();
+        let pickup = PointId::from_bytes([47; 16]).unwrap();
+        let unload = PointId::from_bytes([48; 16]).unwrap();
+        let route = vec![
+            TripRoutePoint {
+                point_id: pickup,
+                sequence: 1,
+                kind: TripPointKind::Load,
+                title: "Pickup".to_owned(),
+                navigation: None,
+            },
+            TripRoutePoint {
+                point_id: unload,
+                sequence: 2,
+                kind: TripPointKind::Unload,
+                title: "Unload".to_owned(),
+                navigation: None,
+            },
+        ];
+        let basis = TripPlanningBasis {
+            vehicle_type: "tractor + semi-trailer".to_owned(),
+            cargos: vec![PlannedCargoBasis {
+                cargo_id: CargoId::from_bytes([49; 16]).unwrap(),
+                title: "Steel coils".to_owned(),
+                weight_kg: Some(20_000),
+                pallets: None,
+                pickup_point_id: Some(pickup),
+                unload_point_id: Some(unload),
+            }],
+        };
+        let draft = PlannerTripExportDraft {
+            header: TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap(),
+            working_route_id: WorkingRouteId::from_bytes([50; 16]).unwrap(),
+            working_route_revision: 1,
+            created_at_unix_ms: 1,
+            created_by: OperatorId::from_bytes([51; 16]).unwrap(),
+            ordered_point_ids: vec![pickup, unload],
+            planning_basis: Some(basis.clone()),
+            routing_profile: None,
+            route_geometry: None,
+        };
+
+        export_package(&package, &draft, &route)?;
+        let imported = TripFolder::import(&folder, &package)?;
+        assert_eq!(imported.planning_basis(), Some(&basis));
+        drop(imported);
+        let reopened = TripFolder::open(&folder, trip)?;
+        assert_eq!(reopened.planning_basis(), Some(&basis));
         Ok(())
     }
 
@@ -1668,6 +1733,10 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([3; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|p| p.point_id).collect(),
+            planning_basis: Some(TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            }),
             routing_profile: None,
             route_geometry: None,
         };
@@ -1731,6 +1800,10 @@ mod tests {
             None,
             1,
             operator,
+            TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            },
         )
         .expect("first trip export");
         let mut history = InMemoryTripExportHistory::default();
@@ -1783,6 +1856,10 @@ mod tests {
             Some(TripVersion::new(1).unwrap()),
             4,
             operator,
+            TripPlanningBasis {
+                vehicle_type: "synthetic truck".to_owned(),
+                cargos: Vec::new(),
+            },
         )
         .expect("second trip export");
         history
