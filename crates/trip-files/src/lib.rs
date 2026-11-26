@@ -76,6 +76,13 @@ pub struct ActiveTripSessionMetadata {
     pub vehicle_type: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManualTripCreateDraft {
+    pub trip_id: TripId,
+    pub route_points: Vec<TripRoutePoint>,
+    pub planning_basis: Option<TripPlanningBasis>,
+}
+
 fn validate_session_text(value: &Option<String>, field: &str) -> io::Result<()> {
     if let Some(value) = value {
         if value.trim().is_empty() {
@@ -700,6 +707,69 @@ impl From<&TripPlanningBasis> for PlanningBasisFile {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ManualTripFile {
+    trip: [u8; 16],
+    points: Vec<Point>,
+    planning_basis: Option<PlanningBasisFile>,
+}
+
+impl ManualTripFile {
+    fn candidate(&self) -> io::Result<TripImportCandidate> {
+        let trip_id = TripId::from_bytes(self.trip).map_err(invalid)?;
+        let route_points = points(&self.points)?;
+        if route_points.is_empty() {
+            return Err(invalid("manual trip requires at least one point"));
+        }
+        validate_route_points(&route_points).map_err(invalid)?;
+        let planning_basis = self
+            .planning_basis
+            .as_ref()
+            .map(PlanningBasisFile::typed)
+            .transpose()?;
+        if let Some(basis) = &planning_basis {
+            validate_trip_planning_basis(basis, &route_points).map_err(invalid)?;
+        }
+        let header = TripPackageHeader::new(
+            trip_id,
+            TripVersion::new(1).map_err(invalid)?,
+            None,
+        )
+        .map_err(invalid)?;
+        let hash = Sha256::digest(serde_json::to_vec(self)?);
+        Ok(TripImportCandidate {
+            header,
+            route_points,
+            route_geometry: None,
+            content_fingerprint: PackageContentFingerprint::from_bytes(hash.into()),
+        })
+    }
+
+    fn planning_basis(&self) -> io::Result<Option<TripPlanningBasis>> {
+        let route_points = points(&self.points)?;
+        let basis = self
+            .planning_basis
+            .as_ref()
+            .map(PlanningBasisFile::typed)
+            .transpose()?;
+        if let Some(basis) = &basis {
+            validate_trip_planning_basis(basis, &route_points).map_err(invalid)?;
+        }
+        Ok(basis)
+    }
+}
+
+impl From<&ManualTripCreateDraft> for ManualTripFile {
+    fn from(draft: &ManualTripCreateDraft) -> Self {
+        Self {
+            trip: draft.trip_id.as_bytes(),
+            points: draft.route_points.iter().map(Point::from).collect(),
+            planning_basis: draft.planning_basis.as_ref().map(PlanningBasisFile::from),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Manifest {
@@ -889,6 +959,7 @@ fn read_package(path: &Path) -> io::Result<Manifest> {
 #[derive(Debug, Serialize, Deserialize)]
 enum Change {
     Import(Box<Manifest>),
+    ManualCreate(ManualTripFile),
     Complete([u8; 16]),
     OperatorEdit(Vec<Point>),
     DriverOrder(Vec<[u8; 16]>),
@@ -941,6 +1012,22 @@ fn apply(
                 *planning_basis = incoming_basis;
                 *routing_profile = incoming_profile;
             }
+        }
+        Change::ManualCreate(file) => {
+            if file.trip != trip.as_bytes() {
+                return Err(invalid("different trip"));
+            }
+            let incoming_basis = file.planning_basis()?;
+            let result = reg.import(file.candidate()?).map_err(invalid)?;
+            if !matches!(
+                result,
+                ImportResult::AppliedFirstVersion | ImportResult::IdempotentSameVersion
+            ) {
+                return Err(invalid("manual trip creation must create version 1"));
+            }
+            *planning_basis = incoming_basis;
+            *routing_profile = None;
+            *active_routing_profile = None;
         }
         Change::Complete(id) => {
             reg.mark_point_completed(trip, PointId::from_bytes(*id).map_err(invalid)?)
@@ -1071,7 +1158,7 @@ impl TripFolder {
             }
             let event: Change = serde_json::from_slice(&bounded(File::open(entry)?)?)?;
             let before = this.registry.get(trip);
-            let is_import = matches!(&event, Change::Import(_));
+            let is_import = matches!(&event, Change::Import(_) | Change::ManualCreate(_));
             apply(
                 &mut this.registry,
                 ApplyAux {
@@ -1113,16 +1200,36 @@ impl TripFolder {
     pub fn open_detected(path: &Path) -> io::Result<Self> {
         let first = path.join("00000000000000000001.json");
         let event: Change = serde_json::from_slice(&bounded(File::open(first)?)?)?;
-        let Change::Import(manifest) = event else {
-            return Err(invalid("trip history must start with import"));
+        let trip = match event {
+            Change::Import(manifest) => manifest.candidate()?.header.trip_id,
+            Change::ManualCreate(file) => file.candidate()?.header.trip_id,
+            _ => return Err(invalid("trip history must start with import or manual create")),
         };
-        let trip = manifest.candidate()?.header.trip_id;
         Self::open(path, trip)
     }
 
     #[must_use]
     pub const fn trip_id(&self) -> TripId {
         self.trip
+    }
+
+    pub fn create_manual(path: &Path, draft: ManualTripCreateDraft) -> io::Result<Self> {
+        if draft.route_points.is_empty() {
+            return Err(invalid("manual trip requires at least one point"));
+        }
+        validate_route_points(&draft.route_points).map_err(invalid)?;
+        if let Some(basis) = &draft.planning_basis {
+            validate_trip_planning_basis(basis, &draft.route_points).map_err(invalid)?;
+        }
+        fs::create_dir_all(path)?;
+        let first = path.join("00000000000000000001.json");
+        if first.try_exists()? {
+            return Err(invalid("trip folder is not empty"));
+        }
+        let trip = draft.trip_id;
+        let mut this = Self::load(path, trip)?;
+        this.record(Change::ManualCreate(ManualTripFile::from(&draft)))?;
+        Ok(this)
     }
 
     pub fn import(path: &Path, package: &Path) -> io::Result<Self> {
