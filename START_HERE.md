@@ -20,3 +20,4 @@
 10. Control залишається єдиним джерелом фактичного стану активного рейсу. Gateway не зберігає trip DB, документи, медіа чи історію позицій.
 11. Повна локалізація 8 мовами інтегрована й захищена CI, включно з Planner UI.
 12. Ручне створення рейсу в Control уже інтегроване й використовує той самий durable trip state без вигаданого planning basis. `v0.1.0-preview.8` уже опублікований у GitHub Releases з Control/Planner Windows/macOS/Linux, Android, iOS Simulator, Gateway і SHA256SUMS.
+13. Автоматичний Driver Browser acceptance уже інтегрований окремо для loopback і явного private-LAN bind через реальний Control session. Це не замінює ручну візуальну перевірку narrow phone / tablet / wide desktop та реальний телефон у фізичній LAN/VPN.
