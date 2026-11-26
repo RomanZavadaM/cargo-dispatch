@@ -1,10 +1,10 @@
 #![forbid(unsafe_code)]
 
-use cargo_dispatch_domain::{PointId, ReplanRequestId, TripId};
+use cargo_dispatch_domain::{CargoId, PointId, ReplanRequestId, TripId};
 use core::fmt;
 
 pub const TRIP_PACKAGE_SCHEMA_NAME: &str = "cargo-dispatch.trip-package";
-pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion::new(1, 3);
+pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion::new(1, 4);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SchemaVersion {
@@ -191,6 +191,63 @@ pub fn validate_trip_road_geometry(
         }
         if !(-1_800_000_000..=1_800_000_000).contains(&point.longitude_e7) {
             return Err(TripGeometryContractError::InvalidLongitude(index));
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannedCargoBasis {
+    pub cargo_id: CargoId,
+    pub title: String,
+    pub weight_kg: Option<u32>,
+    pub pallets: Option<u16>,
+    pub pickup_point_id: Option<PointId>,
+    pub unload_point_id: Option<PointId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TripPlanningBasis {
+    pub vehicle_type: String,
+    pub cargos: Vec<PlannedCargoBasis>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PlanningBasisError {
+    VehicleTypeRequired,
+    CargoTitleRequired(CargoId),
+    CargoWeightMustBePositive(CargoId),
+    CargoPalletsMustBePositive(CargoId),
+    UnknownPickupPoint(CargoId),
+    UnknownUnloadPoint(CargoId),
+}
+
+pub fn validate_trip_planning_basis(
+    basis: &TripPlanningBasis,
+    route_points: &[TripRoutePoint],
+) -> Result<(), PlanningBasisError> {
+    if basis.vehicle_type.trim().is_empty() {
+        return Err(PlanningBasisError::VehicleTypeRequired);
+    }
+    for cargo in &basis.cargos {
+        if cargo.title.trim().is_empty() {
+            return Err(PlanningBasisError::CargoTitleRequired(cargo.cargo_id));
+        }
+        if cargo.weight_kg == Some(0) {
+            return Err(PlanningBasisError::CargoWeightMustBePositive(cargo.cargo_id));
+        }
+        if cargo.pallets == Some(0) {
+            return Err(PlanningBasisError::CargoPalletsMustBePositive(cargo.cargo_id));
+        }
+        if let Some(point_id) = cargo.pickup_point_id
+            && !route_points.iter().any(|point| point.point_id == point_id)
+        {
+            return Err(PlanningBasisError::UnknownPickupPoint(cargo.cargo_id));
+        }
+        if let Some(point_id) = cargo.unload_point_id
+            && !route_points.iter().any(|point| point.point_id == point_id)
+        {
+            return Err(PlanningBasisError::UnknownUnloadPoint(cargo.cargo_id));
         }
     }
     Ok(())
