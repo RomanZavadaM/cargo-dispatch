@@ -48,9 +48,9 @@ Les données, les actions de trajet, les fichiers et le backend sont communs ; s
 
 Control et Driver Browser disposent maintenant d’une vraie carte interactive avec les points du trajet et la dernière position acceptée du conducteur.
 
-La branche `main` contient maintenant une chaîne de géométrie routière versionnée (schéma 1.2) : Planner peut transmettre une géométrie dérivée, Control la conserve et les deux cartes n’affichent la ligne routière que tant qu’elle correspond à l’ordre actuel des arrêts. Tout changement d’ordre invalide immédiatement l’ancienne ligne.
+La branche `main` contient maintenant une chaîne de géométrie routière versionnée (schéma 1.3) : Planner transmet la géométrie dérivée avec le profil de routage réel du véhicule, tandis que les paquets des schémas 1.0–1.2 restent lisibles. Control conserve la géométrie et, après un changement d’ordre, recalcule la ligne routière via le service Valhalla configuré à l’exécution. Une réponse tardive ne peut pas écraser un état de trajet plus récent.
 
-Il reste à connecter le **transport HTTP réel vers Valhalla et le recalcul automatique de la géométrie**. Le contrat et l’affichage sont présents ; le moteur de routage externe n’est pas encore relié au runtime produit.
+L’adresse Valhalla, l’ID du jeu de cartes et les délais sont réglés directement dans Desktop Control ; la disponibilité peut être vérifiée via `/status`, ou le routage peut être désactivé explicitement. Si Valhalla n’est pas configuré ou est temporairement indisponible, Control conserve quand même le nouvel ordre des points et la géométrie dérivée peut simplement être absente.
 
 ## Stable v0.1.0
 
@@ -78,7 +78,6 @@ Les packages Android et Apple ne sont pas encore signés pour les stores. App St
 - chemin HTTPS/adressage public ;
 - validation GPS complète du navigateur via HTTPS ;
 - tests terrain sur différents réseaux/NAT/CGNAT ;
-- transport HTTP Valhalla réel et recalcul de la géométrie après changement d’ordre ;
 
 
 ## Langues de l’interface
