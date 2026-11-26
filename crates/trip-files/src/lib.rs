@@ -708,7 +708,7 @@ fn read_package(path: &Path) -> io::Result<Manifest> {
 
 #[derive(Debug, Serialize, Deserialize)]
 enum Change {
-    Import(Manifest),
+    Import(Box<Manifest>),
     Complete([u8; 16]),
     OperatorEdit(Vec<Point>),
     DriverOrder(Vec<[u8; 16]>),
@@ -889,7 +889,7 @@ impl TripFolder {
     pub fn open_detected(path: &Path) -> io::Result<Self> {
         let first = path.join("00000000000000000001.json");
         let event: Change = serde_json::from_slice(&bounded(File::open(first)?)?)?;
-        let Change::Import(manifest) = event else {
+        let Change::Import(Box::new(manifest)) = event else {
             return Err(invalid("trip history must start with import"));
         };
         let trip = manifest.candidate()?.header.trip_id;
