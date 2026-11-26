@@ -11,7 +11,9 @@ use axum::{
     response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
-use cargo_dispatch_contracts::{TripRoadGeometry, TripRoadGeometryPoint, TripRoutingIdentity};
+use cargo_dispatch_contracts::{
+    TripPlanningBasis, TripRoadGeometry, TripRoadGeometryPoint, TripRoutingIdentity,
+};
 use cargo_dispatch_domain::{DocumentId, PointId};
 use cargo_dispatch_geo::{
     GeoPoint, NormalizedStatus, RouteRequest,
@@ -1123,6 +1125,14 @@ impl ControlBrowserState {
             .lock()
             .map_err(|_| io::Error::other("trip state unavailable"))?;
         Ok(trip.session_metadata().clone())
+    }
+
+    pub fn session_planning_basis(&self, token: &str) -> io::Result<Option<TripPlanningBasis>> {
+        let trip = self.shared_trip(token)?;
+        let trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        Ok(trip.planning_basis().cloned())
     }
 
     pub fn set_session_metadata(
