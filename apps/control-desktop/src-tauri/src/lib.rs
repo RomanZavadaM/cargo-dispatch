@@ -1028,6 +1028,61 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn desktop_session_metadata_keeps_endpoint_and_current_vehicle_separate() -> std::io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (_trip, folder) = create_trip(tmp.path())?;
+        let service = DesktopControlService::default();
+        let token = "desktop-session-metadata-0001";
+
+        let registered = service
+            .register_trip(RegisterTripInput {
+                folder_path: folder.to_string_lossy().into_owned(),
+                token: token.to_owned(),
+            })
+            .await
+            .expect("trip registers");
+        assert!(registered.sessions[0].display_name.starts_with("trip-"));
+        assert!(registered.sessions[0].endpoint_id.is_none());
+        assert!(registered.sessions[0].vehicle_label.is_none());
+
+        let updated = service
+            .update_session_metadata(UpdateSessionMetadataInput {
+                token: token.to_owned(),
+                display_name: String::new(),
+                endpoint_id: Some("31313131313131313131313131313131".to_owned()),
+                endpoint_label: Some("Cab tablet".to_owned()),
+                vehicle_label: Some("BC 1234 AB".to_owned()),
+                vehicle_type: Some("tractor + semi-trailer".to_owned()),
+            })
+            .await
+            .expect("metadata updates");
+        let session = &updated.sessions[0];
+        assert_eq!(session.display_name, "BC 1234 AB");
+        assert_eq!(session.endpoint_label.as_deref(), Some("Cab tablet"));
+        assert_eq!(session.vehicle_label.as_deref(), Some("BC 1234 AB"));
+        assert_eq!(
+            session.vehicle_type.as_deref(),
+            Some("tractor + semi-trailer")
+        );
+
+        let renamed = service
+            .update_session_metadata(UpdateSessionMetadataInput {
+                token: token.to_owned(),
+                display_name: "Швеція 01".to_owned(),
+                endpoint_id: session.endpoint_id.clone(),
+                endpoint_label: session.endpoint_label.clone(),
+                vehicle_label: Some("BC 9999 AA".to_owned()),
+                vehicle_type: session.vehicle_type.clone(),
+            })
+            .await
+            .expect("operator display name updates");
+        assert_eq!(renamed.sessions[0].display_name, "Швеція 01");
+        assert_eq!(renamed.sessions[0].vehicle_label.as_deref(), Some("BC 9999 AA"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn desktop_service_relays_real_driver_page_through_gateway() -> std::io::Result<()> {
         let tmp = tempfile::tempdir()?;
         let (_trip, folder) = create_trip(tmp.path())?;
