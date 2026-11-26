@@ -1,0 +1,67 @@
+name: Driver Browser loopback acceptance
+
+on:
+  push:
+    branches:
+      - "test/**"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/control-web/**"
+      - "crates/trip-files/**"
+      - ".github/scripts/driver-browser-loopback-smoke.sh"
+      - ".github/workflows/driver-browser-loopback.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/control-web/**"
+      - "crates/trip-files/**"
+      - ".github/scripts/driver-browser-loopback-smoke.sh"
+      - ".github/workflows/driver-browser-loopback.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: driver-browser-loopback-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  loopback:
+    name: Control ↔ Driver Browser loopback
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.91"
+          components: rustfmt, clippy
+
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Check Control web examples
+        run: cargo check --locked -p cargo-dispatch-control-web --all-targets
+
+      - name: Clippy Control web examples
+        run: cargo clippy --locked -p cargo-dispatch-control-web --all-targets -- -D warnings
+
+      - name: Run real loopback acceptance
+        run: bash .github/scripts/driver-browser-loopback-smoke.sh
+
+      - name: Upload acceptance diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: driver-browser-loopback-diagnostics
+          path: |
+            driver-browser-loopback.log
+            driver-browser-loopback-results/
+          if-no-files-found: warn
+          retention-days: 7
