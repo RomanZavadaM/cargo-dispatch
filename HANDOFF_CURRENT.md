@@ -20,7 +20,7 @@
 ## Інтегровано
 - Control + Driver Browser з durable trip state, maps, files/media, location, route reorder і reconnect.
 - Android/iOS Driver із native maps, camera/files, durable retry, background tracking і secure session storage.
-- Addressing Gateway — RAM-only relay; Control лишається джерелом активного рейсу.
+- Addressing Gateway — RAM-only relay; Control лишається джерелом активного рейсу. Автоматичний public HTTPS acceptance підтверджує outbound-only Control connection, Driver Browser shell/snapshot/location та двосторонні файли через публічну адресу.
 - Control desktop: Windows + macOS + Linux.
 - Planner desktop: Windows + macOS + Linux.
 - Planner manual route draft:
@@ -48,6 +48,7 @@
 1. Ручне створення активного рейсу в Control без Planner ZIP уже інтегроване й використовує той самий durable trip state.
 2. Ручний рейс не вигадує planning basis; TripId не прив'язується до автомобіля або endpoint, actual vehicle/device context лишається окремим mutable станом Control.
 3. `v0.1.0-preview.8` опублікований у GitHub Releases; publisher SUCCESS, усі 10 assets доступні.
-4. Автоматичний Driver Browser acceptance уже підтверджує реальний Control session окремо через loopback і явний private-LAN bind без Gateway. Наступний етап — ручна візуальна перевірка narrow phone / tablet / wide desktop, карта pan/zoom/fit і перевірка того самого Driver Browser на реальному телефоні в LAN/VPN.
+4. Автоматичний Driver Browser acceptance уже підтверджує реальний Control session окремо через loopback і явний private-LAN bind без Gateway.
+5. Окремий автоматичний public Gateway acceptance підтверджує `Control ↔ public HTTPS Gateway ↔ Driver Browser` через тимчасову публічну HTTPS-адресу без inbound-порту Control. Наступний етап — ручна візуальна перевірка narrow phone / tablet / wide desktop, карта pan/zoom/fit, реальний телефон у LAN/VPN і польова HTTPS-перевірка з окремих мереж/мобільного CGNAT.
 
 Продовження: `START_HERE.md` → private HANDOFF/PROJECT_STATE → Planner STATE/WORKLOG → live GitHub.
