@@ -576,7 +576,9 @@ impl Manifest {
         if let Some(geometry) = &self.road_geometry
             && geometry.routing.profile_fingerprint != profile.profile_fingerprint()
         {
-            return Err(invalid("routing profile does not match geometry fingerprint"));
+            return Err(invalid(
+                "routing profile does not match geometry fingerprint",
+            ));
         }
         Ok(Some(profile))
     }
@@ -1368,8 +1370,7 @@ mod tests {
                 navigation: None,
             },
         ];
-        let mut header =
-            TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap();
+        let mut header = TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap();
         header.schema_version = SchemaVersion::new(1, 2);
         let draft = PlannerTripExportDraft {
             header,
