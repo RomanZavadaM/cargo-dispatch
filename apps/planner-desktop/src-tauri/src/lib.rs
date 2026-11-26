@@ -724,8 +724,8 @@ mod tests {
             .expect("configured profile");
         let profile = configured.vehicle_profile.expect("profile");
         assert_eq!(profile.width_m, Some(2.45));
-        assert_eq!(profile.hazmat, false);
-        assert_eq!(profile.hgv, true);
+        assert!(!profile.hazmat);
+        assert!(profile.hgv);
         assert_eq!(profile.toll_preference, "prefer_avoid");
         assert!(profile.warnings.contains(&"height_m".to_owned()));
     }
@@ -747,7 +747,7 @@ mod tests {
             .expect("profile");
         assert_eq!(profile.gross_weight_t, Some(12.0));
         assert_eq!(profile.axle_count, Some(2));
-        assert_eq!(profile.exclude_unpaved, true);
+        assert!(profile.exclude_unpaved);
 
         let _ = fs::remove_file(path);
     }
