@@ -16,11 +16,11 @@ use cargo_dispatch_planner::{
     manual_working_route,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    PlannerPackageExportInput, PlannerPackageExportResult, PlannerPointInput, PlannerPointView, PlannerRoadGeometryPoint, PlannerRouteView,
-    PlannerRoutingAvailabilityState, PlannerRoutingConfigInput, PlannerRoutingPreviewInput,
-    PlannerRoutingPreviewState, PlannerRoutingPreviewView, PlannerRoutingProbeResult,
-    PlannerRoutingProfileInput, PlannerRoutingStatus, PlannerTollPreference, PointActionInput,
-    ReorderPointsInput,
+    PlannerPackageExportInput, PlannerPackageExportResult, PlannerPointInput, PlannerPointView,
+    PlannerRoadGeometryPoint, PlannerRouteView, PlannerRoutingAvailabilityState,
+    PlannerRoutingConfigInput, PlannerRoutingPreviewInput, PlannerRoutingPreviewState,
+    PlannerRoutingPreviewView, PlannerRoutingProbeResult, PlannerRoutingProfileInput,
+    PlannerRoutingStatus, PlannerTollPreference, PointActionInput, ReorderPointsInput,
 };
 use cargo_dispatch_trip_files::export_package as write_trip_package;
 use serde::{Deserialize, Serialize};
@@ -1111,12 +1111,12 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cargo_dispatch_planner_ui_contracts::PlannerPackageCargoInput;
     use axum::{
         Json, Router,
         extract::State as AxumState,
         routing::{get, post},
     };
+    use cargo_dispatch_planner_ui_contracts::PlannerPackageCargoInput;
     use serde_json::{Value, json};
     use std::{
         sync::{Arc, Mutex as StdMutex},
