@@ -6,16 +6,19 @@ use cargo_dispatch_control_ui_contracts::{
     ConfigureRoutingInput, ControlUiStatus, DashboardActualContext, DashboardDocument,
     DashboardDocumentDirection, DashboardLocation, DashboardNavigation, DashboardPlanningBasis,
     DashboardPlanningCargo, DashboardPoint, DashboardRoadGeometry, DashboardRoadGeometryPoint,
-    DashboardRoutingIdentity, GatewayStatus, ListenerMode, ListenerStatus, OperatorDocumentInput,
-    PickedFile, RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
-    RoutingStatus, SaveDocumentInput, SessionInput, SessionStatus, StartGatewayInput,
-    StartLanInput, TripDashboard, UpdateSessionMetadataInput,
+    DashboardRoutingIdentity, DashboardVehicleRoutingProfile, GatewayStatus, ListenerMode,
+    ListenerStatus, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
+    RoutingAvailabilityState, RoutingProbeResult, RoutingStatus, RoutingTollPreference,
+    SaveDocumentInput, SessionInput, SessionStatus, StartGatewayInput, StartLanInput,
+    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput,
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
 };
 use cargo_dispatch_domain::{DocumentId, DriverEndpointId, PointId};
-use cargo_dispatch_geo::{NormalizedStatus, valhalla_http::ValhallaRuntimeConfig};
+use cargo_dispatch_geo::{
+    NormalizedStatus, TollPreference, VehicleRoutingProfile, valhalla_http::ValhallaRuntimeConfig,
+};
 use cargo_dispatch_trip_files::{
     ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, TripFolder,
 };
@@ -137,6 +140,54 @@ fn session_display_name(session: &RegisteredSession) -> String {
         .unwrap_or_else(|| format!("trip-{}", &session.trip_id[..8.min(session.trip_id.len())]))
 }
 
+fn routing_profile_view(profile: &VehicleRoutingProfile) -> DashboardVehicleRoutingProfile {
+    DashboardVehicleRoutingProfile {
+        height_m: profile.height_m,
+        width_m: profile.width_m,
+        length_m: profile.length_m,
+        gross_weight_t: profile.gross_weight_t,
+        axle_load_t: profile.axle_load_t,
+        axle_count: profile.axle_count,
+        hazmat: profile.hazmat,
+        hgv: profile.hgv,
+        exclude_unpaved: profile.exclude_unpaved,
+        prefer_truck_routes: profile.prefer_truck_routes,
+        toll_preference: match profile.toll_preference {
+            TollPreference::Allow => RoutingTollPreference::Allow,
+            TollPreference::PreferAvoid => RoutingTollPreference::PreferAvoid,
+            TollPreference::Avoid => RoutingTollPreference::Avoid,
+        },
+        max_speed_kmh: profile.max_speed_kmh,
+    }
+}
+
+fn routing_profile_from_view(
+    profile: DashboardVehicleRoutingProfile,
+) -> Result<VehicleRoutingProfile, String> {
+    let profile = VehicleRoutingProfile {
+        height_m: profile.height_m,
+        width_m: profile.width_m,
+        length_m: profile.length_m,
+        gross_weight_t: profile.gross_weight_t,
+        axle_load_t: profile.axle_load_t,
+        axle_count: profile.axle_count,
+        hazmat: profile.hazmat,
+        hgv: profile.hgv,
+        exclude_unpaved: profile.exclude_unpaved,
+        prefer_truck_routes: profile.prefer_truck_routes,
+        toll_preference: match profile.toll_preference {
+            RoutingTollPreference::Allow => TollPreference::Allow,
+            RoutingTollPreference::PreferAvoid => TollPreference::PreferAvoid,
+            RoutingTollPreference::Avoid => TollPreference::Avoid,
+        },
+        max_speed_kmh: profile.max_speed_kmh,
+    };
+    profile
+        .validate()
+        .map_err(|error| format!("Некоректний routing profile: {error}"))?;
+    Ok(profile)
+}
+
 fn mime_for_path(path: &Path) -> String {
     match path
         .extension()
@@ -164,6 +215,7 @@ fn dashboard(
     snapshot: DriverTripSnapshot,
     planning_basis: Option<TripPlanningBasis>,
     actual_context: ActiveTripSessionMetadata,
+    active_routing_profile: Option<VehicleRoutingProfile>,
 ) -> Result<TripDashboard, String> {
     let documents = snapshot
         .documents
@@ -212,6 +264,7 @@ fn dashboard(
             endpoint_label: actual_context.endpoint_label,
             vehicle_label: actual_context.vehicle_label,
             vehicle_type: actual_context.vehicle_type,
+            routing_profile: active_routing_profile.as_ref().map(routing_profile_view),
         },
         points: snapshot
             .points
@@ -556,18 +609,30 @@ impl DesktopControlService {
             .lock()
             .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?
             .values()
-            .map(|session| SessionStatus {
-                trip_id: session.trip_id.clone(),
-                token: session.token.clone(),
-                display_name: session_display_name(session),
-                endpoint_id: session.endpoint_id.map(|id| id_hex(id.as_bytes())),
-                endpoint_label: session.endpoint_label.clone(),
-                vehicle_label: session.vehicle_label.clone(),
-                vehicle_type: session.vehicle_type.clone(),
-                driver_url: address.map(|address| driver_url(address, &session.token)),
-                public_driver_url: public_driver_urls.get(&session.token).cloned(),
+            .map(|session| {
+                let routing_profile = self
+                    .browser
+                    .session_active_routing_profile(&session.token)
+                    .map_err(|error| {
+                        format!(
+                            "Не вдалося прочитати routing context сесії {}: {error}",
+                            session_display_name(session)
+                        )
+                    })?;
+                Ok(SessionStatus {
+                    trip_id: session.trip_id.clone(),
+                    token: session.token.clone(),
+                    display_name: session_display_name(session),
+                    endpoint_id: session.endpoint_id.map(|id| id_hex(id.as_bytes())),
+                    endpoint_label: session.endpoint_label.clone(),
+                    vehicle_label: session.vehicle_label.clone(),
+                    vehicle_type: session.vehicle_type.clone(),
+                    routing_profile: routing_profile.as_ref().map(routing_profile_view),
+                    driver_url: address.map(|address| driver_url(address, &session.token)),
+                    public_driver_url: public_driver_urls.get(&session.token).cloned(),
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, String>>()?;
 
         Ok(ControlUiStatus {
             listener,
@@ -724,7 +789,16 @@ impl DesktopControlService {
             .browser
             .session_metadata(token)
             .map_err(|error| format!("Не вдалося прочитати фактичний контекст рейсу: {error}"))?;
-        dashboard(snapshot, planning_basis, actual_context)
+        let active_routing_profile = self
+            .browser
+            .session_active_routing_profile(token)
+            .map_err(|error| format!("Не вдалося прочитати routing context рейсу: {error}"))?;
+        dashboard(
+            snapshot,
+            planning_basis,
+            actual_context,
+            active_routing_profile,
+        )
     }
 
     fn dashboard(&self, token: &str) -> Result<TripDashboard, String> {
@@ -733,6 +807,28 @@ impl DesktopControlService {
             .session_snapshot(token)
             .map_err(|error| format!("Не вдалося прочитати рейс: {error}"))?;
         self.dashboard_from_snapshot(token, snapshot)
+    }
+
+    async fn update_routing_context(
+        &self,
+        input: UpdateRoutingContextInput,
+    ) -> Result<TripDashboard, String> {
+        let token = input.token.trim().to_owned();
+        let profile = input.profile.map(routing_profile_from_view).transpose()?;
+        self.browser
+            .set_session_active_routing_profile(&token, profile.clone())
+            .map_err(|error| format!("Не вдалося зберегти routing context рейсу: {error}"))?;
+
+        if profile.is_some() {
+            let outcome = self
+                .browser
+                .recalculate_session_route_live(&token)
+                .await
+                .map_err(|error| format!("Не вдалося перерахувати маршрут: {error}"))?;
+            self.dashboard_from_snapshot(&token, outcome.snapshot)
+        } else {
+            self.dashboard(&token)
+        }
     }
 
     async fn reorder_route(&self, input: ReorderRouteInput) -> Result<TripDashboard, String> {
@@ -888,6 +984,14 @@ async fn reorder_trip_route(
 }
 
 #[tauri::command]
+async fn update_routing_context(
+    input: UpdateRoutingContextInput,
+    state: State<'_, DesktopControlService>,
+) -> Result<TripDashboard, String> {
+    state.update_routing_context(input).await
+}
+
+#[tauri::command]
 async fn send_operator_document(
     input: OperatorDocumentInput,
     state: State<'_, DesktopControlService>,
@@ -1034,6 +1138,7 @@ pub fn run() {
             save_session_document,
             trip_dashboard,
             reorder_trip_route,
+            update_routing_context,
             send_operator_document,
         ])
         .run(tauri::generate_context!())
@@ -1245,6 +1350,68 @@ mod tests {
             recovered.sessions[0].vehicle_label.as_deref(),
             Some("BC 9999 AA")
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn desktop_service_persists_current_routing_context_without_valhalla()
+    -> std::io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (_trip, folder) = create_trip(tmp.path())?;
+        let service = DesktopControlService::default();
+        let token = "desktop-routing-context-0001";
+
+        service
+            .register_trip(RegisterTripInput {
+                folder_path: folder.to_string_lossy().into_owned(),
+                token: token.to_owned(),
+            })
+            .await
+            .expect("trip registers");
+
+        let profile = DashboardVehicleRoutingProfile {
+            height_m: Some(4.0),
+            width_m: Some(2.55),
+            length_m: Some(16.5),
+            gross_weight_t: Some(40.0),
+            axle_load_t: Some(11.5),
+            axle_count: Some(5),
+            hazmat: false,
+            hgv: true,
+            exclude_unpaved: true,
+            prefer_truck_routes: true,
+            toll_preference: RoutingTollPreference::Allow,
+            max_speed_kmh: Some(90.0),
+        };
+
+        let dashboard = service
+            .update_routing_context(UpdateRoutingContextInput {
+                token: token.to_owned(),
+                profile: Some(profile.clone()),
+            })
+            .await
+            .expect("routing context updates");
+        assert_eq!(
+            dashboard.actual_context.routing_profile.as_ref(),
+            Some(&profile)
+        );
+        assert!(dashboard.road_geometry.is_none());
+
+        drop(service);
+        let recovered = DesktopControlService::default();
+        let status = recovered
+            .register_trip(RegisterTripInput {
+                folder_path: folder.to_string_lossy().into_owned(),
+                token: "desktop-routing-context-0002".to_owned(),
+            })
+            .await
+            .expect("trip re-registers");
+        assert_eq!(status.sessions.len(), 1);
+        let dashboard = recovered
+            .dashboard("desktop-routing-context-0002")
+            .expect("dashboard recovers");
+        assert_eq!(dashboard.actual_context.routing_profile, Some(profile));
 
         Ok(())
     }

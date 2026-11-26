@@ -16,7 +16,7 @@ use cargo_dispatch_contracts::{
 };
 use cargo_dispatch_domain::{DocumentId, PointId};
 use cargo_dispatch_geo::{
-    GeoPoint, NormalizedStatus, RouteRequest,
+    GeoPoint, NormalizedStatus, RouteRequest, VehicleRoutingProfile,
     valhalla_http::{ValhallaHttpClient, ValhallaHttpError, ValhallaRuntimeConfig},
 };
 use cargo_dispatch_trip_files::{
@@ -995,6 +995,7 @@ pub enum LiveRerouteStatus {
     NotEnoughPoints,
     RouteStatus(NormalizedStatus),
     StaleTripState,
+    StaleRoutingContext,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1147,6 +1148,29 @@ impl ControlBrowserState {
         trip.set_session_metadata(metadata)
     }
 
+    pub fn session_active_routing_profile(
+        &self,
+        token: &str,
+    ) -> io::Result<Option<VehicleRoutingProfile>> {
+        let trip = self.shared_trip(token)?;
+        let trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        Ok(trip.active_routing_profile().cloned())
+    }
+
+    pub fn set_session_active_routing_profile(
+        &self,
+        token: &str,
+        profile: Option<VehicleRoutingProfile>,
+    ) -> io::Result<()> {
+        let trip = self.shared_trip(token)?;
+        let mut trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.set_active_routing_profile(profile)
+    }
+
     pub fn reorder_session_route(
         &self,
         token: &str,
@@ -1175,7 +1199,7 @@ impl ControlBrowserState {
         order: &[PointId],
     ) -> io::Result<LiveRerouteOutcome> {
         let trip = self.shared_trip(token)?;
-        let (displayed, request) = {
+        let (displayed, request, profile_fingerprint) = {
             let mut trip = trip
                 .lock()
                 .map_err(|_| io::Error::other("trip state unavailable"))?;
@@ -1189,12 +1213,13 @@ impl ControlBrowserState {
             trip.driver_order(&shown, order)?;
             let displayed = trip.state();
 
-            let Some(profile) = trip.routing_profile().cloned() else {
+            let Some(profile) = trip.active_routing_profile().cloned() else {
                 return Ok(LiveRerouteOutcome {
                     snapshot: snapshot(&trip),
                     status: LiveRerouteStatus::RoutingProfileMissing,
                 });
             };
+            let profile_fingerprint = profile.profile_fingerprint();
 
             let mut points = Vec::new();
             if let Some(location) = trip.latest_location() {
@@ -1227,7 +1252,7 @@ impl ControlBrowserState {
             }
             let request = RouteRequest::new(points, profile)
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-            (displayed, request)
+            (displayed, request, profile_fingerprint)
         };
 
         let Some(client) = self.valhalla_client()? else {
@@ -1292,11 +1317,58 @@ impl ControlBrowserState {
                 status: LiveRerouteStatus::StaleTripState,
             });
         }
+        if trip
+            .active_routing_profile()
+            .map(VehicleRoutingProfile::profile_fingerprint)
+            .as_deref()
+            != Some(profile_fingerprint.as_str())
+        {
+            return Ok(LiveRerouteOutcome {
+                snapshot: snapshot(&trip),
+                status: LiveRerouteStatus::StaleRoutingContext,
+            });
+        }
         trip.set_route_geometry(&displayed, &geometry)?;
         Ok(LiveRerouteOutcome {
             snapshot: snapshot(&trip),
             status: LiveRerouteStatus::Updated,
         })
+    }
+    pub async fn recalculate_session_route_live(
+        &self,
+        token: &str,
+    ) -> io::Result<LiveRerouteOutcome> {
+        let (revision, order) = {
+            let trip = self.shared_trip(token)?;
+            let trip = trip
+                .lock()
+                .map_err(|_| io::Error::other("trip state unavailable"))?;
+            let state = trip.state();
+            let order = state
+                .route_points
+                .iter()
+                .filter(|point| !state.completed_point_ids.contains(&point.point_id))
+                .map(|point| point.point_id)
+                .collect::<Vec<_>>();
+            (state.local_route_revision, order)
+        };
+
+        match self
+            .reorder_session_route_live(token, revision, &order)
+            .await
+        {
+            Ok(outcome) => Ok(outcome),
+            Err(error)
+                if error.kind() == io::ErrorKind::InvalidData
+                    && error.to_string() == "stale route revision" =>
+            {
+                Ok(LiveRerouteOutcome {
+                    snapshot: self.session_snapshot(token)?,
+                    status: LiveRerouteStatus::StaleTripState,
+                })
+            }
+            Err(error) => Err(error),
+        }
     }
 
     pub fn store_operator_document(
@@ -2151,6 +2223,10 @@ mod tests {
         state
             .register_trip("reroute-trip-token-0001", folder)
             .expect("register trip");
+        state.set_session_active_routing_profile(
+            "reroute-trip-token-0001",
+            Some(routing_profile()),
+        )?;
 
         let (base_url, mock, server) = spawn_mock_valhalla(false).await?;
         state
@@ -2203,6 +2279,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn routing_context_change_recalculates_same_order_without_revision_change()
+    -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (trip_id, _route, folder) = create_trip(tmp.path(), "context-recalc-trip", 66, 76)?;
+        let state = ControlBrowserState::new();
+        let token = "context-recalc-token-0001";
+        state.register_trip(token, folder).expect("register trip");
+
+        let mut profile = routing_profile();
+        profile.gross_weight_t = Some(26.0);
+        state.set_session_active_routing_profile(token, Some(profile.clone()))?;
+
+        let (base_url, mock, server) = spawn_mock_valhalla(false).await?;
+        state
+            .configure_valhalla(
+                ValhallaRuntimeConfig::new(
+                    &base_url,
+                    "fixture-europe-2026-11",
+                    std::time::Duration::from_millis(250),
+                    std::time::Duration::from_secs(2),
+                )
+                .expect("Valhalla config"),
+            )
+            .expect("configure Valhalla");
+
+        let outcome = state.recalculate_session_route_live(token).await?;
+        assert_eq!(outcome.status, LiveRerouteStatus::Updated);
+        assert_eq!(outcome.snapshot.local_route_revision, 0);
+        let geometry = outcome
+            .snapshot
+            .road_geometry
+            .expect("recalculated geometry");
+        assert_eq!(
+            geometry.routing.profile_fingerprint,
+            profile.profile_fingerprint()
+        );
+
+        let requests = mock.requests.lock().expect("request log");
+        assert_eq!(requests.len(), 1);
+        assert_eq!(
+            requests[0]["costing_options"]["truck"]["weight"],
+            serde_json::json!(26.0)
+        );
+        drop(requests);
+
+        let recovered = TripFolder::open(&tmp.path().join("context-recalc-trip"), trip_id)?;
+        assert_eq!(recovered.state().local_route_revision, 0);
+        assert!(recovered.state().route_geometry.is_some());
+
+        server.abort();
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn delayed_reroute_cannot_overwrite_newer_control_order() -> io::Result<()> {
         let tmp = tempfile::tempdir()?;
         let folder_path = tmp.path().join("stale-reroute-trip");
@@ -2210,6 +2340,7 @@ mod tests {
         let state = ControlBrowserState::new();
         let token = "stale-reroute-token-0001";
         state.register_trip(token, folder).expect("register trip");
+        state.set_session_active_routing_profile(token, Some(routing_profile()))?;
 
         let (base_url, mock, server) = spawn_mock_valhalla(true).await?;
         state
@@ -2250,6 +2381,64 @@ mod tests {
         let recovered = TripFolder::open(&folder_path, trip_id)?;
         assert_eq!(recovered.state().local_route_revision, 2);
         assert!(recovered.state().route_geometry.is_none());
+
+        server.abort();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn delayed_reroute_cannot_overwrite_changed_routing_context() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let folder_path = tmp.path().join("stale-context-trip");
+        let (trip_id, route, folder) = create_trip(tmp.path(), "stale-context-trip", 100, 110)?;
+        let state = ControlBrowserState::new();
+        let token = "stale-context-token-0001";
+        let initial_profile = routing_profile();
+        state.register_trip(token, folder).expect("register trip");
+        state.set_session_active_routing_profile(token, Some(initial_profile.clone()))?;
+
+        let (base_url, mock, server) = spawn_mock_valhalla(true).await?;
+        state
+            .configure_valhalla(
+                ValhallaRuntimeConfig::new(
+                    &base_url,
+                    "fixture-europe-2026-11",
+                    std::time::Duration::from_millis(250),
+                    std::time::Duration::from_secs(2),
+                )
+                .expect("Valhalla config"),
+            )
+            .expect("configure Valhalla");
+
+        let running_state = state.clone();
+        let order = vec![route[2].point_id, route[0].point_id, route[1].point_id];
+        let running = tokio::spawn(async move {
+            running_state
+                .reorder_session_route_live(token, 0, &order)
+                .await
+        });
+
+        mock.route_started.notified().await;
+        let mut changed_profile = initial_profile;
+        changed_profile.gross_weight_t = Some(26.0);
+        state.set_session_active_routing_profile(token, Some(changed_profile.clone()))?;
+        assert_eq!(
+            state.session_active_routing_profile(token)?,
+            Some(changed_profile)
+        );
+        assert!(state.session_snapshot(token)?.road_geometry.is_none());
+
+        mock.route_release.notify_one();
+        let outcome = running.await.expect("reroute task")?;
+        assert_eq!(outcome.status, LiveRerouteStatus::StaleRoutingContext);
+        assert!(outcome.snapshot.road_geometry.is_none());
+
+        let recovered = TripFolder::open(&folder_path, trip_id)?;
+        assert!(recovered.state().route_geometry.is_none());
+        assert_eq!(
+            recovered.active_routing_profile(),
+            state.session_active_routing_profile(token)?.as_ref()
+        );
 
         server.abort();
         Ok(())

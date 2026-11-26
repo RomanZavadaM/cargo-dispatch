@@ -7,9 +7,10 @@ mod i18n;
 use crate::i18n::{UiLocale, localize_problem, strings};
 use cargo_dispatch_control_ui_contracts::{
     ConfigureRoutingInput, ControlUiStatus, DashboardDocumentDirection, DashboardPoint,
-    ListenerMode, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
-    RoutingAvailabilityState, RoutingProbeResult, SaveDocumentInput, SessionInput,
-    StartGatewayInput, StartLanInput, TripDashboard, UpdateSessionMetadataInput,
+    DashboardVehicleRoutingProfile, ListenerMode, OperatorDocumentInput, PickedFile,
+    RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
+    RoutingTollPreference, SaveDocumentInput, SessionInput, StartGatewayInput, StartLanInput,
+    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -457,6 +458,240 @@ fn submit_session_metadata(
         {
             Ok(current) => {
                 status.set(Some(current));
+                error.set(false);
+            }
+            Err(problem) => {
+                message.set(localize_problem(locale.get_untracked(), &problem));
+                error.set(true);
+            }
+        }
+    });
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RoutingDraftError {
+    InvalidNumber,
+    ChoiceRequired,
+}
+
+#[derive(Debug, Clone, Default)]
+struct RoutingProfileDraft {
+    height_m: String,
+    width_m: String,
+    length_m: String,
+    gross_weight_t: String,
+    axle_load_t: String,
+    axle_count: String,
+    hazmat: String,
+    hgv: String,
+    exclude_unpaved: String,
+    prefer_truck_routes: String,
+    toll_preference: String,
+    max_speed_kmh: String,
+}
+
+impl RoutingProfileDraft {
+    fn from_profile(profile: Option<&DashboardVehicleRoutingProfile>) -> Self {
+        let Some(profile) = profile else {
+            return Self::default();
+        };
+        Self {
+            height_m: profile
+                .height_m
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            width_m: profile
+                .width_m
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            length_m: profile
+                .length_m
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            gross_weight_t: profile
+                .gross_weight_t
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            axle_load_t: profile
+                .axle_load_t
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            axle_count: profile
+                .axle_count
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            hazmat: if profile.hazmat { "yes" } else { "no" }.to_owned(),
+            hgv: if profile.hgv { "yes" } else { "no" }.to_owned(),
+            exclude_unpaved: if profile.exclude_unpaved { "yes" } else { "no" }.to_owned(),
+            prefer_truck_routes: if profile.prefer_truck_routes {
+                "yes"
+            } else {
+                "no"
+            }
+            .to_owned(),
+            toll_preference: match profile.toll_preference {
+                RoutingTollPreference::Allow => "allow",
+                RoutingTollPreference::PreferAvoid => "prefer_avoid",
+                RoutingTollPreference::Avoid => "avoid",
+            }
+            .to_owned(),
+            max_speed_kmh: profile
+                .max_speed_kmh
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+        }
+    }
+
+    fn optional_positive_f64(value: &str) -> Result<Option<f64>, RoutingDraftError> {
+        let value = value.trim();
+        if value.is_empty() {
+            return Ok(None);
+        }
+        let parsed = value
+            .parse::<f64>()
+            .map_err(|_| RoutingDraftError::InvalidNumber)?;
+        if !parsed.is_finite() || parsed <= 0.0 {
+            return Err(RoutingDraftError::InvalidNumber);
+        }
+        Ok(Some(parsed))
+    }
+
+    fn optional_positive_u8(value: &str) -> Result<Option<u8>, RoutingDraftError> {
+        let value = value.trim();
+        if value.is_empty() {
+            return Ok(None);
+        }
+        let parsed = value
+            .parse::<u8>()
+            .map_err(|_| RoutingDraftError::InvalidNumber)?;
+        if parsed == 0 {
+            return Err(RoutingDraftError::InvalidNumber);
+        }
+        Ok(Some(parsed))
+    }
+
+    fn explicit_bool(value: &str) -> Result<bool, RoutingDraftError> {
+        match value {
+            "yes" => Ok(true),
+            "no" => Ok(false),
+            _ => Err(RoutingDraftError::ChoiceRequired),
+        }
+    }
+
+    fn profile(&self) -> Result<DashboardVehicleRoutingProfile, RoutingDraftError> {
+        let toll_preference = match self.toll_preference.as_str() {
+            "allow" => RoutingTollPreference::Allow,
+            "prefer_avoid" => RoutingTollPreference::PreferAvoid,
+            "avoid" => RoutingTollPreference::Avoid,
+            _ => return Err(RoutingDraftError::ChoiceRequired),
+        };
+        Ok(DashboardVehicleRoutingProfile {
+            height_m: Self::optional_positive_f64(&self.height_m)?,
+            width_m: Self::optional_positive_f64(&self.width_m)?,
+            length_m: Self::optional_positive_f64(&self.length_m)?,
+            gross_weight_t: Self::optional_positive_f64(&self.gross_weight_t)?,
+            axle_load_t: Self::optional_positive_f64(&self.axle_load_t)?,
+            axle_count: Self::optional_positive_u8(&self.axle_count)?,
+            hazmat: Self::explicit_bool(&self.hazmat)?,
+            hgv: Self::explicit_bool(&self.hgv)?,
+            exclude_unpaved: Self::explicit_bool(&self.exclude_unpaved)?,
+            prefer_truck_routes: Self::explicit_bool(&self.prefer_truck_routes)?,
+            toll_preference,
+            max_speed_kmh: Self::optional_positive_f64(&self.max_speed_kmh)?,
+        })
+    }
+}
+
+fn routing_profile_summary(profile: &DashboardVehicleRoutingProfile, locale: UiLocale) -> String {
+    let text = strings(locale);
+    let mut parts = Vec::new();
+    if let Some(value) = profile.height_m {
+        parts.push(format!("{}: {value}", text.height_m));
+    }
+    if let Some(value) = profile.width_m {
+        parts.push(format!("{}: {value}", text.width_m));
+    }
+    if let Some(value) = profile.length_m {
+        parts.push(format!("{}: {value}", text.length_m));
+    }
+    if let Some(value) = profile.gross_weight_t {
+        parts.push(format!("{}: {value}", text.gross_weight_t));
+    }
+    if let Some(value) = profile.axle_load_t {
+        parts.push(format!("{}: {value}", text.axle_load_t));
+    }
+    if let Some(value) = profile.axle_count {
+        parts.push(format!("{}: {value}", text.axle_count));
+    }
+    parts.push(format!(
+        "{}: {}",
+        text.hazmat,
+        if profile.hazmat { text.yes } else { text.no }
+    ));
+    parts.push(format!(
+        "{}: {}",
+        text.hgv,
+        if profile.hgv { text.yes } else { text.no }
+    ));
+    parts.push(format!(
+        "{}: {}",
+        text.exclude_unpaved,
+        if profile.exclude_unpaved {
+            text.yes
+        } else {
+            text.no
+        }
+    ));
+    parts.push(format!(
+        "{}: {}",
+        text.prefer_truck_routes,
+        if profile.prefer_truck_routes {
+            text.yes
+        } else {
+            text.no
+        }
+    ));
+    let toll = match profile.toll_preference {
+        RoutingTollPreference::Allow => text.toll_allow,
+        RoutingTollPreference::PreferAvoid => text.toll_prefer_avoid,
+        RoutingTollPreference::Avoid => text.toll_avoid,
+    };
+    parts.push(format!("{}: {toll}", text.toll_preference));
+    if let Some(value) = profile.max_speed_kmh {
+        parts.push(format!("{}: {value}", text.max_speed_kmh));
+    }
+    parts.join(" · ")
+}
+
+fn submit_routing_context(
+    input: UpdateRoutingContextInput,
+    status: RwSignal<Option<ControlUiStatus>>,
+    selected_token: RwSignal<String>,
+    dashboard: RwSignal<Option<TripDashboard>>,
+    message: RwSignal<String>,
+    error: RwSignal<bool>,
+    locale: RwSignal<UiLocale>,
+) {
+    let target = input.token.clone();
+    spawn_local(async move {
+        match invoke::<TripDashboard, _>(
+            "update_routing_context",
+            &serde_json::json!({ "input": input }),
+        )
+        .await
+        {
+            Ok(current) => {
+                if selected_token.get_untracked() == target {
+                    dashboard.set(Some(current));
+                }
+                if let Ok(current_status) = load_status().await {
+                    status.set(Some(current_status));
+                }
+                message.set(
+                    strings(locale.get_untracked())
+                        .routing_context_saved
+                        .to_owned(),
+                );
                 error.set(false);
             }
             Err(problem) => {
@@ -1192,7 +1427,12 @@ fn ControlApp() -> impl IntoView {
                                 RwSignal::new(session.vehicle_label.clone().unwrap_or_default());
                             let edit_vehicle_type =
                                 RwSignal::new(session.vehicle_type.clone().unwrap_or_default());
+                            let edit_routing_profile = RwSignal::new(
+                                RoutingProfileDraft::from_profile(session.routing_profile.as_ref()),
+                            );
                             let edit_token = session.token.clone();
+                            let routing_token_apply = session.token.clone();
+                            let routing_token_clear = session.token.clone();
                             view! {
                                 <li>
                                     <div><strong>{display_name}</strong></div>
@@ -1313,6 +1553,167 @@ fn ControlApp() -> impl IntoView {
                                         >
                                             {move || strings(locale.get()).save}
                                         </button>
+                                        <h4>{move || strings(locale.get()).routing_context}</h4>
+                                        <p class="note">{move || strings(locale.get()).routing_context_note}</p>
+                                        <div class="grid">
+                                            <label>
+                                                {move || strings(locale.get()).height_m}
+                                                <input type="number" step="0.01" min="0"
+                                                    prop:value=move || edit_routing_profile.get().height_m
+                                                    on:input=move |event| edit_routing_profile.update(|draft| draft.height_m = event_target_value(&event))
+                                                />
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).width_m}
+                                                <input type="number" step="0.01" min="0"
+                                                    prop:value=move || edit_routing_profile.get().width_m
+                                                    on:input=move |event| edit_routing_profile.update(|draft| draft.width_m = event_target_value(&event))
+                                                />
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).length_m}
+                                                <input type="number" step="0.01" min="0"
+                                                    prop:value=move || edit_routing_profile.get().length_m
+                                                    on:input=move |event| edit_routing_profile.update(|draft| draft.length_m = event_target_value(&event))
+                                                />
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).gross_weight_t}
+                                                <input type="number" step="0.01" min="0"
+                                                    prop:value=move || edit_routing_profile.get().gross_weight_t
+                                                    on:input=move |event| edit_routing_profile.update(|draft| draft.gross_weight_t = event_target_value(&event))
+                                                />
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).axle_load_t}
+                                                <input type="number" step="0.01" min="0"
+                                                    prop:value=move || edit_routing_profile.get().axle_load_t
+                                                    on:input=move |event| edit_routing_profile.update(|draft| draft.axle_load_t = event_target_value(&event))
+                                                />
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).axle_count}
+                                                <input type="number" step="1" min="1" max="255"
+                                                    prop:value=move || edit_routing_profile.get().axle_count
+                                                    on:input=move |event| edit_routing_profile.update(|draft| draft.axle_count = event_target_value(&event))
+                                                />
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).hazmat}
+                                                <select
+                                                    prop:value=move || edit_routing_profile.get().hazmat
+                                                    on:change=move |event| edit_routing_profile.update(|draft| draft.hazmat = event_target_value(&event))
+                                                >
+                                                    <option value="">{move || strings(locale.get()).not_specified}</option>
+                                                    <option value="yes">{move || strings(locale.get()).yes}</option>
+                                                    <option value="no">{move || strings(locale.get()).no}</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).hgv}
+                                                <select
+                                                    prop:value=move || edit_routing_profile.get().hgv
+                                                    on:change=move |event| edit_routing_profile.update(|draft| draft.hgv = event_target_value(&event))
+                                                >
+                                                    <option value="">{move || strings(locale.get()).not_specified}</option>
+                                                    <option value="yes">{move || strings(locale.get()).yes}</option>
+                                                    <option value="no">{move || strings(locale.get()).no}</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).exclude_unpaved}
+                                                <select
+                                                    prop:value=move || edit_routing_profile.get().exclude_unpaved
+                                                    on:change=move |event| edit_routing_profile.update(|draft| draft.exclude_unpaved = event_target_value(&event))
+                                                >
+                                                    <option value="">{move || strings(locale.get()).not_specified}</option>
+                                                    <option value="yes">{move || strings(locale.get()).yes}</option>
+                                                    <option value="no">{move || strings(locale.get()).no}</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).prefer_truck_routes}
+                                                <select
+                                                    prop:value=move || edit_routing_profile.get().prefer_truck_routes
+                                                    on:change=move |event| edit_routing_profile.update(|draft| draft.prefer_truck_routes = event_target_value(&event))
+                                                >
+                                                    <option value="">{move || strings(locale.get()).not_specified}</option>
+                                                    <option value="yes">{move || strings(locale.get()).yes}</option>
+                                                    <option value="no">{move || strings(locale.get()).no}</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).toll_preference}
+                                                <select
+                                                    prop:value=move || edit_routing_profile.get().toll_preference
+                                                    on:change=move |event| edit_routing_profile.update(|draft| draft.toll_preference = event_target_value(&event))
+                                                >
+                                                    <option value="">{move || strings(locale.get()).not_specified}</option>
+                                                    <option value="allow">{move || strings(locale.get()).toll_allow}</option>
+                                                    <option value="prefer_avoid">{move || strings(locale.get()).toll_prefer_avoid}</option>
+                                                    <option value="avoid">{move || strings(locale.get()).toll_avoid}</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                {move || strings(locale.get()).max_speed_kmh}
+                                                <input type="number" step="0.1" min="0"
+                                                    prop:value=move || edit_routing_profile.get().max_speed_kmh
+                                                    on:input=move |event| edit_routing_profile.update(|draft| draft.max_speed_kmh = event_target_value(&event))
+                                                />
+                                            </label>
+                                        </div>
+                                        <div class="actions">
+                                            <button
+                                                class="primary"
+                                                type="button"
+                                                on:click=move |_| {
+                                                    match edit_routing_profile.get_untracked().profile() {
+                                                        Ok(profile) => submit_routing_context(
+                                                            UpdateRoutingContextInput {
+                                                                token: routing_token_apply.clone(),
+                                                                profile: Some(profile),
+                                                            },
+                                                            status,
+                                                            selected_token,
+                                                            dashboard,
+                                                            message,
+                                                            error,
+                                                            locale,
+                                                        ),
+                                                        Err(RoutingDraftError::InvalidNumber) => {
+                                                            message.set(strings(locale.get_untracked()).invalid_routing_value.to_owned());
+                                                            error.set(true);
+                                                        }
+                                                        Err(RoutingDraftError::ChoiceRequired) => {
+                                                            message.set(strings(locale.get_untracked()).routing_choice_required.to_owned());
+                                                            error.set(true);
+                                                        }
+                                                    }
+                                                }
+                                            >
+                                                {move || strings(locale.get()).apply_routing_context}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                on:click=move |_| {
+                                                    submit_routing_context(
+                                                        UpdateRoutingContextInput {
+                                                            token: routing_token_clear.clone(),
+                                                            profile: None,
+                                                        },
+                                                        status,
+                                                        selected_token,
+                                                        dashboard,
+                                                        message,
+                                                        error,
+                                                        locale,
+                                                    );
+                                                    edit_routing_profile.set(RoutingProfileDraft::default());
+                                                }
+                                            >
+                                                {move || strings(locale.get()).clear_routing_context}
+                                            </button>
+                                        </div>
                                         <div><strong>{move || format!("{}: ", strings(locale.get()).token)}</strong><code>{session_token}</code></div>
                                     </details>
                                     <button
@@ -1409,6 +1810,7 @@ fn ControlApp() -> impl IntoView {
                         .or(actual_context.endpoint_id.clone());
                     let actual_vehicle = actual_context.vehicle_label.clone();
                     let actual_vehicle_type = actual_context.vehicle_type.clone();
+                    let actual_routing_profile = actual_context.routing_profile.clone();
                     let trip_id = trip.trip_id.clone();
                     let version = trip.trip_version;
 
@@ -1487,6 +1889,17 @@ fn ControlApp() -> impl IntoView {
                                         <strong>{move || format!("{}: ", strings(locale.get()).vehicle_type)}</strong>
                                         {actual_vehicle_type.unwrap_or_else(|| "—".to_owned())}
                                     </p>
+                                    <h4>{move || strings(locale.get()).routing_context}</h4>
+                                    {match actual_routing_profile {
+                                        Some(profile) => view! {
+                                            <p class="note">
+                                                {move || routing_profile_summary(&profile, locale.get())}
+                                            </p>
+                                        }.into_any(),
+                                        None => view! {
+                                            <p class="note">{move || strings(locale.get()).not_specified}</p>
+                                        }.into_any(),
+                                    }}
                                 </div>
                             </div>
 

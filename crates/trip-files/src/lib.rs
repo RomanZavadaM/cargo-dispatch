@@ -899,11 +899,13 @@ enum Change {
     DocumentStored(DocumentEntry),
     DriverLocation(DriverLocationSample),
     SessionMetadata(SessionMetadataFile),
+    ActiveRoutingProfile(Option<VehicleRoutingProfile>),
 }
 
 struct ApplyAux<'a> {
     planning_basis: &'a mut Option<TripPlanningBasis>,
     routing_profile: &'a mut Option<VehicleRoutingProfile>,
+    active_routing_profile: &'a mut Option<VehicleRoutingProfile>,
     session_metadata: &'a mut ActiveTripSessionMetadata,
 }
 
@@ -918,6 +920,7 @@ fn apply(
     let ApplyAux {
         planning_basis,
         routing_profile,
+        active_routing_profile,
         session_metadata,
     } = aux;
     match event {
@@ -1009,6 +1012,18 @@ fn apply(
         Change::SessionMetadata(file) => {
             *session_metadata = file.typed()?;
         }
+        Change::ActiveRoutingProfile(profile) => {
+            if let Some(profile) = profile {
+                profile.validate().map_err(invalid)?;
+            }
+            *active_routing_profile = profile.clone();
+            reg.invalidate_route_geometry(trip)
+                .map_err(|error| match error {
+                    RouteGeometryUpdateError::TripNotFound => invalid("missing trip"),
+                    RouteGeometryUpdateError::StaleView => invalid("stale route geometry state"),
+                    RouteGeometryUpdateError::InvalidGeometry(error) => invalid(error),
+                })?;
+        }
     }
     Ok(())
 }
@@ -1021,6 +1036,7 @@ pub struct TripFolder {
     registry: InMemoryTripRegistry,
     planning_basis: Option<TripPlanningBasis>,
     routing_profile: Option<VehicleRoutingProfile>,
+    active_routing_profile: Option<VehicleRoutingProfile>,
     session_metadata: ActiveTripSessionMetadata,
     documents: std::collections::BTreeMap<DocumentId, StoredDocument>,
     locations: Vec<DriverLocationSample>,
@@ -1044,6 +1060,7 @@ impl TripFolder {
             registry: InMemoryTripRegistry::default(),
             planning_basis: None,
             routing_profile: None,
+            active_routing_profile: None,
             session_metadata: ActiveTripSessionMetadata::default(),
             documents: std::collections::BTreeMap::new(),
             locations: Vec::new(),
@@ -1060,6 +1077,7 @@ impl TripFolder {
                 ApplyAux {
                     planning_basis: &mut this.planning_basis,
                     routing_profile: &mut this.routing_profile,
+                    active_routing_profile: &mut this.active_routing_profile,
                     session_metadata: &mut this.session_metadata,
                 },
                 &mut this.documents,
@@ -1130,6 +1148,11 @@ impl TripFolder {
     #[must_use]
     pub fn routing_profile(&self) -> Option<&VehicleRoutingProfile> {
         self.routing_profile.as_ref()
+    }
+
+    #[must_use]
+    pub fn active_routing_profile(&self) -> Option<&VehicleRoutingProfile> {
+        self.active_routing_profile.as_ref()
     }
 
     #[must_use]
@@ -1226,6 +1249,7 @@ impl TripFolder {
         let mut updated = self.registry.clone();
         let mut updated_planning_basis = self.planning_basis.clone();
         let mut updated_routing_profile = self.routing_profile.clone();
+        let mut updated_active_routing_profile = self.active_routing_profile.clone();
         let mut updated_session_metadata = self.session_metadata.clone();
         let mut updated_documents = self.documents.clone();
         let mut updated_locations = self.locations.clone();
@@ -1235,6 +1259,7 @@ impl TripFolder {
             ApplyAux {
                 planning_basis: &mut updated_planning_basis,
                 routing_profile: &mut updated_routing_profile,
+                active_routing_profile: &mut updated_active_routing_profile,
                 session_metadata: &mut updated_session_metadata,
             },
             &mut updated_documents,
@@ -1246,6 +1271,7 @@ impl TripFolder {
         if !registry_changed
             && updated_planning_basis == self.planning_basis
             && updated_routing_profile == self.routing_profile
+            && updated_active_routing_profile == self.active_routing_profile
             && updated_session_metadata == self.session_metadata
             && updated_documents == self.documents
             && updated_locations == self.locations
@@ -1262,6 +1288,7 @@ impl TripFolder {
         self.registry = updated;
         self.planning_basis = updated_planning_basis;
         self.routing_profile = updated_routing_profile;
+        self.active_routing_profile = updated_active_routing_profile;
         self.session_metadata = updated_session_metadata;
         self.documents = updated_documents;
         self.locations = updated_locations;
@@ -1311,6 +1338,21 @@ impl TripFolder {
             local_route_revision: displayed.local_route_revision,
             geometry: RoadGeometryFile::from(geometry),
         })
+    }
+
+    pub fn set_active_routing_profile(
+        &mut self,
+        profile: Option<VehicleRoutingProfile>,
+    ) -> io::Result<()> {
+        if let Some(profile) = &profile {
+            profile.validate().map_err(invalid)?;
+        }
+        if self.active_routing_profile == profile
+            && !(profile.is_none() && self.state().route_geometry.is_some())
+        {
+            return Ok(());
+        }
+        self.record(Change::ActiveRoutingProfile(profile))
     }
 
     pub fn set_session_metadata(&mut self, metadata: ActiveTripSessionMetadata) -> io::Result<()> {
@@ -1724,6 +1766,89 @@ mod tests {
         drop(imported);
         let reopened = TripFolder::open(&folder, trip)?;
         assert_eq!(reopened.routing_profile(), Some(&profile));
+        Ok(())
+    }
+
+    #[test]
+    fn active_routing_profile_is_durable_and_invalidates_planner_geometry() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package = tmp.path().join("active-routing-profile.zip");
+        let folder = tmp.path().join("active-routing-profile-trip");
+        let trip = TripId::from_bytes([61; 16]).unwrap();
+        let route = vec![
+            TripRoutePoint {
+                point_id: PointId::from_bytes([62; 16]).unwrap(),
+                sequence: 1,
+                kind: TripPointKind::Load,
+                title: "A".to_owned(),
+                navigation: Some(TripNavigationTarget {
+                    latitude_e7: 498_393_000,
+                    longitude_e7: 240_296_000,
+                    address: None,
+                }),
+            },
+            TripRoutePoint {
+                point_id: PointId::from_bytes([63; 16]).unwrap(),
+                sequence: 2,
+                kind: TripPointKind::Unload,
+                title: "B".to_owned(),
+                navigation: Some(TripNavigationTarget {
+                    latitude_e7: 498_430_000,
+                    longitude_e7: 240_360_000,
+                    address: None,
+                }),
+            },
+        ];
+        let planner_profile = routing_profile_fixture();
+        let mut current_profile = planner_profile.clone();
+        current_profile.gross_weight_t = Some(24.0);
+        let mut header = TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap();
+        header.schema_version = SchemaVersion::new(1, 3);
+        let draft = PlannerTripExportDraft {
+            header,
+            working_route_id: WorkingRouteId::from_bytes([64; 16]).unwrap(),
+            working_route_revision: 1,
+            created_at_unix_ms: 1,
+            created_by: OperatorId::from_bytes([65; 16]).unwrap(),
+            ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            planning_basis: None,
+            routing_profile: Some(planner_profile.clone()),
+            route_geometry: Some(TripRoadGeometry {
+                routing: TripRoutingIdentity {
+                    engine: "valhalla".to_owned(),
+                    engine_version: "3.9.2".to_owned(),
+                    map_dataset_id: "fixture".to_owned(),
+                    profile_fingerprint: planner_profile.profile_fingerprint(),
+                },
+                points: vec![
+                    TripRoadGeometryPoint {
+                        latitude_e7: 498_393_000,
+                        longitude_e7: 240_296_000,
+                    },
+                    TripRoadGeometryPoint {
+                        latitude_e7: 498_430_000,
+                        longitude_e7: 240_360_000,
+                    },
+                ],
+            }),
+        };
+
+        export_package(&package, &draft, &route)?;
+        let mut imported = TripFolder::import(&folder, &package)?;
+        assert_eq!(imported.routing_profile(), Some(&planner_profile));
+        assert!(imported.active_routing_profile().is_none());
+        assert!(imported.state().route_geometry.is_some());
+
+        imported.set_active_routing_profile(Some(current_profile.clone()))?;
+        assert_eq!(imported.routing_profile(), Some(&planner_profile));
+        assert_eq!(imported.active_routing_profile(), Some(&current_profile));
+        assert!(imported.state().route_geometry.is_none());
+        drop(imported);
+
+        let reopened = TripFolder::open(&folder, trip)?;
+        assert_eq!(reopened.routing_profile(), Some(&planner_profile));
+        assert_eq!(reopened.active_routing_profile(), Some(&current_profile));
+        assert!(reopened.state().route_geometry.is_none());
         Ok(())
     }
 
