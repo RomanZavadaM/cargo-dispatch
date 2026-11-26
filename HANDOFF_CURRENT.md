@@ -48,6 +48,6 @@
 1. Ручне створення активного рейсу в Control без Planner ZIP уже інтегроване й використовує той самий durable trip state.
 2. Ручний рейс не вигадує planning basis; TripId не прив'язується до автомобіля або endpoint, actual vehicle/device context лишається окремим mutable станом Control.
 3. `v0.1.0-preview.8` опублікований у GitHub Releases; publisher SUCCESS, усі 10 assets доступні.
-4. Наступний етап — ручне приймання актуальних Control/Planner збірок, local Driver Browser acceptance і перевірка шляху Control ↔ клієнт у loopback/LAN.
+4. Автоматичний Driver Browser acceptance уже підтверджує реальний Control session окремо через loopback і явний private-LAN bind без Gateway. Наступний етап — ручна візуальна перевірка narrow phone / tablet / wide desktop, карта pan/zoom/fit і перевірка того самого Driver Browser на реальному телефоні в LAN/VPN.
 
 Продовження: `START_HERE.md` → private HANDOFF/PROJECT_STATE → Planner STATE/WORKLOG → live GitHub.
