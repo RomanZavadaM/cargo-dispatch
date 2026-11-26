@@ -1003,6 +1003,77 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn desktop_service_configures_tests_and_disables_valhalla() -> std::io::Result<()> {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+        let address = listener.local_addr()?;
+        let app = axum::Router::new().route(
+            "/status",
+            axum::routing::get(|| async {
+                r#"{"version":"3.9.2","tileset_last_modified":1795550000}"#
+            }),
+        );
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("mock Valhalla");
+        });
+
+        let service = DesktopControlService::default();
+        let configured = service
+            .configure_routing(ConfigureRoutingInput {
+                base_url: format!("http://{address}"),
+                map_dataset_id: "fixture-europe-2026-11".to_owned(),
+                connect_timeout_ms: 500,
+                request_timeout_ms: 2_000,
+            })
+            .await
+            .expect("routing config");
+        let routing = configured.routing.expect("routing status");
+        assert_eq!(routing.map_dataset_id, "fixture-europe-2026-11");
+        assert_eq!(routing.connect_timeout_ms, 500);
+        assert_eq!(routing.request_timeout_ms, 2_000);
+
+        let probe = service.test_routing().await.expect("routing probe");
+        assert_eq!(probe.state, RoutingAvailabilityState::Ok);
+        assert_eq!(probe.engine_version.as_deref(), Some("3.9.2"));
+        assert_eq!(probe.tileset_last_modified, Some(1_795_550_000));
+
+        let disabled = service.disable_routing().await.expect("disable routing");
+        assert!(disabled.routing.is_none());
+        let probe = service.test_routing().await.expect("disabled probe");
+        assert_eq!(probe.state, RoutingAvailabilityState::NotConfigured);
+
+        server.abort();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn desktop_service_rejects_unbounded_routing_timeouts() {
+        let service = DesktopControlService::default();
+        assert!(
+            service
+                .configure_routing(ConfigureRoutingInput {
+                    base_url: "http://127.0.0.1:8002".to_owned(),
+                    map_dataset_id: "fixture".to_owned(),
+                    connect_timeout_ms: 99,
+                    request_timeout_ms: 2_000,
+                })
+                .await
+                .is_err()
+        );
+        assert!(
+            service
+                .configure_routing(ConfigureRoutingInput {
+                    base_url: "http://127.0.0.1:8002".to_owned(),
+                    map_dataset_id: "fixture".to_owned(),
+                    connect_timeout_ms: 2_000,
+                    request_timeout_ms: 1_000,
+                })
+                .await
+                .is_err()
+        );
+        assert!(service.status().await.expect("status").routing.is_none());
+    }
+
+    #[tokio::test]
     async fn desktop_service_does_not_bypass_lan_validation() {
         let service = DesktopControlService::default();
         assert!(
