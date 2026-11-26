@@ -966,6 +966,15 @@ fn PlannerApp() -> impl IntoView {
                 return;
             }
         };
+        if cargos.is_empty() {
+            message.set(
+                strings(locale.get_untracked())
+                    .package_needs_cargo
+                    .to_owned(),
+            );
+            error.set(true);
+            return;
+        }
         let routing_profile_input = routing_profile.get_untracked().input().ok();
         let routing_preview = if routing_profile_input.is_some() {
             preview.get_untracked().filter(|value| {
