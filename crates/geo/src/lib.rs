@@ -43,6 +43,11 @@ pub enum TollPreference {
     Avoid,
 }
 
+/// Lowest `max_speed_kmh` accepted for a new routing calculation.
+pub const MIN_MAX_SPEED_KMH: f64 = 10.0;
+/// Highest `max_speed_kmh` accepted for a new routing calculation.
+pub const MAX_MAX_SPEED_KMH: f64 = 252.0;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VehicleRoutingProfile {
@@ -74,6 +79,22 @@ impl VehicleRoutingProfile {
         }
 
         Ok(())
+    }
+
+    /// Checks a profile before it is used for a new routing calculation.
+    ///
+    /// `validate` remains the check for stored data, so packages and trip journals
+    /// written earlier stay readable. Valhalla does not reject a `top_speed`
+    /// outside 10..=252: it silently replaces it with its own default.
+    pub fn validate_for_routing(&self) -> Result<(), GeoContractError> {
+        self.validate()?;
+
+        match self.max_speed_kmh {
+            Some(value) if !(MIN_MAX_SPEED_KMH..=MAX_MAX_SPEED_KMH).contains(&value) => {
+                Err(GeoContractError::MaxSpeedOutOfRange)
+            }
+            _ => Ok(()),
+        }
     }
 
     #[must_use]
@@ -231,7 +252,7 @@ impl RouteRequest {
         if points.len() < 2 {
             return Err(GeoContractError::RouteNeedsAtLeastTwoPoints);
         }
-        profile.validate()?;
+        profile.validate_for_routing()?;
         Ok(Self { points, profile })
     }
 
@@ -276,7 +297,7 @@ impl MatrixRequest {
         if targets.is_empty() {
             return Err(GeoContractError::MatrixNeedsTarget);
         }
-        profile.validate()?;
+        profile.validate_for_routing()?;
         Ok(Self {
             sources,
             targets,
@@ -331,6 +352,7 @@ pub enum GeoContractError {
     InvalidLatitude,
     InvalidLongitude,
     InvalidVehicleValue(&'static str),
+    MaxSpeedOutOfRange,
     EmptyIdentity(&'static str),
     RouteNeedsAtLeastTwoPoints,
     MatrixNeedsSource,
@@ -348,6 +370,9 @@ impl fmt::Display for GeoContractError {
             }
             Self::InvalidVehicleValue(field) => {
                 write!(formatter, "{field} must be positive and finite")
+            }
+            Self::MaxSpeedOutOfRange => {
+                formatter.write_str("max_speed_kmh must be within 10..=252")
             }
             Self::EmptyIdentity(field) => write!(formatter, "{field} must not be empty"),
             Self::RouteNeedsAtLeastTwoPoints => {
@@ -434,6 +459,43 @@ mod tests {
             invalid.validate(),
             Err(GeoContractError::InvalidVehicleValue("gross_weight_t"))
         );
+    }
+
+    #[test]
+    fn routing_requests_refuse_max_speed_the_engine_would_replace() {
+        let point = GeoPoint::new(49.0, 24.0).expect("valid point");
+
+        for unsupported in [5.0, 9.9, 252.1, 300.0] {
+            let mut candidate = profile();
+            candidate.max_speed_kmh = Some(unsupported);
+
+            assert!(candidate.validate().is_ok(), "stored data stays readable");
+            assert_eq!(
+                RouteRequest::new(vec![point, point], candidate.clone()),
+                Err(GeoContractError::MaxSpeedOutOfRange)
+            );
+            assert_eq!(
+                MatrixRequest::new(vec![point], vec![point], candidate),
+                Err(GeoContractError::MaxSpeedOutOfRange)
+            );
+        }
+
+        for supported in [None, Some(10.0), Some(90.0), Some(252.0)] {
+            let mut candidate = profile();
+            candidate.max_speed_kmh = supported;
+
+            assert!(RouteRequest::new(vec![point, point], candidate).is_ok());
+        }
+
+        for invalid in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            let mut candidate = profile();
+            candidate.max_speed_kmh = Some(invalid);
+
+            assert_eq!(
+                candidate.validate_for_routing(),
+                Err(GeoContractError::InvalidVehicleValue("max_speed_kmh"))
+            );
+        }
     }
 
     #[test]
