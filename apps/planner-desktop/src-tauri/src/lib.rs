@@ -1126,7 +1126,10 @@ mod tests {
         assert_eq!(preview.state, PlannerRoutingPreviewState::Ok);
         assert_eq!(preview.revision, reordered.revision);
         assert!(preview.warnings.contains(&"missing_height_m".to_owned()));
-        assert_eq!(service.status().expect("draft").revision, reordered.revision);
+        assert_eq!(
+            service.status().expect("draft").revision,
+            reordered.revision
+        );
 
         let requests = capture.requests.lock().expect("request log");
         assert_eq!(requests.len(), 1);
