@@ -467,7 +467,7 @@ impl PlannerDesktopService {
             return Err("At least one cargo is required for trip package export".to_owned());
         }
 
-        let (working_route_id, revision, route, planning_basis) = {
+        let (working_route_id, revision, route, planning_basis, last_export_version) = {
             let state = self
                 .inner
                 .lock()
@@ -516,14 +516,26 @@ impl PlannerDesktopService {
                 state.route.current_revision,
                 route,
                 planning_basis,
+                state.last_export_version,
             )
         };
 
         let trip_id = TripId::from_bytes(trip_id_bytes(working_route_id))
             .map_err(|error| format!("Could not create trip id: {error}"))?;
-        let trip_version = TripVersion::new(1)
+        let next_version = last_export_version
+            .checked_add(1)
+            .ok_or("Planner trip version overflow")?;
+        let trip_version = TripVersion::new(next_version)
             .map_err(|error| format!("Could not create trip version: {error:?}"))?;
-        let header = TripPackageHeader::new(trip_id, trip_version, None)
+        let base_version = if last_export_version == 0 {
+            None
+        } else {
+            Some(
+                TripVersion::new(last_export_version)
+                    .map_err(|error| format!("Could not create base trip version: {error:?}"))?,
+            )
+        };
+        let header = TripPackageHeader::new(trip_id, trip_version, base_version)
             .map_err(|error| format!("Could not create package header: {error:?}"))?;
         let created_at_unix_ms = unix_time_ms()?;
         let mut draft = PlannerTripExportDraft {
@@ -595,6 +607,39 @@ impl PlannerDesktopService {
 
         write_trip_package(&path, &draft, &route)
             .map_err(|error| format!("Could not export trip package: {error}"))?;
+
+        let commit_result = (|| {
+            let mut state = self
+                .inner
+                .lock()
+                .map_err(|_| "Planner state unavailable".to_owned())?;
+            if state.route.working_route_id != working_route_id
+                || state.route.current_revision != revision
+                || state.last_export_version != last_export_version
+            {
+                return Err(
+                    "Planner draft or export history changed while the package was being written"
+                        .to_owned(),
+                );
+            }
+            self.commit_event(
+                &mut state,
+                PlannerDraftEvent::ExportedPackage {
+                    trip_version: trip_version.get(),
+                    working_route_revision: revision,
+                },
+            )?;
+            Ok::<(), String>(())
+        })();
+        if let Err(problem) = commit_result {
+            if let Err(cleanup) = fs::remove_file(&path) {
+                return Err(format!(
+                    "{problem}; package history was not committed and the package could not be removed: {cleanup}"
+                ));
+            }
+            return Err(problem);
+        }
+
         Ok(PlannerPackageExportResult {
             path: path.to_string_lossy().into_owned(),
             trip_id: hex_id(trip_id.as_bytes()),
