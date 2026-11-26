@@ -55,6 +55,8 @@ Control은 파생 geometry를 유지하고 지점 순서 변경 후 설정된 ru
 
 Planner desktop에는 이제 자체 runtime Valhalla preview가 있습니다. 운영자가 Valhalla 주소, 지도 데이터셋 ID, timeout을 지정하고 `/status`를 확인하며, `/route`는 명시적으로 입력한 planning profile만으로 계산됩니다. 알 수 없는 숫자 제약값은 추정하지 않습니다. 성공한 결과는 OSM 위에 실제 도로 polyline을 그리며 결과가 없을 때 가짜 직선을 그리지 않습니다. Preview는 route/revision/profile에서 파생되므로 초안이나 planning profile이 바뀌면 이전 선을 지우고 늦은 응답도 거부합니다. Routing 실패는 Planner 초안을 변경하지 않습니다.
 
+Planner desktop은 이제 native Save As를 통해 기존 versioned trip package를 schema 1.4로 내보냅니다. Package에는 명시적인 planning basis(차량 유형/등급과 화물), 지점 순서, 그리고 존재하는 경우에만 일치하는 planning routing profile/Valhalla geometry snapshot이 포함됩니다. 하나의 초안에서 TripId는 유지되고 TripVersion은 재시작 후에도 이어지며 CargoId는 행 위치와 무관하고 기존 ZIP은 덮어쓰지 않습니다.
+
 ## Test v0.1.0-preview.7
 
 [Test v0.1.0-preview.7 열기](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
@@ -94,7 +96,7 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 
 ## 앞으로 필요한 작업
 
-- 기존 versioned trip package를 이용한 Planner UI package export;
+- Planner ZIP이 없을 때 Control에서 직접 새 운행을 생성;
 
 - 로컬 브라우저 수동 검수;
 - 동일한 Driver Browser를 실제 휴대폰에서 같은 LAN으로 테스트;
