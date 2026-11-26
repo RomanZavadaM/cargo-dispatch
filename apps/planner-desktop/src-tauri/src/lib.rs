@@ -1511,6 +1511,145 @@ mod tests {
         server.abort();
     }
 
+    #[tokio::test]
+    async fn package_export_roundtrips_schema_1_4_basis_profile_and_geometry() {
+        let journal = unique_journal("package-export");
+        let service = PlannerDesktopService::open(journal.clone()).expect("open Planner");
+        let first = service
+            .add_point(point("Warehouse", 49.8393, 24.0296))
+            .expect("warehouse");
+        let route = service
+            .add_point(point("Customer", 49.8430, 24.0360))
+            .expect("customer");
+
+        let app = Router::new()
+            .route("/status", get(status_ok))
+            .route("/route", post(route_ok));
+        let (base_url, server) = spawn_mock_valhalla(app).await;
+        configure_mock(&service, &base_url);
+
+        let profile = routing_profile_input();
+        let preview = service
+            .preview_route(PlannerRoutingPreviewInput {
+                profile: profile.clone(),
+            })
+            .await
+            .expect("road preview");
+        assert_eq!(preview.state, PlannerRoutingPreviewState::Ok);
+
+        let package = journal.with_extension("trip-package.zip");
+        let imported_path = journal.with_extension("imported-trip");
+        let result = service
+            .export_trip_package(PlannerPackageExportInput {
+                path: package.to_string_lossy().into_owned(),
+                vehicle_type: "current routing vehicle".to_owned(),
+                cargos: vec![PlannerPackageCargoInput {
+                    title: "Synthetic cargo".to_owned(),
+                    weight_kg: Some(12_500),
+                    pallets: Some(18),
+                    pickup_point_id: Some(first.points[0].point_id.clone()),
+                    unload_point_id: Some(route.points[1].point_id.clone()),
+                }],
+                routing_profile: Some(profile.clone()),
+                routing_preview: Some(preview.clone()),
+            })
+            .expect("export package");
+
+        assert_eq!(result.schema_major, 1);
+        assert_eq!(result.schema_minor, 4);
+        assert_eq!(result.trip_version, 1);
+        assert_eq!(result.point_count, 2);
+        assert_eq!(result.cargo_count, 1);
+        assert!(result.geometry_included);
+        assert_eq!(service.status().expect("draft"), route);
+
+        let imported = cargo_dispatch_trip_files::TripFolder::import(&imported_path, &package)
+            .expect("import exported package");
+        assert_eq!(hex_id(imported.trip_id().as_bytes()), result.trip_id);
+        let basis = imported.planning_basis().expect("planning basis");
+        assert_eq!(basis.vehicle_type, "current routing vehicle");
+        assert_eq!(basis.cargos.len(), 1);
+        assert_eq!(basis.cargos[0].title, "Synthetic cargo");
+        assert_eq!(basis.cargos[0].weight_kg, Some(12_500));
+        assert_eq!(basis.cargos[0].pallets, Some(18));
+        assert_eq!(basis.cargos[0].pickup_point_id, Some(first.points[0].point_id.as_str()).and_then(|value| {
+            route
+                .points
+                .iter()
+                .find(|point| point.point_id == value)
+                .and_then(|_| point_from_text(
+                    &service.inner.lock().expect("Planner state"),
+                    value
+                ).ok())
+        }));
+        assert_eq!(
+            imported
+                .routing_profile()
+                .expect("routing profile")
+                .profile_fingerprint(),
+            routing_profile(profile)
+                .expect("typed routing profile")
+                .profile_fingerprint()
+        );
+        let imported_state = imported.state();
+        assert_eq!(imported_state.route_points.len(), 2);
+        assert!(imported_state.route_geometry.is_some());
+
+        server.abort();
+        let _ = fs::remove_file(&package);
+        let _ = fs::remove_dir_all(&imported_path);
+        let _ = fs::remove_file(journal.with_extension("operator-id.bin"));
+        let _ = fs::remove_file(journal);
+    }
+
+    #[tokio::test]
+    async fn package_export_rejects_stale_routing_preview() {
+        let journal = unique_journal("stale-package-export");
+        let service = PlannerDesktopService::open(journal.clone()).expect("open Planner");
+        service
+            .add_point(point("A", 49.8393, 24.0296))
+            .expect("first");
+        let before = service
+            .add_point(point("B", 49.8430, 24.0360))
+            .expect("second");
+
+        let app = Router::new()
+            .route("/status", get(status_ok))
+            .route("/route", post(route_ok));
+        let (base_url, server) = spawn_mock_valhalla(app).await;
+        configure_mock(&service, &base_url);
+
+        let profile = routing_profile_input();
+        let preview = service
+            .preview_route(PlannerRoutingPreviewInput {
+                profile: profile.clone(),
+            })
+            .await
+            .expect("preview");
+        assert_eq!(preview.revision, before.revision);
+
+        let changed = service
+            .add_point(point("C", 49.8500, 24.0500))
+            .expect("changed draft");
+        let package = journal.with_extension("stale.zip");
+        let error = service
+            .export_trip_package(PlannerPackageExportInput {
+                path: package.to_string_lossy().into_owned(),
+                vehicle_type: "truck".to_owned(),
+                cargos: Vec::new(),
+                routing_profile: Some(profile),
+                routing_preview: Some(preview),
+            })
+            .expect_err("stale preview must fail");
+        assert!(error.contains("stale") || error.contains("does not match"));
+        assert_eq!(service.status().expect("draft"), changed);
+        assert!(!package.exists());
+
+        server.abort();
+        let _ = fs::remove_file(journal.with_extension("operator-id.bin"));
+        let _ = fs::remove_file(journal);
+    }
+
     #[test]
     fn recovery_ignores_only_an_incomplete_final_record() {
         let path = unique_journal("truncated-tail");
