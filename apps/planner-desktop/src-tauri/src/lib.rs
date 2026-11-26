@@ -7,8 +7,18 @@ use cargo_dispatch_planner::{
 use cargo_dispatch_planner_ui_contracts::{
     PlannerPointInput, PlannerPointView, PlannerRouteView, PointActionInput, ReorderPointsInput,
 };
-use std::{collections::BTreeMap, sync::Mutex};
-use tauri::State;
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs::{self, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
+use tauri::{Manager, State};
+
+const PLANNER_JOURNAL_SCHEMA: u32 = 1;
+const PLANNER_JOURNAL_FILE: &str = "planner-draft-v1.jsonl";
 
 #[derive(Debug, Clone)]
 struct ManualPoint {
@@ -18,6 +28,7 @@ struct ManualPoint {
     longitude: f64,
 }
 
+#[derive(Debug, Clone)]
 struct PlannerState {
     route: WorkingRoute,
     points: BTreeMap<PointId, ManualPoint>,
@@ -34,9 +45,300 @@ impl Default for PlannerState {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum PlannerDraftEvent {
+    ResetRoute {
+        route_serial: u64,
+    },
+    AddPoint {
+        point_serial: u64,
+        title: String,
+        latitude: f64,
+        longitude: f64,
+    },
+    RemovePoint {
+        point_id: [u8; 16],
+    },
+    ReorderPoints {
+        point_ids: Vec<[u8; 16]>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PlannerJournalRecord {
+    schema: u32,
+    event: PlannerDraftEvent,
+}
+
 struct PlannerDesktopService {
     inner: Mutex<PlannerState>,
+    journal_path: Option<PathBuf>,
+}
+
+impl Default for PlannerDesktopService {
+    fn default() -> Self {
+        Self {
+            inner: Mutex::new(PlannerState::default()),
+            journal_path: None,
+        }
+    }
+}
+
+impl PlannerDesktopService {
+    fn open(journal_path: PathBuf) -> Result<Self, String> {
+        let state = recover_journal(&journal_path)?;
+        Ok(Self {
+            inner: Mutex::new(state),
+            journal_path: Some(journal_path),
+        })
+    }
+
+    fn append_event(&self, event: &PlannerDraftEvent) -> Result<(), String> {
+        let Some(path) = &self.journal_path else {
+            return Ok(());
+        };
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("Could not create Planner data folder: {error}"))?;
+        }
+        let record = PlannerJournalRecord {
+            schema: PLANNER_JOURNAL_SCHEMA,
+            event: event.clone(),
+        };
+        let mut encoded = serde_json::to_vec(&record)
+            .map_err(|error| format!("Could not encode Planner journal record: {error}"))?;
+        encoded.push(b'\n');
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .map_err(|error| format!("Could not open Planner journal: {error}"))?;
+        file.write_all(&encoded)
+            .map_err(|error| format!("Could not write Planner journal: {error}"))?;
+        file.flush()
+            .map_err(|error| format!("Could not flush Planner journal: {error}"))?;
+        file.sync_data()
+            .map_err(|error| format!("Could not sync Planner journal: {error}"))?;
+        Ok(())
+    }
+
+    fn commit_event(
+        &self,
+        state: &mut PlannerState,
+        event: PlannerDraftEvent,
+    ) -> Result<PlannerRouteView, String> {
+        let mut candidate = state.clone();
+        apply_event(&mut candidate, &event)?;
+        self.append_event(&event)?;
+        *state = candidate;
+        route_view(state)
+    }
+
+    fn status(&self) -> Result<PlannerRouteView, String> {
+        let state = self
+            .inner
+            .lock()
+            .map_err(|_| "Planner state unavailable".to_owned())?;
+        route_view(&state)
+    }
+
+    fn reset(&self) -> Result<PlannerRouteView, String> {
+        let mut state = self
+            .inner
+            .lock()
+            .map_err(|_| "Planner state unavailable".to_owned())?;
+        let event = PlannerDraftEvent::ResetRoute {
+            route_serial: state.next_serial,
+        };
+        self.commit_event(&mut state, event)
+    }
+
+    fn add_point(&self, input: PlannerPointInput) -> Result<PlannerRouteView, String> {
+        validate_point(&input)?;
+        let mut state = self
+            .inner
+            .lock()
+            .map_err(|_| "Planner state unavailable".to_owned())?;
+        let event = PlannerDraftEvent::AddPoint {
+            point_serial: state.next_serial,
+            title: input.title.trim().to_owned(),
+            latitude: input.latitude,
+            longitude: input.longitude,
+        };
+        self.commit_event(&mut state, event)
+    }
+
+    fn remove_point(&self, input: PointActionInput) -> Result<PlannerRouteView, String> {
+        let mut state = self
+            .inner
+            .lock()
+            .map_err(|_| "Planner state unavailable".to_owned())?;
+        let id = point_from_text(&state, &input.point_id)?;
+        self.commit_event(
+            &mut state,
+            PlannerDraftEvent::RemovePoint {
+                point_id: id.as_bytes(),
+            },
+        )
+    }
+
+    fn reorder(&self, input: ReorderPointsInput) -> Result<PlannerRouteView, String> {
+        let mut state = self
+            .inner
+            .lock()
+            .map_err(|_| "Planner state unavailable".to_owned())?;
+        if input.point_ids.len() != state.route.points.len() {
+            return Err("Reorder must contain every current point exactly once".to_owned());
+        }
+        let order = input
+            .point_ids
+            .iter()
+            .map(|value| point_from_text(&state, value))
+            .collect::<Result<Vec<_>, String>>()?;
+        self.commit_event(
+            &mut state,
+            PlannerDraftEvent::ReorderPoints {
+                point_ids: order.into_iter().map(PointId::as_bytes).collect(),
+            },
+        )
+    }
+}
+
+fn recover_journal(path: &Path) -> Result<PlannerState, String> {
+    if !path
+        .try_exists()
+        .map_err(|error| format!("Could not inspect Planner journal: {error}"))?
+    {
+        return Ok(PlannerState::default());
+    }
+
+    let bytes =
+        fs::read(path).map_err(|error| format!("Could not read Planner journal: {error}"))?;
+    let mut state = PlannerState::default();
+    let mut line_start = 0;
+
+    for (index, byte) in bytes.iter().enumerate() {
+        if *byte != b'\n' {
+            continue;
+        }
+        let line = &bytes[line_start..index];
+        line_start = index + 1;
+        if line.iter().all(u8::is_ascii_whitespace) {
+            continue;
+        }
+        let record: PlannerJournalRecord = serde_json::from_slice(line)
+            .map_err(|error| format!("Planner journal contains an invalid record: {error}"))?;
+        if record.schema != PLANNER_JOURNAL_SCHEMA {
+            return Err(format!(
+                "Unsupported Planner journal schema: {}",
+                record.schema
+            ));
+        }
+        apply_event(&mut state, &record.event)?;
+    }
+
+    // A crash can leave only the final append without its newline. Because a command
+    // is acknowledged only after write + flush + sync_data, that incomplete tail was
+    // never committed and is intentionally ignored during recovery.
+    Ok(state)
+}
+
+fn apply_event(state: &mut PlannerState, event: &PlannerDraftEvent) -> Result<(), String> {
+    match event {
+        PlannerDraftEvent::ResetRoute { route_serial } => {
+            consume_serial(state, *route_serial)?;
+            state.route = manual_working_route(route_id(*route_serial), &[])
+                .map_err(|error| format!("Could not recover manual route: {error:?}"))?;
+            state.points.clear();
+        }
+        PlannerDraftEvent::AddPoint {
+            point_serial,
+            title,
+            latitude,
+            longitude,
+        } => {
+            let input = PlannerPointInput {
+                title: title.clone(),
+                latitude: *latitude,
+                longitude: *longitude,
+            };
+            validate_point(&input)?;
+            consume_serial(state, *point_serial)?;
+            let id = point_id(*point_serial);
+            let mut order = state
+                .route
+                .points
+                .iter()
+                .map(|point| point.point_id)
+                .collect::<Vec<_>>();
+            order.push(id);
+            let updated = edit_manual_working_route(&state.route, &order)
+                .map_err(|error| format!("Planner rejected recovered point edit: {error:?}"))?;
+            state.points.insert(
+                id,
+                ManualPoint {
+                    point_id: id,
+                    title: title.clone(),
+                    latitude: *latitude,
+                    longitude: *longitude,
+                },
+            );
+            state.route = updated;
+        }
+        PlannerDraftEvent::RemovePoint { point_id: bytes } => {
+            let id = PointId::from_bytes(*bytes)
+                .map_err(|error| format!("Planner journal contains invalid point id: {error:?}"))?;
+            if !state.points.contains_key(&id) {
+                return Err("Planner journal removes an unknown point".to_owned());
+            }
+            let order = state
+                .route
+                .points
+                .iter()
+                .map(|point| point.point_id)
+                .filter(|candidate| *candidate != id)
+                .collect::<Vec<_>>();
+            let updated = edit_manual_working_route(&state.route, &order)
+                .map_err(|error| format!("Planner rejected recovered point removal: {error:?}"))?;
+            state.route = updated;
+            state.points.remove(&id);
+        }
+        PlannerDraftEvent::ReorderPoints { point_ids } => {
+            let order = point_ids
+                .iter()
+                .copied()
+                .map(|bytes| {
+                    PointId::from_bytes(bytes).map_err(|error| {
+                        format!("Planner journal contains invalid point id: {error:?}")
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            let known = state.points.keys().copied().collect::<BTreeSet<_>>();
+            let proposed = order.iter().copied().collect::<BTreeSet<_>>();
+            if order.len() != state.route.points.len()
+                || proposed.len() != order.len()
+                || proposed != known
+            {
+                return Err("Planner journal contains an invalid point order".to_owned());
+            }
+            state.route = edit_manual_working_route(&state.route, &order)
+                .map_err(|error| format!("Planner rejected recovered point order: {error:?}"))?;
+        }
+    }
+    Ok(())
+}
+
+fn consume_serial(state: &mut PlannerState, serial: u64) -> Result<(), String> {
+    if serial != state.next_serial {
+        return Err(format!(
+            "Planner journal serial mismatch: expected {}, got {serial}",
+            state.next_serial
+        ));
+    }
+    state.next_serial = serial.checked_add(1).ok_or("Planner id overflow")?;
+    Ok(())
 }
 
 fn id_bytes(kind: u8, serial: u64) -> [u8; 16] {
@@ -45,15 +347,19 @@ fn id_bytes(kind: u8, serial: u64) -> [u8; 16] {
     bytes[8..].copy_from_slice(&serial.to_be_bytes());
     bytes
 }
+
 fn route_id(serial: u64) -> WorkingRouteId {
     WorkingRouteId::from_bytes(id_bytes(0x52, serial)).expect("route id is non-nil")
 }
+
 fn point_id(serial: u64) -> PointId {
     PointId::from_bytes(id_bytes(0x50, serial)).expect("point id is non-nil")
 }
+
 fn hex_id(bytes: [u8; 16]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
+
 fn validate_point(input: &PlannerPointInput) -> Result<(), String> {
     if input.title.trim().is_empty() {
         return Err("Point title is required".to_owned());
@@ -66,6 +372,7 @@ fn validate_point(input: &PlannerPointInput) -> Result<(), String> {
     }
     Ok(())
 }
+
 fn point_from_text(state: &PlannerState, value: &str) -> Result<PointId, String> {
     state
         .points
@@ -74,6 +381,7 @@ fn point_from_text(state: &PlannerState, value: &str) -> Result<PointId, String>
         .find(|id| hex_id(id.as_bytes()) == value)
         .ok_or_else(|| "Unknown point id".to_owned())
 }
+
 fn route_view(state: &PlannerState) -> Result<PlannerRouteView, String> {
     let points = state
         .route
@@ -112,111 +420,18 @@ fn route_view(state: &PlannerState) -> Result<PlannerRouteView, String> {
     })
 }
 
-impl PlannerDesktopService {
-    fn status(&self) -> Result<PlannerRouteView, String> {
-        let state = self
-            .inner
-            .lock()
-            .map_err(|_| "Planner state unavailable".to_owned())?;
-        route_view(&state)
-    }
-    fn reset(&self) -> Result<PlannerRouteView, String> {
-        let mut state = self
-            .inner
-            .lock()
-            .map_err(|_| "Planner state unavailable".to_owned())?;
-        let serial = state.next_serial;
-        state.next_serial = state
-            .next_serial
-            .checked_add(1)
-            .ok_or("Planner id overflow")?;
-        state.route = manual_working_route(route_id(serial), &[])
-            .map_err(|error| format!("Could not create manual route: {error:?}"))?;
-        state.points.clear();
-        route_view(&state)
-    }
-    fn add_point(&self, input: PlannerPointInput) -> Result<PlannerRouteView, String> {
-        validate_point(&input)?;
-        let mut state = self
-            .inner
-            .lock()
-            .map_err(|_| "Planner state unavailable".to_owned())?;
-        let serial = state.next_serial;
-        state.next_serial = state
-            .next_serial
-            .checked_add(1)
-            .ok_or("Planner id overflow")?;
-        let id = point_id(serial);
-        let mut order = state
-            .route
-            .points
-            .iter()
-            .map(|point| point.point_id)
-            .collect::<Vec<_>>();
-        order.push(id);
-        let updated = edit_manual_working_route(&state.route, &order)
-            .map_err(|error| format!("Planner rejected the point edit: {error:?}"))?;
-        state.points.insert(
-            id,
-            ManualPoint {
-                point_id: id,
-                title: input.title.trim().to_owned(),
-                latitude: input.latitude,
-                longitude: input.longitude,
-            },
-        );
-        state.route = updated;
-        route_view(&state)
-    }
-    fn remove_point(&self, input: PointActionInput) -> Result<PlannerRouteView, String> {
-        let mut state = self
-            .inner
-            .lock()
-            .map_err(|_| "Planner state unavailable".to_owned())?;
-        let id = point_from_text(&state, &input.point_id)?;
-        let order = state
-            .route
-            .points
-            .iter()
-            .map(|point| point.point_id)
-            .filter(|candidate| *candidate != id)
-            .collect::<Vec<_>>();
-        let updated = edit_manual_working_route(&state.route, &order)
-            .map_err(|error| format!("Planner rejected the point removal: {error:?}"))?;
-        state.route = updated;
-        state.points.remove(&id);
-        route_view(&state)
-    }
-    fn reorder(&self, input: ReorderPointsInput) -> Result<PlannerRouteView, String> {
-        let mut state = self
-            .inner
-            .lock()
-            .map_err(|_| "Planner state unavailable".to_owned())?;
-        if input.point_ids.len() != state.route.points.len() {
-            return Err("Reorder must contain every current point exactly once".to_owned());
-        }
-        let order = input
-            .point_ids
-            .iter()
-            .map(|value| point_from_text(&state, value))
-            .collect::<Result<Vec<_>, String>>()?;
-        let updated = edit_manual_working_route(&state.route, &order)
-            .map_err(|error| format!("Planner rejected the point order: {error:?}"))?;
-        state.route = updated;
-        route_view(&state)
-    }
-}
-
 #[tauri::command]
 fn planner_status(state: State<'_, PlannerDesktopService>) -> Result<PlannerRouteView, String> {
     state.status()
 }
+
 #[tauri::command]
 fn planner_reset_route(
     state: State<'_, PlannerDesktopService>,
 ) -> Result<PlannerRouteView, String> {
     state.reset()
 }
+
 #[tauri::command]
 fn planner_add_point(
     input: PlannerPointInput,
@@ -224,6 +439,7 @@ fn planner_add_point(
 ) -> Result<PlannerRouteView, String> {
     state.add_point(input)
 }
+
 #[tauri::command]
 fn planner_remove_point(
     input: PointActionInput,
@@ -231,6 +447,7 @@ fn planner_remove_point(
 ) -> Result<PlannerRouteView, String> {
     state.remove_point(input)
 }
+
 #[tauri::command]
 fn planner_reorder_points(
     input: ReorderPointsInput,
@@ -241,7 +458,15 @@ fn planner_reorder_points(
 
 pub fn run() {
     tauri::Builder::default()
-        .manage(PlannerDesktopService::default())
+        .setup(|app| {
+            let app_data_dir = app.path().app_data_dir()?;
+            fs::create_dir_all(&app_data_dir)?;
+            let service =
+                PlannerDesktopService::open(app_data_dir.join(PLANNER_JOURNAL_FILE))
+                    .map_err(std::io::Error::other)?;
+            app.manage(service);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             planner_status,
             planner_reset_route,
@@ -256,12 +481,25 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     fn point(title: &str, latitude: f64, longitude: f64) -> PlannerPointInput {
         PlannerPointInput {
             title: title.to_owned(),
             latitude,
             longitude,
         }
+    }
+
+    fn unique_journal(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "cargo-dispatch-planner-{name}-{}-{nonce}.jsonl",
+            std::process::id()
+        ))
     }
 
     #[test]
@@ -327,5 +565,77 @@ mod tests {
         let service = PlannerDesktopService::default();
         assert!(service.add_point(point("bad", 91.0, 24.0)).is_err());
         assert_eq!(service.status().expect("status").revision, 1);
+    }
+
+    #[test]
+    fn journal_recovers_route_order_revision_and_next_id() {
+        let path = unique_journal("recovery");
+        let service = PlannerDesktopService::open(path.clone()).expect("open journal");
+        let first = service
+            .add_point(point("Warehouse", 49.8393, 24.0296))
+            .expect("first");
+        let second = service
+            .add_point(point("Customer", 49.8430, 24.0360))
+            .expect("second");
+        let reordered = service
+            .reorder(ReorderPointsInput {
+                point_ids: vec![
+                    second.points[1].point_id.clone(),
+                    first.points[0].point_id.clone(),
+                ],
+            })
+            .expect("reorder");
+        assert_eq!(reordered.revision, 4);
+        drop(service);
+
+        let recovered = PlannerDesktopService::open(path.clone()).expect("recover");
+        let view = recovered.status().expect("status");
+        assert_eq!(view.revision, 4);
+        assert_eq!(
+            view.points
+                .iter()
+                .map(|point| point.title.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Customer", "Warehouse"]
+        );
+        let after_restart = recovered
+            .add_point(point("After restart", 49.8500, 24.0500))
+            .expect("new point");
+        assert_eq!(after_restart.revision, 5);
+        assert_ne!(
+            after_restart.points[2].point_id,
+            after_restart.points[0].point_id
+        );
+        assert_ne!(
+            after_restart.points[2].point_id,
+            after_restart.points[1].point_id
+        );
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn recovery_ignores_only_an_incomplete_final_record() {
+        let path = unique_journal("truncated-tail");
+        let service = PlannerDesktopService::open(path.clone()).expect("open journal");
+        let expected = service
+            .add_point(point("Committed", 49.8393, 24.0296))
+            .expect("point");
+        drop(service);
+
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .expect("open tail");
+        file.write_all(br#"{"schema":1,"event":{"type":"add_point""#)
+            .expect("write partial tail");
+        file.sync_data().expect("sync partial tail");
+        drop(file);
+
+        let recovered = PlannerDesktopService::open(path.clone()).expect("recover");
+        let view = recovered.status().expect("status");
+        assert_eq!(view, expected);
+
+        let _ = fs::remove_file(path);
     }
 }
