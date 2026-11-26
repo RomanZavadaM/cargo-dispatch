@@ -11,9 +11,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
-use cargo_dispatch_contracts::{
-    TripRoadGeometry, TripRoadGeometryPoint, TripRoutingIdentity,
-};
+use cargo_dispatch_contracts::{TripRoadGeometry, TripRoadGeometryPoint, TripRoutingIdentity};
 use cargo_dispatch_domain::{DocumentId, PointId};
 use cargo_dispatch_geo::{
     GeoPoint, NormalizedStatus, RouteRequest,
@@ -2093,8 +2091,7 @@ mod tests {
     async fn live_reorder_uses_new_point_order_and_persists_geometry() -> io::Result<()> {
         let tmp = tempfile::tempdir()?;
         let folder_path = tmp.path().join("reroute-trip");
-        let (trip_id, route, folder) =
-            create_trip(tmp.path(), "reroute-trip", 60, 70)?;
+        let (trip_id, route, folder) = create_trip(tmp.path(), "reroute-trip", 60, 70)?;
         let state = ControlBrowserState::new();
         state
             .register_trip("reroute-trip-token-0001", folder)
@@ -2128,10 +2125,7 @@ mod tests {
             .as_ref()
             .expect("live geometry");
         assert_eq!(geometry.routing.engine, "valhalla");
-        assert_eq!(
-            geometry.routing.map_dataset_id,
-            "fixture-europe-2026-11"
-        );
+        assert_eq!(geometry.routing.map_dataset_id, "fixture-europe-2026-11");
         assert!(geometry.points.len() >= 2);
 
         let requests = mock.requests.lock().expect("request log");
@@ -2157,8 +2151,7 @@ mod tests {
     async fn delayed_reroute_cannot_overwrite_newer_control_order() -> io::Result<()> {
         let tmp = tempfile::tempdir()?;
         let folder_path = tmp.path().join("stale-reroute-trip");
-        let (trip_id, route, folder) =
-            create_trip(tmp.path(), "stale-reroute-trip", 80, 90)?;
+        let (trip_id, route, folder) = create_trip(tmp.path(), "stale-reroute-trip", 80, 90)?;
         let state = ControlBrowserState::new();
         let token = "stale-reroute-token-0001";
         state.register_trip(token, folder).expect("register trip");
