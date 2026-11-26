@@ -81,8 +81,12 @@ jobs:
         run: |
           TAG="$(tr -d '\r\n' < .release-stable)"
           APP="apps/driver-ios/build/DerivedData/Build/Products/Debug-iphonesimulator/CargoDispatchDriver.app"
+          PACKAGE="Cargo-Dispatch-Driver-$TAG-iOS-Simulator"
           test -d "$APP"
-          ditto -c -k --sequesterRsrc --keepParent "$APP"             "Cargo-Dispatch-Driver-$TAG-iOS-Simulator.zip"
+          mkdir -p "$PACKAGE"
+          ditto "$APP" "$PACKAGE/CargoDispatchDriver.app"
+          ditto -c -k --sequesterRsrc --keepParent "$PACKAGE" "$PACKAGE.zip"
+          unzip -Z1 "$PACKAGE.zip" | grep -q "^$PACKAGE/"
 
       - name: Upload Apple Simulator release asset
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -391,7 +395,11 @@ jobs:
           "@ | Set-Content -Encoding UTF8 "$packageName/README-TEST.txt"
 
           $windowsZip = "$packageName.zip"
-          Compress-Archive -Path "$packageName/*" -DestinationPath $windowsZip -CompressionLevel Optimal
+          Compress-Archive -Path "$packageName" -DestinationPath $windowsZip -CompressionLevel Optimal
+          $windowsEntries = tar -tf $windowsZip
+          if (-not ($windowsEntries | Where-Object { $_ -like "$packageName/*" })) {
+            throw "Windows archive must contain the versioned package root folder: $packageName"
+          }
 
           $android = Get-ChildItem "mobile-assets/Cargo-Dispatch-Driver-*-Android-debug.apk" | Select-Object -First 1
           $apple = Get-ChildItem "mobile-assets/Cargo-Dispatch-Driver-*-iOS-Simulator.zip" | Select-Object -First 1
