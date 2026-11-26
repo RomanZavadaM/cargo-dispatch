@@ -22,7 +22,9 @@ The main development language is **Rust**.
 - files, photos, and videos **Driver Browser → Control** with local saving;
 - two simultaneous browser clients for one trip and reconnect without a separate browser database;
 - an interactive OpenStreetMap map in both Control and Driver Browser;
-- loopback and explicit LAN modes for testing and local operation.\n- automated Driver Browser acceptance verifies a real Control session separately over loopback and an explicit private-LAN bind;
+- loopback and explicit LAN modes for testing and local operation;
+- automated Driver Browser acceptance verifies a real Control session separately over loopback and an explicit private-LAN bind;
+- automated public HTTPS Gateway acceptance verifies the real `Control ↔ public HTTPS Gateway ↔ Driver Browser` chain: outbound-only Control, Browser shell/snapshot/location, and bidirectional files;
 
 ## Native Driver Apps
 
@@ -98,9 +100,8 @@ Android and Apple packages are not yet store-signed. App Store/TestFlight/Google
 
 - manual visual local-browser acceptance for narrow phone / tablet / wide desktop, including map pan/zoom/fit;
 - testing the same Driver Browser on a real phone in the same LAN;
-- HTTPS/public addressing path;
-- full browser GPS acceptance over HTTPS;
-- field testing across different networks/NAT/CGNAT;
+- real-device HTTPS field acceptance from a separate network and mobile NAT/CGNAT;
+- full browser GPS acceptance over HTTPS on a real device;
 
 
 ## Interface languages
