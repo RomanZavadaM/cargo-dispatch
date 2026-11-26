@@ -1405,7 +1405,8 @@ fn ControlApp() -> impl IntoView {
                                 RoutingProfileDraft::from_profile(session.routing_profile.as_ref()),
                             );
                             let edit_token = session.token.clone();
-                            let routing_token = session.token.clone();
+                            let routing_token_apply = session.token.clone();
+                            let routing_token_clear = session.token.clone();
                             view! {
                                 <li>
                                     <div><strong>{display_name}</strong></div>
@@ -1643,7 +1644,7 @@ fn ControlApp() -> impl IntoView {
                                                     match edit_routing_profile.get_untracked().profile() {
                                                         Ok(profile) => submit_routing_context(
                                                             UpdateRoutingContextInput {
-                                                                token: routing_token.clone(),
+                                                                token: routing_token_apply.clone(),
                                                                 profile: Some(profile),
                                                             },
                                                             status,
@@ -1671,7 +1672,7 @@ fn ControlApp() -> impl IntoView {
                                                 on:click=move |_| {
                                                     submit_routing_context(
                                                         UpdateRoutingContextInput {
-                                                            token: routing_token.clone(),
+                                                            token: routing_token_clear.clone(),
                                                             profile: None,
                                                         },
                                                         status,
