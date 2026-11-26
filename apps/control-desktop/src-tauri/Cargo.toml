@@ -10,6 +10,7 @@ publish = false
 tauri-build = "=2.7.6"
 
 [dependencies]
+cargo-dispatch-contracts = { path = "../../../crates/contracts" }
 cargo-dispatch-control-gateway-client = { path = "../../../crates/control-gateway-client" }
 cargo-dispatch-control-ui-contracts = { path = "../../../crates/control-ui-contracts" }
 cargo-dispatch-control-web = { path = "../../../crates/control-web" }
@@ -24,7 +25,6 @@ tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "sync"] 
 [dev-dependencies]
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
 cargo-dispatch-addressing-gateway = { path = "../../../crates/addressing-gateway" }
-cargo-dispatch-contracts = { path = "../../../crates/contracts" }
 cargo-dispatch-planner = { path = "../../../crates/planner" }
 reqwest = { version = "=0.13.5", default-features = false }
 tempfile = "=3.27.0"

@@ -1400,6 +1400,15 @@ fn ControlApp() -> impl IntoView {
                     let route_rows = trip.points.clone();
                     let documents = trip.documents.clone();
                     let location = trip.latest_location.clone();
+                    let planning_basis = trip.planning_basis.clone();
+                    let planning_basis_missing = planning_basis.is_none();
+                    let actual_context = trip.actual_context.clone();
+                    let actual_device = actual_context
+                        .endpoint_label
+                        .clone()
+                        .or(actual_context.endpoint_id.clone());
+                    let actual_vehicle = actual_context.vehicle_label.clone();
+                    let actual_vehicle_type = actual_context.vehicle_type.clone();
                     let trip_id = trip.trip_id.clone();
                     let version = trip.trip_version;
 
@@ -1410,6 +1419,76 @@ fn ControlApp() -> impl IntoView {
                                 {move || format!(" · {} ", strings(locale.get()).version)} {version}
                                 {move || format!(" · {} ", strings(locale.get()).route_revision)} {revision}
                             </p>
+
+                            <div class="context-grid">
+                                <div class="context-card">
+                                    <h3>{move || strings(locale.get()).planning_basis}</h3>
+                                    {planning_basis.map(|basis| {
+                                        let vehicle_type = basis.vehicle_type;
+                                        let cargos = basis.cargos;
+                                        view! {
+                                            <div>
+                                                <p>
+                                                    <strong>{move || format!("{}: ", strings(locale.get()).planned_vehicle)}</strong>
+                                                    {vehicle_type}
+                                                </p>
+                                                <h4>{move || strings(locale.get()).planned_cargos}</h4>
+                                                {cargos.is_empty().then(|| view! {
+                                                    <p class="note">{move || strings(locale.get()).not_specified}</p>
+                                                })}
+                                                <For
+                                                    each=move || cargos.clone()
+                                                    key=|cargo| cargo.cargo_id.clone()
+                                                    children=move |cargo| {
+                                                        let weight = cargo.weight_kg;
+                                                        let pallets = cargo.pallets;
+                                                        view! {
+                                                            <div class="context-item">
+                                                                <strong>{cargo.title}</strong>
+                                                                {weight.map(|value| view! {
+                                                                    <span>
+                                                                        " · "
+                                                                        {value}
+                                                                        " "
+                                                                        {move || strings(locale.get()).weight_kg}
+                                                                    </span>
+                                                                })}
+                                                                {pallets.map(|value| view! {
+                                                                    <span>
+                                                                        " · "
+                                                                        {value}
+                                                                        " "
+                                                                        {move || strings(locale.get()).pallets}
+                                                                    </span>
+                                                                })}
+                                                            </div>
+                                                        }
+                                                    }
+                                                />
+                                            </div>
+                                        }
+                                    })}
+                                    {planning_basis_missing.then(|| view! {
+                                        <p class="note">{move || strings(locale.get()).not_specified}</p>
+                                    })}
+                                </div>
+
+                                <div class="context-card">
+                                    <h3>{move || strings(locale.get()).actual_context}</h3>
+                                    <p>
+                                        <strong>{move || format!("{}: ", strings(locale.get()).endpoint_label)}</strong>
+                                        {actual_device.unwrap_or_else(|| "—".to_owned())}
+                                    </p>
+                                    <p>
+                                        <strong>{move || format!("{}: ", strings(locale.get()).vehicle_label)}</strong>
+                                        {actual_vehicle.unwrap_or_else(|| "—".to_owned())}
+                                    </p>
+                                    <p>
+                                        <strong>{move || format!("{}: ", strings(locale.get()).vehicle_type)}</strong>
+                                        {actual_vehicle_type.unwrap_or_else(|| "—".to_owned())}
+                                    </p>
+                                </div>
+                            </div>
 
                             <h3>{move || strings(locale.get()).route}</h3>
                             <div>
