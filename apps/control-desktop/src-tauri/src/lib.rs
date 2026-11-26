@@ -6,14 +6,14 @@ use cargo_dispatch_contracts::{
 use cargo_dispatch_control_gateway_client::{ControlGatewayClient, GatewayRelayConfig};
 use cargo_dispatch_control_ui_contracts::{
     ConfigureRoutingInput, ControlUiStatus, CreateManualTripInput, DashboardActualContext,
-    DashboardDocument,
-    DashboardDocumentDirection, DashboardLocation, DashboardNavigation, DashboardPlanningBasis,
-    DashboardPlanningCargo, DashboardPoint, DashboardRoadGeometry, DashboardRoadGeometryPoint,
-    DashboardRoutingIdentity, DashboardVehicleRoutingProfile, GatewayStatus, ListenerMode,
-    ListenerStatus, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
-    RoutingAvailabilityState, RoutingProbeResult, RoutingStatus, RoutingTollPreference,
-    SaveDocumentInput, SessionInput, SessionStatus, StartGatewayInput, StartLanInput,
-    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput,
+    DashboardDocument, DashboardDocumentDirection, DashboardLocation, DashboardNavigation,
+    DashboardPlanningBasis, DashboardPlanningCargo, DashboardPoint, DashboardRoadGeometry,
+    DashboardRoadGeometryPoint, DashboardRoutingIdentity, DashboardVehicleRoutingProfile,
+    GatewayStatus, ListenerMode, ListenerStatus, OperatorDocumentInput, PickedFile,
+    RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
+    RoutingStatus, RoutingTollPreference, SaveDocumentInput, SessionInput, SessionStatus,
+    StartGatewayInput, StartLanInput, TripDashboard, UpdateRoutingContextInput,
+    UpdateSessionMetadataInput,
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
@@ -351,8 +351,8 @@ impl DesktopControlService {
                 if title.is_empty() {
                     return Err("Кожна точка рейсу повинна мати назву".to_owned());
                 }
-                let sequence = u32::try_from(index + 1)
-                    .map_err(|_| "Забагато точок у рейсі".to_owned())?;
+                let sequence =
+                    u32::try_from(index + 1).map_err(|_| "Забагато точок у рейсі".to_owned())?;
                 Ok(TripRoutePoint {
                     point_id: point_id(point.point_id.trim())?,
                     sequence,
