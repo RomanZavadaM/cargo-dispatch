@@ -1,5 +1,5 @@
 use crate::{
-    GeoContractError, GeoWarning, NormalizedStatus, RouteRequest, RouteResult, RoutingIdentity,
+    GeoContractError, NormalizedStatus, RouteRequest, RouteResult, RoutingIdentity,
     valhalla::{normalize_route_response, route_payload},
 };
 use core::fmt;
@@ -314,7 +314,7 @@ impl std::error::Error for ValhallaHttpError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{GeoPoint, TollPreference, VehicleRoutingProfile};
+    use crate::{GeoPoint, GeoWarning, TollPreference, VehicleRoutingProfile};
     use axum::{
         Json, Router,
         http::StatusCode,
@@ -516,11 +516,12 @@ mod tests {
 
     async fn route_slow(Json(_payload): Json<Value>) -> Json<Value> {
         sleep(Duration::from_millis(150)).await;
-        route_ok(Json(json!({
-            "costing": "truck",
-            "costing_options": {"truck": {"width": 2.4}}
-        })))
-        .await
+        Json(json!({
+            "trip": {
+                "summary": {"length": 2.75, "time": 240.0},
+                "legs": [{"shape": "gk}`~A_ysyl@gfF_oKwvInnT"}]
+            }
+        }))
     }
 
     #[tokio::test]
