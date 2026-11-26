@@ -101,6 +101,7 @@ fn main() -> io::Result<()> {
         created_at_unix_ms: 1_795_550_000_000,
         created_by: OperatorId::from_bytes([0x43; 16]).expect("synthetic operator id"),
         ordered_point_ids: route.iter().map(|item| item.point_id).collect(),
+        routing_profile: None,
         route_geometry: Some(TripRoadGeometry {
             routing: TripRoutingIdentity {
                 engine: "synthetic-test".to_owned(),
