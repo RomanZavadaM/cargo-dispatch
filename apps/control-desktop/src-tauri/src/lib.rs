@@ -140,6 +140,13 @@ fn driver_endpoint_id(value: &str) -> Result<DriverEndpointId, String> {
         .map_err(|error| format!("Некоректний Driver endpoint ID: {error:?}"))
 }
 
+fn valid_session_token(token: &str) -> bool {
+    (16..=128).contains(&token.len())
+        && token
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
 fn id_hex(bytes: [u8; 16]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
@@ -330,6 +337,40 @@ fn dashboard(
 }
 
 impl DesktopControlService {
+    async fn ensure_session_available(
+        &self,
+        token: &str,
+        trip_id_text: Option<&str>,
+    ) -> Result<(), String> {
+        if self.gateway.lock().await.is_some() {
+            return Err(
+                "Спочатку вимкніть публічну Gateway-трансляцію, потім додайте новий рейс."
+                    .to_owned(),
+            );
+        }
+        if !valid_session_token(token) {
+            return Err(
+                "Session token має містити 16–128 латинських літер, цифр, '-' або '_'"
+                    .to_owned(),
+            );
+        }
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
+        if sessions.contains_key(token) {
+            return Err("Цей token уже зареєстрований".to_owned());
+        }
+        if let Some(trip_id_text) = trip_id_text
+            && sessions
+                .values()
+                .any(|session| session.trip_id == trip_id_text)
+        {
+            return Err("Цей рейс уже зареєстрований у Control".to_owned());
+        }
+        Ok(())
+    }
+
     async fn create_manual_trip(
         &self,
         input: CreateManualTripInput,
@@ -342,6 +383,10 @@ impl DesktopControlService {
             return Err("Додайте хоча б одну точку рейсу".to_owned());
         }
         let parsed_trip_id = trip_id(input.trip_id.trim())?;
+        let token = input.token.trim().to_owned();
+        let trip_id_text = id_hex(parsed_trip_id.as_bytes());
+        self.ensure_session_available(&token, Some(&trip_id_text))
+            .await?;
         let route_points = input
             .points
             .into_iter()
@@ -393,34 +438,18 @@ impl DesktopControlService {
 
         self.register_trip(RegisterTripInput {
             folder_path: folder_path.to_string_lossy().into_owned(),
-            token: input.token,
+            token,
         })
         .await
     }
 
     async fn register_trip(&self, input: RegisterTripInput) -> Result<ControlUiStatus, String> {
-        if self.gateway.lock().await.is_some() {
-            return Err(
-                "Спочатку вимкніть публічну Gateway-трансляцію, потім додайте новий рейс."
-                    .to_owned(),
-            );
-        }
-
         let token = input.token.trim().to_owned();
         let folder_path = PathBuf::from(input.folder_path.trim());
         if folder_path.as_os_str().is_empty() {
             return Err("Потрібно вказати папку рейсу".to_owned());
         }
-
-        {
-            let sessions = self
-                .sessions
-                .lock()
-                .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
-            if sessions.contains_key(&token) {
-                return Err("Цей token уже зареєстрований".to_owned());
-            }
-        }
+        self.ensure_session_available(&token, None).await?;
 
         let folder = tokio::task::spawn_blocking(move || TripFolder::open_detected(&folder_path))
             .await
@@ -434,18 +463,8 @@ impl DesktopControlService {
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
 
-        {
-            let sessions = self
-                .sessions
-                .lock()
-                .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
-            if sessions
-                .values()
-                .any(|session| session.trip_id == trip_id_text)
-            {
-                return Err("Цей рейс уже зареєстрований у Control".to_owned());
-            }
-        }
+        self.ensure_session_available(&token, Some(&trip_id_text))
+            .await?;
 
         self.browser
             .register_trip(token.clone(), folder)
@@ -1284,6 +1303,72 @@ mod tests {
         export_package(&package, &draft, &route)?;
         TripFolder::import(&folder, &package)?;
         Ok((trip, folder))
+    }
+
+    #[tokio::test]
+    async fn desktop_service_rejects_invalid_manual_token_before_disk_write()
+    -> std::io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let folder = tmp.path().join("manual-invalid-token");
+        let service = DesktopControlService::default();
+
+        let error = service
+            .create_manual_trip(CreateManualTripInput {
+                folder_path: folder.to_string_lossy().into_owned(),
+                token: "short".to_owned(),
+                trip_id: "41414141414141414141414141414141".to_owned(),
+                display_name: None,
+                points: vec![cargo_dispatch_control_ui_contracts::CreateManualTripPointInput {
+                    point_id: "42424242424242424242424242424242".to_owned(),
+                    title: "Manual point".to_owned(),
+                    latitude: 49.8393,
+                    longitude: 24.0296,
+                    address: None,
+                }],
+            })
+            .await
+            .expect_err("invalid token must be rejected");
+
+        assert!(error.contains("Session token"));
+        assert!(!folder.exists());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn desktop_service_rejects_duplicate_manual_trip_before_disk_write()
+    -> std::io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (trip, existing_folder) = create_trip(tmp.path())?;
+        let service = DesktopControlService::default();
+        service
+            .register_trip(RegisterTripInput {
+                folder_path: existing_folder.to_string_lossy().into_owned(),
+                token: "existing-trip-token-0001".to_owned(),
+            })
+            .await
+            .expect("existing trip registers");
+
+        let new_folder = tmp.path().join("duplicate-manual-trip");
+        let error = service
+            .create_manual_trip(CreateManualTripInput {
+                folder_path: new_folder.to_string_lossy().into_owned(),
+                token: "new-manual-token-0001".to_owned(),
+                trip_id: id_hex(trip.as_bytes()),
+                display_name: None,
+                points: vec![cargo_dispatch_control_ui_contracts::CreateManualTripPointInput {
+                    point_id: "43434343434343434343434343434343".to_owned(),
+                    title: "Manual point".to_owned(),
+                    latitude: 49.8393,
+                    longitude: 24.0296,
+                    address: None,
+                }],
+            })
+            .await
+            .expect_err("duplicate trip must be rejected");
+
+        assert!(error.contains("уже зареєстрований"));
+        assert!(!new_folder.exists());
+        Ok(())
     }
 
     #[tokio::test]

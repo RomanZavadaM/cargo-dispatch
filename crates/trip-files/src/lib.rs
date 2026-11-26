@@ -1221,10 +1221,15 @@ impl TripFolder {
         if let Some(basis) = &draft.planning_basis {
             validate_trip_planning_basis(basis, &draft.route_points).map_err(invalid)?;
         }
-        fs::create_dir_all(path)?;
-        let first = path.join("00000000000000000001.json");
-        if first.try_exists()? {
-            return Err(invalid("trip folder is not empty"));
+        if path.try_exists()? {
+            if !fs::metadata(path)?.is_dir() {
+                return Err(invalid("trip path is not a directory"));
+            }
+            if fs::read_dir(path)?.next().transpose()?.is_some() {
+                return Err(invalid("trip folder is not empty"));
+            }
+        } else {
+            fs::create_dir_all(path)?;
         }
         let trip = draft.trip_id;
         let mut this = Self::load(path, trip)?;
@@ -2011,6 +2016,40 @@ mod tests {
         assert_eq!(reopened.state().route_points, route);
         assert!(reopened.planning_basis().is_none());
         assert_eq!(reopened.state().local_route_revision, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn manual_trip_creation_rejects_non_empty_folder_without_touching_it() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let folder = tmp.path().join("manual-control-trip-non-empty");
+        fs::create_dir_all(&folder)?;
+        let marker = folder.join("keep.txt");
+        fs::write(&marker, b"keep me")?;
+
+        let error = TripFolder::create_manual(
+            &folder,
+            ManualTripCreateDraft {
+                trip_id: TripId::from_bytes([77; 16]).unwrap(),
+                route_points: vec![TripRoutePoint {
+                    point_id: PointId::from_bytes([78; 16]).unwrap(),
+                    sequence: 1,
+                    kind: TripPointKind::Custom("manual".to_owned()),
+                    title: "Manual stop".to_owned(),
+                    navigation: Some(TripNavigationTarget {
+                        latitude_e7: 498_393_000,
+                        longitude_e7: 240_296_000,
+                        address: None,
+                    }),
+                }],
+                planning_basis: None,
+            },
+        )
+        .expect_err("non-empty folder must be rejected");
+
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(fs::read(marker)?, b"keep me");
+        assert!(!folder.join("00000000000000000001.json").exists());
         Ok(())
     }
 
