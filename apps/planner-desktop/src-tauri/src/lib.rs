@@ -638,13 +638,14 @@ impl PlannerDesktopService {
                         .to_owned(),
                 );
             }
-            self.commit_event(
-                &mut state,
-                PlannerDraftEvent::ExportedPackage {
-                    trip_version: trip_version.get(),
-                    working_route_revision: revision,
-                },
-            )?;
+            let event = PlannerDraftEvent::ExportedPackage {
+                trip_version: trip_version.get(),
+                working_route_revision: revision,
+            };
+            let mut candidate = state.clone();
+            apply_event(&mut candidate, &event)?;
+            self.append_event(&event)?;
+            *state = candidate;
             Ok::<(), String>(())
         })();
         if let Err(problem) = commit_result {
