@@ -1,10 +1,12 @@
 #![forbid(unsafe_code)]
 
+use cargo_dispatch_contracts::TripPlanningBasis;
 use cargo_dispatch_control_gateway_client::{ControlGatewayClient, GatewayRelayConfig};
 use cargo_dispatch_control_ui_contracts::{
-    ConfigureRoutingInput, ControlUiStatus, DashboardDocument, DashboardDocumentDirection,
-    DashboardLocation, DashboardNavigation, DashboardPoint, DashboardRoadGeometry,
-    DashboardRoadGeometryPoint, DashboardRoutingIdentity, GatewayStatus, ListenerMode,
+    ConfigureRoutingInput, ControlUiStatus, DashboardActualContext, DashboardDocument,
+    DashboardDocumentDirection, DashboardLocation, DashboardNavigation, DashboardPlanningBasis,
+    DashboardPlanningCargo, DashboardPoint, DashboardRoadGeometry, DashboardRoadGeometryPoint,
+    DashboardRoutingIdentity, GatewayStatus, ListenerMode,
     ListenerStatus, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
     RoutingAvailabilityState, RoutingProbeResult, RoutingStatus, SaveDocumentInput, SessionInput,
     SessionStatus, StartGatewayInput, StartLanInput, TripDashboard, UpdateSessionMetadataInput,
@@ -158,7 +160,11 @@ fn mime_for_path(path: &Path) -> String {
     .to_owned()
 }
 
-fn dashboard(snapshot: DriverTripSnapshot) -> Result<TripDashboard, String> {
+fn dashboard(
+    snapshot: DriverTripSnapshot,
+    planning_basis: Option<TripPlanningBasis>,
+    actual_context: ActiveTripSessionMetadata,
+) -> Result<TripDashboard, String> {
     let documents = snapshot
         .documents
         .into_iter()
@@ -183,6 +189,34 @@ fn dashboard(snapshot: DriverTripSnapshot) -> Result<TripDashboard, String> {
         trip_id: snapshot.trip_id,
         trip_version: snapshot.trip_version,
         local_route_revision: snapshot.local_route_revision,
+        planning_basis: planning_basis.map(|basis| DashboardPlanningBasis {
+            vehicle_type: basis.vehicle_type,
+            cargos: basis
+                .cargos
+                .into_iter()
+                .map(|cargo| DashboardPlanningCargo {
+                    cargo_id: id_hex(cargo.cargo_id.as_bytes()),
+                    title: cargo.title,
+                    weight_kg: cargo.weight_kg,
+                    pallets: cargo.pallets,
+                    pickup_point_id: cargo
+                        .pickup_point_id
+                        .map(|point| id_hex(point.as_bytes())),
+                    unload_point_id: cargo
+                        .unload_point_id
+                        .map(|point| id_hex(point.as_bytes())),
+                })
+                .collect(),
+        }),
+        actual_context: DashboardActualContext {
+            display_name: actual_context.display_name,
+            endpoint_id: actual_context
+                .endpoint_id
+                .map(|endpoint| id_hex(endpoint.as_bytes())),
+            endpoint_label: actual_context.endpoint_label,
+            vehicle_label: actual_context.vehicle_label,
+            vehicle_type: actual_context.vehicle_type,
+        },
         points: snapshot
             .points
             .into_iter()
@@ -681,12 +715,28 @@ impl DesktopControlService {
         })
     }
 
+    fn dashboard_from_snapshot(
+        &self,
+        token: &str,
+        snapshot: DriverTripSnapshot,
+    ) -> Result<TripDashboard, String> {
+        let planning_basis = self
+            .browser
+            .session_planning_basis(token)
+            .map_err(|error| format!("Не вдалося прочитати планову основу рейсу: {error}"))?;
+        let actual_context = self
+            .browser
+            .session_metadata(token)
+            .map_err(|error| format!("Не вдалося прочитати фактичний контекст рейсу: {error}"))?;
+        dashboard(snapshot, planning_basis, actual_context)
+    }
+
     fn dashboard(&self, token: &str) -> Result<TripDashboard, String> {
         let snapshot = self
             .browser
             .session_snapshot(token)
             .map_err(|error| format!("Не вдалося прочитати рейс: {error}"))?;
-        dashboard(snapshot)
+        self.dashboard_from_snapshot(token, snapshot)
     }
 
     async fn reorder_route(&self, input: ReorderRouteInput) -> Result<TripDashboard, String> {
@@ -700,7 +750,7 @@ impl DesktopControlService {
             .reorder_session_route_live(&input.token, input.based_on_revision, &order)
             .await
             .map_err(|error| format!("Control не прийняв нову черговість: {error}"))?;
-        dashboard(outcome.snapshot)
+        self.dashboard_from_snapshot(&input.token, outcome.snapshot)
     }
 
     async fn add_operator_document(
@@ -728,13 +778,14 @@ impl DesktopControlService {
         };
         let browser = self.browser.clone();
         let token = input.token;
+        let dashboard_token = token.clone();
         let snapshot = tokio::task::spawn_blocking(move || {
             browser.store_operator_document(&token, draft, &source)
         })
         .await
         .map_err(|error| format!("Не вдалося виконати файлову операцію: {error}"))?
         .map_err(|error| format!("Control не прийняв файл: {error}"))?;
-        dashboard(snapshot)
+        self.dashboard_from_snapshot(&dashboard_token, snapshot)
     }
 
     fn verified_document(
