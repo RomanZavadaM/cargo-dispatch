@@ -11,6 +11,7 @@ tauri-build = "=2.7.6"
 
 [dependencies]
 cargo-dispatch-domain = { path = "../../../crates/domain" }
+cargo-dispatch-geo = { path = "../../../crates/geo" }
 cargo-dispatch-planner = { path = "../../../crates/planner" }
 cargo-dispatch-planner-ui-contracts = { path = "../../../crates/planner-ui-contracts" }
 serde = { version = "1", features = ["derive"] }
