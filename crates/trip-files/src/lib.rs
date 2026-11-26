@@ -825,6 +825,7 @@ enum Change {
 
 fn apply(
     reg: &mut InMemoryTripRegistry,
+    planning_basis: &mut Option<TripPlanningBasis>,
     routing_profile: &mut Option<VehicleRoutingProfile>,
     documents: &mut std::collections::BTreeMap<DocumentId, StoredDocument>,
     locations: &mut Vec<DriverLocationSample>,
@@ -836,6 +837,8 @@ fn apply(
             if m.trip != trip.as_bytes() {
                 return Err(invalid("different trip"));
             }
+            let route_points = points(&m.points)?;
+            let incoming_basis = m.validated_planning_basis(&route_points)?;
             let incoming_profile = m.validated_routing_profile()?;
             let result = reg.import(m.candidate()?).map_err(invalid)?;
             if matches!(
@@ -844,6 +847,7 @@ fn apply(
                     | ImportResult::AppliedNewerVersion { .. }
                     | ImportResult::IdempotentSameVersion
             ) {
+                *planning_basis = incoming_basis;
                 *routing_profile = incoming_profile;
             }
         }
@@ -924,6 +928,7 @@ pub struct TripFolder {
     cursor: u64,
     plan_version_count: u64,
     registry: InMemoryTripRegistry,
+    planning_basis: Option<TripPlanningBasis>,
     routing_profile: Option<VehicleRoutingProfile>,
     documents: std::collections::BTreeMap<DocumentId, StoredDocument>,
     locations: Vec<DriverLocationSample>,
@@ -945,6 +950,7 @@ impl TripFolder {
             cursor: 0,
             plan_version_count: 0,
             registry: InMemoryTripRegistry::default(),
+            planning_basis: None,
             routing_profile: None,
             documents: std::collections::BTreeMap::new(),
             locations: Vec::new(),
@@ -958,6 +964,7 @@ impl TripFolder {
             let is_import = matches!(&event, Change::Import(_));
             apply(
                 &mut this.registry,
+                &mut this.planning_basis,
                 &mut this.routing_profile,
                 &mut this.documents,
                 &mut this.locations,
@@ -1017,6 +1024,11 @@ impl TripFolder {
         self.registry
             .get(self.trip)
             .expect("folder contains imported trip")
+    }
+
+    #[must_use]
+    pub fn planning_basis(&self) -> Option<&TripPlanningBasis> {
+        self.planning_basis.as_ref()
     }
 
     #[must_use]
@@ -1111,12 +1123,14 @@ impl TripFolder {
             return Err(invalid("trip changed; reopen folder"));
         }
         let mut updated = self.registry.clone();
+        let mut updated_planning_basis = self.planning_basis.clone();
         let mut updated_routing_profile = self.routing_profile.clone();
         let mut updated_documents = self.documents.clone();
         let mut updated_locations = self.locations.clone();
         let is_import = matches!(&event, Change::Import(_));
         apply(
             &mut updated,
+            &mut updated_planning_basis,
             &mut updated_routing_profile,
             &mut updated_documents,
             &mut updated_locations,
@@ -1125,6 +1139,7 @@ impl TripFolder {
         )?;
         let registry_changed = updated.get(self.trip) != self.registry.get(self.trip);
         if !registry_changed
+            && updated_planning_basis == self.planning_basis
             && updated_routing_profile == self.routing_profile
             && updated_documents == self.documents
             && updated_locations == self.locations
@@ -1139,6 +1154,7 @@ impl TripFolder {
         file.write_all(&bytes)?;
         publish(file, &path)?;
         self.registry = updated;
+        self.planning_basis = updated_planning_basis;
         self.routing_profile = updated_routing_profile;
         self.documents = updated_documents;
         self.locations = updated_locations;
