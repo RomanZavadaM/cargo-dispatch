@@ -6,11 +6,12 @@ mod i18n;
 // The same eight-language set is enforced by .github/scripts/check-localizations.py.
 use crate::i18n::{UiLocale, localize_problem, strings};
 use cargo_dispatch_control_ui_contracts::{
-    ConfigureRoutingInput, ControlUiStatus, DashboardDocumentDirection, DashboardPoint,
-    DashboardVehicleRoutingProfile, ListenerMode, OperatorDocumentInput, PickedFile,
-    RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
-    RoutingTollPreference, SaveDocumentInput, SessionInput, StartGatewayInput, StartLanInput,
-    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput,
+    ConfigureRoutingInput, ControlUiStatus, CreateManualTripInput, CreateManualTripPointInput,
+    DashboardDocumentDirection, DashboardPoint, DashboardVehicleRoutingProfile, ListenerMode,
+    OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
+    RoutingAvailabilityState, RoutingProbeResult, RoutingTollPreference, SaveDocumentInput,
+    SessionInput, StartGatewayInput, StartLanInput, TripDashboard, UpdateRoutingContextInput,
+    UpdateSessionMetadataInput,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -702,6 +703,61 @@ fn submit_routing_context(
     });
 }
 
+#[derive(Clone)]
+struct ManualPointDraft {
+    point_id: String,
+    title: RwSignal<String>,
+    latitude: RwSignal<String>,
+    longitude: RwSignal<String>,
+    address: RwSignal<String>,
+}
+
+impl ManualPointDraft {
+    fn new() -> Self {
+        Self {
+            point_id: cargo_control_random_id(),
+            title: RwSignal::new(String::new()),
+            latitude: RwSignal::new(String::new()),
+            longitude: RwSignal::new(String::new()),
+            address: RwSignal::new(String::new()),
+        }
+    }
+
+    fn input(&self) -> Result<CreateManualTripPointInput, ()> {
+        let title = self.title.get_untracked().trim().to_owned();
+        if title.is_empty() {
+            return Err(());
+        }
+        let latitude = self
+            .latitude
+            .get_untracked()
+            .trim()
+            .parse::<f64>()
+            .map_err(|_| ())?;
+        let longitude = self
+            .longitude
+            .get_untracked()
+            .trim()
+            .parse::<f64>()
+            .map_err(|_| ())?;
+        if !latitude.is_finite()
+            || !longitude.is_finite()
+            || !(-90.0..=90.0).contains(&latitude)
+            || !(-180.0..=180.0).contains(&longitude)
+        {
+            return Err(());
+        }
+        let address = self.address.get_untracked().trim().to_owned();
+        Ok(CreateManualTripPointInput {
+            point_id: self.point_id.clone(),
+            title,
+            latitude,
+            longitude,
+            address: (!address.is_empty()).then_some(address),
+        })
+    }
+}
+
 fn main() {
     console_error_panic_hook::set_once();
     leptos::mount::mount_to_body(ControlApp);
@@ -712,6 +768,11 @@ fn ControlApp() -> impl IntoView {
     let locale = RwSignal::new(UiLocale::parse(&cargo_control_initial_locale()));
     let folder = RwSignal::new(String::new());
     let token = RwSignal::new(String::new());
+    let manual_folder = RwSignal::new(String::new());
+    let manual_token = RwSignal::new(cargo_control_random_token());
+    let manual_trip_id = RwSignal::new(cargo_control_random_id());
+    let manual_display_name = RwSignal::new(String::new());
+    let manual_points = RwSignal::new(vec![ManualPointDraft::new(), ManualPointDraft::new()]);
     let lan_ip = RwSignal::new(String::new());
     let lan_port = RwSignal::new("8080".to_owned());
     let gateway_url = RwSignal::new(String::new());
@@ -866,6 +927,97 @@ fn ControlApp() -> impl IntoView {
         spawn_local(async move {
             let result = invoke("register_trip", &serde_json::json!({ "input": input })).await;
             set_status_result(result, strings(locale.get_untracked()).trip_registered);
+        });
+    };
+
+    let pick_manual_folder = move |_| {
+        spawn_local(async move {
+            match invoke::<Option<String>, _>("pick_trip_folder", &serde_json::json!({})).await {
+                Ok(Some(path)) => {
+                    manual_folder.set(path);
+                    error.set(false);
+                }
+                Ok(None) => {}
+                Err(problem) => {
+                    message.set(localize_problem(locale.get_untracked(), &problem));
+                    error.set(true);
+                }
+            }
+        });
+    };
+
+    let create_manual = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let points = match manual_points
+            .get_untracked()
+            .iter()
+            .map(ManualPointDraft::input)
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(points) if !points.is_empty() => points,
+            _ => {
+                message.set(
+                    strings(locale.get_untracked())
+                        .manual_point_invalid
+                        .to_owned(),
+                );
+                error.set(true);
+                return;
+            }
+        };
+        let created_token = manual_token.get_untracked();
+        let input = CreateManualTripInput {
+            folder_path: manual_folder.get_untracked(),
+            token: created_token.clone(),
+            trip_id: manual_trip_id.get_untracked(),
+            display_name: {
+                let value = manual_display_name.get_untracked().trim().to_owned();
+                (!value.is_empty()).then_some(value)
+            },
+            points,
+        };
+        busy.set(true);
+        message.set(strings(locale.get_untracked()).opening_trip.to_owned());
+        error.set(false);
+        spawn_local(async move {
+            match invoke::<ControlUiStatus, _>(
+                "create_manual_trip",
+                &serde_json::json!({ "input": input }),
+            )
+            .await
+            {
+                Ok(current) => {
+                    status.set(Some(current));
+                    selected_token.set(created_token.clone());
+                    match load_dashboard(created_token).await {
+                        Ok(current) => dashboard.set(Some(current)),
+                        Err(problem) => {
+                            message.set(localize_problem(locale.get_untracked(), &problem));
+                            error.set(true);
+                            busy.set(false);
+                            return;
+                        }
+                    }
+                    manual_folder.set(String::new());
+                    manual_display_name.set(String::new());
+                    manual_token.set(cargo_control_random_token());
+                    manual_trip_id.set(cargo_control_random_id());
+                    manual_points.set(vec![ManualPointDraft::new(), ManualPointDraft::new()]);
+                    message.set(
+                        strings(locale.get_untracked())
+                            .manual_trip_created
+                            .to_owned(),
+                    );
+                    error.set(false);
+                }
+                Err(problem) => {
+                    message.set(localize_problem(locale.get_untracked(), &problem));
+                    error.set(true);
+                }
+            }
+            busy.set(false);
         });
     };
 
@@ -1188,6 +1340,7 @@ fn ControlApp() -> impl IntoView {
 
             <section class="manager-only">
                 <h2>{move || strings(locale.get()).connect_trip}</h2>
+                <h3>{move || strings(locale.get()).existing_trip}</h3>
                 <div class="grid">
                     <label>
                         {move || strings(locale.get()).trip_folder}
@@ -1216,6 +1369,119 @@ fn ControlApp() -> impl IntoView {
                     </button>
                     <button class="primary" type="button" on:click=register disabled=move || busy.get()>
                         {move || strings(locale.get()).connect}
+                    </button>
+                </div>
+
+                <h3>{move || strings(locale.get()).manual_trip}</h3>
+                <p class="note">{move || strings(locale.get()).manual_trip_note}</p>
+                <div class="grid">
+                    <label>
+                        {move || strings(locale.get()).trip_folder}
+                        <input
+                            type="text"
+                            placeholder=r"D:\CargoDispatch\active\manual-trip"
+                            prop:value=move || manual_folder.get()
+                            on:input=move |event| manual_folder.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).session_display_name}
+                        <input
+                            type="text"
+                            prop:value=move || manual_display_name.get()
+                            on:input=move |event| manual_display_name.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).session_token}
+                        <input
+                            type="text"
+                            minlength="16"
+                            prop:value=move || manual_token.get()
+                            on:input=move |event| manual_token.set(event_target_value(&event))
+                        />
+                    </label>
+                </div>
+                <div class="actions">
+                    <button type="button" on:click=pick_manual_folder disabled=move || busy.get()>
+                        {move || strings(locale.get()).choose_folder}
+                    </button>
+                </div>
+                <h4>{move || strings(locale.get()).manual_points}</h4>
+                <For
+                    each=move || manual_points.get()
+                    key=|point| point.point_id.clone()
+                    children=move |point| {
+                        let remove_id = point.point_id.clone();
+                        view! {
+                            <div class="manual-point">
+                                <div class="grid">
+                                    <label>
+                                        {move || strings(locale.get()).point_title}
+                                        <input
+                                            type="text"
+                                            prop:value=move || point.title.get()
+                                            on:input=move |event| point.title.set(event_target_value(&event))
+                                        />
+                                    </label>
+                                    <label>
+                                        {move || strings(locale.get()).latitude}
+                                        <input
+                                            type="number"
+                                            step="0.000001"
+                                            min="-90"
+                                            max="90"
+                                            prop:value=move || point.latitude.get()
+                                            on:input=move |event| point.latitude.set(event_target_value(&event))
+                                        />
+                                    </label>
+                                    <label>
+                                        {move || strings(locale.get()).longitude}
+                                        <input
+                                            type="number"
+                                            step="0.000001"
+                                            min="-180"
+                                            max="180"
+                                            prop:value=move || point.longitude.get()
+                                            on:input=move |event| point.longitude.set(event_target_value(&event))
+                                        />
+                                    </label>
+                                    <label>
+                                        {move || strings(locale.get()).address_optional}
+                                        <input
+                                            type="text"
+                                            prop:value=move || point.address.get()
+                                            on:input=move |event| point.address.set(event_target_value(&event))
+                                        />
+                                    </label>
+                                </div>
+                                <div class="actions">
+                                    <button
+                                        type="button"
+                                        on:click=move |_| {
+                                            manual_points.update(|rows| {
+                                                rows.retain(|row| row.point_id != remove_id);
+                                            });
+                                        }
+                                        disabled=move || busy.get()
+                                    >
+                                        {move || strings(locale.get()).remove_point}
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    }
+                />
+                <div class="actions">
+                    <button
+                        type="button"
+                        on:click=move |_| manual_points.update(|rows| rows.push(ManualPointDraft::new()))
+                        disabled=move || busy.get()
+                    >
+                        {move || strings(locale.get()).add_point}
+                    </button>
+                    <button class="primary" type="button" on:click=create_manual disabled=move || busy.get()>
+                        {move || strings(locale.get()).create_trip}
                     </button>
                 </div>
             </section>
