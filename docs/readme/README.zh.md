@@ -13,7 +13,7 @@
 ## 当前已实现
 
 - 基于 Tauri/Leptos 的独立桌面 **Control** 应用；
-- 基于 Tauri/Leptos 的独立桌面 **Planner**：手动路线草稿、站点添加/删除/重排、导航坐标，以及由 Planner core 管理的 revision；
+- 基于 Tauri/Leptos 的独立桌面 **Planner**：手动路线草稿、站点添加/删除/重排、导航坐标，以及由 Planner core 管理的 revision；草稿保存在 app-data 中的 versioned append-only journal，并可在重启后恢复；
 - 活跃行程的持久本地存储与重启恢复；
 - Planner 与 Control 之间的版本化 trip package；
 - 一个自适应 **Driver Browser**，适用于手机、平板、笔记本和桌面浏览器；
@@ -92,7 +92,7 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 
 ## 后续工作
 
-- Planner 草稿的重启后持久保存，随后是地图/routing preview 和 package export 准备；
+- Planner 中的地图/routing preview，随后从 Planner UI 准备 package export；
 
 - 本地浏览器手动验收；
 - 在同一 LAN 中用真实手机测试相同的 Driver Browser；
