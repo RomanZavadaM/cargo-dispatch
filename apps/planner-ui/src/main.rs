@@ -462,6 +462,7 @@ impl CargoDraft {
             return Err(());
         }
         Ok(Some(PlannerPackageCargoInput {
+            row_id: self.row_id,
             title: title.to_owned(),
             weight_kg: Self::optional_positive_u32(&self.weight_kg)?,
             pallets: Self::optional_positive_u16(&self.pallets)?,
