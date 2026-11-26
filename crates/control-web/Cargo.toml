@@ -2,7 +2,7 @@
 name = "cargo-dispatch-control-web"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+license-file.workspace = true
 rust-version.workspace = true
 publish = false
 
