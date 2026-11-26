@@ -1036,7 +1036,10 @@ mod tests {
         assert!(edited.revision > before.revision);
         mock.route_release.notify_one();
 
-        let preview = running.await.expect("preview task").expect("preview result");
+        let preview = running
+            .await
+            .expect("preview task")
+            .expect("preview result");
         assert_eq!(preview.state, PlannerRoutingPreviewState::StaleDraft);
         assert!(preview.geometry.is_empty());
         assert_eq!(preview.revision, before.revision);
