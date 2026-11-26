@@ -528,6 +528,7 @@ dependencies = [
  "cargo-dispatch-planner",
  "cargo-dispatch-planner-ui-contracts",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
 ]
