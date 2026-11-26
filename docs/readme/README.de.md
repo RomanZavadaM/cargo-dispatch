@@ -47,11 +47,13 @@ Daten, Routenaktionen, Dateien und Backend sind gemeinsam; nur das Layout passt 
 
 ## Karte
 
-Control und Driver Browser enthalten jetzt eine echte interaktive Basiskarte mit den Tourpunkten und der zuletzt akzeptierten Fahrerposition.
+Control und Driver Browser enthalten bereits eine echte interaktive Basiskarte mit den Fahrtpunkten und der zuletzt übernommenen Fahrerposition.
 
-In `main` ist jetzt eine versionierte Road-Geometry-Pipeline (Schema 1.3) integriert: Planner übergibt abgeleitete Geometrie zusammen mit dem tatsächlichen Fahrzeug-Routingprofil; Pakete der Schemas 1.0–1.2 bleiben lesbar. Control speichert die Geometrie und berechnet nach einem Reorder die Straßenlinie über den konfigurierten Valhalla-Runtime-Dienst neu. Eine verspätete Routing-Antwort kann keinen neueren Tourzustand überschreiben.
+Der aktuelle `main` verwendet schema 1.4 mit einer unveränderlichen Planungsgrundlage; ältere Schemas bleiben lesbar. Ein Planner-Routingprofil ist nur die Eingabe für eine konkrete Planungsberechnung und keine dauerhafte Bindung einer Fahrt an ein Fahrzeug. Nach dem Import verwaltet Control einen separaten veränderlichen tatsächlichen Routing-Kontext der aktiven Sitzung.
 
-Valhalla-Adresse, Karten-Dataset-ID und Timeouts werden direkt in Desktop Control eingestellt; die Verfügbarkeit lässt sich über `/status` prüfen oder das Routing ausdrücklich deaktivieren. Ist Valhalla nicht konfiguriert oder vorübergehend nicht verfügbar, speichert Control die neue Punktreihenfolge trotzdem; die abgeleitete Geometrie kann dann fehlen.
+Control speichert abgeleitete Geometrie und berechnet die Straßenlinie nach einer Umordnung über den konfigurierten runtime Valhalla-Dienst neu. Eine verspätete Routing-Antwort kann keinen neueren Fahrtzustand überschreiben. Ist Valhalla nicht konfiguriert oder vorübergehend nicht verfügbar, wird die neue Punktreihenfolge trotzdem gespeichert; die abgeleitete Geometrie kann fehlen.
+
+Planner desktop besitzt jetzt eine eigene runtime Valhalla-Vorschau: Der Operator setzt Valhalla-Adresse, Kartendatensatz-ID und Timeouts, prüft `/status`, und `/route` wird nur mit einem ausdrücklich angegebenen Planungsprofil berechnet. Unbekannte numerische Fahrzeuggrenzen werden nicht erfunden. Ein erfolgreiches Ergebnis zeichnet die echte Straßen-Polyline über OSM; ohne Routenergebnis wird keine künstliche Gerade gezeichnet. Die Vorschau ist von Route/Revision/Profil abgeleitet: Änderungen am Entwurf oder Planungsprofil entfernen die alte Linie, verspätete Antworten werden verworfen. Ein Routing-Fehler verändert den Planner-Entwurf nicht.
 
 ## Test v0.1.0-preview.7
 
@@ -92,7 +94,7 @@ Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/Te
 
 ## Was noch fehlt
 
-- Karten-/Routing-Vorschau im Planner, danach Vorbereitung des Package-Exports aus der Planner-UI;
+- Package-Export aus der Planner-UI über das vorhandene versionierte Trip-Paket;
 
 - manuelle lokale Browser-Abnahme;
 - Test desselben Driver Browser auf einem echten Telefon im selben LAN;
