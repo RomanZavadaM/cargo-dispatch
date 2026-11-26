@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · **🇯🇵 日本語** · [🇨🇳 简体中文](README.zh.md)
 
-> **ステータス:** 開発中です。現在の安定版は **v0.1.0** です。8言語の完全なローカライズを統合済みで、次の大きな作業はルート Planner です。
+> **ステータス:** 開発中です。現在の安定版は **v0.1.0** です。現在のテスト prerelease は **v0.1.0-preview.7** で、Windows・macOS・Linux 向けの独立した Planner を含みます。8言語の完全なローカライズを統合済みです。
 
 ## 製品について
 
@@ -13,6 +13,7 @@
 ## 現在実装されている機能
 
 - Tauri/Leptos ベースの独立した desktop **Control** アプリ;
+- Tauri/Leptos ベースの独立した desktop **Planner**：手動ルート下書き、地点の追加/削除/並べ替え、ナビゲーション座標、Planner core による revision 管理;
 - アクティブな運行の永続ローカル保存と再起動後の復旧;
 - Planner と Control 間のバージョン付き trip package;
 - 電話・タブレット・ノート PC・desktop browser 向けの単一の適応型 **Driver Browser**;
@@ -52,6 +53,26 @@ Control と Driver Browser には、運行地点と最後に受理されたド�
 
 Valhalla アドレス、地図データセット ID、timeout は Desktop Control で直接設定し、`/status` で利用可否を確認するか routing を明示的に無効化できます。Valhalla が未設定または一時的に利用できない場合でも、新しい地点順は Control に保存され、派生 geometry だけが存在しない状態になります。
 
+## Test v0.1.0-preview.7
+
+[Test v0.1.0-preview.7 を開く](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7)。
+
+これは Stable ではなく **prerelease** です。1つの正確なソースから他の製品コンポーネントと一緒に独立した desktop Planner を公開する最初の統合 preview です。
+
+Release には以下が含まれます:
+- Windows Control x64 ZIP;
+- macOS Control universal ZIP — Intel + Apple Silicon;
+- Linux Control x64 tar.gz;
+- Windows Planner x64 ZIP;
+- macOS Planner universal ZIP — Intel + Apple Silicon;
+- Linux Planner x64 tar.gz;
+- Android Driver debug APK;
+- iOS/iPadOS Driver Simulator ZIP;
+- Linux Addressing Gateway x64 package;
+- SHA256SUMS。
+
+最初の Planner slice は手動ルート下書きと地点編集に対応します。preview.7 では Planner の下書きはまだ再起動後に保持されません。これが次の段階です。
+
 ## Stable v0.1.0
 
 [Stable v0.1.0 を開く](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0)。
@@ -71,7 +92,7 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 
 ## 今後の作業
 
-- Windows・macOS・Linux 向け Planner/editor デスクトップ UI とリリースビルド;
+- Planner 下書きの再起動をまたぐ永続保存、その後の地図/routing preview と package export の準備;
 
 - ローカル browser の手動受け入れ;
 - 同じ Driver Browser を実機の電話で同一 LAN 内テスト;
@@ -82,7 +103,7 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 
 ## インターフェース言語
 
-Control、Driver Browser、Android Driver、iOS/iPadOS Driver は共通の **8言語セット: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** で実装・検証済みです。Control と Driver Browser はシステム言語と保存される手動選択をサポートし、CI が8言語すべての完全性を確認します。
+Control、Planner、Driver Browser、Android Driver、iOS/iPadOS Driver は共通の **8言語セット: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** で実装・検証済みです。Control と Driver Browser はシステム言語と保存される手動選択をサポートし、CI が8言語すべての完全性を確認します。
 
 ## ドキュメント
 
