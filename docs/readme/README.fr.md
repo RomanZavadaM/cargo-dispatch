@@ -55,6 +55,8 @@ Control conserve la géométrie dérivée et recalcule la ligne routière via le
 
 Planner desktop possède maintenant son propre aperçu Valhalla runtime : l’opérateur fournit l’adresse Valhalla, l’ID du jeu de cartes et les délais, vérifie `/status`, et `/route` est calculé uniquement avec un profil de planification explicitement fourni. Les contraintes numériques inconnues ne sont pas inventées. Un résultat réussi trace la vraie polyline routière sur OSM ; aucune ligne droite fictive n’est dessinée sans résultat. L’aperçu est dérivé de la route/révision/du profil : modifier le brouillon ou le profil de planification efface l’ancienne ligne, et une réponse tardive est rejetée. Un échec de routage ne modifie pas le brouillon Planner.
 
+Planner desktop exporte désormais aussi le package de trajet versionné existant en schema 1.4 via une boîte native « Enregistrer sous ». Le package contient une planning basis explicite (type/classe de véhicule et cargaisons), l’ordre des points et, lorsqu’il existe, uniquement le snapshot correspondant du planning routing profile et de la géométrie Valhalla. Le TripId reste stable pour un brouillon, la TripVersion continue après redémarrage, le CargoId ne dépend pas de la position de la ligne et un ZIP existant n’est jamais écrasé.
+
 ## Test v0.1.0-preview.7
 
 [Ouvrir Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
@@ -94,7 +96,7 @@ Les packages Android et Apple ne sont pas encore signés pour les stores. App St
 
 ## Étapes restantes
 
-- export du package depuis l’UI Planner via le package de trajet versionné existant ;
+- création d’un nouveau trajet directement dans Control lorsqu’aucun ZIP Planner n’est disponible ;
 
 - validation manuelle locale dans le navigateur ;
 - test du même Driver Browser sur un vrai téléphone dans le même LAN ;

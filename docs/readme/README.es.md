@@ -55,6 +55,8 @@ Control conserva la geometría derivada y recalcula la línea vial mediante el s
 
 Planner desktop dispone ahora de su propio preview Valhalla runtime: el operador indica la dirección de Valhalla, el ID del conjunto de mapas y los tiempos de espera, comprueba `/status`, y `/route` se calcula solo con un perfil de planificación proporcionado explícitamente. No se inventan restricciones numéricas desconocidas. Un resultado correcto dibuja la polyline real de carretera sobre OSM; sin resultado no se dibuja una línea recta ficticia. El preview se deriva de ruta/revisión/perfil: cambiar el borrador o el perfil de planificación elimina la línea anterior y una respuesta tardía se rechaza. Un fallo de routing no modifica el borrador de Planner.
 
+Planner desktop ahora también exporta el package de viaje versionado existente como schema 1.4 mediante un diálogo nativo «Guardar como». El package incluye una planning basis explícita (tipo/clase de vehículo y cargas), el orden de puntos y, cuando existe, solo el snapshot coincidente del planning routing profile y la geometría Valhalla. TripId se mantiene estable para un borrador, TripVersion continúa tras reinicios, CargoId no depende de la posición de la fila y un ZIP existente nunca se sobrescribe.
+
 ## Test v0.1.0-preview.7
 
 [Abrir Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
@@ -94,7 +96,7 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 
 ## Qué falta
 
-- package export desde la UI de Planner mediante el package de viaje versionado existente;
+- creación de un nuevo viaje directamente en Control cuando no haya un ZIP de Planner;
 
 - validación manual local en navegador;
 - prueba del mismo Driver Browser en un teléfono real dentro de la misma LAN;

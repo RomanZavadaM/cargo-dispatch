@@ -30,8 +30,9 @@
   - stale response protection і для Control, і для Planner preview;
   - невідомі параметри автомобіля не підставляються;
   - відмова routing не скасовує Control reorder і не змінює Planner draft;
-  - Planner desktop показує real road geometry поверх OSM через власний runtime Valhalla preview.
-- Наступний великий функціональний етап: **package export із Planner UI** через наявний versioned trip package.
+  - Planner desktop показує real road geometry поверх OSM через власний runtime Valhalla preview;
+  - Planner desktop експортує versioned schema 1.4 ZIP через native Save As, з explicit planning basis, optional matching routing snapshot, durable TripVersion history та stable CargoId.
+- Наступний великий функціональний етап: **ручне створення нового рейсу в Control** без Planner ZIP, на тому самому durable trip state.
 - Користувацькі compiled test/stable builds мають публікуватися в GitHub Releases, не залишатися тільки в Actions artifacts.
 
 Для продовження: `START_HERE.md` → private module logs → live GitHub.

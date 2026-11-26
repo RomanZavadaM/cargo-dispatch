@@ -55,6 +55,8 @@ Control keeps derived geometry and recalculates the road line through its config
 
 Planner desktop now has its own runtime Valhalla preview: the operator supplies the Valhalla address, map dataset ID and timeouts, probes `/status`, and `/route` is calculated only from an explicitly supplied planning profile. Unknown numeric constraints are not invented. A successful result draws the real road polyline over OSM; no fake straight connector is drawn without a route result. The preview is derived from route/revision/profile: editing the draft or planning profile clears the old line, and a late response is rejected. Routing failure does not mutate the Planner draft.
 
+Planner desktop now also exports the existing versioned trip package as schema 1.4 through a native Save As dialog. The package carries an explicit planning basis (vehicle type/class and cargos), ordered points and, when available, only the matching planning routing profile/Valhalla geometry snapshot. TripId remains stable for one draft, TripVersion continues across restarts, CargoId is independent of row position, and an existing ZIP is never overwritten.
+
 ## Test v0.1.0-preview.7
 
 [Open Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
@@ -94,7 +96,7 @@ Android and Apple packages are not yet store-signed. App Store/TestFlight/Google
 
 ## What is still ahead
 
-- package export from the Planner UI through the existing versioned trip package;
+- creating a new trip directly in Control when no Planner ZIP is available;
 
 - manual local-browser acceptance;
 - testing the same Driver Browser on a real phone in the same LAN;

@@ -55,6 +55,8 @@ Control speichert abgeleitete Geometrie und berechnet die Straßenlinie nach ein
 
 Planner desktop besitzt jetzt eine eigene runtime Valhalla-Vorschau: Der Operator setzt Valhalla-Adresse, Kartendatensatz-ID und Timeouts, prüft `/status`, und `/route` wird nur mit einem ausdrücklich angegebenen Planungsprofil berechnet. Unbekannte numerische Fahrzeuggrenzen werden nicht erfunden. Ein erfolgreiches Ergebnis zeichnet die echte Straßen-Polyline über OSM; ohne Routenergebnis wird keine künstliche Gerade gezeichnet. Die Vorschau ist von Route/Revision/Profil abgeleitet: Änderungen am Entwurf oder Planungsprofil entfernen die alte Linie, verspätete Antworten werden verworfen. Ein Routing-Fehler verändert den Planner-Entwurf nicht.
 
+Planner desktop exportiert jetzt außerdem das bestehende versionierte Trip-Paket als Schema 1.4 über einen nativen „Speichern unter“-Dialog. Das Paket enthält eine explizite Planungsgrundlage (Fahrzeugtyp/-klasse und Ladungen), die geordnete Punktfolge und – falls vorhanden – nur den passenden Snapshot aus Planning-Routing-Profil und Valhalla-Geometrie. TripId bleibt für einen Entwurf stabil, TripVersion wird über Neustarts fortgeführt, CargoId hängt nicht von der Zeilenposition ab und eine vorhandene ZIP-Datei wird nie überschrieben.
+
 ## Test v0.1.0-preview.7
 
 [Test v0.1.0-preview.7 öffnen](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
@@ -94,7 +96,7 @@ Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/Te
 
 ## Was noch fehlt
 
-- Package-Export aus der Planner-UI über das vorhandene versionierte Trip-Paket;
+- Erstellen einer neuen Fahrt direkt in Control, wenn kein Planner-ZIP vorhanden ist;
 
 - manuelle lokale Browser-Abnahme;
 - Test desselben Driver Browser auf einem echten Telefon im selben LAN;
