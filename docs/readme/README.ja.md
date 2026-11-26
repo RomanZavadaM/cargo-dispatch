@@ -13,7 +13,7 @@
 ## 現在実装されている機能
 
 - Tauri/Leptos ベースの独立した desktop **Control** アプリ;
-- Tauri/Leptos ベースの独立した desktop **Planner**：手動ルート下書き、地点の追加/削除/並べ替え、ナビゲーション座標、Planner core による revision 管理;
+- Tauri/Leptos ベースの独立した desktop **Planner**：手動ルート下書き、地点の追加/削除/並べ替え、ナビゲーション座標、Planner core による revision 管理。下書きは app-data の versioned append-only journal に保存され、再起動後に復元されます;
 - アクティブな運行の永続ローカル保存と再起動後の復旧;
 - Planner と Control 間のバージョン付き trip package;
 - 電話・タブレット・ノート PC・desktop browser 向けの単一の適応型 **Driver Browser**;
@@ -92,7 +92,7 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 
 ## 今後の作業
 
-- Planner 下書きの再起動をまたぐ永続保存、その後の地図/routing preview と package export の準備;
+- Planner の地図/routing preview、その後 Planner UI からの package export 準備;
 
 - ローカル browser の手動受け入れ;
 - 同じ Driver Browser を実機の電話で同一 LAN 内テスト;
