@@ -1,9 +1,12 @@
 #![forbid(unsafe_code)]
 
-use cargo_dispatch_contracts::TripPlanningBasis;
+use cargo_dispatch_contracts::{
+    TripNavigationTarget, TripPlanningBasis, TripPointKind, TripRoutePoint,
+};
 use cargo_dispatch_control_gateway_client::{ControlGatewayClient, GatewayRelayConfig};
 use cargo_dispatch_control_ui_contracts::{
-    ConfigureRoutingInput, ControlUiStatus, DashboardActualContext, DashboardDocument,
+    ConfigureRoutingInput, ControlUiStatus, CreateManualTripInput, DashboardActualContext,
+    DashboardDocument,
     DashboardDocumentDirection, DashboardLocation, DashboardNavigation, DashboardPlanningBasis,
     DashboardPlanningCargo, DashboardPoint, DashboardRoadGeometry, DashboardRoadGeometryPoint,
     DashboardRoutingIdentity, DashboardVehicleRoutingProfile, GatewayStatus, ListenerMode,
@@ -15,12 +18,13 @@ use cargo_dispatch_control_ui_contracts::{
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
 };
-use cargo_dispatch_domain::{DocumentId, DriverEndpointId, PointId};
+use cargo_dispatch_domain::{DocumentId, DriverEndpointId, PointId, TripId};
 use cargo_dispatch_geo::{
     NormalizedStatus, TollPreference, VehicleRoutingProfile, valhalla_http::ValhallaRuntimeConfig,
 };
 use cargo_dispatch_trip_files::{
-    ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, TripFolder,
+    ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, ManualTripCreateDraft,
+    TripFolder,
 };
 use std::{
     collections::BTreeMap,
@@ -113,6 +117,22 @@ fn point_id(value: &str) -> Result<PointId, String> {
 fn document_id(value: &str) -> Result<DocumentId, String> {
     DocumentId::from_bytes(parse_id_bytes(value, "Document ID")?)
         .map_err(|error| format!("Некоректний Document ID: {error:?}"))
+}
+
+fn trip_id(value: &str) -> Result<TripId, String> {
+    TripId::from_bytes(parse_id_bytes(value, "Trip ID")?)
+        .map_err(|error| format!("Некоректний Trip ID: {error:?}"))
+}
+
+fn coordinate_e7(value: f64, max_abs: f64, label: &str) -> Result<i32, String> {
+    if !value.is_finite() || value.abs() > max_abs {
+        return Err(format!("Некоректна координата {label}"));
+    }
+    let scaled = (value * 10_000_000.0).round();
+    if scaled < f64::from(i32::MIN) || scaled > f64::from(i32::MAX) {
+        return Err(format!("Координата {label} поза допустимим діапазоном"));
+    }
+    Ok(scaled as i32)
 }
 
 fn driver_endpoint_id(value: &str) -> Result<DriverEndpointId, String> {
@@ -310,6 +330,74 @@ fn dashboard(
 }
 
 impl DesktopControlService {
+    async fn create_manual_trip(
+        &self,
+        input: CreateManualTripInput,
+    ) -> Result<ControlUiStatus, String> {
+        let folder_path = PathBuf::from(input.folder_path.trim());
+        if folder_path.as_os_str().is_empty() {
+            return Err("Потрібно вказати папку нового рейсу".to_owned());
+        }
+        if input.points.is_empty() {
+            return Err("Додайте хоча б одну точку рейсу".to_owned());
+        }
+        let parsed_trip_id = trip_id(input.trip_id.trim())?;
+        let route_points = input
+            .points
+            .into_iter()
+            .enumerate()
+            .map(|(index, point)| {
+                let title = point.title.trim();
+                if title.is_empty() {
+                    return Err("Кожна точка рейсу повинна мати назву".to_owned());
+                }
+                let sequence = u32::try_from(index + 1)
+                    .map_err(|_| "Забагато точок у рейсі".to_owned())?;
+                Ok(TripRoutePoint {
+                    point_id: point_id(point.point_id.trim())?,
+                    sequence,
+                    kind: TripPointKind::Custom("manual".to_owned()),
+                    title: title.to_owned(),
+                    navigation: Some(TripNavigationTarget {
+                        latitude_e7: coordinate_e7(point.latitude, 90.0, "широти")?,
+                        longitude_e7: coordinate_e7(point.longitude, 180.0, "довготи")?,
+                        address: optional_text(point.address),
+                    }),
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let display_name = optional_text(input.display_name);
+        let create_path = folder_path.clone();
+        tokio::task::spawn_blocking(move || -> Result<(), String> {
+            let mut folder = TripFolder::create_manual(
+                &create_path,
+                ManualTripCreateDraft {
+                    trip_id: parsed_trip_id,
+                    route_points,
+                    planning_basis: None,
+                },
+            )
+            .map_err(|error| format!("Не вдалося створити папку рейсу: {error}"))?;
+            if display_name.is_some() {
+                folder
+                    .set_session_metadata(ActiveTripSessionMetadata {
+                        display_name,
+                        ..ActiveTripSessionMetadata::default()
+                    })
+                    .map_err(|error| format!("Не вдалося зберегти назву рейсу: {error}"))?;
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|error| format!("Не вдалося виконати створення рейсу: {error}"))??;
+
+        self.register_trip(RegisterTripInput {
+            folder_path: folder_path.to_string_lossy().into_owned(),
+            token: input.token,
+        })
+        .await
+    }
+
     async fn register_trip(&self, input: RegisterTripInput) -> Result<ControlUiStatus, String> {
         if self.gateway.lock().await.is_some() {
             return Err(
@@ -1015,6 +1103,14 @@ async fn register_trip(
 }
 
 #[tauri::command]
+async fn create_manual_trip(
+    input: CreateManualTripInput,
+    state: State<'_, DesktopControlService>,
+) -> Result<ControlUiStatus, String> {
+    state.create_manual_trip(input).await
+}
+
+#[tauri::command]
 async fn update_session_metadata(
     input: UpdateSessionMetadataInput,
     state: State<'_, DesktopControlService>,
@@ -1123,6 +1219,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             control_status,
             register_trip,
+            create_manual_trip,
             update_session_metadata,
             open_session_window,
             start_loopback,
@@ -1187,6 +1284,60 @@ mod tests {
         export_package(&package, &draft, &route)?;
         TripFolder::import(&folder, &package)?;
         Ok((trip, folder))
+    }
+
+    #[tokio::test]
+    async fn desktop_service_creates_and_registers_manual_trip_without_planning_basis()
+    -> std::io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let folder = tmp.path().join("manual-control-trip");
+        let service = DesktopControlService::default();
+        let token = "manual-trip-token-0001";
+
+        let status = service
+            .create_manual_trip(CreateManualTripInput {
+                folder_path: folder.to_string_lossy().into_owned(),
+                token: token.to_owned(),
+                trip_id: "51515151515151515151515151515151".to_owned(),
+                display_name: Some("Ручний рейс 51".to_owned()),
+                points: vec![
+                    cargo_dispatch_control_ui_contracts::CreateManualTripPointInput {
+                        point_id: "52525252525252525252525252525252".to_owned(),
+                        title: "Warehouse".to_owned(),
+                        latitude: 49.8393,
+                        longitude: 24.0296,
+                        address: Some("Lviv".to_owned()),
+                    },
+                    cargo_dispatch_control_ui_contracts::CreateManualTripPointInput {
+                        point_id: "53535353535353535353535353535353".to_owned(),
+                        title: "Customer".to_owned(),
+                        latitude: 49.8430,
+                        longitude: 24.0360,
+                        address: None,
+                    },
+                ],
+            })
+            .await
+            .expect("manual trip created");
+
+        assert_eq!(status.sessions.len(), 1);
+        assert_eq!(status.sessions[0].display_name, "Ручний рейс 51");
+        let dashboard = service.dashboard(token).expect("manual dashboard");
+        assert_eq!(dashboard.trip_version, 1);
+        assert_eq!(dashboard.points.len(), 2);
+        assert_eq!(dashboard.points[0].title, "Warehouse");
+        assert_eq!(dashboard.points[1].title, "Customer");
+        assert!(dashboard.planning_basis.is_none());
+
+        drop(service);
+        let recovered = TripFolder::open_detected(&folder)?;
+        assert_eq!(recovered.state().route_points.len(), 2);
+        assert!(recovered.planning_basis().is_none());
+        assert_eq!(
+            recovered.session_metadata().display_name.as_deref(),
+            Some("Ручний рейс 51")
+        );
+        Ok(())
     }
 
     #[tokio::test]
