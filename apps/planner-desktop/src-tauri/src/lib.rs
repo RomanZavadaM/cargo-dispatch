@@ -461,9 +461,8 @@ pub fn run() {
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
             fs::create_dir_all(&app_data_dir)?;
-            let service =
-                PlannerDesktopService::open(app_data_dir.join(PLANNER_JOURNAL_FILE))
-                    .map_err(std::io::Error::other)?;
+            let service = PlannerDesktopService::open(app_data_dir.join(PLANNER_JOURNAL_FILE))
+                .map_err(std::io::Error::other)?;
             app.manage(service);
             Ok(())
         })
