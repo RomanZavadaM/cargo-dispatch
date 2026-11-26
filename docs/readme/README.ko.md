@@ -48,9 +48,9 @@ Driver Browser는 전화용과 데스크톱용으로 나뉜 별도 제품이 아
 
 Control과 Driver Browser에는 운행 지점과 마지막으로 승인된 운전자 위치를 보여 주는 실제 인터랙티브 기본 지도가 있습니다.
 
-`main`에는 이제 버전 관리되는 도로 경로 형상 파이프라인(schema 1.2)이 통합되어 있습니다. Planner가 파생 geometry를 전달할 수 있고 Control이 이를 저장하며, 두 지도는 현재 지점 순서와 일치할 때만 도로 선을 표시합니다. 순서를 바꾸면 이전 선은 즉시 무효화됩니다.
+`main`에는 이제 버전 관리되는 도로 geometry 파이프라인(schema 1.3)이 통합되어 있습니다. Planner는 파생 geometry와 실제 차량 routing profile을 함께 전달하며 schema 1.0–1.2 패키지도 계속 읽을 수 있습니다. Control은 geometry를 저장하고 지점 순서가 바뀌면 설정된 runtime Valhalla를 통해 도로 선을 다시 계산합니다. 늦게 도착한 routing 응답은 더 최신 운행 상태를 덮어쓸 수 없습니다.
 
-아직 남은 것은 **Valhalla로의 실제 HTTP transport와 geometry 자동 재계산**입니다. 계약과 표시 계층은 준비되어 있지만 외부 라우팅 엔진은 아직 product runtime에 연결되지 않았습니다.
+Valhalla 주소, 지도 데이터셋 ID, timeout은 Desktop Control에서 직접 설정하며 `/status`로 사용 가능 여부를 확인하거나 routing을 명시적으로 끌 수 있습니다. Valhalla가 설정되지 않았거나 일시적으로 사용할 수 없어도 새 지점 순서는 Control에 저장되고 파생 geometry만 없을 수 있습니다.
 
 ## Stable v0.1.0
 
@@ -78,7 +78,6 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 - HTTPS/public addressing 경로;
 - HTTPS를 통한 브라우저 GPS 전체 검수;
 - 서로 다른 네트워크/NAT/CGNAT 현장 테스트;
-- 실제 Valhalla HTTP transport 및 순서 변경 후 geometry 재계산;
 
 
 ## 인터페이스 언어
