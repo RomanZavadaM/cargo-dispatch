@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · **🇯🇵 日本語** · [🇨🇳 简体中文](README.zh.md)
 
-> **ステータス:** 開発中です。現在の安定版は **v0.1.0** です。現在のテスト prerelease は **v0.1.0-preview.7** で、Windows・macOS・Linux 向けの独立した Planner を含みます。8言語の完全なローカライズを統合済みです。
+> **ステータス:** 開発中です。現在の安定版は **v0.1.0** です。現在のテスト prerelease は **v0.1.0-preview.8** で、Windows・macOS・Linux 向けの独立した Planner を含みます。8言語の完全なローカライズを統合済みです。
 
 ## 製品について
 
@@ -57,11 +57,11 @@ Planner desktop には独自の runtime Valhalla preview が追加されてい�
 
 Planner desktop は native Save As から既存の versioned trip package を schema 1.4 としてエクスポートできるようになりました。Package には明示的な planning basis（車両タイプ/クラスと貨物）、地点順、存在する場合に限り一致する planning routing profile/Valhalla geometry の snapshot が含まれます。1つの下書きでは TripId が安定し、TripVersion は再起動後も継続し、CargoId は行位置に依存せず、既存 ZIP は上書きしません。
 
-## Test v0.1.0-preview.7
+## Test v0.1.0-preview.8
 
-[Test v0.1.0-preview.7 を開く](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7)。
+[Test v0.1.0-preview.8 を開く](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8)。
 
-これは Stable ではなく **prerelease** です。1つの正確なソースから他の製品コンポーネントと一緒に独立した desktop Planner を公開する最初の統合 preview です。
+これは Stable ではなく **prerelease** です。1つの正確なソースからビルドされた現在の製品の統合テスト版です。
 
 Release には以下が含まれます:
 - Windows Control x64 ZIP;
@@ -75,7 +75,7 @@ Release には以下が含まれます:
 - Linux Addressing Gateway x64 package;
 - SHA256SUMS。
 
-最初の Planner slice は手動ルート下書きと地点編集に対応します。preview.7 では Planner の下書きはまだ再起動後に保持されません。これが次の段階です。
+preview.8 には、durable な Planner 下書き、実際の Valhalla 道路 preview、planning basis を含む versioned schema 1.4 ZIP export、Planner ZIP なしで Control からアクティブ運行を手動作成する機能が含まれます。Planner profile は運行→車両の恒久的な結び付けではなく、実際の車両/端末 context は Control が別に管理します。
 
 ## Stable v0.1.0
 

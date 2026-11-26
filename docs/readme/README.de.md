@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · **🇩🇪 Deutsch** · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** aktive Entwicklung. Die aktuelle stabile Version ist **v0.1.0**. Der aktuelle Test-Prerelease ist **v0.1.0-preview.7** und enthält bereits einen separaten Planner für Windows, macOS und Linux. Die vollständige Lokalisierung in 8 Sprachen ist integriert.
+> **Status:** aktive Entwicklung. Die aktuelle stabile Version ist **v0.1.0**. Der aktuelle Test-Prerelease ist **v0.1.0-preview.8** und enthält bereits einen separaten Planner für Windows, macOS und Linux. Die vollständige Lokalisierung in 8 Sprachen ist integriert.
 
 ## Über das Produkt
 
@@ -57,11 +57,11 @@ Planner desktop besitzt jetzt eine eigene runtime Valhalla-Vorschau: Der Operato
 
 Planner desktop exportiert jetzt außerdem das bestehende versionierte Trip-Paket als Schema 1.4 über einen nativen „Speichern unter“-Dialog. Das Paket enthält eine explizite Planungsgrundlage (Fahrzeugtyp/-klasse und Ladungen), die geordnete Punktfolge und – falls vorhanden – nur den passenden Snapshot aus Planning-Routing-Profil und Valhalla-Geometrie. TripId bleibt für einen Entwurf stabil, TripVersion wird über Neustarts fortgeführt, CargoId hängt nicht von der Zeilenposition ab und eine vorhandene ZIP-Datei wird nie überschrieben.
 
-## Test v0.1.0-preview.7
+## Test v0.1.0-preview.8
 
-[Test v0.1.0-preview.7 öffnen](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
+[Test v0.1.0-preview.8 öffnen](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8).
 
-Dies ist ein **Prerelease**, nicht Stable. Es ist der erste integrierte Preview, der einen separaten Desktop-Planner zusammen mit den übrigen Produktteilen aus derselben exakten Quelle veröffentlicht.
+Dies ist ein **Prerelease**, nicht Stable. Es ist ein integrierter Teststand des aktuellen Produkts aus einer einzigen exakten Quelle.
 
 Der Release enthält:
 - Windows Control x64 ZIP;
@@ -75,7 +75,7 @@ Der Release enthält:
 - Linux Addressing Gateway x64 package;
 - SHA256SUMS.
 
-Der erste Planner-Slice unterstützt einen manuellen Routenentwurf und die Bearbeitung der Punkte. In preview.7 wird der Planner-Entwurf noch nicht über Neustarts hinweg gespeichert; das ist der nächste Schritt.
+preview.8 enthält bereits den dauerhaften Planner-Entwurf, die echte Valhalla-Straßenvorschau, den versionierten schema-1.4-ZIP-Export mit Planning Basis sowie das manuelle Erstellen einer aktiven Fahrt in Control ohne Planner-ZIP. Das Planner-Profil ist keine dauerhafte Bindung Fahrt→Fahrzeug; der tatsächliche Fahrzeug-/Gerätekontext wird getrennt in Control geführt.
 
 ## Stable v0.1.0
 

@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · **🇫🇷 Français** · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Statut :** développement actif. La version stable actuelle est **v0.1.0**. Le prerelease de test actuel est **v0.1.0-preview.7**, avec désormais un Planner séparé pour Windows, macOS et Linux. La localisation complète en 8 langues est intégrée.
+> **Statut :** développement actif. La version stable actuelle est **v0.1.0**. Le prerelease de test actuel est **v0.1.0-preview.8**, avec désormais un Planner séparé pour Windows, macOS et Linux. La localisation complète en 8 langues est intégrée.
 
 ## À propos
 
@@ -57,11 +57,11 @@ Planner desktop possède maintenant son propre aperçu Valhalla runtime : l’op
 
 Planner desktop exporte désormais aussi le package de trajet versionné existant en schema 1.4 via une boîte native « Enregistrer sous ». Le package contient une planning basis explicite (type/classe de véhicule et cargaisons), l’ordre des points et, lorsqu’il existe, uniquement le snapshot correspondant du planning routing profile et de la géométrie Valhalla. Le TripId reste stable pour un brouillon, la TripVersion continue après redémarrage, le CargoId ne dépend pas de la position de la ligne et un ZIP existant n’est jamais écrasé.
 
-## Test v0.1.0-preview.7
+## Test v0.1.0-preview.8
 
-[Ouvrir Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
+[Ouvrir Test v0.1.0-preview.8](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8).
 
-Il s’agit d’un **prerelease**, pas de la version Stable. C’est le premier preview intégré qui publie un Planner desktop séparé avec les autres composants depuis une même source exacte.
+Il s’agit d’un **prerelease**, pas de la version Stable. C’est une version de test intégrée du produit actuel, construite depuis une source exacte unique.
 
 Le release contient :
 - Windows Control x64 ZIP ;
@@ -72,10 +72,10 @@ Le release contient :
 - Linux Planner x64 tar.gz ;
 - Android Driver debug APK ;
 - iOS/iPadOS Driver Simulator ZIP ;
-- package Linux Addressing Gateway x64 ;
+- Linux Addressing Gateway x64 package ;
 - SHA256SUMS.
 
-Le premier slice Planner gère un brouillon d’itinéraire manuel et la modification des points. Dans preview.7, le brouillon Planner n’est pas encore conservé après redémarrage ; c’est l’étape suivante.
+preview.8 inclut déjà le brouillon Planner durable, l’aperçu routier réel Valhalla, l’export ZIP versionné schema 1.4 avec planning basis et la création manuelle d’un trajet actif dans Control sans ZIP Planner. Le profil Planner n’est pas une liaison permanente trajet→véhicule ; le contexte véhicule/appareil réel est géré séparément par Control.
 
 ## Stable v0.1.0
 

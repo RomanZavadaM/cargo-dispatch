@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · **🇬🇧 English** · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** active development. The current stable version is **v0.1.0**. The current test prerelease is **v0.1.0-preview.7**, now including a separate Planner for Windows, macOS, and Linux. Full 8-language localization is integrated.
+> **Status:** active development. The current stable version is **v0.1.0**. The current test prerelease is **v0.1.0-preview.8**, now including a separate Planner for Windows, macOS, and Linux. Full 8-language localization is integrated.
 
 ## About
 
@@ -57,13 +57,13 @@ Planner desktop now has its own runtime Valhalla preview: the operator supplies 
 
 Planner desktop now also exports the existing versioned trip package as schema 1.4 through a native Save As dialog. The package carries an explicit planning basis (vehicle type/class and cargos), ordered points and, when available, only the matching planning routing profile/Valhalla geometry snapshot. TripId remains stable for one draft, TripVersion continues across restarts, CargoId is independent of row position, and an existing ZIP is never overwritten.
 
-## Test v0.1.0-preview.7
+## Test v0.1.0-preview.8
 
-[Open Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
+[Open Test v0.1.0-preview.8](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8).
 
-This is a **prerelease**, not Stable. It is the first integrated preview to publish a separate desktop Planner together with the other product components from one exact source.
+This is a **prerelease**, not Stable. It is an integrated test build of the current product from one exact source.
 
-The release contains:
+The release includes:
 - Windows Control x64 ZIP;
 - macOS Control universal ZIP — Intel + Apple Silicon;
 - Linux Control x64 tar.gz;
@@ -75,7 +75,7 @@ The release contains:
 - Linux Addressing Gateway x64 package;
 - SHA256SUMS.
 
-The first Planner slice supports a manual route draft and point editing. In preview.7, the Planner draft is not yet persisted across restarts; that is the next stage.
+preview.8 already includes the durable Planner draft, real Valhalla road preview, versioned schema 1.4 ZIP export with planning basis, and manual active-trip creation in Control without a Planner ZIP. The Planner profile is not a permanent trip-to-vehicle binding; actual vehicle/device context is maintained separately by Control.
 
 ## Stable v0.1.0
 
