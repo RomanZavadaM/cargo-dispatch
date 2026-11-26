@@ -7,12 +7,12 @@ use cargo_dispatch_control_ui_contracts::{
     DashboardRoadGeometryPoint, DashboardRoutingIdentity, GatewayStatus, ListenerMode,
     ListenerStatus, OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
     RoutingAvailabilityState, RoutingProbeResult, RoutingStatus, SaveDocumentInput, SessionInput,
-    SessionStatus, StartGatewayInput, StartLanInput, TripDashboard,
+    SessionStatus, StartGatewayInput, StartLanInput, TripDashboard, UpdateSessionMetadataInput,
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
 };
-use cargo_dispatch_domain::{DocumentId, PointId};
+use cargo_dispatch_domain::{DocumentId, DriverEndpointId, PointId};
 use cargo_dispatch_geo::{NormalizedStatus, valhalla_http::ValhallaRuntimeConfig};
 use cargo_dispatch_trip_files::{DocumentDirection, DocumentStoreDraft, TripFolder};
 use std::{
@@ -34,6 +34,11 @@ use tokio::{
 struct RegisteredSession {
     trip_id: String,
     token: String,
+    operator_display_name: Option<String>,
+    endpoint_id: Option<DriverEndpointId>,
+    endpoint_label: Option<String>,
+    vehicle_label: Option<String>,
+    vehicle_type: Option<String>,
 }
 
 struct GatewayRelayTask {
@@ -92,6 +97,31 @@ fn point_id(value: &str) -> Result<PointId, String> {
 fn document_id(value: &str) -> Result<DocumentId, String> {
     DocumentId::from_bytes(parse_id_bytes(value, "Document ID")?)
         .map_err(|error| format!("Некоректний Document ID: {error:?}"))
+}
+
+fn driver_endpoint_id(value: &str) -> Result<DriverEndpointId, String> {
+    DriverEndpointId::from_bytes(parse_id_bytes(value, "Driver endpoint ID")?)
+        .map_err(|error| format!("Некоректний Driver endpoint ID: {error:?}"))
+}
+
+fn id_hex(bytes: [u8; 16]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn optional_text(value: Option<String>) -> Option<String> {
+    value.and_then(|value| {
+        let trimmed = value.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_owned())
+    })
+}
+
+fn session_display_name(session: &RegisteredSession) -> String {
+    session
+        .operator_display_name
+        .clone()
+        .or_else(|| session.vehicle_label.clone())
+        .or_else(|| session.endpoint_label.clone())
+        .unwrap_or_else(|| format!("trip-{}", &session.trip_id[..8.min(session.trip_id.len())]))
 }
 
 fn mime_for_path(path: &Path) -> String {
@@ -246,6 +276,11 @@ impl DesktopControlService {
                 RegisteredSession {
                     trip_id: trip_id_text,
                     token,
+                    operator_display_name: None,
+                    endpoint_id: None,
+                    endpoint_label: None,
+                    vehicle_label: None,
+                    vehicle_type: None,
                 },
             );
 
@@ -482,6 +517,11 @@ impl DesktopControlService {
             .map(|session| SessionStatus {
                 trip_id: session.trip_id.clone(),
                 token: session.token.clone(),
+                display_name: session_display_name(session),
+                endpoint_id: session.endpoint_id.map(|id| id_hex(id.as_bytes())),
+                endpoint_label: session.endpoint_label.clone(),
+                vehicle_label: session.vehicle_label.clone(),
+                vehicle_type: session.vehicle_type.clone(),
                 driver_url: address.map(|address| driver_url(address, &session.token)),
                 public_driver_url: public_driver_urls.get(&session.token).cloned(),
             })
@@ -493,6 +533,37 @@ impl DesktopControlService {
             routing,
             sessions,
         })
+    }
+
+    async fn update_session_metadata(
+        &self,
+        input: UpdateSessionMetadataInput,
+    ) -> Result<ControlUiStatus, String> {
+        let endpoint_id = input
+            .endpoint_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(driver_endpoint_id)
+            .transpose()?;
+        let operator_display_name = {
+            let value = input.display_name.trim();
+            (!value.is_empty()).then(|| value.to_owned())
+        };
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
+        let session = sessions
+            .get_mut(input.token.trim())
+            .ok_or_else(|| "Сесію не знайдено".to_owned())?;
+        session.operator_display_name = operator_display_name;
+        session.endpoint_id = endpoint_id;
+        session.endpoint_label = optional_text(input.endpoint_label);
+        session.vehicle_label = optional_text(input.vehicle_label);
+        session.vehicle_type = optional_text(input.vehicle_type);
+        drop(sessions);
+        self.status().await
     }
 
     async fn configure_routing(
@@ -751,6 +822,14 @@ async fn register_trip(
 }
 
 #[tauri::command]
+async fn update_session_metadata(
+    input: UpdateSessionMetadataInput,
+    state: State<'_, DesktopControlService>,
+) -> Result<ControlUiStatus, String> {
+    state.update_session_metadata(input).await
+}
+
+#[tauri::command]
 async fn start_loopback(
     state: State<'_, DesktopControlService>,
 ) -> Result<ControlUiStatus, String> {
@@ -814,6 +893,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             control_status,
             register_trip,
+            update_session_metadata,
             start_loopback,
             start_lan,
             stop_browser_server,
