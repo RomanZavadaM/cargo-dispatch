@@ -2,7 +2,7 @@
 
 **🇺🇦 Українська** · [🇬🇧 English](docs/readme/README.en.md) · [🇫🇷 Français](docs/readme/README.fr.md) · [🇩🇪 Deutsch](docs/readme/README.de.md) · [🇪🇸 Español](docs/readme/README.es.md) · [🇰🇷 한국어](docs/readme/README.ko.md) · [🇯🇵 日本語](docs/readme/README.ja.md) · [🇨🇳 简体中文](docs/readme/README.zh.md)
 
-> **Статус:** активна розробка. Поточна стабільна версія — **v0.1.0**. Поточний тестовий prerelease — **v0.1.0-preview.7**, уже з окремим Planner для Windows, macOS і Linux. Повна локалізація 8 мовами інтегрована.
+> **Статус:** активна розробка. Поточна стабільна версія — **v0.1.0**. Поточний тестовий prerelease — **v0.1.0-preview.8**, уже з окремим Planner для Windows, macOS і Linux. Повна локалізація 8 мовами інтегрована.
 
 ## Про продукт
 
@@ -59,11 +59,11 @@ Planner desktop тепер має власний runtime Valhalla preview: оп�
 
 Planner desktop також уже експортує чинний versioned trip package у schema 1.4 через native Save As. Пакет містить явний planning basis (тип/клас транспорту та вантажі), порядок точок і, за наявності, лише matching snapshot planning routing profile/Valhalla geometry. TripId стабільний для однієї чернетки, TripVersion продовжується між перезапусками, CargoId не залежить від позиції рядка, а існуючий ZIP ніколи не перезаписується.
 
-## Test v0.1.0-preview.7
+## Test v0.1.0-preview.8
 
-[Відкрити Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
+[Відкрити Test v0.1.0-preview.8](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8).
 
-Це **prerelease**, не Stable. У ньому вперше опубліковано окремий desktop Planner разом з іншими частинами продукту з одного exact source.
+Це **prerelease**, не Stable. Це інтегрована тестова версія поточного продукту з одного exact source.
 
 Release містить:
 - Windows Control x64 ZIP;
@@ -77,7 +77,7 @@ Release містить:
 - Linux Addressing Gateway x64 package;
 - SHA256SUMS.
 
-preview.7 був першим релізом з окремим compiled Planner. Поточний main уже значно попереду: durable Planner draft, real Valhalla road preview, schema 1.4 ZIP export і ручне створення активного рейсу в Control увійдуть у наступний preview.
+У preview.8 уже є durable Planner draft, real Valhalla road preview, versioned schema 1.4 ZIP export із planning basis та ручне створення активного рейсу в Control без Planner ZIP. Planner profile не є постійною прив'язкою рейсу до автомобіля; фактичний vehicle/device context ведеться окремо в Control.
 
 ## Stable v0.1.0
 
