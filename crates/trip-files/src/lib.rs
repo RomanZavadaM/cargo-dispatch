@@ -10,7 +10,7 @@ use cargo_dispatch_control::{
     ImportResult, InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft,
     RouteGeometryUpdateError, StoredTripPlan, TripImportCandidate,
 };
-use cargo_dispatch_domain::{CargoId, DocumentId, PointId, TripId};
+use cargo_dispatch_domain::{CargoId, DocumentId, DriverEndpointId, PointId, TripId};
 use cargo_dispatch_geo::VehicleRoutingProfile;
 use cargo_dispatch_planner::PlannerTripExportDraft;
 use serde::{Deserialize, Serialize};
@@ -65,6 +65,80 @@ pub struct DriverLocationSample {
     pub longitude_e7: i32,
     pub accuracy_cm: Option<u32>,
     pub observed_at_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ActiveTripSessionMetadata {
+    pub display_name: Option<String>,
+    pub endpoint_id: Option<DriverEndpointId>,
+    pub endpoint_label: Option<String>,
+    pub vehicle_label: Option<String>,
+    pub vehicle_type: Option<String>,
+}
+
+fn validate_session_text(value: &Option<String>, field: &str) -> io::Result<()> {
+    if let Some(value) = value {
+        if value.trim().is_empty() {
+            return Err(invalid(format!("{field} must not be empty")));
+        }
+        if value.chars().count() > 128 {
+            return Err(invalid(format!("{field} is too long")));
+        }
+        if value.chars().any(char::is_control) {
+            return Err(invalid(format!("{field} contains control characters")));
+        }
+    }
+    Ok(())
+}
+
+impl ActiveTripSessionMetadata {
+    pub fn validate(&self) -> io::Result<()> {
+        validate_session_text(&self.display_name, "display_name")?;
+        validate_session_text(&self.endpoint_label, "endpoint_label")?;
+        validate_session_text(&self.vehicle_label, "vehicle_label")?;
+        validate_session_text(&self.vehicle_type, "vehicle_type")?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SessionMetadataFile {
+    display_name: Option<String>,
+    endpoint_id: Option<[u8; 16]>,
+    endpoint_label: Option<String>,
+    vehicle_label: Option<String>,
+    vehicle_type: Option<String>,
+}
+
+impl SessionMetadataFile {
+    fn typed(&self) -> io::Result<ActiveTripSessionMetadata> {
+        let metadata = ActiveTripSessionMetadata {
+            display_name: self.display_name.clone(),
+            endpoint_id: self
+                .endpoint_id
+                .map(DriverEndpointId::from_bytes)
+                .transpose()
+                .map_err(invalid)?,
+            endpoint_label: self.endpoint_label.clone(),
+            vehicle_label: self.vehicle_label.clone(),
+            vehicle_type: self.vehicle_type.clone(),
+        };
+        metadata.validate()?;
+        Ok(metadata)
+    }
+}
+
+impl From<&ActiveTripSessionMetadata> for SessionMetadataFile {
+    fn from(metadata: &ActiveTripSessionMetadata) -> Self {
+        Self {
+            display_name: metadata.display_name.clone(),
+            endpoint_id: metadata.endpoint_id.map(DriverEndpointId::as_bytes),
+            endpoint_label: metadata.endpoint_label.clone(),
+            vehicle_label: metadata.vehicle_label.clone(),
+            vehicle_type: metadata.vehicle_type.clone(),
+        }
+    }
 }
 
 impl DriverLocationSample {
@@ -824,12 +898,14 @@ enum Change {
     },
     DocumentStored(DocumentEntry),
     DriverLocation(DriverLocationSample),
+    SessionMetadata(SessionMetadataFile),
 }
 
 fn apply(
     reg: &mut InMemoryTripRegistry,
     planning_basis: &mut Option<TripPlanningBasis>,
     routing_profile: &mut Option<VehicleRoutingProfile>,
+    session_metadata: &mut ActiveTripSessionMetadata,
     documents: &mut std::collections::BTreeMap<DocumentId, StoredDocument>,
     locations: &mut Vec<DriverLocationSample>,
     trip: TripId,
@@ -921,6 +997,9 @@ fn apply(
                 locations.push(sample);
             }
         }
+        Change::SessionMetadata(file) => {
+            *session_metadata = file.typed()?;
+        }
     }
     Ok(())
 }
@@ -933,6 +1012,7 @@ pub struct TripFolder {
     registry: InMemoryTripRegistry,
     planning_basis: Option<TripPlanningBasis>,
     routing_profile: Option<VehicleRoutingProfile>,
+    session_metadata: ActiveTripSessionMetadata,
     documents: std::collections::BTreeMap<DocumentId, StoredDocument>,
     locations: Vec<DriverLocationSample>,
 }
@@ -955,6 +1035,7 @@ impl TripFolder {
             registry: InMemoryTripRegistry::default(),
             planning_basis: None,
             routing_profile: None,
+            session_metadata: ActiveTripSessionMetadata::default(),
             documents: std::collections::BTreeMap::new(),
             locations: Vec::new(),
         };
@@ -969,6 +1050,7 @@ impl TripFolder {
                 &mut this.registry,
                 &mut this.planning_basis,
                 &mut this.routing_profile,
+                &mut this.session_metadata,
                 &mut this.documents,
                 &mut this.locations,
                 trip,
@@ -1037,6 +1119,11 @@ impl TripFolder {
     #[must_use]
     pub fn routing_profile(&self) -> Option<&VehicleRoutingProfile> {
         self.routing_profile.as_ref()
+    }
+
+    #[must_use]
+    pub const fn session_metadata(&self) -> &ActiveTripSessionMetadata {
+        &self.session_metadata
     }
 
     #[must_use]
@@ -1128,6 +1215,7 @@ impl TripFolder {
         let mut updated = self.registry.clone();
         let mut updated_planning_basis = self.planning_basis.clone();
         let mut updated_routing_profile = self.routing_profile.clone();
+        let mut updated_session_metadata = self.session_metadata.clone();
         let mut updated_documents = self.documents.clone();
         let mut updated_locations = self.locations.clone();
         let is_import = matches!(&event, Change::Import(_));
@@ -1135,6 +1223,7 @@ impl TripFolder {
             &mut updated,
             &mut updated_planning_basis,
             &mut updated_routing_profile,
+            &mut updated_session_metadata,
             &mut updated_documents,
             &mut updated_locations,
             self.trip,
@@ -1144,6 +1233,7 @@ impl TripFolder {
         if !registry_changed
             && updated_planning_basis == self.planning_basis
             && updated_routing_profile == self.routing_profile
+            && updated_session_metadata == self.session_metadata
             && updated_documents == self.documents
             && updated_locations == self.locations
         {
@@ -1159,6 +1249,7 @@ impl TripFolder {
         self.registry = updated;
         self.planning_basis = updated_planning_basis;
         self.routing_profile = updated_routing_profile;
+        self.session_metadata = updated_session_metadata;
         self.documents = updated_documents;
         self.locations = updated_locations;
         if is_import && registry_changed {
@@ -1207,6 +1298,17 @@ impl TripFolder {
             local_route_revision: displayed.local_route_revision,
             geometry: RoadGeometryFile::from(geometry),
         })
+    }
+
+    pub fn set_session_metadata(
+        &mut self,
+        metadata: ActiveTripSessionMetadata,
+    ) -> io::Result<()> {
+        metadata.validate()?;
+        if self.session_metadata == metadata {
+            return Ok(());
+        }
+        self.record(Change::SessionMetadata(SessionMetadataFile::from(&metadata)))
     }
 
     pub fn record_location(&mut self, sample: DriverLocationSample) -> io::Result<()> {
