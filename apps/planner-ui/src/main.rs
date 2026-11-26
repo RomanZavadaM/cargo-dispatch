@@ -4,6 +4,7 @@ mod i18n;
 
 use crate::i18n::{UiLocale, strings};
 use cargo_dispatch_planner_ui_contracts::{
+    PlannerPackageCargoInput, PlannerPackageExportInput, PlannerPackageExportResult,
     PlannerPointInput, PlannerRouteView, PlannerRoutingAvailabilityState,
     PlannerRoutingConfigInput, PlannerRoutingPreviewInput, PlannerRoutingPreviewState,
     PlannerRoutingPreviewView, PlannerRoutingProbeResult, PlannerRoutingProfileInput,
@@ -382,6 +383,77 @@ impl RoutingProfileDraft {
     }
 }
 
+#[derive(Debug, Clone)]
+struct CargoDraft {
+    row_id: u64,
+    title: String,
+    weight_kg: String,
+    pallets: String,
+    pickup_point_id: String,
+    unload_point_id: String,
+}
+
+impl CargoDraft {
+    fn new(row_id: u64) -> Self {
+        Self {
+            row_id,
+            title: String::new(),
+            weight_kg: String::new(),
+            pallets: String::new(),
+            pickup_point_id: String::new(),
+            unload_point_id: String::new(),
+        }
+    }
+
+    fn optional_positive_u32(value: &str) -> Result<Option<u32>, ()> {
+        let value = value.trim();
+        if value.is_empty() {
+            return Ok(None);
+        }
+        let parsed = value.parse::<u32>().map_err(|_| ())?;
+        if parsed == 0 {
+            return Err(());
+        }
+        Ok(Some(parsed))
+    }
+
+    fn optional_positive_u16(value: &str) -> Result<Option<u16>, ()> {
+        let value = value.trim();
+        if value.is_empty() {
+            return Ok(None);
+        }
+        let parsed = value.parse::<u16>().map_err(|_| ())?;
+        if parsed == 0 {
+            return Err(());
+        }
+        Ok(Some(parsed))
+    }
+
+    fn input(&self) -> Result<Option<PlannerPackageCargoInput>, ()> {
+        let is_empty = self.title.trim().is_empty()
+            && self.weight_kg.trim().is_empty()
+            && self.pallets.trim().is_empty()
+            && self.pickup_point_id.is_empty()
+            && self.unload_point_id.is_empty();
+        if is_empty {
+            return Ok(None);
+        }
+        let title = self.title.trim();
+        if title.is_empty() {
+            return Err(());
+        }
+        Ok(Some(PlannerPackageCargoInput {
+            title: title.to_owned(),
+            weight_kg: Self::optional_positive_u32(&self.weight_kg)?,
+            pallets: Self::optional_positive_u16(&self.pallets)?,
+            pickup_point_id: (!self.pickup_point_id.is_empty())
+                .then(|| self.pickup_point_id.clone()),
+            unload_point_id: (!self.unload_point_id.is_empty())
+                .then(|| self.unload_point_id.clone()),
+        }))
+    }
+}
+
 fn probe_message(state: PlannerRoutingAvailabilityState, locale: UiLocale) -> &'static str {
     let text = strings(locale);
     match state {
@@ -444,6 +516,10 @@ fn PlannerApp() -> impl IntoView {
     let connect_timeout_ms = RwSignal::new("1000".to_owned());
     let request_timeout_ms = RwSignal::new("10000".to_owned());
     let routing_profile = RwSignal::new(RoutingProfileDraft::default());
+    let export_vehicle_type = RwSignal::new(String::new());
+    let export_cargos = RwSignal::new(vec![CargoDraft::new(1)]);
+    let next_cargo_row = RwSignal::new(2_u64);
+    let export_result = RwSignal::new(None::<PlannerPackageExportResult>);
 
     Effect::new(move |_| {
         spawn_local(async move {
@@ -839,6 +915,119 @@ fn PlannerApp() -> impl IntoView {
         });
     };
 
+    let add_cargo = move |_| {
+        let row_id = next_cargo_row.get_untracked();
+        next_cargo_row.set(row_id.saturating_add(1));
+        export_cargos.update(|rows| rows.push(CargoDraft::new(row_id)));
+        export_result.set(None);
+    };
+
+    let remove_cargo = move |row_id: u64| {
+        export_cargos.update(|rows| rows.retain(|row| row.row_id != row_id));
+        export_result.set(None);
+    };
+
+    let export_package = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let Some(current) = route.get_untracked() else {
+            return;
+        };
+        if current.points.is_empty() {
+            message.set(strings(locale.get_untracked()).package_needs_points.to_owned());
+            error.set(true);
+            return;
+        }
+        let vehicle_type = export_vehicle_type.get_untracked().trim().to_owned();
+        if vehicle_type.is_empty() {
+            message.set(
+                strings(locale.get_untracked())
+                    .vehicle_type_required
+                    .to_owned(),
+            );
+            error.set(true);
+            return;
+        }
+        let cargos = match export_cargos
+            .get_untracked()
+            .iter()
+            .map(CargoDraft::input)
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(rows) => rows.into_iter().flatten().collect::<Vec<_>>(),
+            Err(()) => {
+                message.set(strings(locale.get_untracked()).invalid_cargo.to_owned());
+                error.set(true);
+                return;
+            }
+        };
+        let routing_profile_input = routing_profile.get_untracked().input().ok();
+        let routing_preview = if routing_profile_input.is_some() {
+            preview.get_untracked().filter(|value| {
+                value.state == PlannerRoutingPreviewState::Ok
+                    && value.working_route_id == current.working_route_id
+                    && value.revision == current.revision
+            })
+        } else {
+            None
+        };
+
+        busy.set(true);
+        spawn_local(async move {
+            let selected = invoke::<Option<String>, _>(
+                "planner_pick_export_path",
+                &serde_json::json!({}),
+            )
+            .await;
+            let path = match selected {
+                Ok(Some(path)) => path,
+                Ok(None) => {
+                    message.set(
+                        strings(locale.get_untracked())
+                            .package_dialog_cancelled
+                            .to_owned(),
+                    );
+                    error.set(false);
+                    busy.set(false);
+                    return;
+                }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                    busy.set(false);
+                    return;
+                }
+            };
+
+            let input = PlannerPackageExportInput {
+                path,
+                vehicle_type,
+                cargos,
+                routing_profile: routing_profile_input,
+                routing_preview,
+            };
+            match invoke::<PlannerPackageExportResult, _>(
+                "planner_export_package",
+                &serde_json::json!({ "input": input }),
+            )
+            .await
+            {
+                Ok(result) => {
+                    export_result.set(Some(result));
+                    message.set(strings(locale.get_untracked()).package_exported.to_owned());
+                    error.set(false);
+                }
+                Err(problem) => {
+                    export_result.set(None);
+                    message.set(problem);
+                    error.set(true);
+                }
+            }
+            busy.set(false);
+        });
+    };
+
     view! {
         <main>
             <header>
@@ -1065,6 +1254,184 @@ fn PlannerApp() -> impl IntoView {
                     }
                     None => view! { <span></span> }.into_any(),
                 }}
+            </section>
+
+            <section>
+                <h2>{move || strings(locale.get()).package_export_title}</h2>
+                <p class="note">{move || strings(locale.get()).package_export_note}</p>
+                <div class="routing-grid">
+                    <label>
+                        {move || strings(locale.get()).vehicle_type}
+                        <input
+                            prop:value=move || export_vehicle_type.get()
+                            on:input=move |event| {
+                                export_vehicle_type.set(event_target_value(&event));
+                                export_result.set(None);
+                            }
+                        />
+                    </label>
+                </div>
+
+                <div class="package-heading">
+                    <h3>{move || strings(locale.get()).cargos}</h3>
+                    <button type="button" on:click=add_cargo disabled=move || busy.get()>
+                        {move || strings(locale.get()).add_cargo}
+                    </button>
+                </div>
+
+                <div class="cargo-list">
+                    <For
+                        each=move || export_cargos.get()
+                        key=|cargo| cargo.row_id
+                        children=move |cargo| {
+                            let row_id = cargo.row_id;
+                            let row_title = cargo.title.clone();
+                            let row_weight = cargo.weight_kg.clone();
+                            let row_pallets = cargo.pallets.clone();
+                            let row_pickup = cargo.pickup_point_id.clone();
+                            let row_unload = cargo.unload_point_id.clone();
+                            view! {
+                                <div class="cargo-card">
+                                    <div class="cargo-grid">
+                                        <label>
+                                            {move || strings(locale.get()).cargo_title}
+                                            <input
+                                                prop:value=row_title
+                                                on:input=move |event| {
+                                                    let value = event_target_value(&event);
+                                                    export_cargos.update(|rows| {
+                                                        if let Some(row) = rows.iter_mut().find(|row| row.row_id == row_id) {
+                                                            row.title = value;
+                                                        }
+                                                    });
+                                                    export_result.set(None);
+                                                }
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).cargo_weight_kg}
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                step="1"
+                                                prop:value=row_weight
+                                                on:input=move |event| {
+                                                    let value = event_target_value(&event);
+                                                    export_cargos.update(|rows| {
+                                                        if let Some(row) = rows.iter_mut().find(|row| row.row_id == row_id) {
+                                                            row.weight_kg = value;
+                                                        }
+                                                    });
+                                                    export_result.set(None);
+                                                }
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).cargo_pallets}
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                step="1"
+                                                prop:value=row_pallets
+                                                on:input=move |event| {
+                                                    let value = event_target_value(&event);
+                                                    export_cargos.update(|rows| {
+                                                        if let Some(row) = rows.iter_mut().find(|row| row.row_id == row_id) {
+                                                            row.pallets = value;
+                                                        }
+                                                    });
+                                                    export_result.set(None);
+                                                }
+                                            />
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).pickup_point}
+                                            <select
+                                                prop:value=row_pickup
+                                                on:change=move |event| {
+                                                    let value = event_target_value(&event);
+                                                    export_cargos.update(|rows| {
+                                                        if let Some(row) = rows.iter_mut().find(|row| row.row_id == row_id) {
+                                                            row.pickup_point_id = value;
+                                                        }
+                                                    });
+                                                    export_result.set(None);
+                                                }
+                                            >
+                                                <option value="">{move || strings(locale.get()).choose_point}</option>
+                                                <For
+                                                    each=move || route.get().map(|value| value.points).unwrap_or_default()
+                                                    key=|point| point.point_id.clone()
+                                                    children=move |point| {
+                                                        let value = point.point_id.clone();
+                                                        view! { <option value=value>{format!("{}. {}", point.sequence, point.title)}</option> }
+                                                    }
+                                                />
+                                            </select>
+                                        </label>
+                                        <label>
+                                            {move || strings(locale.get()).unload_point}
+                                            <select
+                                                prop:value=row_unload
+                                                on:change=move |event| {
+                                                    let value = event_target_value(&event);
+                                                    export_cargos.update(|rows| {
+                                                        if let Some(row) = rows.iter_mut().find(|row| row.row_id == row_id) {
+                                                            row.unload_point_id = value;
+                                                        }
+                                                    });
+                                                    export_result.set(None);
+                                                }
+                                            >
+                                                <option value="">{move || strings(locale.get()).choose_point}</option>
+                                                <For
+                                                    each=move || route.get().map(|value| value.points).unwrap_or_default()
+                                                    key=|point| point.point_id.clone()
+                                                    children=move |point| {
+                                                        let value = point.point_id.clone();
+                                                        view! { <option value=value>{format!("{}. {}", point.sequence, point.title)}</option> }
+                                                    }
+                                                />
+                                            </select>
+                                        </label>
+                                    </div>
+                                    <div class="actions">
+                                        <button
+                                            class="danger"
+                                            type="button"
+                                            on:click=move |_| remove_cargo(row_id)
+                                            disabled=move || busy.get()
+                                        >
+                                            {move || strings(locale.get()).remove_cargo}
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    />
+                </div>
+
+                <div class="actions">
+                    <button class="primary" type="button" on:click=export_package disabled=move || busy.get()>
+                        {move || strings(locale.get()).export_package}
+                    </button>
+                </div>
+
+                {move || export_result.get().map(|result| {
+                    let geometry = if result.geometry_included {
+                        strings(locale.get()).geometry_included
+                    } else {
+                        strings(locale.get()).geometry_not_included
+                    };
+                    view! {
+                        <div class="status package-result">
+                            <div><strong>{move || strings(locale.get()).package_file}</strong>{format!(": {}", result.path)}</div>
+                            <div><strong>{move || strings(locale.get()).package_schema}</strong>{format!(": {}.{}", result.schema_major, result.schema_minor)}</div>
+                            <div><strong>{move || strings(locale.get()).cargo_count}</strong>{format!(": {}", result.cargo_count)}</div>
+                            <div>{geometry}</div>
+                        </div>
+                    }
+                })}
             </section>
 
             <section>
