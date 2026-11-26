@@ -14,7 +14,9 @@ use cargo_dispatch_control_web::{
 };
 use cargo_dispatch_domain::{DocumentId, DriverEndpointId, PointId};
 use cargo_dispatch_geo::{NormalizedStatus, valhalla_http::ValhallaRuntimeConfig};
-use cargo_dispatch_trip_files::{DocumentDirection, DocumentStoreDraft, TripFolder};
+use cargo_dispatch_trip_files::{
+    ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, TripFolder,
+};
 use std::{
     collections::BTreeMap,
     fs,
@@ -253,6 +255,7 @@ impl DesktopControlService {
             .await
             .map_err(|error| format!("Не вдалося відкрити задачу читання рейсу: {error}"))?
             .map_err(|error| format!("Не вдалося відкрити папку рейсу: {error}"))?;
+        let persisted_metadata = folder.session_metadata().clone();
         let trip_id_text = folder
             .trip_id()
             .as_bytes()
@@ -285,11 +288,11 @@ impl DesktopControlService {
                 RegisteredSession {
                     trip_id: trip_id_text,
                     token,
-                    operator_display_name: None,
-                    endpoint_id: None,
-                    endpoint_label: None,
-                    vehicle_label: None,
-                    vehicle_type: None,
+                    operator_display_name: persisted_metadata.display_name,
+                    endpoint_id: persisted_metadata.endpoint_id,
+                    endpoint_label: persisted_metadata.endpoint_label,
+                    vehicle_label: persisted_metadata.vehicle_label,
+                    vehicle_type: persisted_metadata.vehicle_type,
                 },
             );
 
@@ -559,18 +562,36 @@ impl DesktopControlService {
             let value = input.display_name.trim();
             (!value.is_empty()).then(|| value.to_owned())
         };
+        let endpoint_label = optional_text(input.endpoint_label);
+        let vehicle_label = optional_text(input.vehicle_label);
+        let vehicle_type = optional_text(input.vehicle_type);
+        let token = input.token.trim().to_owned();
+
+        self.browser
+            .set_session_metadata(
+                &token,
+                ActiveTripSessionMetadata {
+                    display_name: operator_display_name.clone(),
+                    endpoint_id,
+                    endpoint_label: endpoint_label.clone(),
+                    vehicle_label: vehicle_label.clone(),
+                    vehicle_type: vehicle_type.clone(),
+                },
+            )
+            .map_err(|error| format!("Не вдалося зберегти дані сесії: {error}"))?;
+
         let mut sessions = self
             .sessions
             .lock()
             .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
         let session = sessions
-            .get_mut(input.token.trim())
+            .get_mut(&token)
             .ok_or_else(|| "Сесію не знайдено".to_owned())?;
         session.operator_display_name = operator_display_name;
         session.endpoint_id = endpoint_id;
-        session.endpoint_label = optional_text(input.endpoint_label);
-        session.vehicle_label = optional_text(input.vehicle_label);
-        session.vehicle_type = optional_text(input.vehicle_type);
+        session.endpoint_label = endpoint_label;
+        session.vehicle_label = vehicle_label;
+        session.vehicle_type = vehicle_type;
         drop(sessions);
         self.status().await
     }
