@@ -13,7 +13,7 @@
 ## 현재 구현된 기능
 
 - Tauri/Leptos 기반의 별도 데스크톱 **Control** 애플리케이션;
-- Tauri/Leptos 기반의 별도 데스크톱 **Planner**: 수동 경로 초안, 지점 추가/삭제/재정렬, 내비게이션 좌표, Planner core revision 관리;
+- Tauri/Leptos 기반의 별도 데스크톱 **Planner**: 수동 경로 초안, 지점 추가/삭제/재정렬, 내비게이션 좌표, Planner core revision 관리; 초안은 app-data의 versioned append-only journal에 저장되고 재시작 후 복구됩니다;
 - 활성 운행의 지속적 로컬 저장 및 재시작 후 복구;
 - Planner와 Control 사이의 버전 관리된 trip package;
 - 휴대폰·태블릿·노트북·데스크톱 브라우저용 하나의 적응형 **Driver Browser**;
@@ -92,7 +92,7 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 
 ## 앞으로 필요한 작업
 
-- Planner 초안의 재시작 간 영구 저장, 이후 지도/routing preview와 package export 준비;
+- Planner 지도/routing preview, 이후 Planner UI에서 package export 준비;
 
 - 로컬 브라우저 수동 검수;
 - 동일한 Driver Browser를 실제 휴대폰에서 같은 LAN으로 테스트;
