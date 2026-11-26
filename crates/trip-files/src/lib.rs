@@ -901,16 +901,25 @@ enum Change {
     SessionMetadata(SessionMetadataFile),
 }
 
+struct ApplyAux<'a> {
+    planning_basis: &'a mut Option<TripPlanningBasis>,
+    routing_profile: &'a mut Option<VehicleRoutingProfile>,
+    session_metadata: &'a mut ActiveTripSessionMetadata,
+}
+
 fn apply(
     reg: &mut InMemoryTripRegistry,
-    planning_basis: &mut Option<TripPlanningBasis>,
-    routing_profile: &mut Option<VehicleRoutingProfile>,
-    session_metadata: &mut ActiveTripSessionMetadata,
+    aux: ApplyAux<'_>,
     documents: &mut std::collections::BTreeMap<DocumentId, StoredDocument>,
     locations: &mut Vec<DriverLocationSample>,
     trip: TripId,
     event: &Change,
 ) -> io::Result<()> {
+    let ApplyAux {
+        planning_basis,
+        routing_profile,
+        session_metadata,
+    } = aux;
     match event {
         Change::Import(m) => {
             if m.trip != trip.as_bytes() {
@@ -1048,9 +1057,11 @@ impl TripFolder {
             let is_import = matches!(&event, Change::Import(_));
             apply(
                 &mut this.registry,
-                &mut this.planning_basis,
-                &mut this.routing_profile,
-                &mut this.session_metadata,
+                ApplyAux {
+                    planning_basis: &mut this.planning_basis,
+                    routing_profile: &mut this.routing_profile,
+                    session_metadata: &mut this.session_metadata,
+                },
                 &mut this.documents,
                 &mut this.locations,
                 trip,
@@ -1221,9 +1232,11 @@ impl TripFolder {
         let is_import = matches!(&event, Change::Import(_));
         apply(
             &mut updated,
-            &mut updated_planning_basis,
-            &mut updated_routing_profile,
-            &mut updated_session_metadata,
+            ApplyAux {
+                planning_basis: &mut updated_planning_basis,
+                routing_profile: &mut updated_routing_profile,
+                session_metadata: &mut updated_session_metadata,
+            },
             &mut updated_documents,
             &mut updated_locations,
             self.trip,
