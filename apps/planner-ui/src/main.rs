@@ -502,8 +502,8 @@ fn PlannerApp() -> impl IntoView {
                     <div class="map-tiles"></div>
                     <div class="map-overlays"></div>
                     <div class="map-controls">
-                        <button type="button" aria-label="Zoom in" on:click=move |_| cargo_planner_map_zoom(1)>"+"</button>
-                        <button type="button" aria-label="Zoom out" on:click=move |_| cargo_planner_map_zoom(-1)>"−"</button>
+                        <button type="button" aria-label=move || strings(locale.get()).map_zoom_in on:click=move |_| cargo_planner_map_zoom(1)>"+"</button>
+                        <button type="button" aria-label=move || strings(locale.get()).map_zoom_out on:click=move |_| cargo_planner_map_zoom(-1)>"−"</button>
                         <button type="button" on:click=move |_| cargo_planner_map_fit()>{move || strings(locale.get()).map_fit}</button>
                     </div>
                     <a
