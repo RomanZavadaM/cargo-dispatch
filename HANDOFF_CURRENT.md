@@ -15,18 +15,22 @@
 - Addressing Gateway — RAM-only relay; Control лишається джерелом активного рейсу.
 - Control desktop: Windows + macOS + Linux.
 - Full 8-language localization закрита й контролюється CI.
-- Planner:
+- Planner / routing:
   - Valhalla adapter;
-  - trip schema 1.2 derived geometry;
+  - trip schema 1.3 з actual VehicleRoutingProfile; legacy 1.0–1.2 readable;
   - real Valhalla HTTP transport;
-  - runtime URL / map dataset id / connect + request timeout;
+  - runtime URL / map dataset id / bounded connect + request timeout у Desktop Control;
   - `/status` availability + live engine version;
-  - `/route` transport без вигаданих vehicle defaults.
+  - `/route` transport без вигаданих vehicle defaults;
+  - live geometry recalculation після operator/driver reorder;
+  - reorder durable до network call;
+  - stale/late Valhalla response не може перезаписати новіший active-trip state;
+  - routing може бути вимкнений або недоступний без втрати нового порядку точок.
 
 ## Next
-1. Planner live reroute geometry після зміни порядку відкритих точок оператором або водієм.
-2. Geometry лишається derived; Control лишається authoritative.
-3. Planner desktop release line: Windows + macOS + Linux.
+1. Наступний великий Planner етап — desktop UI composition для планування маршруту.
+2. Planner desktop release line: Windows + macOS + Linux.
+3. Geometry лишається derived; Control лишається authoritative після імпорту рейсу.
 4. Compiled Planner test/stable builds публікувати через GitHub Releases.
 
 Продовження: `START_HERE.md` → private HANDOFF/PROJECT_STATE → Planner STATE/WORKLOG → live GitHub.
