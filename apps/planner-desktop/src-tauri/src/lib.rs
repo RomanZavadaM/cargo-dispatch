@@ -1634,6 +1634,70 @@ mod tests {
         let _ = fs::remove_file(journal);
     }
 
+    #[test]
+    fn package_export_version_survives_restart_and_imports_as_next_version() {
+        let journal = unique_journal("package-export-version-history");
+        let package_v1 = journal.with_extension("trip-v1.zip");
+        let package_v2 = journal.with_extension("trip-v2.zip");
+        let imported_path = journal.with_extension("imported-versioned-trip");
+
+        let service = PlannerDesktopService::open(journal.clone()).expect("open Planner");
+        service
+            .add_point(point("Warehouse", 49.8393, 24.0296))
+            .expect("warehouse");
+        let route = service
+            .add_point(point("Customer", 49.8430, 24.0360))
+            .expect("customer");
+        let cargo = PlannerPackageCargoInput {
+            title: "Synthetic cargo".to_owned(),
+            weight_kg: Some(8_000),
+            pallets: Some(10),
+            pickup_point_id: Some(route.points[0].point_id.clone()),
+            unload_point_id: Some(route.points[1].point_id.clone()),
+        };
+
+        let first = service
+            .export_trip_package(PlannerPackageExportInput {
+                path: package_v1.to_string_lossy().into_owned(),
+                vehicle_type: "truck".to_owned(),
+                cargos: vec![cargo.clone()],
+                routing_profile: None,
+                routing_preview: None,
+            })
+            .expect("first export");
+        assert_eq!(first.trip_version, 1);
+        drop(service);
+
+        let reopened = PlannerDesktopService::open(journal.clone()).expect("reopen Planner");
+        let second = reopened
+            .export_trip_package(PlannerPackageExportInput {
+                path: package_v2.to_string_lossy().into_owned(),
+                vehicle_type: "truck".to_owned(),
+                cargos: vec![cargo],
+                routing_profile: None,
+                routing_preview: None,
+            })
+            .expect("second export");
+        assert_eq!(second.trip_id, first.trip_id);
+        assert_eq!(second.trip_version, 2);
+
+        let imported =
+            cargo_dispatch_trip_files::TripFolder::import(&imported_path, &package_v1)
+                .expect("import v1");
+        assert_eq!(imported.state().current_version.get(), 1);
+        drop(imported);
+        let imported =
+            cargo_dispatch_trip_files::TripFolder::import(&imported_path, &package_v2)
+                .expect("import v2");
+        assert_eq!(imported.state().current_version.get(), 2);
+
+        let _ = fs::remove_file(&package_v1);
+        let _ = fs::remove_file(&package_v2);
+        let _ = fs::remove_dir_all(&imported_path);
+        let _ = fs::remove_file(journal.with_extension("operator-id.bin"));
+        let _ = fs::remove_file(journal);
+    }
+
     #[tokio::test]
     async fn package_export_roundtrips_schema_1_4_basis_profile_and_geometry() {
         let journal = unique_journal("package-export");
