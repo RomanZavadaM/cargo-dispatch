@@ -525,6 +525,7 @@ name = "cargo-dispatch-planner-desktop"
 version = "0.1.0"
 dependencies = [
  "cargo-dispatch-domain",
+ "cargo-dispatch-geo",
  "cargo-dispatch-planner",
  "cargo-dispatch-planner-ui-contracts",
  "serde",
