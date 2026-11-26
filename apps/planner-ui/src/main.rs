@@ -437,6 +437,13 @@ fn PlannerApp() -> impl IntoView {
     let message = RwSignal::new(String::new());
     let error = RwSignal::new(false);
     let busy = RwSignal::new(false);
+    let routing_status = RwSignal::new(None::<PlannerRoutingStatus>);
+    let preview = RwSignal::new(None::<PlannerRoutingPreviewView>);
+    let routing_url = RwSignal::new(String::new());
+    let routing_dataset = RwSignal::new(String::new());
+    let connect_timeout_ms = RwSignal::new("1000".to_owned());
+    let request_timeout_ms = RwSignal::new("10000".to_owned());
+    let routing_profile = RwSignal::new(RoutingProfileDraft::default());
 
     Effect::new(move |_| {
         spawn_local(async move {
@@ -451,10 +458,50 @@ fn PlannerApp() -> impl IntoView {
     });
 
     Effect::new(move |_| {
+        spawn_local(async move {
+            match invoke::<Option<PlannerRoutingStatus>, _>(
+                "planner_routing_status",
+                &serde_json::json!({}),
+            )
+            .await
+            {
+                Ok(current) => {
+                    if let Some(current) = &current {
+                        routing_url.set(current.base_url.clone());
+                        routing_dataset.set(current.map_dataset_id.clone());
+                        connect_timeout_ms.set(current.connect_timeout_ms.to_string());
+                        request_timeout_ms.set(current.request_timeout_ms.to_string());
+                    }
+                    routing_status.set(current);
+                }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
+            }
+        });
+    });
+
+    Effect::new(move |_| {
         if let Some(current) = route.get()
             && let Ok(points_json) = serde_json::to_string(&current.points)
         {
-            cargo_planner_map_render(&current.working_route_id, &points_json);
+            let geometry = preview
+                .get()
+                .filter(|value| {
+                    value.state == PlannerRoutingPreviewState::Ok
+                        && value.working_route_id == current.working_route_id
+                        && value.revision == current.revision
+                })
+                .map(|value| value.geometry)
+                .unwrap_or_default();
+            if let Ok(geometry_json) = serde_json::to_string(&geometry) {
+                cargo_planner_map_render(
+                    &current.working_route_id,
+                    &points_json,
+                    &geometry_json,
+                );
+            }
         }
     });
 
@@ -497,6 +544,7 @@ fn PlannerApp() -> impl IntoView {
             .await
             {
                 Ok(current) => {
+                    preview.set(None);
                     route.set(Some(current));
                     title.set(String::new());
                     latitude.set(String::new());
@@ -522,6 +570,7 @@ fn PlannerApp() -> impl IntoView {
             match invoke::<PlannerRouteView, _>("planner_reset_route", &serde_json::json!({})).await
             {
                 Ok(current) => {
+                    preview.set(None);
                     route.set(Some(current));
                     message.set(strings(locale.get_untracked()).reset_done.to_owned());
                     error.set(false);
@@ -549,6 +598,7 @@ fn PlannerApp() -> impl IntoView {
             .await
             {
                 Ok(current) => {
+                    preview.set(None);
                     route.set(Some(current));
                     message.set(strings(locale.get_untracked()).removed.to_owned());
                     error.set(false);
@@ -563,6 +613,9 @@ fn PlannerApp() -> impl IntoView {
     };
 
     let move_point = move |point_id: String, delta: isize| {
+        if busy.get_untracked() {
+            return;
+        }
         let Some(current) = route.get_untracked() else {
             return;
         };
@@ -595,11 +648,164 @@ fn PlannerApp() -> impl IntoView {
             .await
             {
                 Ok(current) => {
+                    preview.set(None);
                     route.set(Some(current));
                     message.set(strings(locale.get_untracked()).reordered.to_owned());
                     error.set(false);
                 }
                 Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
+            }
+            busy.set(false);
+        });
+    };
+
+    let configure_routing = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let base_url = routing_url.get_untracked().trim().to_owned();
+        let map_dataset_id = routing_dataset.get_untracked().trim().to_owned();
+        let Ok(connect_timeout) = connect_timeout_ms.get_untracked().trim().parse::<u64>() else {
+            message.set(strings(locale.get_untracked()).routing_error.to_owned());
+            error.set(true);
+            return;
+        };
+        let Ok(request_timeout) = request_timeout_ms.get_untracked().trim().parse::<u64>() else {
+            message.set(strings(locale.get_untracked()).routing_error.to_owned());
+            error.set(true);
+            return;
+        };
+        busy.set(true);
+        spawn_local(async move {
+            let input = PlannerRoutingConfigInput {
+                base_url,
+                map_dataset_id,
+                connect_timeout_ms: connect_timeout,
+                request_timeout_ms: request_timeout,
+            };
+            match invoke::<PlannerRoutingStatus, _>(
+                "planner_configure_routing",
+                &serde_json::json!({ "input": input }),
+            )
+            .await
+            {
+                Ok(current) => {
+                    preview.set(None);
+                    routing_status.set(Some(current));
+                    message.set(strings(locale.get_untracked()).routing_configured.to_owned());
+                    error.set(false);
+                }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
+            }
+            busy.set(false);
+        });
+    };
+
+    let disable_routing = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            match invoke::<(), _>("planner_disable_routing", &serde_json::json!({})).await {
+                Ok(()) => {
+                    preview.set(None);
+                    routing_status.set(None);
+                    message.set(strings(locale.get_untracked()).routing_disabled.to_owned());
+                    error.set(false);
+                }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
+            }
+            busy.set(false);
+        });
+    };
+
+    let test_routing = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            match invoke::<PlannerRoutingProbeResult, _>(
+                "planner_test_routing",
+                &serde_json::json!({}),
+            )
+            .await
+            {
+                Ok(result) => {
+                    let is_ok = result.state == PlannerRoutingAvailabilityState::Ok;
+                    message.set(probe_message(result.state, locale.get_untracked()).to_owned());
+                    error.set(!is_ok);
+                }
+                Err(problem) => {
+                    message.set(problem);
+                    error.set(true);
+                }
+            }
+            busy.set(false);
+        });
+    };
+
+    let calculate_preview = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let Some(current) = route.get_untracked() else {
+            return;
+        };
+        if current.points.len() < 2 {
+            message.set(strings(locale.get_untracked()).preview_needs_points.to_owned());
+            error.set(true);
+            return;
+        }
+        let profile = match routing_profile.get_untracked().input() {
+            Ok(profile) => profile,
+            Err(RoutingDraftError::InvalidNumber) => {
+                message.set(strings(locale.get_untracked()).invalid_profile_value.to_owned());
+                error.set(true);
+                return;
+            }
+            Err(RoutingDraftError::ChoiceRequired) => {
+                message.set(strings(locale.get_untracked()).routing_choice_required.to_owned());
+                error.set(true);
+                return;
+            }
+        };
+        busy.set(true);
+        spawn_local(async move {
+            let input = PlannerRoutingPreviewInput { profile };
+            match invoke::<PlannerRoutingPreviewView, _>(
+                "planner_preview_route",
+                &serde_json::json!({ "input": input }),
+            )
+            .await
+            {
+                Ok(result) => {
+                    let state = result.state;
+                    let current_route = route.get_untracked();
+                    let still_current = current_route.as_ref().is_some_and(|current| {
+                        current.working_route_id == result.working_route_id
+                            && current.revision == result.revision
+                    });
+                    if still_current {
+                        preview.set(Some(result));
+                    } else {
+                        preview.set(None);
+                    }
+                    message.set(preview_message(state, locale.get_untracked()).to_owned());
+                    error.set(state != PlannerRoutingPreviewState::Ok);
+                }
+                Err(problem) => {
+                    preview.set(None);
                     message.set(problem);
                     error.set(true);
                 }
@@ -648,6 +854,192 @@ fn PlannerApp() -> impl IntoView {
                     <button class="primary" type="button" on:click=add_point disabled=move || busy.get()>{move || strings(locale.get()).add_point}</button>
                     <button type="button" on:click=reset disabled=move || busy.get()>{move || strings(locale.get()).reset_route}</button>
                 </div>
+            </section>
+
+            <section>
+                <h2>{move || strings(locale.get()).routing_title}</h2>
+                <p class="note">{move || strings(locale.get()).routing_note}</p>
+                <div class="routing-grid">
+                    <label>
+                        {move || strings(locale.get()).routing_url}
+                        <input
+                            prop:value=move || routing_url.get()
+                            on:input=move |event| routing_url.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).routing_dataset}
+                        <input
+                            prop:value=move || routing_dataset.get()
+                            on:input=move |event| routing_dataset.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).connect_timeout_ms}
+                        <input
+                            type="number"
+                            min="100"
+                            max="30000"
+                            prop:value=move || connect_timeout_ms.get()
+                            on:input=move |event| connect_timeout_ms.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label>
+                        {move || strings(locale.get()).request_timeout_ms}
+                        <input
+                            type="number"
+                            min="250"
+                            max="120000"
+                            prop:value=move || request_timeout_ms.get()
+                            on:input=move |event| request_timeout_ms.set(event_target_value(&event))
+                        />
+                    </label>
+                </div>
+                <div class="actions">
+                    <button class="primary" type="button" on:click=configure_routing disabled=move || busy.get()>
+                        {move || strings(locale.get()).save_routing}
+                    </button>
+                    <button type="button" on:click=test_routing disabled=move || busy.get()>
+                        {move || strings(locale.get()).test_routing}
+                    </button>
+                    <button type="button" on:click=disable_routing disabled=move || busy.get()>
+                        {move || strings(locale.get()).disable_routing}
+                    </button>
+                </div>
+                <div class="status">
+                    {move || routing_status.get().map(|value| {
+                        format!("{} · {}", value.base_url, value.map_dataset_id)
+                    }).unwrap_or_else(|| strings(locale.get()).routing_not_configured.to_owned())}
+                </div>
+
+                <h3>{move || strings(locale.get()).planning_profile}</h3>
+                <p class="note">{move || strings(locale.get()).planning_profile_note}</p>
+                <div class="routing-grid">
+                    <label>{move || strings(locale.get()).height_m}
+                        <input type="number" step="0.01" min="0"
+                            prop:value=move || routing_profile.get().height_m
+                            on:input=move |event| routing_profile.update(|draft| draft.height_m = event_target_value(&event))
+                        />
+                    </label>
+                    <label>{move || strings(locale.get()).width_m}
+                        <input type="number" step="0.01" min="0"
+                            prop:value=move || routing_profile.get().width_m
+                            on:input=move |event| routing_profile.update(|draft| draft.width_m = event_target_value(&event))
+                        />
+                    </label>
+                    <label>{move || strings(locale.get()).length_m}
+                        <input type="number" step="0.01" min="0"
+                            prop:value=move || routing_profile.get().length_m
+                            on:input=move |event| routing_profile.update(|draft| draft.length_m = event_target_value(&event))
+                        />
+                    </label>
+                    <label>{move || strings(locale.get()).gross_weight_t}
+                        <input type="number" step="0.01" min="0"
+                            prop:value=move || routing_profile.get().gross_weight_t
+                            on:input=move |event| routing_profile.update(|draft| draft.gross_weight_t = event_target_value(&event))
+                        />
+                    </label>
+                    <label>{move || strings(locale.get()).axle_load_t}
+                        <input type="number" step="0.01" min="0"
+                            prop:value=move || routing_profile.get().axle_load_t
+                            on:input=move |event| routing_profile.update(|draft| draft.axle_load_t = event_target_value(&event))
+                        />
+                    </label>
+                    <label>{move || strings(locale.get()).axle_count}
+                        <input type="number" step="1" min="1" max="255"
+                            prop:value=move || routing_profile.get().axle_count
+                            on:input=move |event| routing_profile.update(|draft| draft.axle_count = event_target_value(&event))
+                        />
+                    </label>
+                    <label>{move || strings(locale.get()).hazmat}
+                        <select
+                            prop:value=move || routing_profile.get().hazmat
+                            on:change=move |event| routing_profile.update(|draft| draft.hazmat = event_target_value(&event))
+                        >
+                            <option value="">{move || strings(locale.get()).not_specified}</option>
+                            <option value="yes">{move || strings(locale.get()).yes}</option>
+                            <option value="no">{move || strings(locale.get()).no}</option>
+                        </select>
+                    </label>
+                    <label>{move || strings(locale.get()).hgv}
+                        <select
+                            prop:value=move || routing_profile.get().hgv
+                            on:change=move |event| routing_profile.update(|draft| draft.hgv = event_target_value(&event))
+                        >
+                            <option value="">{move || strings(locale.get()).not_specified}</option>
+                            <option value="yes">{move || strings(locale.get()).yes}</option>
+                            <option value="no">{move || strings(locale.get()).no}</option>
+                        </select>
+                    </label>
+                    <label>{move || strings(locale.get()).exclude_unpaved}
+                        <select
+                            prop:value=move || routing_profile.get().exclude_unpaved
+                            on:change=move |event| routing_profile.update(|draft| draft.exclude_unpaved = event_target_value(&event))
+                        >
+                            <option value="">{move || strings(locale.get()).not_specified}</option>
+                            <option value="yes">{move || strings(locale.get()).yes}</option>
+                            <option value="no">{move || strings(locale.get()).no}</option>
+                        </select>
+                    </label>
+                    <label>{move || strings(locale.get()).prefer_truck_routes}
+                        <select
+                            prop:value=move || routing_profile.get().prefer_truck_routes
+                            on:change=move |event| routing_profile.update(|draft| draft.prefer_truck_routes = event_target_value(&event))
+                        >
+                            <option value="">{move || strings(locale.get()).not_specified}</option>
+                            <option value="yes">{move || strings(locale.get()).yes}</option>
+                            <option value="no">{move || strings(locale.get()).no}</option>
+                        </select>
+                    </label>
+                    <label>{move || strings(locale.get()).toll_preference}
+                        <select
+                            prop:value=move || routing_profile.get().toll_preference
+                            on:change=move |event| routing_profile.update(|draft| draft.toll_preference = event_target_value(&event))
+                        >
+                            <option value="">{move || strings(locale.get()).not_specified}</option>
+                            <option value="allow">{move || strings(locale.get()).toll_allow}</option>
+                            <option value="prefer_avoid">{move || strings(locale.get()).toll_prefer_avoid}</option>
+                            <option value="avoid">{move || strings(locale.get()).toll_avoid}</option>
+                        </select>
+                    </label>
+                    <label>{move || strings(locale.get()).max_speed_kmh}
+                        <input type="number" step="0.1" min="0"
+                            prop:value=move || routing_profile.get().max_speed_kmh
+                            on:input=move |event| routing_profile.update(|draft| draft.max_speed_kmh = event_target_value(&event))
+                        />
+                    </label>
+                </div>
+                <div class="actions">
+                    <button class="primary" type="button" on:click=calculate_preview disabled=move || busy.get()>
+                        {move || strings(locale.get()).calculate_preview}
+                    </button>
+                </div>
+                {move || match preview.get() {
+                    Some(value) => {
+                        let distance = value.distance_m.map(|distance| distance / 1000.0);
+                        let duration = value.duration_s.map(|seconds| seconds / 60.0);
+                        let warnings = value
+                            .warnings
+                            .iter()
+                            .map(|warning| warning_label(warning, locale.get()))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        view! {
+                            <div class="preview-summary">
+                                {distance.map(|value| view! {
+                                    <span><strong>{move || strings(locale.get()).distance_km}</strong>{format!(": {value:.1}")}</span>
+                                })}
+                                {duration.map(|value| view! {
+                                    <span><strong>{move || strings(locale.get()).duration_min}</strong>{format!(": {value:.0}")}</span>
+                                })}
+                                {(!warnings.is_empty()).then(|| view! {
+                                    <span><strong>{move || strings(locale.get()).warnings}</strong>{format!(": {warnings}")}</span>
+                                })}
+                            </div>
+                        }.into_any()
+                    }
+                    None => view! { <span></span> }.into_any(),
+                }}
             </section>
 
             <section>
