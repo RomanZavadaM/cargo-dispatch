@@ -12,7 +12,7 @@ El lenguaje principal de desarrollo es **Rust**.
 
 ## Funciones ya disponibles
 
-- aplicación de escritorio **Control** separada basada en Tauri/Leptos;
+- aplicación de escritorio **Control** separada basada en Tauri/Leptos; Control puede importar un ZIP de Planner o crear manualmente un nuevo viaje activo sin ZIP de Planner usando el mismo estado persistente del viaje;
 - una aplicación desktop **Planner** separada basada en Tauri/Leptos: borrador manual de ruta, añadir/eliminar/reordenar puntos, coordenadas de navegación y revisión gestionada por Planner core; el borrador se guarda en un journal append-only versionado dentro de los datos de la aplicación y se recupera tras reiniciar;
 - almacenamiento local persistente del viaje activo y recuperación tras reinicio;
 - paquete de viaje versionado entre Planner y Control;
@@ -75,7 +75,7 @@ El release contiene:
 - Linux Addressing Gateway x64 package;
 - SHA256SUMS.
 
-El primer slice de Planner permite trabajar con un borrador manual de ruta y editar puntos. En preview.7, el borrador de Planner todavía no se conserva entre reinicios; ese es el siguiente paso.
+preview.7 fue la primera versión con un Planner compilado separado. El main actual ya está mucho más avanzado: borrador Planner persistente, vista previa vial real con Valhalla, exportación ZIP schema 1.4 y creación manual de un viaje activo en Control llegarán en el siguiente preview.
 
 ## Stable v0.1.0
 
