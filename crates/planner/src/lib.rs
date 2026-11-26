@@ -755,7 +755,7 @@ pub fn transition_working_route(
     Ok(transitioned)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PlannerTripExportDraft {
     pub header: TripPackageHeader,
     pub working_route_id: WorkingRouteId,
@@ -763,15 +763,37 @@ pub struct PlannerTripExportDraft {
     pub created_at_unix_ms: u64,
     pub created_by: OperatorId,
     pub ordered_point_ids: Vec<PointId>,
+    pub routing_profile: Option<VehicleRoutingProfile>,
     pub route_geometry: Option<TripRoadGeometry>,
 }
 
 impl PlannerTripExportDraft {
+    pub fn with_routing_profile(
+        mut self,
+        profile: VehicleRoutingProfile,
+    ) -> Result<Self, PlannerExportError> {
+        profile
+            .validate()
+            .map_err(|_| PlannerExportError::InvalidRoutingProfile)?;
+        if self.route_geometry.as_ref().is_some_and(|geometry| {
+            geometry.routing.profile_fingerprint != profile.profile_fingerprint()
+        }) {
+            return Err(PlannerExportError::RoutingProfileMismatch);
+        }
+        self.routing_profile = Some(profile);
+        Ok(self)
+    }
+
     pub fn with_route_geometry(
         mut self,
         geometry: TripRoadGeometry,
     ) -> Result<Self, PlannerExportError> {
         validate_trip_road_geometry(&geometry).map_err(PlannerExportError::InvalidGeometry)?;
+        if self.routing_profile.as_ref().is_some_and(|profile| {
+            geometry.routing.profile_fingerprint != profile.profile_fingerprint()
+        }) {
+            return Err(PlannerExportError::RoutingProfileMismatch);
+        }
         self.route_geometry = Some(geometry);
         Ok(self)
     }
@@ -810,6 +832,8 @@ pub enum PlannerExportError {
     DuplicatePoint(PointId),
     Contract(ContractError),
     InvalidGeometry(TripGeometryContractError),
+    InvalidRoutingProfile,
+    RoutingProfileMismatch,
     RouteGeometryUnavailable,
 }
 
@@ -842,6 +866,7 @@ pub fn build_trip_export_draft(
         created_at_unix_ms,
         created_by,
         ordered_point_ids: route.points.iter().map(|point| point.point_id).collect(),
+        routing_profile: None,
         route_geometry: None,
     })
 }

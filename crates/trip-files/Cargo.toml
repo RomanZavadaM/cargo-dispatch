@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 cargo-dispatch-contracts = { path = "../contracts" }
 cargo-dispatch-domain = { path = "../domain" }
+cargo-dispatch-geo = { path = "../geo" }
 cargo-dispatch-control = { path = "../control" }
 cargo-dispatch-planner = { path = "../planner" }
 serde = { version = "1", features = ["derive"] }

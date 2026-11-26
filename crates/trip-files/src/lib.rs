@@ -7,9 +7,11 @@ use cargo_dispatch_contracts::{
     validate_trip_road_geometry,
 };
 use cargo_dispatch_control::{
-    InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft, StoredTripPlan, TripImportCandidate,
+    ImportResult, InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft,
+    RouteGeometryUpdateError, StoredTripPlan, TripImportCandidate,
 };
 use cargo_dispatch_domain::{DocumentId, PointId, TripId};
+use cargo_dispatch_geo::VehicleRoutingProfile;
 use cargo_dispatch_planner::PlannerTripExportDraft;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -560,10 +562,27 @@ struct Manifest {
     operator: [u8; 16],
     points: Vec<Point>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    routing_profile: Option<VehicleRoutingProfile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     road_geometry: Option<RoadGeometryFile>,
 }
 
 impl Manifest {
+    fn validated_routing_profile(&self) -> io::Result<Option<VehicleRoutingProfile>> {
+        let Some(profile) = self.routing_profile.clone() else {
+            return Ok(None);
+        };
+        profile.validate().map_err(invalid)?;
+        if let Some(geometry) = &self.road_geometry
+            && geometry.routing.profile_fingerprint != profile.profile_fingerprint()
+        {
+            return Err(invalid(
+                "routing profile does not match geometry fingerprint",
+            ));
+        }
+        Ok(Some(profile))
+    }
+
     fn candidate(&self) -> io::Result<TripImportCandidate> {
         if self.schema != TRIP_PACKAGE_SCHEMA_NAME
             || self.schema_version[0] != CURRENT_SCHEMA_VERSION.major
@@ -586,6 +605,7 @@ impl Manifest {
         );
         let route_points = points(&self.points)?;
         validate_route_points(&route_points).map_err(invalid)?;
+        self.validated_routing_profile()?;
         let route_geometry = self.road_geometry.as_ref().map(TripRoadGeometry::from);
         if let Some(geometry) = &route_geometry {
             validate_trip_road_geometry(geometry).map_err(invalid)?;
@@ -630,6 +650,9 @@ pub fn export_package(
         return Err(invalid("route differs from Planner export"));
     }
     let h = &draft.header;
+    if draft.routing_profile.is_some() && h.schema_version.minor < 3 {
+        return Err(invalid("routing profile requires trip package schema 1.3"));
+    }
     let manifest = Manifest {
         schema: h.schema_name.clone(),
         schema_version: [h.schema_version.major, h.schema_version.minor],
@@ -641,6 +664,7 @@ pub fn export_package(
         created_at_unix_ms: draft.created_at_unix_ms,
         operator: draft.created_by.as_bytes(),
         points: route.iter().map(Point::from).collect(),
+        routing_profile: draft.routing_profile.clone(),
         road_geometry: draft.route_geometry.as_ref().map(RoadGeometryFile::from),
     };
     manifest.candidate()?;
@@ -684,16 +708,21 @@ fn read_package(path: &Path) -> io::Result<Manifest> {
 
 #[derive(Debug, Serialize, Deserialize)]
 enum Change {
-    Import(Manifest),
+    Import(Box<Manifest>),
     Complete([u8; 16]),
     OperatorEdit(Vec<Point>),
     DriverOrder(Vec<[u8; 16]>),
+    RouteGeometry {
+        local_route_revision: u64,
+        geometry: RoadGeometryFile,
+    },
     DocumentStored(DocumentEntry),
     DriverLocation(DriverLocationSample),
 }
 
 fn apply(
     reg: &mut InMemoryTripRegistry,
+    routing_profile: &mut Option<VehicleRoutingProfile>,
     documents: &mut std::collections::BTreeMap<DocumentId, StoredDocument>,
     locations: &mut Vec<DriverLocationSample>,
     trip: TripId,
@@ -704,7 +733,16 @@ fn apply(
             if m.trip != trip.as_bytes() {
                 return Err(invalid("different trip"));
             }
-            reg.import(m.candidate()?).map_err(invalid)?;
+            let incoming_profile = m.validated_routing_profile()?;
+            let result = reg.import(m.candidate()?).map_err(invalid)?;
+            if matches!(
+                result,
+                ImportResult::AppliedFirstVersion
+                    | ImportResult::AppliedNewerVersion { .. }
+                    | ImportResult::IdempotentSameVersion
+            ) {
+                *routing_profile = incoming_profile;
+            }
         }
         Change::Complete(id) => {
             reg.mark_point_completed(trip, PointId::from_bytes(*id).map_err(invalid)?)
@@ -741,6 +779,22 @@ fn apply(
             }
             reg.edit_active_route(&current, proposed).map_err(invalid)?;
         }
+        Change::RouteGeometry {
+            local_route_revision,
+            geometry,
+        } => {
+            let current = reg.get(trip).ok_or_else(|| invalid("missing trip"))?;
+            if current.local_route_revision != *local_route_revision {
+                return Err(invalid("stale route geometry revision"));
+            }
+            let geometry = TripRoadGeometry::from(geometry);
+            reg.update_route_geometry(&current, geometry)
+                .map_err(|error| match error {
+                    RouteGeometryUpdateError::TripNotFound => invalid("missing trip"),
+                    RouteGeometryUpdateError::StaleView => invalid("stale route geometry state"),
+                    RouteGeometryUpdateError::InvalidGeometry(error) => invalid(error),
+                })?;
+        }
         Change::DocumentStored(entry) => {
             let document = entry.record()?;
             match documents.get(&document.document_id) {
@@ -767,6 +821,7 @@ pub struct TripFolder {
     cursor: u64,
     plan_version_count: u64,
     registry: InMemoryTripRegistry,
+    routing_profile: Option<VehicleRoutingProfile>,
     documents: std::collections::BTreeMap<DocumentId, StoredDocument>,
     locations: Vec<DriverLocationSample>,
 }
@@ -787,6 +842,7 @@ impl TripFolder {
             cursor: 0,
             plan_version_count: 0,
             registry: InMemoryTripRegistry::default(),
+            routing_profile: None,
             documents: std::collections::BTreeMap::new(),
             locations: Vec::new(),
         };
@@ -799,6 +855,7 @@ impl TripFolder {
             let is_import = matches!(&event, Change::Import(_));
             apply(
                 &mut this.registry,
+                &mut this.routing_profile,
                 &mut this.documents,
                 &mut this.locations,
                 trip,
@@ -849,7 +906,7 @@ impl TripFolder {
         let trip = plan.candidate()?.header.trip_id;
         fs::create_dir_all(path)?;
         let mut this = Self::load(path, trip)?;
-        this.record(Change::Import(plan))?;
+        this.record(Change::Import(Box::new(plan)))?;
         Ok(this)
     }
 
@@ -857,6 +914,11 @@ impl TripFolder {
         self.registry
             .get(self.trip)
             .expect("folder contains imported trip")
+    }
+
+    #[must_use]
+    pub fn routing_profile(&self) -> Option<&VehicleRoutingProfile> {
+        self.routing_profile.as_ref()
     }
 
     #[must_use]
@@ -946,11 +1008,13 @@ impl TripFolder {
             return Err(invalid("trip changed; reopen folder"));
         }
         let mut updated = self.registry.clone();
+        let mut updated_routing_profile = self.routing_profile.clone();
         let mut updated_documents = self.documents.clone();
         let mut updated_locations = self.locations.clone();
         let is_import = matches!(&event, Change::Import(_));
         apply(
             &mut updated,
+            &mut updated_routing_profile,
             &mut updated_documents,
             &mut updated_locations,
             self.trip,
@@ -958,6 +1022,7 @@ impl TripFolder {
         )?;
         let registry_changed = updated.get(self.trip) != self.registry.get(self.trip);
         if !registry_changed
+            && updated_routing_profile == self.routing_profile
             && updated_documents == self.documents
             && updated_locations == self.locations
         {
@@ -971,6 +1036,7 @@ impl TripFolder {
         file.write_all(&bytes)?;
         publish(file, &path)?;
         self.registry = updated;
+        self.routing_profile = updated_routing_profile;
         self.documents = updated_documents;
         self.locations = updated_locations;
         if is_import && registry_changed {
@@ -1004,6 +1070,21 @@ impl TripFolder {
         self.record(Change::DriverOrder(
             order.iter().map(|p| p.as_bytes()).collect(),
         ))
+    }
+
+    pub fn set_route_geometry(
+        &mut self,
+        displayed: &StoredTripPlan,
+        geometry: &TripRoadGeometry,
+    ) -> io::Result<()> {
+        if self.state() != *displayed {
+            return Err(invalid("stale route geometry state"));
+        }
+        validate_trip_road_geometry(geometry).map_err(invalid)?;
+        self.record(Change::RouteGeometry {
+            local_route_revision: displayed.local_route_revision,
+            geometry: RoadGeometryFile::from(geometry),
+        })
     }
 
     pub fn record_location(&mut self, sample: DriverLocationSample) -> io::Result<()> {
@@ -1189,9 +1270,10 @@ pub fn verify_archive(path: &Path, trip: TripId) -> io::Result<ExecutionSummary>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cargo_dispatch_contracts::{ReplanReasonCode, ReplanRequest};
+    use cargo_dispatch_contracts::{ReplanReasonCode, ReplanRequest, SchemaVersion};
     use cargo_dispatch_control::ReplanRequestDraft;
     use cargo_dispatch_domain::{OperatorId, ReplanRequestId, WorkingRouteId};
+    use cargo_dispatch_geo::{TollPreference, VehicleRoutingProfile};
     use cargo_dispatch_planner::{
         InMemoryTripExportHistory, PlannerTripExportRecord, WorkingRouteState,
         apply_planner_replan, build_trip_export_draft, manual_working_route,
@@ -1224,6 +1306,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            routing_profile: None,
             route_geometry: None,
         };
         export_package(path, &draft, &route)?;
@@ -1255,6 +1338,7 @@ mod tests {
             created_at_unix_ms: 1,
             operator: OperatorId::from_bytes([4; 16]).unwrap().as_bytes(),
             points: vec![decoded],
+            routing_profile: None,
             road_geometry: None,
         };
         let candidate = manifest.candidate()?;
@@ -1286,13 +1370,16 @@ mod tests {
                 navigation: None,
             },
         ];
+        let mut header = TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap();
+        header.schema_version = SchemaVersion::new(1, 2);
         let draft = PlannerTripExportDraft {
-            header: TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap(),
+            header,
             working_route_id: WorkingRouteId::from_bytes([34; 16]).unwrap(),
             working_route_revision: 1,
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([35; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            routing_profile: None,
             route_geometry: Some(TripRoadGeometry {
                 routing: TripRoutingIdentity {
                     engine: "valhalla".to_owned(),
@@ -1327,6 +1414,119 @@ mod tests {
         Ok(())
     }
 
+    fn routing_profile_fixture() -> VehicleRoutingProfile {
+        VehicleRoutingProfile {
+            height_m: None,
+            width_m: Some(2.45),
+            length_m: Some(12.0),
+            gross_weight_t: Some(18.0),
+            axle_load_t: None,
+            axle_count: Some(2),
+            hazmat: false,
+            hgv: true,
+            exclude_unpaved: true,
+            prefer_truck_routes: true,
+            toll_preference: TollPreference::Allow,
+            max_speed_kmh: None,
+        }
+    }
+
+    #[test]
+    fn schema_1_3_roundtrips_actual_routing_profile() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package = tmp.path().join("profile.zip");
+        let folder = tmp.path().join("profile-trip");
+        let trip = TripId::from_bytes([41; 16]).unwrap();
+        let route = vec![
+            TripRoutePoint {
+                point_id: PointId::from_bytes([42; 16]).unwrap(),
+                sequence: 1,
+                kind: TripPointKind::Load,
+                title: "A".to_owned(),
+                navigation: Some(TripNavigationTarget {
+                    latitude_e7: 498_393_000,
+                    longitude_e7: 240_296_000,
+                    address: None,
+                }),
+            },
+            TripRoutePoint {
+                point_id: PointId::from_bytes([43; 16]).unwrap(),
+                sequence: 2,
+                kind: TripPointKind::Unload,
+                title: "B".to_owned(),
+                navigation: Some(TripNavigationTarget {
+                    latitude_e7: 498_430_000,
+                    longitude_e7: 240_360_000,
+                    address: None,
+                }),
+            },
+        ];
+        let profile = routing_profile_fixture();
+        let draft = PlannerTripExportDraft {
+            header: TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap(),
+            working_route_id: WorkingRouteId::from_bytes([44; 16]).unwrap(),
+            working_route_revision: 1,
+            created_at_unix_ms: 1,
+            created_by: OperatorId::from_bytes([45; 16]).unwrap(),
+            ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
+            routing_profile: Some(profile.clone()),
+            route_geometry: None,
+        };
+
+        export_package(&package, &draft, &route)?;
+        let imported = TripFolder::import(&folder, &package)?;
+        assert_eq!(imported.routing_profile(), Some(&profile));
+        drop(imported);
+        let reopened = TripFolder::open(&folder, trip)?;
+        assert_eq!(reopened.routing_profile(), Some(&profile));
+        Ok(())
+    }
+
+    #[test]
+    fn reroute_geometry_is_durable_and_rejects_stale_revision() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package = tmp.path().join("reroute.zip");
+        let folder = tmp.path().join("reroute-trip");
+        let (trip, route) = create_test_package(&package, 51, 52)?;
+        let mut control = TripFolder::import(&folder, &package)?;
+        let before = control.state();
+        control.driver_order(&before, &[route[1].point_id, route[0].point_id])?;
+        let reordered = control.state();
+        assert_eq!(reordered.local_route_revision, 1);
+        assert!(reordered.route_geometry.is_none());
+
+        let geometry = TripRoadGeometry {
+            routing: TripRoutingIdentity {
+                engine: "valhalla".to_owned(),
+                engine_version: "3.9.2".to_owned(),
+                map_dataset_id: "fixture".to_owned(),
+                profile_fingerprint: "profile".to_owned(),
+            },
+            points: vec![
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_430_000,
+                    longitude_e7: 240_360_000,
+                },
+                TripRoadGeometryPoint {
+                    latitude_e7: 498_393_000,
+                    longitude_e7: 240_296_000,
+                },
+            ],
+        };
+        control.set_route_geometry(&reordered, &geometry)?;
+        assert_eq!(control.state().route_geometry, Some(geometry.clone()));
+        drop(control);
+
+        let mut reopened = TripFolder::open(&folder, trip)?;
+        assert_eq!(reopened.state().route_geometry, Some(geometry.clone()));
+        let shown = reopened.state();
+        reopened.driver_order(&shown, &[route[0].point_id, route[1].point_id])?;
+        assert!(reopened.state().route_geometry.is_none());
+        assert!(reopened.set_route_geometry(&reordered, &geometry).is_err());
+        assert!(reopened.state().route_geometry.is_none());
+        Ok(())
+    }
+
     #[test]
     fn independent_control_recovers_driver_changes() -> io::Result<()> {
         let tmp = tempfile::tempdir()?;
@@ -1349,6 +1549,7 @@ mod tests {
             created_at_unix_ms: 1,
             created_by: OperatorId::from_bytes([3; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|p| p.point_id).collect(),
+            routing_profile: None,
             route_geometry: None,
         };
         export_package(&package, &draft, &route)?;
