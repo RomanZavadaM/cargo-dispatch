@@ -189,9 +189,7 @@ impl ValhallaHttpClient {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(ToOwned::to_owned);
-        let tileset_last_modified = parsed
-            .get("tileset_last_modified")
-            .and_then(Value::as_u64);
+        let tileset_last_modified = parsed.get("tileset_last_modified").and_then(Value::as_u64);
 
         let status = if engine_version.is_none() {
             NormalizedStatus::EngineError
@@ -208,23 +206,27 @@ impl ValhallaHttpClient {
         })
     }
 
-    pub async fn route(
-        &self,
-        request: &RouteRequest,
-    ) -> Result<RouteResult, ValhallaHttpError> {
+    pub async fn route(&self, request: &RouteRequest) -> Result<RouteResult, ValhallaHttpError> {
         let availability = self.availability().await?;
         if !availability.is_available() {
             return Err(ValhallaHttpError::Unavailable(availability.status));
         }
 
-        let engine_version = availability
-            .engine_version
-            .as_deref()
-            .ok_or(ValhallaHttpError::Unavailable(
-                NormalizedStatus::EngineError,
-            ))?;
+        let engine_version =
+            availability
+                .engine_version
+                .as_deref()
+                .ok_or(ValhallaHttpError::Unavailable(
+                    NormalizedStatus::EngineError,
+                ))?;
         let url = self.config.endpoint(ROUTE_ENDPOINT)?;
-        let response = match self.http.post(url).json(&route_payload(request)).send().await {
+        let response = match self
+            .http
+            .post(url)
+            .json(&route_payload(request))
+            .send()
+            .await
+        {
             Ok(response) => response,
             Err(error) => {
                 return self.transport_result(request, engine_version, transport_status(&error));
@@ -294,9 +296,13 @@ impl fmt::Display for ValhallaHttpError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidConfig(message) => formatter.write_str(message),
-            Self::ClientBuild(error) => write!(formatter, "cannot build Valhalla HTTP client: {error}"),
+            Self::ClientBuild(error) => {
+                write!(formatter, "cannot build Valhalla HTTP client: {error}")
+            }
             Self::Unavailable(status) => write!(formatter, "Valhalla is unavailable: {status:?}"),
-            Self::GeoContract(error) => write!(formatter, "Valhalla route contract failed: {error}"),
+            Self::GeoContract(error) => {
+                write!(formatter, "Valhalla route contract failed: {error}")
+            }
         }
     }
 }
@@ -381,9 +387,7 @@ mod tests {
     async fn route_ok(Json(payload): Json<Value>) -> Json<Value> {
         assert_eq!(payload["costing"], "truck");
         assert!(
-            payload["costing_options"]["truck"]
-                .get("height")
-                .is_none(),
+            payload["costing_options"]["truck"].get("height").is_none(),
             "missing vehicle dimensions must not be invented"
         );
         assert_eq!(payload["costing_options"]["truck"]["width"], 2.4);
@@ -401,41 +405,51 @@ mod tests {
 
     #[test]
     fn runtime_config_rejects_ambiguous_or_unsafe_values() {
-        assert!(ValhallaRuntimeConfig::new(
-            "file:///tmp/valhalla",
-            "dataset",
-            Duration::from_secs(1),
-            Duration::from_secs(5)
-        )
-        .is_err());
-        assert!(ValhallaRuntimeConfig::new(
-            "https://user:pass@example.test",
-            "dataset",
-            Duration::from_secs(1),
-            Duration::from_secs(5)
-        )
-        .is_err());
-        assert!(ValhallaRuntimeConfig::new(
-            "https://example.test?x=1",
-            "dataset",
-            Duration::from_secs(1),
-            Duration::from_secs(5)
-        )
-        .is_err());
-        assert!(ValhallaRuntimeConfig::new(
-            "https://example.test",
-            "   ",
-            Duration::from_secs(1),
-            Duration::from_secs(5)
-        )
-        .is_err());
-        assert!(ValhallaRuntimeConfig::new(
-            "https://example.test",
-            "dataset",
-            Duration::ZERO,
-            Duration::from_secs(5)
-        )
-        .is_err());
+        assert!(
+            ValhallaRuntimeConfig::new(
+                "file:///tmp/valhalla",
+                "dataset",
+                Duration::from_secs(1),
+                Duration::from_secs(5)
+            )
+            .is_err()
+        );
+        assert!(
+            ValhallaRuntimeConfig::new(
+                "https://user:pass@example.test",
+                "dataset",
+                Duration::from_secs(1),
+                Duration::from_secs(5)
+            )
+            .is_err()
+        );
+        assert!(
+            ValhallaRuntimeConfig::new(
+                "https://example.test?x=1",
+                "dataset",
+                Duration::from_secs(1),
+                Duration::from_secs(5)
+            )
+            .is_err()
+        );
+        assert!(
+            ValhallaRuntimeConfig::new(
+                "https://example.test",
+                "   ",
+                Duration::from_secs(1),
+                Duration::from_secs(5)
+            )
+            .is_err()
+        );
+        assert!(
+            ValhallaRuntimeConfig::new(
+                "https://example.test",
+                "dataset",
+                Duration::ZERO,
+                Duration::from_secs(5)
+            )
+            .is_err()
+        );
     }
 
     #[tokio::test]
@@ -444,25 +458,19 @@ mod tests {
             .route("/status", get(status_ok))
             .route("/route", post(route_ok));
         let (base_url, server) = spawn(app).await;
-        let client = ValhallaHttpClient::new(config(&base_url, Duration::from_secs(2)))
-            .expect("client");
+        let client =
+            ValhallaHttpClient::new(config(&base_url, Duration::from_secs(2))).expect("client");
 
         let availability = client.availability().await.expect("availability");
         assert!(availability.is_available());
         assert_eq!(availability.engine_version.as_deref(), Some("3.9.2"));
-        assert_eq!(
-            availability.tileset_last_modified,
-            Some(1_795_550_000_u64)
-        );
+        assert_eq!(availability.tileset_last_modified, Some(1_795_550_000_u64));
 
         let result = client.route(&request()).await.expect("route");
         assert_eq!(result.status, NormalizedStatus::Ok);
         assert_eq!(result.identity.engine(), "valhalla");
         assert_eq!(result.identity.engine_version(), "3.9.2");
-        assert_eq!(
-            result.identity.map_dataset_id(),
-            "fixture-europe-2026-11"
-        );
+        assert_eq!(result.identity.map_dataset_id(), "fixture-europe-2026-11");
         assert_eq!(result.distance_m, Some(2750.0));
         assert_eq!(result.duration_s, Some(240.0));
         assert_eq!(result.geometry.len(), 3);
@@ -485,8 +493,8 @@ mod tests {
     async fn status_without_tiles_is_dataset_missing() {
         let app = Router::new().route("/status", get(status_without_tiles));
         let (base_url, server) = spawn(app).await;
-        let client = ValhallaHttpClient::new(config(&base_url, Duration::from_secs(2)))
-            .expect("client");
+        let client =
+            ValhallaHttpClient::new(config(&base_url, Duration::from_secs(2))).expect("client");
 
         let availability = client.availability().await.expect("availability");
         assert_eq!(availability.status, NormalizedStatus::DatasetMissing);
@@ -504,8 +512,8 @@ mod tests {
     async fn status_timeout_is_reported_without_external_network() {
         let app = Router::new().route("/status", get(status_slow));
         let (base_url, server) = spawn(app).await;
-        let client = ValhallaHttpClient::new(config(&base_url, Duration::from_millis(25)))
-            .expect("client");
+        let client =
+            ValhallaHttpClient::new(config(&base_url, Duration::from_millis(25))).expect("client");
 
         let availability = client.availability().await.expect("availability");
         assert_eq!(availability.status, NormalizedStatus::Timeout);
@@ -530,8 +538,8 @@ mod tests {
             .route("/status", get(status_ok))
             .route("/route", post(route_slow));
         let (base_url, server) = spawn(app).await;
-        let client = ValhallaHttpClient::new(config(&base_url, Duration::from_millis(25)))
-            .expect("client");
+        let client =
+            ValhallaHttpClient::new(config(&base_url, Duration::from_millis(25))).expect("client");
 
         let result = client.route(&request()).await.expect("normalized timeout");
         assert_eq!(result.status, NormalizedStatus::Timeout);
@@ -557,14 +565,11 @@ mod tests {
 
         let app = Router::new().route("/status", get(unavailable));
         let (base_url, server) = spawn(app).await;
-        let client = ValhallaHttpClient::new(config(&base_url, Duration::from_secs(2)))
-            .expect("client");
+        let client =
+            ValhallaHttpClient::new(config(&base_url, Duration::from_secs(2))).expect("client");
 
         let availability = client.availability().await.expect("availability");
-        assert_eq!(
-            availability.status,
-            NormalizedStatus::EngineUnavailable
-        );
+        assert_eq!(availability.status, NormalizedStatus::EngineUnavailable);
 
         server.abort();
     }
