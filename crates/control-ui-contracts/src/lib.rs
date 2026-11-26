@@ -78,8 +78,23 @@ pub struct ListenerStatus {
 pub struct SessionStatus {
     pub trip_id: String,
     pub token: String,
+    pub display_name: String,
+    pub endpoint_id: Option<String>,
+    pub endpoint_label: Option<String>,
+    pub vehicle_label: Option<String>,
+    pub vehicle_type: Option<String>,
     pub driver_url: Option<String>,
     pub public_driver_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UpdateSessionMetadataInput {
+    pub token: String,
+    pub display_name: String,
+    pub endpoint_id: Option<String>,
+    pub endpoint_label: Option<String>,
+    pub vehicle_label: Option<String>,
+    pub vehicle_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
