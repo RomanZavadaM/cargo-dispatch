@@ -1,11 +1,13 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_domain::{PointId, WorkingRouteId};
+use cargo_dispatch_geo::{TollPreference, VehicleRoutingProfile};
 use cargo_dispatch_planner::{
     WorkingRoute, WorkingRouteState, edit_manual_working_route, manual_working_route,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    PlannerPointInput, PlannerPointView, PlannerRouteView, PointActionInput, ReorderPointsInput,
+    PlannerPointInput, PlannerPointView, PlannerRouteView, PlannerVehicleProfileInput,
+    PlannerVehicleProfileView, PointActionInput, ReorderPointsInput,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -32,6 +34,7 @@ struct ManualPoint {
 struct PlannerState {
     route: WorkingRoute,
     points: BTreeMap<PointId, ManualPoint>,
+    vehicle_profile: Option<VehicleRoutingProfile>,
     next_serial: u64,
 }
 
@@ -40,6 +43,7 @@ impl Default for PlannerState {
         Self {
             route: manual_working_route(route_id(1), &[]).expect("empty manual route is valid"),
             points: BTreeMap::new(),
+            vehicle_profile: None,
             next_serial: 2,
         }
     }
@@ -62,6 +66,9 @@ enum PlannerDraftEvent {
     },
     ReorderPoints {
         point_ids: Vec<[u8; 16]>,
+    },
+    SetVehicleProfile {
+        profile: PlannerVehicleProfileInput,
     },
 }
 
@@ -204,6 +211,21 @@ impl PlannerDesktopService {
             },
         )
     }
+
+    fn set_vehicle_profile(
+        &self,
+        input: PlannerVehicleProfileInput,
+    ) -> Result<PlannerRouteView, String> {
+        profile_from_input(&input)?;
+        let mut state = self
+            .inner
+            .lock()
+            .map_err(|_| "Planner state unavailable".to_owned())?;
+        self.commit_event(
+            &mut state,
+            PlannerDraftEvent::SetVehicleProfile { profile: input },
+        )
+    }
 }
 
 fn recover_journal(path: &Path) -> Result<PlannerState, String> {
@@ -252,6 +274,7 @@ fn apply_event(state: &mut PlannerState, event: &PlannerDraftEvent) -> Result<()
             state.route = manual_working_route(route_id(*route_serial), &[])
                 .map_err(|error| format!("Could not recover manual route: {error:?}"))?;
             state.points.clear();
+            state.vehicle_profile = None;
         }
         PlannerDraftEvent::AddPoint {
             point_serial,
@@ -326,8 +349,110 @@ fn apply_event(state: &mut PlannerState, event: &PlannerDraftEvent) -> Result<()
             state.route = edit_manual_working_route(&state.route, &order)
                 .map_err(|error| format!("Planner rejected recovered point order: {error:?}"))?;
         }
+        PlannerDraftEvent::SetVehicleProfile { profile } => {
+            state.vehicle_profile = Some(profile_from_input(profile)?);
+        }
     }
     Ok(())
+}
+
+fn toll_preference(value: &str) -> Result<TollPreference, String> {
+    match value {
+        "allow" => Ok(TollPreference::Allow),
+        "prefer_avoid" => Ok(TollPreference::PreferAvoid),
+        "avoid" => Ok(TollPreference::Avoid),
+        _ => Err("Потрібно явно вибрати ставлення до платних доріг".to_owned()),
+    }
+}
+
+fn profile_from_input(input: &PlannerVehicleProfileInput) -> Result<VehicleRoutingProfile, String> {
+    let hazmat = input
+        .hazmat
+        .ok_or_else(|| "Потрібно явно вказати, чи є небезпечний вантаж".to_owned())?;
+    let hgv = input
+        .hgv
+        .ok_or_else(|| "Потрібно явно вказати, чи це вантажний автомобіль".to_owned())?;
+    let exclude_unpaved = input
+        .exclude_unpaved
+        .ok_or_else(|| "Потрібно явно вказати ставлення до ґрунтових доріг".to_owned())?;
+    let prefer_truck_routes = input
+        .prefer_truck_routes
+        .ok_or_else(|| "Потрібно явно вказати пріоритет вантажних доріг".to_owned())?;
+    let toll_preference = input
+        .toll_preference
+        .as_deref()
+        .ok_or_else(|| "Потрібно явно вибрати ставлення до платних доріг".to_owned())
+        .and_then(toll_preference)?;
+
+    let profile = VehicleRoutingProfile {
+        height_m: input.height_m,
+        width_m: input.width_m,
+        length_m: input.length_m,
+        gross_weight_t: input.gross_weight_t,
+        axle_load_t: input.axle_load_t,
+        axle_count: input.axle_count,
+        hazmat,
+        hgv,
+        exclude_unpaved,
+        prefer_truck_routes,
+        toll_preference,
+        max_speed_kmh: input.max_speed_kmh,
+    };
+    profile
+        .validate()
+        .map_err(|error| format!("Некоректний профіль авто: {error}"))?;
+    Ok(profile)
+}
+
+fn profile_view(profile: &VehicleRoutingProfile) -> PlannerVehicleProfileView {
+    let warnings = profile
+        .warnings()
+        .into_iter()
+        .map(|warning| match warning {
+            cargo_dispatch_geo::GeoWarning::MissingVehicleDimension(
+                cargo_dispatch_geo::VehicleDimension::Height,
+            ) => "height_m",
+            cargo_dispatch_geo::GeoWarning::MissingVehicleDimension(
+                cargo_dispatch_geo::VehicleDimension::Width,
+            ) => "width_m",
+            cargo_dispatch_geo::GeoWarning::MissingVehicleDimension(
+                cargo_dispatch_geo::VehicleDimension::Length,
+            ) => "length_m",
+            cargo_dispatch_geo::GeoWarning::MissingVehicleDimension(
+                cargo_dispatch_geo::VehicleDimension::GrossWeight,
+            ) => "gross_weight_t",
+            cargo_dispatch_geo::GeoWarning::MissingVehicleDimension(
+                cargo_dispatch_geo::VehicleDimension::AxleLoad,
+            ) => "axle_load_t",
+            cargo_dispatch_geo::GeoWarning::MissingVehicleDimension(
+                cargo_dispatch_geo::VehicleDimension::AxleCount,
+            ) => "axle_count",
+            cargo_dispatch_geo::GeoWarning::ApproximateEstimate => "approximate_estimate",
+        })
+        .map(str::to_owned)
+        .collect();
+
+    PlannerVehicleProfileView {
+        height_m: profile.height_m,
+        width_m: profile.width_m,
+        length_m: profile.length_m,
+        gross_weight_t: profile.gross_weight_t,
+        axle_load_t: profile.axle_load_t,
+        axle_count: profile.axle_count,
+        hazmat: profile.hazmat,
+        hgv: profile.hgv,
+        exclude_unpaved: profile.exclude_unpaved,
+        prefer_truck_routes: profile.prefer_truck_routes,
+        toll_preference: match profile.toll_preference {
+            TollPreference::Allow => "allow",
+            TollPreference::PreferAvoid => "prefer_avoid",
+            TollPreference::Avoid => "avoid",
+        }
+        .to_owned(),
+        max_speed_kmh: profile.max_speed_kmh,
+        fingerprint: profile.profile_fingerprint(),
+        warnings,
+    }
 }
 
 fn consume_serial(state: &mut PlannerState, serial: u64) -> Result<(), String> {
@@ -417,6 +542,7 @@ fn route_view(state: &PlannerState) -> Result<PlannerRouteView, String> {
         revision: state.route.current_revision,
         state: state_name.to_owned(),
         points,
+        vehicle_profile: state.vehicle_profile.as_ref().map(profile_view),
     })
 }
 
@@ -456,6 +582,14 @@ fn planner_reorder_points(
     state.reorder(input)
 }
 
+#[tauri::command]
+fn planner_set_vehicle_profile(
+    input: PlannerVehicleProfileInput,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<PlannerRouteView, String> {
+    state.set_vehicle_profile(input)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -471,7 +605,8 @@ pub fn run() {
             planner_reset_route,
             planner_add_point,
             planner_remove_point,
-            planner_reorder_points
+            planner_reorder_points,
+            planner_set_vehicle_profile
         ])
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");
@@ -557,6 +692,64 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["C", "B"]
         );
+    }
+
+    fn profile_input() -> PlannerVehicleProfileInput {
+        PlannerVehicleProfileInput {
+            height_m: None,
+            width_m: Some(2.45),
+            length_m: None,
+            gross_weight_t: Some(12.0),
+            axle_load_t: None,
+            axle_count: Some(2),
+            hazmat: Some(false),
+            hgv: Some(true),
+            exclude_unpaved: Some(true),
+            prefer_truck_routes: Some(true),
+            toll_preference: Some("prefer_avoid".to_owned()),
+            max_speed_kmh: None,
+        }
+    }
+
+    #[test]
+    fn vehicle_profile_requires_explicit_non_numeric_choices() {
+        let service = PlannerDesktopService::default();
+        let mut input = profile_input();
+        input.hazmat = None;
+        assert!(service.set_vehicle_profile(input).is_err());
+        assert!(service.status().expect("status").vehicle_profile.is_none());
+
+        let configured = service
+            .set_vehicle_profile(profile_input())
+            .expect("configured profile");
+        let profile = configured.vehicle_profile.expect("profile");
+        assert_eq!(profile.width_m, Some(2.45));
+        assert_eq!(profile.hazmat, false);
+        assert_eq!(profile.hgv, true);
+        assert_eq!(profile.toll_preference, "prefer_avoid");
+        assert!(profile.warnings.contains(&"height_m".to_owned()));
+    }
+
+    #[test]
+    fn vehicle_profile_is_recovered_from_journal() {
+        let path = unique_journal("profile-recovery");
+        let service = PlannerDesktopService::open(path.clone()).expect("open journal");
+        service
+            .set_vehicle_profile(profile_input())
+            .expect("save profile");
+        drop(service);
+
+        let recovered = PlannerDesktopService::open(path.clone()).expect("recover");
+        let profile = recovered
+            .status()
+            .expect("status")
+            .vehicle_profile
+            .expect("profile");
+        assert_eq!(profile.gross_weight_t, Some(12.0));
+        assert_eq!(profile.axle_count, Some(2));
+        assert_eq!(profile.exclude_unpaved, true);
+
+        let _ = fs::remove_file(path);
     }
 
     #[test]
