@@ -1043,6 +1043,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn failed_routing_probe_keeps_runtime_configuration() -> std::io::Result<()> {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+        let address = listener.local_addr()?;
+        let app = axum::Router::new().route(
+            "/status",
+            axum::routing::get(|| async {
+                (
+                    axum::http::StatusCode::SERVICE_UNAVAILABLE,
+                    r#"{"status":"down"}"#,
+                )
+            }),
+        );
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("mock unavailable Valhalla");
+        });
+
+        let service = DesktopControlService::default();
+        service
+            .configure_routing(ConfigureRoutingInput {
+                base_url: format!("http://{address}"),
+                map_dataset_id: "fixture-europe-2026-11".to_owned(),
+                connect_timeout_ms: 500,
+                request_timeout_ms: 2_000,
+            })
+            .await
+            .expect("routing config");
+
+        let probe = service.test_routing().await.expect("routing probe");
+        assert_eq!(probe.state, RoutingAvailabilityState::EngineUnavailable);
+        let status = service.status().await.expect("status");
+        assert!(status.routing.is_some(), "failed probe must not erase config");
+
+        server.abort();
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn desktop_service_rejects_unbounded_routing_timeouts() {
         let service = DesktopControlService::default();
         assert!(
