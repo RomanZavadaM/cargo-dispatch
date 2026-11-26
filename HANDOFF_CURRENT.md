@@ -41,12 +41,13 @@
   - Control `/status` availability + live geometry recalculation після operator/driver reorder;
   - stale/late Valhalla response не може перезаписати новіший active-trip state;
   - Planner desktop має власний runtime Valhalla preview: `/status`, real `/route`, explicit planning profile, реальна дорожня polyline поверх OSM;
-  - невдала або застаріла відповідь Planner routing не змінює manual draft чи його revision.
+  - невдала або застаріла відповідь Planner routing не змінює manual draft чи його revision;
+  - Planner експортує schema 1.4 ZIP через native Save As: explicit planning basis, ordered points, optional matching routing snapshot, durable TripVersion history і стабільні CargoId за row identity; існуючий ZIP не перезаписується.
 
 ## Next
-1. Package export із Planner UI через наявний versioned trip package.
-2. Передавати planning basis та потрібну derived geometry як snapshot пакета, не як постійну прив'язку рейсу до авто.
-3. Geometry лишається derived; Control лишається authoritative після імпорту рейсу і веде окремий actual routing context.
+1. Додати в Control ручне створення нового активного рейсу, коли Planner ZIP відсутній.
+2. Ручний рейс має використовувати той самий durable trip state, reorder, документи, геолокацію й routing, що й імпортований рейс.
+3. Не вигадувати planning basis і не прив'язувати TripId до автомобіля або endpoint; actual vehicle/device context лишається окремим mutable станом Control.
 4. Compiled test/stable builds публікувати через GitHub Releases, не залишати тільки в Actions artifacts.
 
 Продовження: `START_HERE.md` → private HANDOFF/PROJECT_STATE → Planner STATE/WORKLOG → live GitHub.
