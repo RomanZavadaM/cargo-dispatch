@@ -33,18 +33,20 @@
   - обірваний незавершений останній journal record після аварії ігнорується.
 - Full 8-language localization контролюється CI.
 - Planner / routing foundation:
-  - Valhalla adapter;
-  - trip schema 1.3 з actual VehicleRoutingProfile; legacy 1.0–1.2 readable;
-  - real Valhalla HTTP transport;
+  - Valhalla adapter і real HTTP transport;
+  - trip schema 1.4 з immutable planning basis; legacy schema залишаються читабельними;
+  - Planner routing profile — лише параметри конкретного планового розрахунку, а не прив'язка рейсу до автомобіля;
+  - Control зберігає окремий mutable actual routing context для активної сесії;
   - runtime URL / map dataset id / bounded connect + request timeout у Desktop Control;
-  - `/status` availability + live engine version;
-  - live geometry recalculation після operator/driver reorder;
-  - stale/late Valhalla response не може перезаписати новіший active-trip state.
+  - Control `/status` availability + live geometry recalculation після operator/driver reorder;
+  - stale/late Valhalla response не може перезаписати новіший active-trip state;
+  - Planner desktop має власний runtime Valhalla preview: `/status`, real `/route`, explicit planning profile, реальна дорожня polyline поверх OSM;
+  - невдала або застаріла відповідь Planner routing не змінює manual draft чи його revision.
 
 ## Next
-1. Map/routing preview у Planner desktop UI.
-2. Далі package export із Planner UI через наявний versioned trip package.
-3. Geometry лишається derived; Control лишається authoritative після імпорту рейсу.
+1. Package export із Planner UI через наявний versioned trip package.
+2. Передавати planning basis та потрібну derived geometry як snapshot пакета, не як постійну прив'язку рейсу до авто.
+3. Geometry лишається derived; Control лишається authoritative після імпорту рейсу і веде окремий actual routing context.
 4. Compiled test/stable builds публікувати через GitHub Releases, не залишати тільки в Actions artifacts.
 
 Продовження: `START_HERE.md` → private HANDOFF/PROJECT_STATE → Planner STATE/WORKLOG → live GitHub.
