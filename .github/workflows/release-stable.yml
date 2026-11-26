@@ -385,8 +385,9 @@ jobs:
           6. Check route reorder both ways, files/PDF, Browser -> Control photo/video/file + Save,
              two browser clients, refresh/reconnect and maps in Control/Driver Browser.
 
-          Versioned road geometry is included. Live Valhalla HTTP transport/recalculation,
-          Public Gateway transport is included. Real-world HTTPS/NAT/CGNAT field acceptance and live Valhalla HTTP recalculation remain future field work.
+          Versioned schema 1.3 road geometry, runtime Valhalla configuration and live
+          recalculation after reorder are included. Public Gateway transport is included.
+          Real-world HTTPS/NAT/CGNAT field acceptance remains separate field work.
           "@ | Set-Content -Encoding UTF8 "$packageName/README-TEST.txt"
 
           $windowsZip = "$packageName.zip"
@@ -437,15 +438,14 @@ jobs:
           - зміна порядку відкритих точок;
           - документи, фото, відео та геолокація;
           - інтерактивні карти;
-          - Valhalla adapter і schema 1.2 road geometry;
+          - Valhalla adapter, schema 1.3 road geometry + actual vehicle routing profile, legacy 1.0–1.2 readable;
+          - runtime Valhalla URL/dataset/timeouts у Desktop Control і live geometry recalculation після reorder;
           - native Android та iOS/iPadOS Driver clients з background tracking, durable retry і захищеним зберіганням сесії;
           - Addressing Gateway для публічного зв'язку Control ↔ Driver без зберігання рейсу на сервері;
           - desktop Control сам виходить на Gateway, тому вхідний публічний порт на комп'ютері Control не потрібен.
 
           ### Наступні напрями
-          - завершення локалізації Control UI і Driver Browser всіма мовами проєкту;
           - Planner/editor desktop UI і його Windows/macOS/Linux builds;
-          - live HTTP transport до Valhalla та автоматичний recalculation geometry;
           - real phone/iPhone field acceptance;
           - NAT/CGNAT field acceptance;
           - production mobile signing/TestFlight/Google Play.
