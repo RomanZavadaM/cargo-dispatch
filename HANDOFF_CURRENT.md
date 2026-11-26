@@ -6,9 +6,9 @@
 
 ## Release checkpoints
 - Поточна Stable: `v0.1.0`.
-- Поточний Test/prerelease: `v0.1.0-preview.7`.
-- Exact source `preview.7`: `db3d6f7450bd886f80f8a48221f6254394fad08e`.
-- `preview.7` містить 10 release assets:
+- Поточний Test/prerelease: `v0.1.0-preview.8`.
+- Exact source `preview.8`: `47352ca341a2d3747d503164de0555b891db6bf1`.
+- `preview.8` містить 10 release assets:
   - Control Windows x64 / macOS universal / Linux x64;
   - Planner Windows x64 / macOS universal / Linux x64;
   - Android Driver APK;
@@ -47,7 +47,7 @@
 ## Next
 1. Ручне створення активного рейсу в Control без Planner ZIP уже інтегроване й використовує той самий durable trip state.
 2. Ручний рейс не вигадує planning basis; TripId не прив'язується до автомобіля або endpoint, actual vehicle/device context лишається окремим mutable станом Control.
-3. Поточний release-крок — підготувати й опублікувати повний `v0.1.0-preview.8` через GitHub Releases.
-4. Після preview.8 — ручне приймання актуальних Control/Planner збірок і продовження наступного продуктового етапу.
+3. `v0.1.0-preview.8` опублікований у GitHub Releases; publisher SUCCESS, усі 10 assets доступні.
+4. Наступний етап — ручне приймання актуальних Control/Planner збірок, local Driver Browser acceptance і перевірка шляху Control ↔ клієнт у loopback/LAN.
 
 Продовження: `START_HERE.md` → private HANDOFF/PROJECT_STATE → Planner STATE/WORKLOG → live GitHub.
