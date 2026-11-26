@@ -350,8 +350,7 @@ impl DesktopControlService {
         }
         if !valid_session_token(token) {
             return Err(
-                "Session token має містити 16–128 латинських літер, цифр, '-' або '_'"
-                    .to_owned(),
+                "Session token має містити 16–128 латинських літер, цифр, '-' або '_'".to_owned(),
             );
         }
         let sessions = self
@@ -1306,8 +1305,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn desktop_service_rejects_invalid_manual_token_before_disk_write()
-    -> std::io::Result<()> {
+    async fn desktop_service_rejects_invalid_manual_token_before_disk_write() -> std::io::Result<()>
+    {
         let tmp = tempfile::tempdir()?;
         let folder = tmp.path().join("manual-invalid-token");
         let service = DesktopControlService::default();
@@ -1318,13 +1317,15 @@ mod tests {
                 token: "short".to_owned(),
                 trip_id: "41414141414141414141414141414141".to_owned(),
                 display_name: None,
-                points: vec![cargo_dispatch_control_ui_contracts::CreateManualTripPointInput {
-                    point_id: "42424242424242424242424242424242".to_owned(),
-                    title: "Manual point".to_owned(),
-                    latitude: 49.8393,
-                    longitude: 24.0296,
-                    address: None,
-                }],
+                points: vec![
+                    cargo_dispatch_control_ui_contracts::CreateManualTripPointInput {
+                        point_id: "42424242424242424242424242424242".to_owned(),
+                        title: "Manual point".to_owned(),
+                        latitude: 49.8393,
+                        longitude: 24.0296,
+                        address: None,
+                    },
+                ],
             })
             .await
             .expect_err("invalid token must be rejected");
@@ -1335,8 +1336,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn desktop_service_rejects_duplicate_manual_trip_before_disk_write()
-    -> std::io::Result<()> {
+    async fn desktop_service_rejects_duplicate_manual_trip_before_disk_write() -> std::io::Result<()>
+    {
         let tmp = tempfile::tempdir()?;
         let (trip, existing_folder) = create_trip(tmp.path())?;
         let service = DesktopControlService::default();
@@ -1355,13 +1356,15 @@ mod tests {
                 token: "new-manual-token-0001".to_owned(),
                 trip_id: id_hex(trip.as_bytes()),
                 display_name: None,
-                points: vec![cargo_dispatch_control_ui_contracts::CreateManualTripPointInput {
-                    point_id: "43434343434343434343434343434343".to_owned(),
-                    title: "Manual point".to_owned(),
-                    latitude: 49.8393,
-                    longitude: 24.0296,
-                    address: None,
-                }],
+                points: vec![
+                    cargo_dispatch_control_ui_contracts::CreateManualTripPointInput {
+                        point_id: "43434343434343434343434343434343".to_owned(),
+                        title: "Manual point".to_owned(),
+                        latitude: 49.8393,
+                        longitude: 24.0296,
+                        address: None,
+                    },
+                ],
             })
             .await
             .expect_err("duplicate trip must be rejected");
