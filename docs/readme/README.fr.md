@@ -13,7 +13,7 @@ Le principal langage de développement est **Rust**.
 ## Fonctionnalités déjà présentes
 
 - application desktop **Control** séparée basée sur Tauri/Leptos ;
-- application desktop **Planner** séparée basée sur Tauri/Leptos : brouillon d’itinéraire manuel, ajout/suppression/réorganisation des points, coordonnées de navigation et révision gérée par le cœur Planner ;
+- application desktop **Planner** séparée basée sur Tauri/Leptos : brouillon d’itinéraire manuel, ajout/suppression/réorganisation des points, coordonnées de navigation et révision gérée par le cœur Planner ; le brouillon est stocké dans un journal append-only versionné dans les données de l’application et restauré après redémarrage ;
 - stockage local durable du trajet actif et restauration après redémarrage ;
 - paquet de trajet versionné entre Planner et Control ;
 - un seul **Driver Browser** adaptatif pour téléphone, tablette, ordinateur portable et navigateur desktop ;
@@ -92,7 +92,7 @@ Les packages Android et Apple ne sont pas encore signés pour les stores. App St
 
 ## Étapes restantes
 
-- persistance durable du brouillon Planner après redémarrage, puis aperçu carte/routage et préparation de l’export du package ;
+- aperçu carte/routage dans Planner, puis préparation de l’export du package depuis l’UI Planner ;
 
 - validation manuelle locale dans le navigateur ;
 - test du même Driver Browser sur un vrai téléphone dans le même LAN ;
