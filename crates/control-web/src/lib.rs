@@ -1371,7 +1371,6 @@ impl ControlBrowserState {
         }
     }
 
-
     pub fn store_operator_document(
         &self,
         token: &str,
@@ -2280,10 +2279,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn routing_context_change_recalculates_same_order_without_revision_change() -> io::Result<()> {
+    async fn routing_context_change_recalculates_same_order_without_revision_change()
+    -> io::Result<()> {
         let tmp = tempfile::tempdir()?;
-        let (trip_id, _route, folder) =
-            create_trip(tmp.path(), "context-recalc-trip", 66, 76)?;
+        let (trip_id, _route, folder) = create_trip(tmp.path(), "context-recalc-trip", 66, 76)?;
         let state = ControlBrowserState::new();
         let token = "context-recalc-token-0001";
         state.register_trip(token, folder).expect("register trip");
@@ -2308,7 +2307,10 @@ mod tests {
         let outcome = state.recalculate_session_route_live(token).await?;
         assert_eq!(outcome.status, LiveRerouteStatus::Updated);
         assert_eq!(outcome.snapshot.local_route_revision, 0);
-        let geometry = outcome.snapshot.road_geometry.expect("recalculated geometry");
+        let geometry = outcome
+            .snapshot
+            .road_geometry
+            .expect("recalculated geometry");
         assert_eq!(
             geometry.routing.profile_fingerprint,
             profile.profile_fingerprint()
@@ -2322,10 +2324,7 @@ mod tests {
         );
         drop(requests);
 
-        let recovered = TripFolder::open(
-            &tmp.path().join("context-recalc-trip"),
-            trip_id,
-        )?;
+        let recovered = TripFolder::open(&tmp.path().join("context-recalc-trip"), trip_id)?;
         assert_eq!(recovered.state().local_route_revision, 0);
         assert!(recovered.state().route_geometry.is_some());
 
