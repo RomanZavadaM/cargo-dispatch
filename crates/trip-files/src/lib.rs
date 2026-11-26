@@ -1300,15 +1300,14 @@ impl TripFolder {
         })
     }
 
-    pub fn set_session_metadata(
-        &mut self,
-        metadata: ActiveTripSessionMetadata,
-    ) -> io::Result<()> {
+    pub fn set_session_metadata(&mut self, metadata: ActiveTripSessionMetadata) -> io::Result<()> {
         metadata.validate()?;
         if self.session_metadata == metadata {
             return Ok(());
         }
-        self.record(Change::SessionMetadata(SessionMetadataFile::from(&metadata)))
+        self.record(Change::SessionMetadata(SessionMetadataFile::from(
+            &metadata,
+        )))
     }
 
     pub fn record_location(&mut self, sample: DriverLocationSample) -> io::Result<()> {
