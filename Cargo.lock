@@ -534,6 +534,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tauri",
+ "tauri-plugin-dialog",
  "tauri-build",
  "tokio",
 ]
