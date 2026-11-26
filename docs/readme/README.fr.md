@@ -47,11 +47,13 @@ Les données, les actions de trajet, les fichiers et le backend sont communs ; s
 
 ## Carte
 
-Control et Driver Browser disposent maintenant d’une vraie carte interactive avec les points du trajet et la dernière position acceptée du conducteur.
+Control et Driver Browser disposent déjà d’une vraie carte de base interactive avec les points du trajet et la dernière position acceptée du conducteur.
 
-La branche `main` contient maintenant une chaîne de géométrie routière versionnée (schéma 1.3) : Planner transmet la géométrie dérivée avec le profil de routage réel du véhicule, tandis que les paquets des schémas 1.0–1.2 restent lisibles. Control conserve la géométrie et, après un changement d’ordre, recalcule la ligne routière via le service Valhalla configuré à l’exécution. Une réponse tardive ne peut pas écraser un état de trajet plus récent.
+Le `main` actuel utilise le schema 1.4 avec une base de planification immuable ; les anciens schemas restent lisibles. Un profil de routage Planner sert uniquement à un calcul de planification précis et ne crée pas de liaison permanente entre le trajet et un véhicule. Après l’import, Control maintient séparément le contexte de routage réel et modifiable de la session active.
 
-L’adresse Valhalla, l’ID du jeu de cartes et les délais sont réglés directement dans Desktop Control ; la disponibilité peut être vérifiée via `/status`, ou le routage peut être désactivé explicitement. Si Valhalla n’est pas configuré ou est temporairement indisponible, Control conserve quand même le nouvel ordre des points et la géométrie dérivée peut simplement être absente.
+Control conserve la géométrie dérivée et recalcule la ligne routière via le service Valhalla runtime configuré après un changement d’ordre. Une réponse de routage tardive ne peut pas écraser un état de trajet plus récent. Si Valhalla n’est pas configuré ou est temporairement indisponible, le nouvel ordre des points est tout de même enregistré et la géométrie dérivée peut être absente.
+
+Planner desktop possède maintenant son propre aperçu Valhalla runtime : l’opérateur fournit l’adresse Valhalla, l’ID du jeu de cartes et les délais, vérifie `/status`, et `/route` est calculé uniquement avec un profil de planification explicitement fourni. Les contraintes numériques inconnues ne sont pas inventées. Un résultat réussi trace la vraie polyline routière sur OSM ; aucune ligne droite fictive n’est dessinée sans résultat. L’aperçu est dérivé de la route/révision/du profil : modifier le brouillon ou le profil de planification efface l’ancienne ligne, et une réponse tardive est rejetée. Un échec de routage ne modifie pas le brouillon Planner.
 
 ## Test v0.1.0-preview.7
 
@@ -92,7 +94,7 @@ Les packages Android et Apple ne sont pas encore signés pour les stores. App St
 
 ## Étapes restantes
 
-- aperçu carte/routage dans Planner, puis préparation de l’export du package depuis l’UI Planner ;
+- export du package depuis l’UI Planner via le package de trajet versionné existant ;
 
 - validation manuelle locale dans le navigateur ;
 - test du même Driver Browser sur un vrai téléphone dans le même LAN ;
