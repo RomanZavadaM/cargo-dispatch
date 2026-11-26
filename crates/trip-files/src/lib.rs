@@ -1072,12 +1072,15 @@ impl TripFolder {
 
     pub fn set_route_geometry(
         &mut self,
-        local_route_revision: u64,
+        displayed: &StoredTripPlan,
         geometry: &TripRoadGeometry,
     ) -> io::Result<()> {
+        if self.state() != *displayed {
+            return Err(invalid("stale route geometry state"));
+        }
         validate_trip_road_geometry(geometry).map_err(invalid)?;
         self.record(Change::RouteGeometry {
-            local_route_revision,
+            local_route_revision: displayed.local_route_revision,
             geometry: RoadGeometryFile::from(geometry),
         })
     }
@@ -1509,7 +1512,7 @@ mod tests {
                 },
             ],
         };
-        control.set_route_geometry(1, &geometry)?;
+        control.set_route_geometry(&reordered, &geometry)?;
         assert_eq!(control.state().route_geometry, Some(geometry.clone()));
         drop(control);
 
@@ -1518,7 +1521,7 @@ mod tests {
         let shown = reopened.state();
         reopened.driver_order(&shown, &[route[0].point_id, route[1].point_id])?;
         assert!(reopened.state().route_geometry.is_none());
-        assert!(reopened.set_route_geometry(1, &geometry).is_err());
+        assert!(reopened.set_route_geometry(&reordered, &geometry).is_err());
         assert!(reopened.state().route_geometry.is_none());
         Ok(())
     }
