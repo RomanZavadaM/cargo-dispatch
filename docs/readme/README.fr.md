@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · **🇫🇷 Français** · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Statut :** développement actif. La version stable actuelle est **v0.1.0**. La localisation complète en 8 langues est intégrée ; le prochain grand axe est le Planner d’itinéraire.
+> **Statut :** développement actif. La version stable actuelle est **v0.1.0**. Le prerelease de test actuel est **v0.1.0-preview.7**, avec désormais un Planner séparé pour Windows, macOS et Linux. La localisation complète en 8 langues est intégrée.
 
 ## À propos
 
@@ -13,6 +13,7 @@ Le principal langage de développement est **Rust**.
 ## Fonctionnalités déjà présentes
 
 - application desktop **Control** séparée basée sur Tauri/Leptos ;
+- application desktop **Planner** séparée basée sur Tauri/Leptos : brouillon d’itinéraire manuel, ajout/suppression/réorganisation des points, coordonnées de navigation et révision gérée par le cœur Planner ; le brouillon est stocké dans un journal append-only versionné dans les données de l’application et restauré après redémarrage ;
 - stockage local durable du trajet actif et restauration après redémarrage ;
 - paquet de trajet versionné entre Planner et Control ;
 - un seul **Driver Browser** adaptatif pour téléphone, tablette, ordinateur portable et navigateur desktop ;
@@ -52,6 +53,26 @@ La branche `main` contient maintenant une chaîne de géométrie routière versi
 
 L’adresse Valhalla, l’ID du jeu de cartes et les délais sont réglés directement dans Desktop Control ; la disponibilité peut être vérifiée via `/status`, ou le routage peut être désactivé explicitement. Si Valhalla n’est pas configuré ou est temporairement indisponible, Control conserve quand même le nouvel ordre des points et la géométrie dérivée peut simplement être absente.
 
+## Test v0.1.0-preview.7
+
+[Ouvrir Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
+
+Il s’agit d’un **prerelease**, pas de la version Stable. C’est le premier preview intégré qui publie un Planner desktop séparé avec les autres composants depuis une même source exacte.
+
+Le release contient :
+- Windows Control x64 ZIP ;
+- macOS Control universal ZIP — Intel + Apple Silicon ;
+- Linux Control x64 tar.gz ;
+- Windows Planner x64 ZIP ;
+- macOS Planner universal ZIP — Intel + Apple Silicon ;
+- Linux Planner x64 tar.gz ;
+- Android Driver debug APK ;
+- iOS/iPadOS Driver Simulator ZIP ;
+- package Linux Addressing Gateway x64 ;
+- SHA256SUMS.
+
+Le premier slice Planner gère un brouillon d’itinéraire manuel et la modification des points. Dans preview.7, le brouillon Planner n’est pas encore conservé après redémarrage ; c’est l’étape suivante.
+
 ## Stable v0.1.0
 
 [Ouvrir Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
@@ -71,7 +92,7 @@ Les packages Android et Apple ne sont pas encore signés pour les stores. App St
 
 ## Étapes restantes
 
-- UI desktop Planner/editor et builds de release pour Windows, macOS et Linux ;
+- aperçu carte/routage dans Planner, puis préparation de l’export du package depuis l’UI Planner ;
 
 - validation manuelle locale dans le navigateur ;
 - test du même Driver Browser sur un vrai téléphone dans le même LAN ;
@@ -82,7 +103,7 @@ Les packages Android et Apple ne sont pas encore signés pour les stores. App St
 
 ## Langues de l’interface
 
-Control, Driver Browser, Android Driver et iOS/iPadOS Driver sont implémentés et vérifiés avec le même **ensemble de 8 langues : uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control et Driver Browser utilisent la langue système avec un choix manuel mémorisé, et le CI vérifie la couverture complète des 8 localisations.
+Control, Planner, Driver Browser, Android Driver et iOS/iPadOS Driver sont implémentés et vérifiés avec le même **ensemble de 8 langues : uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control et Driver Browser utilisent la langue système avec un choix manuel mémorisé, et le CI vérifie la couverture complète des 8 localisations.
 
 ## Documentation
 

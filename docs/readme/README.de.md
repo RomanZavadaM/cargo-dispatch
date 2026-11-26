@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · **🇩🇪 Deutsch** · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** aktive Entwicklung. Die aktuelle stabile Version ist **v0.1.0**. Die vollständige Lokalisierung in 8 Sprachen ist integriert; der nächste große Schwerpunkt ist der Routen-Planner.
+> **Status:** aktive Entwicklung. Die aktuelle stabile Version ist **v0.1.0**. Der aktuelle Test-Prerelease ist **v0.1.0-preview.7** und enthält bereits einen separaten Planner für Windows, macOS und Linux. Die vollständige Lokalisierung in 8 Sprachen ist integriert.
 
 ## Über das Produkt
 
@@ -13,6 +13,7 @@ Die Hauptentwicklungssprache ist **Rust**.
 ## Bereits vorhanden
 
 - separate Desktop-Anwendung **Control** auf Basis von Tauri/Leptos;
+- eine separate Desktop-**Planner**-Anwendung auf Tauri/Leptos: manueller Routenentwurf, Punkte hinzufügen/entfernen/neu ordnen, Navigationskoordinaten und Revision über den Planner-Core; der Entwurf wird in einem versionierten Append-only-Journal in den App-Daten gespeichert und nach einem Neustart wiederhergestellt;
 - dauerhafte lokale Speicherung der aktiven Tour und Wiederherstellung nach Neustart;
 - versioniertes Trip-Paket zwischen Planner und Control;
 - ein adaptiver **Driver Browser** für Telefon, Tablet, Laptop und Desktop-Browser;
@@ -52,6 +53,26 @@ In `main` ist jetzt eine versionierte Road-Geometry-Pipeline (Schema 1.3) integr
 
 Valhalla-Adresse, Karten-Dataset-ID und Timeouts werden direkt in Desktop Control eingestellt; die Verfügbarkeit lässt sich über `/status` prüfen oder das Routing ausdrücklich deaktivieren. Ist Valhalla nicht konfiguriert oder vorübergehend nicht verfügbar, speichert Control die neue Punktreihenfolge trotzdem; die abgeleitete Geometrie kann dann fehlen.
 
+## Test v0.1.0-preview.7
+
+[Test v0.1.0-preview.7 öffnen](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
+
+Dies ist ein **Prerelease**, nicht Stable. Es ist der erste integrierte Preview, der einen separaten Desktop-Planner zusammen mit den übrigen Produktteilen aus derselben exakten Quelle veröffentlicht.
+
+Der Release enthält:
+- Windows Control x64 ZIP;
+- macOS Control universal ZIP — Intel + Apple Silicon;
+- Linux Control x64 tar.gz;
+- Windows Planner x64 ZIP;
+- macOS Planner universal ZIP — Intel + Apple Silicon;
+- Linux Planner x64 tar.gz;
+- Android Driver debug APK;
+- iOS/iPadOS Driver Simulator ZIP;
+- Linux Addressing Gateway x64 package;
+- SHA256SUMS.
+
+Der erste Planner-Slice unterstützt einen manuellen Routenentwurf und die Bearbeitung der Punkte. In preview.7 wird der Planner-Entwurf noch nicht über Neustarts hinweg gespeichert; das ist der nächste Schritt.
+
 ## Stable v0.1.0
 
 [Stable v0.1.0 öffnen](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
@@ -71,7 +92,7 @@ Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/Te
 
 ## Was noch fehlt
 
-- Planner/editor-Desktop-UI und Release-Builds für Windows, macOS und Linux;
+- Karten-/Routing-Vorschau im Planner, danach Vorbereitung des Package-Exports aus der Planner-UI;
 
 - manuelle lokale Browser-Abnahme;
 - Test desselben Driver Browser auf einem echten Telefon im selben LAN;
@@ -82,7 +103,7 @@ Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/Te
 
 ## Sprachen der Benutzeroberfläche
 
-Control, Driver Browser, Android Driver und iOS/iPadOS Driver sind mit demselben **8-Sprachen-Satz: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** implementiert und geprüft. Control und Driver Browser verwenden die Systemsprache plus eine gespeicherte manuelle Auswahl; CI prüft die vollständige Abdeckung aller 8 Lokalisierungen.
+Control, Planner, Driver Browser, Android Driver und iOS/iPadOS Driver sind mit demselben **8-Sprachen-Satz: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** implementiert und geprüft. Control und Driver Browser verwenden die Systemsprache plus eine gespeicherte manuelle Auswahl; CI prüft die vollständige Abdeckung aller 8 Lokalisierungen.
 
 ## Dokumentation
 

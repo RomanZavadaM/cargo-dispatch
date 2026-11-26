@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · **🇰🇷 한국어** · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **상태:** 활발히 개발 중입니다. 현재 안정 버전은 **v0.1.0**입니다. 8개 언어 전체 현지화가 통합되었으며 다음 큰 작업은 경로 Planner입니다.
+> **상태:** 활발히 개발 중입니다. 현재 안정 버전은 **v0.1.0**입니다. 현재 테스트 prerelease는 **v0.1.0-preview.7**이며 Windows, macOS, Linux용 별도 Planner가 포함됩니다. 8개 언어 전체 현지화가 통합되어 있습니다.
 
 ## 제품 소개
 
@@ -13,6 +13,7 @@
 ## 현재 구현된 기능
 
 - Tauri/Leptos 기반의 별도 데스크톱 **Control** 애플리케이션;
+- Tauri/Leptos 기반의 별도 데스크톱 **Planner**: 수동 경로 초안, 지점 추가/삭제/재정렬, 내비게이션 좌표, Planner core revision 관리; 초안은 app-data의 versioned append-only journal에 저장되고 재시작 후 복구됩니다;
 - 활성 운행의 지속적 로컬 저장 및 재시작 후 복구;
 - Planner와 Control 사이의 버전 관리된 trip package;
 - 휴대폰·태블릿·노트북·데스크톱 브라우저용 하나의 적응형 **Driver Browser**;
@@ -52,6 +53,26 @@ Control과 Driver Browser에는 운행 지점과 마지막으로 승인된 운�
 
 Valhalla 주소, 지도 데이터셋 ID, timeout은 Desktop Control에서 직접 설정하며 `/status`로 사용 가능 여부를 확인하거나 routing을 명시적으로 끌 수 있습니다. Valhalla가 설정되지 않았거나 일시적으로 사용할 수 없어도 새 지점 순서는 Control에 저장되고 파생 geometry만 없을 수 있습니다.
 
+## Test v0.1.0-preview.7
+
+[Test v0.1.0-preview.7 열기](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
+
+이 버전은 Stable이 아닌 **prerelease**입니다. 하나의 정확한 소스에서 다른 제품 구성요소와 함께 별도 데스크톱 Planner를 게시하는 첫 통합 preview입니다.
+
+Release 구성:
+- Windows Control x64 ZIP;
+- macOS Control universal ZIP — Intel + Apple Silicon;
+- Linux Control x64 tar.gz;
+- Windows Planner x64 ZIP;
+- macOS Planner universal ZIP — Intel + Apple Silicon;
+- Linux Planner x64 tar.gz;
+- Android Driver debug APK;
+- iOS/iPadOS Driver Simulator ZIP;
+- Linux Addressing Gateway x64 package;
+- SHA256SUMS.
+
+첫 Planner slice는 수동 경로 초안과 지점 편집을 지원합니다. preview.7에서는 Planner 초안이 아직 재시작 후 유지되지 않으며, 이것이 다음 단계입니다.
+
 ## Stable v0.1.0
 
 [Stable v0.1.0 열기](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
@@ -71,7 +92,7 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 
 ## 앞으로 필요한 작업
 
-- Windows, macOS, Linux용 Planner/editor 데스크톱 UI 및 릴리스 빌드;
+- Planner 지도/routing preview, 이후 Planner UI에서 package export 준비;
 
 - 로컬 브라우저 수동 검수;
 - 동일한 Driver Browser를 실제 휴대폰에서 같은 LAN으로 테스트;
@@ -82,7 +103,7 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 
 ## 인터페이스 언어
 
-Control, Driver Browser, Android Driver, iOS/iPadOS Driver는 모두 동일한 **8개 언어 세트: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**로 구현·검증되었습니다. Control과 Driver Browser는 시스템 언어와 저장되는 수동 선택을 지원하며 CI가 8개 현지화의 완전성을 검사합니다.
+Control, Planner, Driver Browser, Android Driver, iOS/iPadOS Driver는 모두 동일한 **8개 언어 세트: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**로 구현·검증되었습니다. Control과 Driver Browser는 시스템 언어와 저장되는 수동 선택을 지원하며 CI가 8개 현지화의 완전성을 검사합니다.
 
 ## 문서
 
