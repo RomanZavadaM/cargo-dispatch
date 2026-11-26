@@ -55,6 +55,8 @@ Control は派生 geometry を保持し、地点順変更後に設定済み runt
 
 Planner desktop には独自の runtime Valhalla preview が追加されています。オペレーターが Valhalla アドレス、地図データセット ID、timeout を指定し、`/status` を確認し、`/route` は明示的に入力された planning profile だけで計算されます。不明な数値制約を推測しません。成功時は OSM 上に実際の道路 polyline を描画し、結果がない場合は仮の直線を描きません。Preview は route/revision/profile から派生するため、下書きまたは planning profile が変わると古い線を消し、遅れた応答も拒否します。Routing 失敗は Planner の下書きを変更しません。
 
+Planner desktop は native Save As から既存の versioned trip package を schema 1.4 としてエクスポートできるようになりました。Package には明示的な planning basis（車両タイプ/クラスと貨物）、地点順、存在する場合に限り一致する planning routing profile/Valhalla geometry の snapshot が含まれます。1つの下書きでは TripId が安定し、TripVersion は再起動後も継続し、CargoId は行位置に依存せず、既存 ZIP は上書きしません。
+
 ## Test v0.1.0-preview.7
 
 [Test v0.1.0-preview.7 を開く](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7)。
@@ -94,7 +96,7 @@ Android と Apple のパッケージはまだストア用署名を行ってい�
 
 ## 今後の作業
 
-- 既存の versioned trip package を使用した Planner UI からの package export;
+- Planner ZIP がない場合に Control から直接新しい運行を作成;
 
 - ローカル browser の手動受け入れ;
 - 同じ Driver Browser を実機の電話で同一 LAN 内テスト;
