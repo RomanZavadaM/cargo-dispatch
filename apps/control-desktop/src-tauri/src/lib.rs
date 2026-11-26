@@ -23,7 +23,7 @@ use std::{
     sync::Mutex,
     time::Duration,
 };
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 use tokio::{
     sync::{Mutex as AsyncMutex, watch},
@@ -74,6 +74,15 @@ impl Default for DesktopControlService {
 
 fn driver_url(address: SocketAddr, token: &str) -> String {
     format!("http://{address}/driver/{token}")
+}
+
+fn session_window_label(token: &str) -> String {
+    let suffix = token
+        .chars()
+        .filter(|value| value.is_ascii_alphanumeric())
+        .take(40)
+        .collect::<String>();
+    format!("trip-session-{suffix}")
 }
 
 fn parse_id_bytes(value: &str, label: &str) -> Result<[u8; 16], String> {
@@ -565,6 +574,17 @@ impl DesktopControlService {
         drop(sessions);
         self.status().await
     }
+    fn session_window_details(&self, token: &str) -> Result<(String, String), String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?;
+        let session = sessions
+            .get(token)
+            .ok_or_else(|| "Сесію не знайдено".to_owned())?;
+        Ok((session_display_name(session), session.token.clone()))
+    }
+
 
     async fn configure_routing(
         &self,
@@ -830,6 +850,43 @@ async fn update_session_metadata(
 }
 
 #[tauri::command]
+async fn open_session_window(
+    input: SessionInput,
+    app: AppHandle,
+    state: State<'_, DesktopControlService>,
+) -> Result<(), String> {
+    let (display_name, token) = state.session_window_details(input.token.trim())?;
+    let label = session_window_label(&token);
+    let title = format!("Cargo Dispatch Control — {display_name}");
+
+    if let Some(window) = app.get_webview_window(&label) {
+        window
+            .set_title(&title)
+            .map_err(|error| format!("Не вдалося оновити назву вікна: {error}"))?;
+        window
+            .show()
+            .map_err(|error| format!("Не вдалося показати вікно: {error}"))?;
+        window
+            .set_focus()
+            .map_err(|error| format!("Не вдалося активувати вікно: {error}"))?;
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(
+        &app,
+        label,
+        WebviewUrl::App(format!("index.html?session={token}").into()),
+    )
+    .title(title)
+    .inner_size(1080.0, 760.0)
+    .min_inner_size(760.0, 520.0)
+    .resizable(true)
+    .build()
+    .map_err(|error| format!("Не вдалося відкрити вікно сесії: {error}"))?;
+    Ok(())
+}
+
+#[tauri::command]
 async fn start_loopback(
     state: State<'_, DesktopControlService>,
 ) -> Result<ControlUiStatus, String> {
@@ -894,6 +951,7 @@ pub fn run() {
             control_status,
             register_trip,
             update_session_metadata,
+            open_session_window,
             start_loopback,
             start_lan,
             stop_browser_server,
