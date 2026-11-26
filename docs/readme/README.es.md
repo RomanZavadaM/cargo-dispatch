@@ -22,7 +22,7 @@ El lenguaje principal de desarrollo es **Rust**.
 - archivos, fotos y vídeos **Driver Browser → Control** con guardado local;
 - dos clientes de navegador simultáneos para un mismo viaje y reconexión sin una base de datos separada del navegador;
 - mapa interactivo OpenStreetMap en Control y Driver Browser;
-- modos loopback y LAN explícito para pruebas y trabajo local.
+- modos loopback y LAN explícito para pruebas y trabajo local.\n- la aceptación automatizada de Driver Browser verifica una sesión real de Control por separado mediante loopback y un bind LAN privado explícito.
 
 ## Driver Apps nativas
 
@@ -98,7 +98,7 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 
 - creación de un nuevo viaje directamente en Control cuando no haya un ZIP de Planner;
 
-- validación manual local en navegador;
+- validación visual manual del navegador local para narrow phone / tablet / wide desktop, incluido pan/zoom/fit del mapa;
 - prueba del mismo Driver Browser en un teléfono real dentro de la misma LAN;
 - ruta HTTPS/direccionamiento público;
 - validación completa del GPS del navegador mediante HTTPS;

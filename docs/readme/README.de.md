@@ -22,7 +22,7 @@ Die Hauptentwicklungssprache ist **Rust**.
 - Dateien, Fotos und Videos **Driver Browser → Control** mit lokaler Speicherung;
 - zwei gleichzeitige Browser-Clients für dieselbe Tour und Reconnect ohne separate Browser-Datenbank;
 - interaktive OpenStreetMap-Karte in Control und Driver Browser;
-- Loopback- und expliziter LAN-Modus für Tests und lokale Arbeit.
+- Loopback- und expliziter LAN-Modus für Tests und lokale Arbeit.\n- die automatisierte Driver-Browser-Abnahme prüft eine echte Control-Session getrennt über Loopback und einen expliziten privaten LAN-Bind.
 
 ## Native Driver Apps
 
@@ -96,7 +96,7 @@ Android- und Apple-Pakete sind noch nicht für die Stores signiert. App Store/Te
 
 ## Was noch fehlt
 
-- manuelle lokale Browser-Abnahme;
+- manuelle visuelle lokale Browser-Abnahme für narrow phone / tablet / wide desktop einschließlich Karten-Pan/Zoom/Fit;
 - Test desselben Driver Browser auf einem echten Telefon im selben LAN;
 - HTTPS-/Public-Addressing-Pfad;
 - vollständige Browser-GPS-Abnahme über HTTPS;

@@ -22,7 +22,7 @@
 - 파일·사진·동영상 **Driver Browser → Control** 및 로컬 저장;
 - 하나의 운행에 대해 두 개의 동시 브라우저 클라이언트와 별도 브라우저 DB 없는 재연결;
 - Control과 Driver Browser의 인터랙티브 OpenStreetMap 지도;
-- 테스트 및 로컬 작업을 위한 loopback 및 명시적 LAN 모드.
+- 테스트 및 로컬 작업을 위한 loopback 및 명시적 LAN 모드.\n- 자동화된 Driver Browser acceptance는 실제 Control session을 loopback과 명시적 private-LAN bind에서 각각 검증합니다.
 
 ## 네이티브 Driver App
 
@@ -96,7 +96,7 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 
 ## 앞으로 필요한 작업
 
-- 로컬 브라우저 수동 검수;
+- narrow phone / tablet / wide desktop에서 지도 pan/zoom/fit을 포함한 로컬 브라우저 수동 시각 검수;
 - 동일한 Driver Browser를 실제 휴대폰에서 같은 LAN으로 테스트;
 - HTTPS/public addressing 경로;
 - HTTPS를 통한 브라우저 GPS 전체 검수;
