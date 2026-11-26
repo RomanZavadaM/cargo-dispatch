@@ -525,13 +525,16 @@ name = "cargo-dispatch-planner-desktop"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "cargo-dispatch-contracts",
  "cargo-dispatch-domain",
  "cargo-dispatch-geo",
  "cargo-dispatch-planner",
  "cargo-dispatch-planner-ui-contracts",
+ "cargo-dispatch-trip-files",
  "serde",
  "serde_json",
  "tauri",
+ "tauri-plugin-dialog",
  "tauri-build",
  "tokio",
 ]

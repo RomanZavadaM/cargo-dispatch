@@ -131,3 +131,34 @@ pub struct PlannerRoutingPreviewView {
     pub geometry: Vec<PlannerRoadGeometryPoint>,
     pub warnings: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PlannerPackageCargoInput {
+    pub row_id: u64,
+    pub title: String,
+    pub weight_kg: Option<u32>,
+    pub pallets: Option<u16>,
+    pub pickup_point_id: Option<String>,
+    pub unload_point_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PlannerPackageExportInput {
+    pub path: String,
+    pub vehicle_type: String,
+    pub cargos: Vec<PlannerPackageCargoInput>,
+    pub routing_profile: Option<PlannerRoutingProfileInput>,
+    pub routing_preview: Option<PlannerRoutingPreviewView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PlannerPackageExportResult {
+    pub path: String,
+    pub trip_id: String,
+    pub trip_version: u64,
+    pub schema_major: u16,
+    pub schema_minor: u16,
+    pub point_count: usize,
+    pub cargo_count: usize,
+    pub geometry_included: bool,
+}
