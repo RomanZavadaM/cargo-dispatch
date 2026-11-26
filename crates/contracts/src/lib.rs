@@ -234,10 +234,14 @@ pub fn validate_trip_planning_basis(
             return Err(PlanningBasisError::CargoTitleRequired(cargo.cargo_id));
         }
         if cargo.weight_kg == Some(0) {
-            return Err(PlanningBasisError::CargoWeightMustBePositive(cargo.cargo_id));
+            return Err(PlanningBasisError::CargoWeightMustBePositive(
+                cargo.cargo_id,
+            ));
         }
         if cargo.pallets == Some(0) {
-            return Err(PlanningBasisError::CargoPalletsMustBePositive(cargo.cargo_id));
+            return Err(PlanningBasisError::CargoPalletsMustBePositive(
+                cargo.cargo_id,
+            ));
         }
         if let Some(point_id) = cargo.pickup_point_id
             && !route_points.iter().any(|point| point.point_id == point_id)
