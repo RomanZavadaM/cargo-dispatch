@@ -12,7 +12,7 @@ Le principal langage de développement est **Rust**.
 
 ## Fonctionnalités déjà présentes
 
-- application desktop **Control** séparée basée sur Tauri/Leptos ;
+- application desktop **Control** séparée basée sur Tauri/Leptos ; Control peut importer un ZIP Planner ou créer manuellement un nouveau trajet actif sans ZIP Planner en utilisant le même état durable du trajet ;
 - application desktop **Planner** séparée basée sur Tauri/Leptos : brouillon d’itinéraire manuel, ajout/suppression/réorganisation des points, coordonnées de navigation et révision gérée par le cœur Planner ; le brouillon est stocké dans un journal append-only versionné dans les données de l’application et restauré après redémarrage ;
 - stockage local durable du trajet actif et restauration après redémarrage ;
 - paquet de trajet versionné entre Planner et Control ;
@@ -95,8 +95,6 @@ La version Stable est reconstruite depuis une seule source exacte et publie :
 Les packages Android et Apple ne sont pas encore signés pour les stores. App Store/TestFlight/Google Play et la signature de production seront traités séparément plus tard.
 
 ## Étapes restantes
-
-- création d’un nouveau trajet directement dans Control lorsqu’aucun ZIP Planner n’est disponible ;
 
 - validation manuelle locale dans le navigateur ;
 - test du même Driver Browser sur un vrai téléphone dans le même LAN ;
