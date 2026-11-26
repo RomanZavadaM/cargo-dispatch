@@ -5,10 +5,10 @@
 Короткий public state; деталі — private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
 
 - Поточний Stable checkpoint: **v0.1.0**.
-- Поточний Test/prerelease: **v0.1.0-preview.7**, exact source `db3d6f7450bd886f80f8a48221f6254394fad08e`.
+- Поточний Test/prerelease: **v0.1.0-preview.8**, exact source `47352ca341a2d3747d503164de0555b891db6bf1`.
 - Product positioning не обмежується малотонажним парком або масою 7,5 т.
 - Control desktop підтримується для Windows, macOS і Linux.
-- Planner desktop також підтримується для Windows, macOS і Linux; перші compiled Planner test builds уже є в `preview.7`.
+- Planner desktop також підтримується для Windows, macOS і Linux; compiled Planner test builds входять у `preview.8`.
 - Planner manual draft у `main` уже durable:
   - add/remove/reorder;
   - navigation coordinates;
@@ -33,7 +33,7 @@
   - Planner desktop показує real road geometry поверх OSM через власний runtime Valhalla preview;
   - Planner desktop експортує versioned schema 1.4 ZIP через native Save As, з explicit planning basis, optional matching routing snapshot, durable TripVersion history та stable CargoId.
 - Control уже вміє **створювати новий активний рейс вручну** без Planner ZIP, на тому самому durable trip state; planning basis при цьому не вигадується, а TripId не прив'язується до автомобіля або endpoint.
-- Поточний release-крок: **v0.1.0-preview.8** з повним набором Control/Planner Windows/macOS/Linux + Android + iOS Simulator + Linux Gateway + SHA256SUMS.
+- Поточний Test: **v0.1.0-preview.8** уже опублікований з повним набором Control/Planner Windows/macOS/Linux + Android + iOS Simulator + Linux Gateway + SHA256SUMS.
 - Користувацькі compiled test/stable builds мають публікуватися в GitHub Releases, не залишатися тільки в Actions artifacts.
 
 Для продовження: `START_HERE.md` → private module logs → live GitHub.
