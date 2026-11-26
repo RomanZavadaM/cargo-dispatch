@@ -24,7 +24,6 @@ pub struct PlannerRouteView {
     pub revision: u64,
     pub state: String,
     pub points: Vec<PlannerPointView>,
-    pub vehicle_profile: Option<PlannerVehicleProfileView>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -41,6 +40,24 @@ pub struct PlannerVehicleProfileInput {
     pub prefer_truck_routes: Option<bool>,
     pub toll_preference: Option<String>,
     pub max_speed_kmh: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PlannerVehicleInput {
+    pub name: String,
+    pub profile: PlannerVehicleProfileInput,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PlannerVehicleView {
+    pub vehicle_id: String,
+    pub name: String,
+    pub profile: PlannerVehicleProfileView,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PlannerVehiclePoolView {
+    pub vehicles: Vec<PlannerVehicleView>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
