@@ -457,6 +457,9 @@ impl PlannerDesktopService {
             fs::create_dir_all(parent)
                 .map_err(|error| format!("Could not create package folder: {error}"))?;
         }
+        if input.cargos.is_empty() {
+            return Err("At least one cargo is required for trip package export".to_owned());
+        }
 
         let (working_route_id, revision, route, planning_basis) = {
             let state = self
@@ -1533,6 +1536,32 @@ mod tests {
         );
 
         server.abort();
+    }
+
+    #[test]
+    fn package_export_requires_at_least_one_cargo() {
+        let journal = unique_journal("package-export-no-cargo");
+        let service = PlannerDesktopService::open(journal.clone()).expect("open Planner");
+        service
+            .add_point(point("Warehouse", 49.8393, 24.0296))
+            .expect("warehouse");
+
+        let package = journal.with_extension("trip-package.zip");
+        let error = service
+            .export_trip_package(PlannerPackageExportInput {
+                path: package.to_string_lossy().into_owned(),
+                vehicle_type: "truck".to_owned(),
+                cargos: Vec::new(),
+                routing_profile: None,
+                routing_preview: None,
+            })
+            .expect_err("cargo description is required");
+
+        assert!(error.contains("At least one cargo"));
+        assert!(!package.exists());
+
+        let _ = fs::remove_file(journal.with_extension("operator-id.bin"));
+        let _ = fs::remove_file(journal);
     }
 
     #[tokio::test]
