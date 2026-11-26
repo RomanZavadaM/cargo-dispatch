@@ -415,6 +415,32 @@ jobs:
           Copy-Item $linux.FullName $linux.Name
           Copy-Item $gateway.FullName $gateway.Name
 
+          function Assert-VersionedArchiveRoot([string]$ArchivePath) {
+            $leaf = Split-Path $ArchivePath -Leaf
+            if ($leaf.EndsWith(".tar.gz")) {
+              $expectedRoot = $leaf.Substring(0, $leaf.Length - 7)
+            } elseif ($leaf.EndsWith(".zip")) {
+              $expectedRoot = $leaf.Substring(0, $leaf.Length - 4)
+            } else {
+              throw "Unsupported archive type for root-folder validation: $leaf"
+            }
+            $entries = @(tar -tf $ArchivePath | Where-Object { $_ -and $_ -ne "./" })
+            if ($entries.Count -eq 0) {
+              throw "Archive is empty: $leaf"
+            }
+            $bad = @($entries | Where-Object {
+              $normalized = $_ -replace "\\", "/"
+              -not ($normalized -eq $expectedRoot -or $normalized.StartsWith("$expectedRoot/"))
+            })
+            if ($bad.Count -gt 0) {
+              throw "Archive $leaf must contain only one versioned root folder '$expectedRoot'. Unexpected entry: $($bad[0])"
+            }
+          }
+
+          @($windowsZip, $macos.Name, $linux.Name, $apple.Name, $gateway.Name) | ForEach-Object {
+            Assert-VersionedArchiveRoot $_
+          }
+
           @($windowsZip, $macos.Name, $linux.Name, $android.Name, $apple.Name, $gateway.Name) | ForEach-Object {
             $hash = (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower()
             "$hash  $_"
