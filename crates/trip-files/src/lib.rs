@@ -1346,7 +1346,9 @@ impl TripFolder {
         if let Some(profile) = &profile {
             profile.validate().map_err(invalid)?;
         }
-        if self.active_routing_profile == profile {
+        if self.active_routing_profile == profile
+            && !(profile.is_none() && self.state().route_geometry.is_some())
+        {
             return Ok(());
         }
         self.record(Change::ActiveRoutingProfile(profile))
