@@ -13,7 +13,7 @@ The main development language is **Rust**.
 ## What already exists
 
 - a separate desktop **Control** application built with Tauri/Leptos;
-- a separate desktop **Planner** built with Tauri/Leptos: manual route draft, point add/remove/reorder, navigation coordinates, and Planner-core revision tracking;
+- a separate desktop **Planner** built with Tauri/Leptos: manual route draft, point add/remove/reorder, navigation coordinates, and Planner-core revision tracking; the draft is stored in a versioned append-only journal in app data and recovered after restart;
 - durable local storage of the active trip and restart recovery;
 - a versioned trip package between Planner and Control;
 - one adaptive **Driver Browser** for phone, tablet, laptop, and desktop browsers;
@@ -92,7 +92,7 @@ Android and Apple packages are not yet store-signed. App Store/TestFlight/Google
 
 ## What is still ahead
 
-- durable Planner draft persistence across restarts, followed by map/routing preview and package-export preparation;
+- Planner map/routing preview, followed by package-export preparation from the Planner UI;
 
 - manual local-browser acceptance;
 - testing the same Driver Browser on a real phone in the same LAN;
