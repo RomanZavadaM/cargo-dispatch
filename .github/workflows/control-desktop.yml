@@ -156,7 +156,9 @@ jobs:
           7. Check route reorder in both directions, two browser clients, and refresh/reconnect.
           8. Check the real OpenStreetMap view in both Control and Driver Browser: pan/zoom/fit,
              route-point markers and the latest accepted driver position.
-          9. The map currently shows points/position, not Valhalla road geometry.
+          9. Configure Valhalla in Control, run the availability check, reorder open points,
+             and verify the derived road geometry updates. If routing is disabled/unavailable,
+             the new point order must still persist and geometry may be absent.
 
           This is a CI test artifact, not a release.
           "@ | Set-Content -Encoding UTF8 LOCAL_BROWSER_TEST.txt
