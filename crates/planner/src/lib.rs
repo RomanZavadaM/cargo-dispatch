@@ -2026,11 +2026,8 @@ mod tests {
             &[point_id(1), point_id(2), point_id(3)],
         )
         .expect("manual route");
-        let edited = edit_manual_working_route(
-            &route,
-            &[point_id(3), point_id(1), point_id(4)],
-        )
-        .expect("manual edit");
+        let edited = edit_manual_working_route(&route, &[point_id(3), point_id(1), point_id(4)])
+            .expect("manual edit");
 
         assert_eq!(edited.state, WorkingRouteState::Draft);
         assert_eq!(edited.current_revision, route.current_revision + 1);
@@ -2043,7 +2040,6 @@ mod tests {
             vec![point_id(3), point_id(1), point_id(4)]
         );
     }
-
 
     use super::*;
     use cargo_dispatch_domain::{
