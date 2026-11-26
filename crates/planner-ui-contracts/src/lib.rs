@@ -35,11 +35,11 @@ pub struct PlannerVehicleProfileInput {
     pub gross_weight_t: Option<f64>,
     pub axle_load_t: Option<f64>,
     pub axle_count: Option<u8>,
-    pub hazmat: bool,
-    pub hgv: bool,
-    pub exclude_unpaved: bool,
-    pub prefer_truck_routes: bool,
-    pub toll_preference: String,
+    pub hazmat: Option<bool>,
+    pub hgv: Option<bool>,
+    pub exclude_unpaved: Option<bool>,
+    pub prefer_truck_routes: Option<bool>,
+    pub toll_preference: Option<String>,
     pub max_speed_kmh: Option<f64>,
 }
 
