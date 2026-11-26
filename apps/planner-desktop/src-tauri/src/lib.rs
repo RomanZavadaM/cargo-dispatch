@@ -51,6 +51,7 @@ struct PlannerState {
     route: WorkingRoute,
     points: BTreeMap<PointId, ManualPoint>,
     next_serial: u64,
+    last_export_version: u64,
 }
 
 impl Default for PlannerState {
@@ -59,6 +60,7 @@ impl Default for PlannerState {
             route: manual_working_route(route_id(1), &[]).expect("empty manual route is valid"),
             points: BTreeMap::new(),
             next_serial: 2,
+            last_export_version: 0,
         }
     }
 }
@@ -80,6 +82,10 @@ enum PlannerDraftEvent {
     },
     ReorderPoints {
         point_ids: Vec<[u8; 16]>,
+    },
+    ExportedPackage {
+        trip_version: u64,
+        working_route_revision: u64,
     },
 }
 
@@ -739,6 +745,7 @@ fn apply_event(state: &mut PlannerState, event: &PlannerDraftEvent) -> Result<()
             state.route = manual_working_route(route_id(*route_serial), &[])
                 .map_err(|error| format!("Could not recover manual route: {error:?}"))?;
             state.points.clear();
+            state.last_export_version = 0;
         }
         PlannerDraftEvent::AddPoint {
             point_serial,
@@ -812,6 +819,24 @@ fn apply_event(state: &mut PlannerState, event: &PlannerDraftEvent) -> Result<()
             }
             state.route = edit_manual_working_route(&state.route, &order)
                 .map_err(|error| format!("Planner rejected recovered point order: {error:?}"))?;
+        }
+        PlannerDraftEvent::ExportedPackage {
+            trip_version,
+            working_route_revision,
+        } => {
+            if *working_route_revision != state.route.current_revision {
+                return Err("Planner journal export revision does not match current draft".to_owned());
+            }
+            let expected = state
+                .last_export_version
+                .checked_add(1)
+                .ok_or("Planner trip version overflow")?;
+            if *trip_version != expected || *trip_version == 0 {
+                return Err(format!(
+                    "Planner journal trip version mismatch: expected {expected}, got {trip_version}"
+                ));
+            }
+            state.last_export_version = *trip_version;
         }
     }
     Ok(())
