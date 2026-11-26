@@ -2,8 +2,9 @@
 
 use cargo_dispatch_contracts::{
     PackageContentFingerprint, ReplanContractError, ReplanReasonCode, ReplanRequest,
-    ReplanRequestData, RouteContractError, TripPackageHeader, TripRoadGeometry, TripRoutePoint,
-    TripVersion, validate_route_points,
+    ReplanRequestData, RouteContractError, TripGeometryContractError, TripPackageHeader,
+    TripRoadGeometry, TripRoutePoint, TripVersion, validate_route_points,
+    validate_trip_road_geometry,
 };
 use cargo_dispatch_domain::{PointId, ReplanRequestId, TripId};
 use std::collections::{BTreeMap, BTreeSet};
@@ -120,6 +121,13 @@ pub enum LocalRouteEditError {
     RevisionOverflow,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RouteGeometryUpdateError {
+    TripNotFound,
+    StaleView,
+    InvalidGeometry(TripGeometryContractError),
+}
+
 impl InMemoryTripRegistry {
     /// Apply an operator edit only while the displayed plan and execution facts are current.
     pub fn edit_active_route(
@@ -149,6 +157,27 @@ impl InMemoryTripRegistry {
         current.route_geometry = None;
         current.local_route_revision = revision;
         Ok(revision)
+    }
+
+    pub fn update_route_geometry(
+        &mut self,
+        displayed: &StoredTripPlan,
+        geometry: TripRoadGeometry,
+    ) -> Result<(), RouteGeometryUpdateError> {
+        validate_trip_road_geometry(&geometry)
+            .map_err(RouteGeometryUpdateError::InvalidGeometry)?;
+        let current = self
+            .trips
+            .get_mut(&displayed.trip_id)
+            .ok_or(RouteGeometryUpdateError::TripNotFound)?;
+        if current != displayed {
+            return Err(RouteGeometryUpdateError::StaleView);
+        }
+        if current.route_geometry.as_ref() == Some(&geometry) {
+            return Ok(());
+        }
+        current.route_geometry = Some(geometry);
+        Ok(())
     }
 
     pub fn import(&mut self, candidate: TripImportCandidate) -> Result<ImportResult, ImportError> {
