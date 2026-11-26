@@ -57,6 +57,8 @@ Control зберігає derived geometry й після reorder через на�
 
 Planner desktop тепер має власний runtime Valhalla preview: оператор задає адресу Valhalla, ID набору карт і таймаути, перевіряє `/status`, а `/route` рахується тільки з явно заданим planning profile. Невідомі числові параметри не вигадуються. Успішний розрахунок малює реальну дорожню polyline поверх OSM; без результату умовна пряма не малюється. Preview є похідним від route/revision/profile: зміна чернетки або planning profile прибирає стару лінію, а запізніла відповідь не приймається. Невдалий routing не змінює Planner draft.
 
+Planner desktop також уже експортує чинний versioned trip package у schema 1.4 через native Save As. Пакет містить явний planning basis (тип/клас транспорту та вантажі), порядок точок і, за наявності, лише matching snapshot planning routing profile/Valhalla geometry. TripId стабільний для однієї чернетки, TripVersion продовжується між перезапусками, CargoId не залежить від позиції рядка, а існуючий ZIP ніколи не перезаписується.
+
 ## Test v0.1.0-preview.7
 
 [Відкрити Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
@@ -96,7 +98,7 @@ Android та Apple пакети поки не підписані для мага
 
 ## Що ще попереду
 
-- package export із Planner UI через наявний versioned trip package;
+- ручне створення нового рейсу безпосередньо в Control, коли Planner ZIP відсутній;
 
 - ручне local browser acceptance;
 - перевірка того самого Driver Browser на реальному телефоні в LAN;
