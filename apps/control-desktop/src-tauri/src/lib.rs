@@ -1197,6 +1197,23 @@ mod tests {
             Some("tractor + semi-trailer")
         );
 
+        let dashboard = service.dashboard(token).expect("dashboard");
+        let planned = dashboard.planning_basis.expect("planning basis");
+        assert_eq!(planned.vehicle_type, "synthetic truck");
+        assert!(planned.cargos.is_empty());
+        assert_eq!(
+            dashboard.actual_context.endpoint_label.as_deref(),
+            Some("Cab tablet")
+        );
+        assert_eq!(
+            dashboard.actual_context.vehicle_label.as_deref(),
+            Some("BC 1234 AB")
+        );
+        assert_eq!(
+            dashboard.actual_context.vehicle_type.as_deref(),
+            Some("tractor + semi-trailer")
+        );
+
         let renamed = service
             .update_session_metadata(UpdateSessionMetadataInput {
                 token: token.to_owned(),
