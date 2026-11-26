@@ -32,7 +32,8 @@
   - відмова routing не скасовує Control reorder і не змінює Planner draft;
   - Planner desktop показує real road geometry поверх OSM через власний runtime Valhalla preview;
   - Planner desktop експортує versioned schema 1.4 ZIP через native Save As, з explicit planning basis, optional matching routing snapshot, durable TripVersion history та stable CargoId.
-- Наступний великий функціональний етап: **ручне створення нового рейсу в Control** без Planner ZIP, на тому самому durable trip state.
+- Control уже вміє **створювати новий активний рейс вручну** без Planner ZIP, на тому самому durable trip state; planning basis при цьому не вигадується, а TripId не прив'язується до автомобіля або endpoint.
+- Поточний release-крок: **v0.1.0-preview.8** з повним набором Control/Planner Windows/macOS/Linux + Android + iOS Simulator + Linux Gateway + SHA256SUMS.
 - Користувацькі compiled test/stable builds мають публікуватися в GitHub Releases, не залишатися тільки в Actions artifacts.
 
 Для продовження: `START_HERE.md` → private module logs → live GitHub.
