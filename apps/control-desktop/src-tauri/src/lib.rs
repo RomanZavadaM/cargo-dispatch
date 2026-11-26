@@ -1056,7 +1056,9 @@ mod tests {
             }),
         );
         let server = tokio::spawn(async move {
-            axum::serve(listener, app).await.expect("mock unavailable Valhalla");
+            axum::serve(listener, app)
+                .await
+                .expect("mock unavailable Valhalla");
         });
 
         let service = DesktopControlService::default();
@@ -1073,7 +1075,10 @@ mod tests {
         let probe = service.test_routing().await.expect("routing probe");
         assert_eq!(probe.state, RoutingAvailabilityState::EngineUnavailable);
         let status = service.status().await.expect("status");
-        assert!(status.routing.is_some(), "failed probe must not erase config");
+        assert!(
+            status.routing.is_some(),
+            "failed probe must not erase config"
+        );
 
         server.abort();
         Ok(())
