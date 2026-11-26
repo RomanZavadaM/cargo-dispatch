@@ -832,7 +832,7 @@ mod tests {
     };
     use serde_json::{Value, json};
     use std::{
-        sync::Arc,
+        sync::{Arc, Mutex as StdMutex},
         time::{SystemTime, UNIX_EPOCH},
     };
     use tokio::{net::TcpListener, sync::Notify, task::JoinHandle};
@@ -854,199 +854,6 @@ mod tests {
             "cargo-dispatch-planner-{name}-{}-{nonce}.jsonl",
             std::process::id()
         ))
-    }
-
-    #[derive(Clone)]
-    struct MockValhalla {
-        requests: Arc<AsyncMutex<Vec<Value>>>,
-        route_started: Arc<Notify>,
-        route_release: Arc<Notify>,
-        delay_route: bool,
-    }
-
-    fn preview_profile() -> PlannerRoutingProfileInput {
-        PlannerRoutingProfileInput {
-            height_m: None,
-            width_m: Some(2.4),
-            length_m: Some(8.5),
-            gross_weight_t: Some(12.0),
-            axle_load_t: None,
-            axle_count: Some(2),
-            hazmat: false,
-            hgv: true,
-            exclude_unpaved: true,
-            prefer_truck_routes: true,
-            toll_preference: PlannerTollPreference::Allow,
-            max_speed_kmh: None,
-        }
-    }
-
-    async fn mock_status() -> Json<Value> {
-        Json(json!({
-            "version": "3.9.2",
-            "tileset_last_modified": 1_795_550_000_u64
-        }))
-    }
-
-    async fn mock_route(
-        AxumState(mock): AxumState<MockValhalla>,
-        Json(payload): Json<Value>,
-    ) -> Json<Value> {
-        mock.requests.lock().await.push(payload);
-        mock.route_started.notify_one();
-        if mock.delay_route {
-            mock.route_release.notified().await;
-        }
-        Json(json!({
-            "trip": {
-                "summary": {"length": 2.75, "time": 240.0},
-                "legs": [{"shape": "gk}`~A_ysyl@gfF_oKwvInnT"}]
-            }
-        }))
-    }
-
-    async fn spawn_mock_valhalla(
-        delay_route: bool,
-    ) -> std::io::Result<(String, MockValhalla, JoinHandle<()>)> {
-        let mock = MockValhalla {
-            requests: Arc::new(AsyncMutex::new(Vec::new())),
-            route_started: Arc::new(Notify::new()),
-            route_release: Arc::new(Notify::new()),
-            delay_route,
-        };
-        let app = Router::new()
-            .route("/status", get(mock_status))
-            .route("/route", post(mock_route))
-            .with_state(mock.clone());
-        let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
-        let address = listener.local_addr()?;
-        let task = tokio::spawn(async move {
-            axum::serve(listener, app).await.expect("mock Valhalla");
-        });
-        Ok((format!("http://{address}/"), mock, task))
-    }
-
-    fn configure_mock_routing(
-        service: &PlannerDesktopService,
-        base_url: String,
-    ) -> PlannerRoutingStatus {
-        service
-            .configure_routing(PlannerRoutingConfigInput {
-                base_url,
-                map_dataset_id: "fixture-europe-2026-11".to_owned(),
-                connect_timeout_ms: 250,
-                request_timeout_ms: 2_000,
-            })
-            .expect("routing config")
-    }
-
-    #[tokio::test]
-    async fn real_preview_uses_current_order_and_only_explicit_vehicle_values()
-    -> std::io::Result<()> {
-        let service = PlannerDesktopService::default();
-        service.add_point(point("A", 49.8393, 24.0296)).expect("A");
-        service.add_point(point("B", 49.8430, 24.0360)).expect("B");
-        let current = service.add_point(point("C", 49.8500, 24.0500)).expect("C");
-        let reordered = service
-            .reorder(ReorderPointsInput {
-                point_ids: vec![
-                    current.points[2].point_id.clone(),
-                    current.points[0].point_id.clone(),
-                    current.points[1].point_id.clone(),
-                ],
-            })
-            .expect("reorder");
-
-        let (base_url, mock, server) = spawn_mock_valhalla(false).await?;
-        let routing = configure_mock_routing(&service, base_url);
-        assert_eq!(routing.map_dataset_id, "fixture-europe-2026-11");
-
-        let probe = service.test_routing().await.expect("probe");
-        assert_eq!(probe.state, PlannerRoutingAvailabilityState::Ok);
-        assert_eq!(probe.engine_version.as_deref(), Some("3.9.2"));
-
-        let profile = preview_profile();
-        let expected_fingerprint = routing_profile(profile.clone())
-            .expect("profile")
-            .profile_fingerprint();
-        let preview = service
-            .preview_route(PlannerRoutingPreviewInput { profile })
-            .await
-            .expect("preview");
-
-        assert_eq!(preview.state, PlannerRoutingPreviewState::Ok);
-        assert_eq!(preview.revision, reordered.revision);
-        assert_eq!(preview.profile_fingerprint, expected_fingerprint);
-        assert_eq!(preview.engine_version.as_deref(), Some("3.9.2"));
-        assert_eq!(
-            preview.map_dataset_id.as_deref(),
-            Some("fixture-europe-2026-11")
-        );
-        assert_eq!(preview.distance_m, Some(2_750.0));
-        assert_eq!(preview.duration_s, Some(240.0));
-        assert!(preview.geometry.len() > 1);
-        assert!(preview.warnings.contains(&"missing_height_m".to_owned()));
-        assert!(preview.warnings.contains(&"missing_axle_load_t".to_owned()));
-        assert_eq!(
-            service.status().expect("status").revision,
-            reordered.revision,
-            "derived preview must not mutate the Planner draft"
-        );
-
-        let requests = mock.requests.lock().await;
-        assert_eq!(requests.len(), 1);
-        let payload = &requests[0];
-        assert_eq!(payload["locations"][0]["lat"], json!(49.8500));
-        assert_eq!(payload["locations"][0]["lon"], json!(24.0500));
-        assert_eq!(payload["locations"][1]["lat"], json!(49.8393));
-        assert_eq!(payload["locations"][2]["lat"], json!(49.8430));
-        assert!(
-            payload["costing_options"]["truck"].get("height").is_none(),
-            "unknown vehicle height must not be invented"
-        );
-        assert_eq!(payload["costing_options"]["truck"]["width"], json!(2.4));
-        drop(requests);
-
-        server.abort();
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn late_valhalla_preview_is_stale_after_draft_edit() -> std::io::Result<()> {
-        let service = Arc::new(PlannerDesktopService::default());
-        service.add_point(point("A", 49.8393, 24.0296)).expect("A");
-        let before = service.add_point(point("B", 49.8430, 24.0360)).expect("B");
-
-        let (base_url, mock, server) = spawn_mock_valhalla(true).await?;
-        configure_mock_routing(&service, base_url);
-
-        let running_service = Arc::clone(&service);
-        let running = tokio::spawn(async move {
-            running_service
-                .preview_route(PlannerRoutingPreviewInput {
-                    profile: preview_profile(),
-                })
-                .await
-        });
-
-        mock.route_started.notified().await;
-        let edited = service
-            .add_point(point("Edited while routing", 49.8500, 24.0500))
-            .expect("edit");
-        assert!(edited.revision > before.revision);
-        mock.route_release.notify_one();
-
-        let preview = running
-            .await
-            .expect("preview task")
-            .expect("preview result");
-        assert_eq!(preview.state, PlannerRoutingPreviewState::StaleDraft);
-        assert!(preview.geometry.is_empty());
-        assert_eq!(preview.revision, before.revision);
-        assert_eq!(service.status().expect("current").revision, edited.revision);
-
-        server.abort();
-        Ok(())
     }
 
     fn routing_profile_input() -> PlannerRoutingProfileInput {
@@ -1119,6 +926,19 @@ mod tests {
     ) -> Json<Value> {
         delay.started.notify_one();
         delay.release.notified().await;
+        route_ok(Json(json!({}))).await
+    }
+
+    #[derive(Clone, Default)]
+    struct CapturedRoute {
+        requests: Arc<StdMutex<Vec<Value>>>,
+    }
+
+    async fn captured_route(
+        AxumState(capture): AxumState<CapturedRoute>,
+        Json(payload): Json<Value>,
+    ) -> Json<Value> {
+        capture.requests.lock().expect("request log").push(payload);
         route_ok(Json(json!({}))).await
     }
 
@@ -1270,6 +1090,58 @@ mod tests {
 
         let after = service.status().expect("draft after preview");
         assert_eq!(after, before);
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn preview_sends_current_order_and_does_not_invent_vehicle_values() {
+        let service = PlannerDesktopService::default();
+        service.add_point(point("A", 49.8393, 24.0296)).expect("A");
+        service.add_point(point("B", 49.8430, 24.0360)).expect("B");
+        let current = service.add_point(point("C", 49.8500, 24.0500)).expect("C");
+        let reordered = service
+            .reorder(ReorderPointsInput {
+                point_ids: vec![
+                    current.points[2].point_id.clone(),
+                    current.points[0].point_id.clone(),
+                    current.points[1].point_id.clone(),
+                ],
+            })
+            .expect("reorder");
+
+        let capture = CapturedRoute::default();
+        let app = Router::new()
+            .route("/status", get(status_ok))
+            .route("/route", post(captured_route))
+            .with_state(capture.clone());
+        let (base_url, server) = spawn_mock_valhalla(app).await;
+        configure_mock(&service, &base_url);
+
+        let preview = service
+            .preview_route(PlannerRoutingPreviewInput {
+                profile: routing_profile_input(),
+            })
+            .await
+            .expect("road preview");
+        assert_eq!(preview.state, PlannerRoutingPreviewState::Ok);
+        assert_eq!(preview.revision, reordered.revision);
+        assert!(preview.warnings.contains(&"missing_height_m".to_owned()));
+        assert_eq!(service.status().expect("draft").revision, reordered.revision);
+
+        let requests = capture.requests.lock().expect("request log");
+        assert_eq!(requests.len(), 1);
+        let payload = &requests[0];
+        assert_eq!(payload["locations"][0]["lat"], json!(49.8500));
+        assert_eq!(payload["locations"][0]["lon"], json!(24.0500));
+        assert_eq!(payload["locations"][1]["lat"], json!(49.8393));
+        assert_eq!(payload["locations"][2]["lat"], json!(49.8430));
+        assert!(
+            payload["costing_options"]["truck"].get("height").is_none(),
+            "unknown vehicle height must not be invented"
+        );
+        assert_eq!(payload["costing_options"]["truck"]["width"], json!(2.55));
+        drop(requests);
+
         server.abort();
     }
 
