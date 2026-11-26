@@ -108,6 +108,18 @@ def check_control() -> None:
         fail("Control UI index is hard-coded to Ukrainian")
 
 
+def check_planner() -> None:
+    catalog = (ROOT / "apps/planner-ui/src/i18n.rs").read_text(encoding="utf-8")
+    expected_statics = ["UK", "EN", "DE", "FR", "ES", "KO", "JA", "ZH"]
+    for name in expected_statics:
+        if f"static {name}: PlannerStrings" not in catalog:
+            fail(f"Planner UI catalog missing {name}")
+
+    index = (ROOT / "apps/planner-ui/index.html").read_text(encoding="utf-8")
+    if '<html lang="uk">' in index:
+        fail("Planner UI index is hard-coded to Ukrainian")
+
+
 def check_driver_browser() -> None:
     source = (ROOT / "crates/control-web/src/lib.rs").read_text(encoding="utf-8")
     if '<html lang="uk">' in source:
@@ -159,6 +171,7 @@ def main() -> None:
     check_xcstrings("apps/driver-ios/CargoDispatchDriver/Localizable.xcstrings")
     check_xcstrings("apps/driver-ios/CargoDispatchDriver/InfoPlist.xcstrings")
     check_control()
+    check_planner()
     check_driver_browser()
     check_readmes()
     print("Localization coverage PASS: uk/en/de/fr/es/ko/ja/zh-Hans")

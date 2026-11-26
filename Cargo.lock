@@ -521,6 +521,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-dispatch-planner-desktop"
+version = "0.1.0"
+dependencies = [
+ "cargo-dispatch-domain",
+ "cargo-dispatch-planner",
+ "cargo-dispatch-planner-ui-contracts",
+ "serde",
+ "tauri",
+ "tauri-build",
+]
+
+[[package]]
+name = "cargo-dispatch-planner-ui"
+version = "0.1.0"
+dependencies = [
+ "cargo-dispatch-planner-ui-contracts",
+ "console_error_panic_hook",
+ "js-sys",
+ "leptos",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "cargo-dispatch-planner-ui-contracts"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "cargo-dispatch-planner"
 version = "0.1.0"
 dependencies = [
