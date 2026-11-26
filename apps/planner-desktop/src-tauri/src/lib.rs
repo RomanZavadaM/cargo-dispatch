@@ -218,7 +218,6 @@ impl PlannerDesktopService {
         )
     }
 
-
     fn routing_status(&self) -> Result<Option<PlannerRoutingStatus>, String> {
         let routing = self
             .routing
@@ -480,7 +479,9 @@ fn warning_code(warning: GeoWarning) -> String {
         GeoWarning::MissingVehicleDimension(VehicleDimension::Height) => "missing_height_m",
         GeoWarning::MissingVehicleDimension(VehicleDimension::Width) => "missing_width_m",
         GeoWarning::MissingVehicleDimension(VehicleDimension::Length) => "missing_length_m",
-        GeoWarning::MissingVehicleDimension(VehicleDimension::GrossWeight) => "missing_gross_weight_t",
+        GeoWarning::MissingVehicleDimension(VehicleDimension::GrossWeight) => {
+            "missing_gross_weight_t"
+        }
         GeoWarning::MissingVehicleDimension(VehicleDimension::AxleLoad) => "missing_axle_load_t",
         GeoWarning::MissingVehicleDimension(VehicleDimension::AxleCount) => "missing_axle_count",
         GeoWarning::ApproximateEstimate => "approximate_estimate",
@@ -759,7 +760,6 @@ fn planner_reorder_points(
 ) -> Result<PlannerRouteView, String> {
     state.reorder(input)
 }
-
 
 #[tauri::command]
 fn planner_routing_status(
