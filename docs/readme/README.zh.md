@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · **🇨🇳 简体中文**
 
-> **状态：** 正在积极开发。当前稳定版本为 **v0.1.0**。完整的 8 语言本地化已集成；下一个主要方向是路线 Planner。
+> **状态：** 正在积极开发。当前稳定版本为 **v0.1.0**。当前测试 prerelease 为 **v0.1.0-preview.7**，已经包含面向 Windows、macOS 和 Linux 的独立 Planner。完整的 8 语言本地化已集成。
 
 ## 产品简介
 
@@ -13,6 +13,7 @@
 ## 当前已实现
 
 - 基于 Tauri/Leptos 的独立桌面 **Control** 应用；
+- 基于 Tauri/Leptos 的独立桌面 **Planner**：手动路线草稿、站点添加/删除/重排、导航坐标，以及由 Planner core 管理的 revision；
 - 活跃行程的持久本地存储与重启恢复；
 - Planner 与 Control 之间的版本化 trip package；
 - 一个自适应 **Driver Browser**，适用于手机、平板、笔记本和桌面浏览器；
@@ -52,6 +53,26 @@ Control 和 Driver Browser 已经包含真正的交互式基础地图，可显�
 
 Valhalla 地址、地图数据集 ID 和 timeout 可直接在 Desktop Control 中设置；可以通过 `/status` 检查可用性，也可以明确关闭 routing。即使 Valhalla 未配置或暂时不可用，Control 仍会保存新的站点顺序，只是派生 geometry 可以暂时不存在。
 
+## Test v0.1.0-preview.7
+
+[打开 Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7)。
+
+这是 **prerelease**，不是 Stable。这是第一个从同一精确源码同时发布独立桌面 Planner 与其他产品组件的集成 preview。
+
+Release 包含：
+- Windows Control x64 ZIP；
+- macOS Control universal ZIP — Intel + Apple Silicon；
+- Linux Control x64 tar.gz；
+- Windows Planner x64 ZIP；
+- macOS Planner universal ZIP — Intel + Apple Silicon；
+- Linux Planner x64 tar.gz；
+- Android Driver debug APK；
+- iOS/iPadOS Driver Simulator ZIP；
+- Linux Addressing Gateway x64 package；
+- SHA256SUMS。
+
+第一个 Planner slice 支持手动路线草稿和站点编辑。在 preview.7 中，Planner 草稿尚不能在重启后保留；这是下一阶段。
+
 ## Stable v0.1.0
 
 [打开 Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0)。
@@ -71,7 +92,7 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 
 ## 后续工作
 
-- 面向 Windows、macOS 和 Linux 的 Planner/editor 桌面 UI 与发布构建；
+- Planner 草稿的重启后持久保存，随后是地图/routing preview 和 package export 准备；
 
 - 本地浏览器手动验收；
 - 在同一 LAN 中用真实手机测试相同的 Driver Browser；
@@ -82,7 +103,7 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 
 ## 界面语言
 
-Control、Driver Browser、Android Driver 和 iOS/iPadOS Driver 已使用同一套 **8 种语言：uk、en、de、fr、es、ko、ja、zh-Hans/zh-CN** 完成实现与验证。Control 和 Driver Browser 支持系统语言与持久化手动选择，CI 会检查全部 8 个本地化的完整性。
+Control、Planner、Driver Browser、Android Driver 和 iOS/iPadOS Driver 已使用同一套 **8 种语言：uk、en、de、fr、es、ko、ja、zh-Hans/zh-CN** 完成实现与验证。Control 和 Driver Browser 支持系统语言与持久化手动选择，CI 会检查全部 8 个本地化的完整性。
 
 ## 文档
 
