@@ -106,6 +106,16 @@ pub struct SessionStatus {
     pub public_driver_url: Option<String>,
 }
 
+impl SessionStatus {
+    /// Identity of one rendered session card. The Control UI keys its session list
+    /// with it, so a card is rebuilt whenever anything it shows changes, such as
+    /// the Driver URL appearing after the listener starts.
+    #[must_use]
+    pub fn card_key(&self) -> String {
+        format!("{self:?}")
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UpdateSessionMetadataInput {
     pub token: String,
@@ -298,4 +308,42 @@ pub struct PickedFile {
     pub path: String,
     pub original_name: String,
     pub mime_type: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn session() -> SessionStatus {
+        SessionStatus {
+            trip_id: "41".repeat(16),
+            token: "trip-0000000000000001".to_owned(),
+            display_name: "trip-41414141".to_owned(),
+            endpoint_id: None,
+            endpoint_label: None,
+            vehicle_label: None,
+            vehicle_type: None,
+            routing_profile: None,
+            driver_url: None,
+            public_driver_url: None,
+        }
+    }
+
+    #[test]
+    fn session_card_is_rebuilt_when_what_it_shows_changes() {
+        let before = session();
+        assert_eq!(before.card_key(), session().card_key());
+
+        let mut local = session();
+        local.driver_url = Some("http://local.invalid/driver/t".to_owned());
+        assert_ne!(before.card_key(), local.card_key());
+
+        let mut public = session();
+        public.public_driver_url = Some("https://public.invalid/driver/t".to_owned());
+        assert_ne!(before.card_key(), public.card_key());
+
+        let mut renamed = session();
+        renamed.vehicle_label = Some("synthetic truck".to_owned());
+        assert_ne!(before.card_key(), renamed.card_key());
+    }
 }

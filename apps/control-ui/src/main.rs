@@ -1682,7 +1682,7 @@ fn ControlApp() -> impl IntoView {
                 <ul>
                     <For
                         each=move || status.get().map(|current| current.sessions).unwrap_or_default()
-                        key=|session| session.token.clone()
+                        key=|session| session.card_key()
                         children=move |session| {
                             let trip = session.trip_id.clone();
                             let session_token = session.token.clone();
@@ -2383,6 +2383,7 @@ fn ControlApp() -> impl IntoView {
                 class=move || if error.get() { "error" } else { "ok" }
                 role="status"
                 aria-live="polite"
+                hidden=move || message.get().is_empty()
             >
                 {move || message.get()}
             </p>
