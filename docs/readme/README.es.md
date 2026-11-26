@@ -13,7 +13,7 @@ El lenguaje principal de desarrollo es **Rust**.
 ## Funciones ya disponibles
 
 - aplicación de escritorio **Control** separada basada en Tauri/Leptos;
-- una aplicación desktop **Planner** separada basada en Tauri/Leptos: borrador manual de ruta, añadir/eliminar/reordenar puntos, coordenadas de navegación y revisión gestionada por Planner core;
+- una aplicación desktop **Planner** separada basada en Tauri/Leptos: borrador manual de ruta, añadir/eliminar/reordenar puntos, coordenadas de navegación y revisión gestionada por Planner core; el borrador se guarda en un journal append-only versionado dentro de los datos de la aplicación y se recupera tras reiniciar;
 - almacenamiento local persistente del viaje activo y recuperación tras reinicio;
 - paquete de viaje versionado entre Planner y Control;
 - un único **Driver Browser** adaptable para teléfono, tableta, portátil y navegador de escritorio;
@@ -92,7 +92,7 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 
 ## Qué falta
 
-- persistencia duradera del borrador de Planner entre reinicios, seguida de vista previa de mapa/routing y preparación del package export;
+- vista previa de mapa/routing en Planner y después preparación del package export desde la UI de Planner;
 
 - validación manual local en navegador;
 - prueba del mismo Driver Browser en un teléfono real dentro de la misma LAN;
