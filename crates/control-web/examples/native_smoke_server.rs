@@ -96,8 +96,8 @@ async fn main() -> io::Result<()> {
             )
         })?;
         let config = GatewayRelayConfig::new(
-            gateway_base_url,
-            local_base_url,
+            &gateway_base_url,
+            &local_base_url,
             control_secret,
             token.clone(),
         )
