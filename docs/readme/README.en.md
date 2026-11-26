@@ -96,8 +96,6 @@ Android and Apple packages are not yet store-signed. App Store/TestFlight/Google
 
 ## What is still ahead
 
-- creating a new trip directly in Control when no Planner ZIP is available;
-
 - manual local-browser acceptance;
 - testing the same Driver Browser on a real phone in the same LAN;
 - HTTPS/public addressing path;

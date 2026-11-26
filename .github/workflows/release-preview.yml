@@ -331,11 +331,12 @@ jobs:
           cat > "$PACKAGE/README-TEST.txt" <<'EOF'
           Cargo Dispatch Planner — macOS universal preview
 
-          First Planner desktop slice: manual route draft with point add/remove/reorder,
-          navigation coordinates, core-owned revision and 8 UI languages.
+          Planner desktop preview: durable manual route draft with point add/remove/reorder,
+          navigation coordinates, revision history, 8 UI languages, real Valhalla road preview
+          over OpenStreetMap and schema 1.4 ZIP export through native Save As.
 
-          This test build keeps the draft in process memory only. Durable Planner draft
-          persistence, routing preview and package export are later slices.
+          Planner routing parameters are a planning snapshot for a calculation, not a permanent
+          trip-to-vehicle binding. Unknown vehicle dimensions are not invented.
           EOF
 
           ditto -c -k --sequesterRsrc --keepParent "$PACKAGE" "$PACKAGE.zip"
@@ -395,11 +396,12 @@ jobs:
           cat > "$PACKAGE/README-TEST.txt" <<'EOF'
           Cargo Dispatch Planner — Linux x64 preview
 
-          First Planner desktop slice: manual route draft with point add/remove/reorder,
-          navigation coordinates, core-owned revision and 8 UI languages.
+          Planner desktop preview: durable manual route draft with point add/remove/reorder,
+          navigation coordinates, revision history, 8 UI languages, real Valhalla road preview
+          over OpenStreetMap and schema 1.4 ZIP export through native Save As.
 
-          This test build keeps the draft in process memory only. Durable Planner draft
-          persistence, routing preview and package export are later slices.
+          Planner routing parameters are a planning snapshot for a calculation, not a permanent
+          trip-to-vehicle binding. Unknown vehicle dimensions are not invented.
           EOF
           tar -czf "$PACKAGE.tar.gz" "$PACKAGE"
 
@@ -565,9 +567,10 @@ jobs:
           6. Check route reorder both ways, files/PDF, Browser -> Control photo/video/file + Save,
              two browser clients, refresh/reconnect and maps in Control/Driver Browser.
 
-          Versioned schema 1.3 road geometry, runtime Valhalla configuration and live
-          recalculation after reorder are included. Real-world HTTPS/NAT/CGNAT field acceptance
-          remains separate field work.
+          Versioned schema 1.4 planning basis, separate mutable actual routing context,
+          runtime Valhalla configuration and live recalculation after reorder are included.
+          Control can also create a new active trip manually without a Planner ZIP.
+          Real-world HTTPS/NAT/CGNAT field acceptance remains separate field work.
           "@ | Set-Content -Encoding UTF8 "$packageName/README-TEST.txt"
 
           $windowsZip = "$packageName.zip"
@@ -584,11 +587,12 @@ jobs:
           @"
           Cargo Dispatch Planner $env:TAG — Windows preview
 
-          First Planner desktop slice: manual route draft with point add/remove/reorder,
-          navigation coordinates, core-owned revision and 8 UI languages.
+          Planner desktop preview: durable manual route draft with point add/remove/reorder,
+          navigation coordinates, revision history, 8 UI languages, real Valhalla road preview
+          over OpenStreetMap and schema 1.4 ZIP export through native Save As.
 
-          This test build keeps the draft in process memory only. Durable Planner draft
-          persistence, routing preview and package export are later slices.
+          Planner routing parameters are a planning snapshot for a calculation, not a permanent
+          trip-to-vehicle binding. Unknown vehicle dimensions are not invented.
           "@ | Set-Content -Encoding UTF8 "$plannerPackage/README-TEST.txt"
           $plannerWindowsZip = "$plannerPackage.zip"
           Compress-Archive -Path "$plannerPackage" -DestinationPath $plannerWindowsZip -CompressionLevel Optimal
@@ -670,14 +674,18 @@ jobs:
           ### Уже в цьому preview
           - Control desktop на Rust/Tauri + Leptos;
           - окремий Planner desktop на Rust/Tauri + Leptos для Windows/macOS/Linux;
-          - чернетка ручного маршруту в Planner: додавання, видалення й перестановка точок, координати навігації, ревізії через ядро Planner, 8 мов;
+          - durable чернетка Planner: додавання, видалення й перестановка точок, координати навігації, ревізії, restart recovery і 8 мов;
+          - real Valhalla preview у Planner з реальною дорожньою polyline поверх OSM без вигаданих параметрів авто;
+          - export versioned schema 1.4 ZIP із explicit planning basis, stable TripId/TripVersion/CargoId та optional matching routing snapshot;
+          - Control приймає Planner ZIP або створює новий активний рейс вручну без Planner ZIP;
           - постійне локальне збереження активного рейсу та відновлення після перезапуску;
           - адаптивний Driver Browser для телефона, планшета та широкого desktop/ноутбук режиму;
           - зміна порядку відкритих точок;
           - документи, фото, відео та геолокація;
           - інтерактивні карти;
-          - адаптер Valhalla, дорожня геометрія schema 1.3 + фактичний профіль маршрутизації автомобіля; старі schema 1.0–1.2 залишаються читабельними;
-          - налаштування адреси Valhalla, набору карт і таймаутів у Desktop Control та живий перерахунок геометрії після зміни порядку точок;
+          - schema 1.4 з immutable planning basis; Planner planning profile є snapshot конкретного розрахунку, а не прив'язкою рейсу до авто; старі schema залишаються читабельними;
+          - Control веде окремий mutable actual routing context для активної сесії; зміна фактичного авто не змінює TripId або endpoint;
+          - налаштування Valhalla, bounded timeouts і живий перерахунок геометрії після зміни порядку точок; stale/late відповіді не перезаписують новіший стан;
           - нативні Android та iOS/iPadOS Driver і тестові збірки з того самого коду релізу;
           - сервер Addressing Gateway для публічного зв'язку Control ↔ Driver без зберігання рейсу на сервері.
 

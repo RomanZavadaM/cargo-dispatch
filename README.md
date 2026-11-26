@@ -12,7 +12,7 @@
 
 ## Що вже є в поточному продукті
 
-- окремий desktop **Control** на Tauri/Leptos;
+- окремий desktop **Control** на Tauri/Leptos; Control приймає Planner ZIP або створює новий активний рейс вручну без Planner ZIP на тому самому durable trip state;
 - окремий desktop **Planner** на Tauri/Leptos: ручна чернетка маршруту, додавання/видалення/перестановка точок, координати навігації та revision через Planner core; чернетка зберігається у versioned append-only journal в app-data і відновлюється після перезапуску;
 - постійне локальне збереження активного рейсу та відновлення після перезапуску;
 - versioned trip package між Planner і Control;
@@ -77,7 +77,7 @@ Release містить:
 - Linux Addressing Gateway x64 package;
 - SHA256SUMS.
 
-Перший Planner slice працює з ручною чернеткою маршруту та точками. У preview.7 чернетка Planner ще не зберігається між перезапусками; це наступний етап.
+preview.7 був першим релізом з окремим compiled Planner. Поточний main уже значно попереду: durable Planner draft, real Valhalla road preview, schema 1.4 ZIP export і ручне створення активного рейсу в Control увійдуть у наступний preview.
 
 ## Stable v0.1.0
 
@@ -97,8 +97,6 @@ Stable збирається з одного exact source і публікує:
 Android та Apple пакети поки не підписані для магазинів. App Store/TestFlight/Google Play і production signing опрацюємо окремо пізніше.
 
 ## Що ще попереду
-
-- ручне створення нового рейсу безпосередньо в Control, коли Planner ZIP відсутній;
 
 - ручне local browser acceptance;
 - перевірка того самого Driver Browser на реальному телефоні в LAN;

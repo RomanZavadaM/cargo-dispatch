@@ -45,9 +45,9 @@
   - Planner експортує schema 1.4 ZIP через native Save As: explicit planning basis, ordered points, optional matching routing snapshot, durable TripVersion history і стабільні CargoId за row identity; існуючий ZIP не перезаписується.
 
 ## Next
-1. Додати в Control ручне створення нового активного рейсу, коли Planner ZIP відсутній.
-2. Ручний рейс має використовувати той самий durable trip state, reorder, документи, геолокацію й routing, що й імпортований рейс.
-3. Не вигадувати planning basis і не прив'язувати TripId до автомобіля або endpoint; actual vehicle/device context лишається окремим mutable станом Control.
-4. Compiled test/stable builds публікувати через GitHub Releases, не залишати тільки в Actions artifacts.
+1. Ручне створення активного рейсу в Control без Planner ZIP уже інтегроване й використовує той самий durable trip state.
+2. Ручний рейс не вигадує planning basis; TripId не прив'язується до автомобіля або endpoint, actual vehicle/device context лишається окремим mutable станом Control.
+3. Поточний release-крок — підготувати й опублікувати повний `v0.1.0-preview.8` через GitHub Releases.
+4. Після preview.8 — ручне приймання актуальних Control/Planner збірок і продовження наступного продуктового етапу.
 
 Продовження: `START_HERE.md` → private HANDOFF/PROJECT_STATE → Planner STATE/WORKLOG → live GitHub.

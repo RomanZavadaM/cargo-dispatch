@@ -96,8 +96,6 @@ Android와 Apple 패키지는 아직 스토어용 서명이 되어 있지 않습
 
 ## 앞으로 필요한 작업
 
-- Planner ZIP이 없을 때 Control에서 직접 새 운행을 생성;
-
 - 로컬 브라우저 수동 검수;
 - 동일한 Driver Browser를 실제 휴대폰에서 같은 LAN으로 테스트;
 - HTTPS/public addressing 경로;

@@ -16,7 +16,7 @@
    - Driver iPhone/iPad Simulator build;
    - Addressing Gateway для Linux;
    - `SHA256SUMS.txt`.
-9. Поточний `main` уже випереджає `preview.7`: Planner manual draft durable, має real Valhalla road preview і експортує versioned schema 1.4 ZIP через native Save As; TripId/TripVersion та CargoId зберігають стабільну ідентичність між послідовними версіями рейсу.
+9. Поточний `main` уже випереджає `preview.7`: Planner manual draft durable, має real Valhalla road preview і експортує versioned schema 1.4 ZIP через native Save As; Control може імпортувати цей ZIP або створити новий активний рейс вручну без Planner ZIP. TripId не прив'язаний до автомобіля чи endpoint.
 10. Control залишається єдиним джерелом фактичного стану активного рейсу. Gateway не зберігає trip DB, документи, медіа чи історію позицій.
 11. Повна локалізація 8 мовами інтегрована й захищена CI, включно з Planner UI.
-12. Наступний активний продуктовий етап — ручне створення нового активного рейсу в Control без Planner ZIP; це має використовувати той самий durable trip state, не вигадувати planning basis і не прив'язувати рейс до автомобіля.
+12. Ручне створення рейсу в Control уже інтегроване й використовує той самий durable trip state без вигаданого planning basis. Поточна release-підготовка — повний `v0.1.0-preview.8` з Control/Planner Windows/macOS/Linux, Android, iOS Simulator, Gateway і SHA256SUMS.
