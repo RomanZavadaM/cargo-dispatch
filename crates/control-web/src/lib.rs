@@ -18,7 +18,8 @@ use cargo_dispatch_geo::{
     valhalla_http::{ValhallaHttpClient, ValhallaHttpError, ValhallaRuntimeConfig},
 };
 use cargo_dispatch_trip_files::{
-    DocumentDirection, DocumentStoreDraft, DriverLocationSample, StoredDocument, TripFolder,
+    ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, DriverLocationSample,
+    StoredDocument, TripFolder,
 };
 use futures_util::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
@@ -1114,6 +1115,26 @@ impl ControlBrowserState {
             .lock()
             .map_err(|_| io::Error::other("trip state unavailable"))?;
         Ok(snapshot(&trip))
+    }
+
+    pub fn session_metadata(&self, token: &str) -> io::Result<ActiveTripSessionMetadata> {
+        let trip = self.shared_trip(token)?;
+        let trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        Ok(trip.session_metadata().clone())
+    }
+
+    pub fn set_session_metadata(
+        &self,
+        token: &str,
+        metadata: ActiveTripSessionMetadata,
+    ) -> io::Result<()> {
+        let trip = self.shared_trip(token)?;
+        let mut trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.set_session_metadata(metadata)
     }
 
     pub fn reorder_session_route(
