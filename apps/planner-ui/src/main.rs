@@ -797,6 +797,7 @@ fn PlannerApp() -> impl IntoView {
                 return;
             }
         };
+        let expected_profile = profile.clone();
         busy.set(true);
         spawn_local(async move {
             let input = PlannerRoutingPreviewInput { profile };
@@ -809,17 +810,24 @@ fn PlannerApp() -> impl IntoView {
                 Ok(result) => {
                     let state = result.state;
                     let current_route = route.get_untracked();
-                    let still_current = current_route.as_ref().is_some_and(|current| {
-                        current.working_route_id == result.working_route_id
-                            && current.revision == result.revision
-                    });
+                    let profile_still_current = routing_profile
+                        .get_untracked()
+                        .input()
+                        .is_ok_and(|current| current == expected_profile);
+                    let still_current = profile_still_current
+                        && current_route.as_ref().is_some_and(|current| {
+                            current.working_route_id == result.working_route_id
+                                && current.revision == result.revision
+                        });
                     if still_current {
                         preview.set(Some(result));
+                        message.set(preview_message(state, locale.get_untracked()).to_owned());
+                        error.set(state != PlannerRoutingPreviewState::Ok);
                     } else {
                         preview.set(None);
+                        message.set(strings(locale.get_untracked()).preview_stale.to_owned());
+                        error.set(true);
                     }
-                    message.set(preview_message(state, locale.get_untracked()).to_owned());
-                    error.set(state != PlannerRoutingPreviewState::Ok);
                 }
                 Err(problem) => {
                     preview.set(None);
