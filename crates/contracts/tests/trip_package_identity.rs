@@ -19,7 +19,7 @@ fn public_contract_keeps_schema_and_plan_versions_independent() {
     .expect("valid package identity");
 
     assert_eq!(header.schema_name, TRIP_PACKAGE_SCHEMA_NAME);
-    assert_eq!(CURRENT_SCHEMA_VERSION, SchemaVersion::new(1, 3));
+    assert_eq!(CURRENT_SCHEMA_VERSION, SchemaVersion::new(1, 4));
     assert_eq!(header.trip_version.get(), 3);
     assert_eq!(header.base_version.map(TripVersion::get), Some(2));
 }
