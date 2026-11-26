@@ -496,11 +496,7 @@ fn PlannerApp() -> impl IntoView {
                 .map(|value| value.geometry)
                 .unwrap_or_default();
             if let Ok(geometry_json) = serde_json::to_string(&geometry) {
-                cargo_planner_map_render(
-                    &current.working_route_id,
-                    &points_json,
-                    &geometry_json,
-                );
+                cargo_planner_map_render(&current.working_route_id, &points_json, &geometry_json);
             }
         }
     });
@@ -695,7 +691,11 @@ fn PlannerApp() -> impl IntoView {
                 Ok(current) => {
                     preview.set(None);
                     routing_status.set(Some(current));
-                    message.set(strings(locale.get_untracked()).routing_configured.to_owned());
+                    message.set(
+                        strings(locale.get_untracked())
+                            .routing_configured
+                            .to_owned(),
+                    );
                     error.set(false);
                 }
                 Err(problem) => {
@@ -763,19 +763,31 @@ fn PlannerApp() -> impl IntoView {
             return;
         };
         if current.points.len() < 2 {
-            message.set(strings(locale.get_untracked()).preview_needs_points.to_owned());
+            message.set(
+                strings(locale.get_untracked())
+                    .preview_needs_points
+                    .to_owned(),
+            );
             error.set(true);
             return;
         }
         let profile = match routing_profile.get_untracked().input() {
             Ok(profile) => profile,
             Err(RoutingDraftError::InvalidNumber) => {
-                message.set(strings(locale.get_untracked()).invalid_profile_value.to_owned());
+                message.set(
+                    strings(locale.get_untracked())
+                        .invalid_profile_value
+                        .to_owned(),
+                );
                 error.set(true);
                 return;
             }
             Err(RoutingDraftError::ChoiceRequired) => {
-                message.set(strings(locale.get_untracked()).routing_choice_required.to_owned());
+                message.set(
+                    strings(locale.get_untracked())
+                        .routing_choice_required
+                        .to_owned(),
+                );
                 error.set(true);
                 return;
             }
