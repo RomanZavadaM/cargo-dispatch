@@ -22,7 +22,9 @@
 - 文件、照片和视频 **Driver Browser → Control**，并可本地保存；
 - 同一行程可同时连接两个浏览器客户端，并在无独立浏览器数据库的情况下重新连接；
 - Control 和 Driver Browser 中的交互式 OpenStreetMap 地图；
-- 用于测试和本地工作的 loopback 与显式 LAN 模式。\n- 自动化 Driver Browser 验收会分别通过 loopback 和显式 private-LAN bind 验证真实 Control session。
+- 用于测试和本地工作的 loopback 与显式 LAN 模式；
+- 自动化 Driver Browser 验收会分别通过 loopback 和显式 private-LAN bind 验证真实 Control session；
+- 自动化 public HTTPS Gateway 验收会验证真实的 `Control ↔ public HTTPS Gateway ↔ Driver Browser` 链路、仅出站的 Control、浏览器 shell/snapshot/location 以及双向文件。
 
 ## 原生 Driver App
 
@@ -98,9 +100,8 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 
 - 在 narrow phone / tablet / wide desktop 下进行本地浏览器手动视觉验收，包括地图 pan/zoom/fit；
 - 在同一 LAN 中用真实手机测试相同的 Driver Browser；
-- HTTPS/公共寻址路径；
-- 通过 HTTPS 完成浏览器 GPS 验收；
-- 不同网络/NAT/CGNAT 的现场测试；
+- 在独立网络和移动 NAT/CGNAT 中使用真实设备进行 HTTPS 现场验收；
+- 在真实设备上通过 HTTPS 完成浏览器 GPS 验收；
 
 
 ## 界面语言
