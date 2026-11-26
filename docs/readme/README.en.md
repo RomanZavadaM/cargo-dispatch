@@ -48,9 +48,9 @@ Trip data, route actions, files, and backend calls are shared; only layout chang
 
 Control and Driver Browser now contain a real interactive basemap with trip points and the latest accepted driver position.
 
-The `main` branch now contains a versioned road-geometry pipeline (schema 1.2): Planner can carry derived geometry, Control stores it, and both maps draw the road line only while it matches the current stop order. Any reorder invalidates the stale line immediately.
+The `main` branch now contains a versioned road-geometry pipeline (schema 1.3): Planner carries derived geometry together with the actual vehicle routing profile, while schema 1.0–1.2 packages remain readable. Control stores geometry and, after a reorder, recalculates the road line through the configured runtime Valhalla service. A late routing response cannot overwrite a newer trip state.
 
-What is still missing is the **live HTTP transport to Valhalla and automatic geometry recalculation**. The geometry contract and rendering exist; the external routing engine is not yet connected to the product runtime.
+The Valhalla address, map dataset ID and timeouts are configured directly in Desktop Control; availability can be checked through `/status`, or routing can be explicitly disabled. If Valhalla is not configured or is temporarily unavailable, the new point order is still stored by Control and derived geometry may simply be absent.
 
 ## Stable v0.1.0
 
@@ -78,7 +78,6 @@ Android and Apple packages are not yet store-signed. App Store/TestFlight/Google
 - HTTPS/public addressing path;
 - full browser GPS acceptance over HTTPS;
 - field testing across different networks/NAT/CGNAT;
-- live Valhalla HTTP transport and geometry recalculation after reorder;
 
 
 ## Interface languages
