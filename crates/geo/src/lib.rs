@@ -5,6 +5,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 pub mod valhalla;
+pub mod valhalla_http;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GeoPoint {

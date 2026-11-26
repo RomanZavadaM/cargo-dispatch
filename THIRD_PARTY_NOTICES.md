@@ -5,6 +5,11 @@ cargo-dispatch може містити або розповсюджуватися
 ## Rust crates
 Файловий обмін використовує crates.io: serde і serde_json для опису рейсу (MIT або Apache-2.0), sha2 для відбитка плану (MIT або Apache-2.0), tempfile для запису без перезапису наявних даних (MIT або Apache-2.0) та zip для переносного архіву (MIT). Перелік версій і непрямих залежностей фіксує Cargo.lock. Ліцензії й повідомлення про вразливості перевіряються під час збірки.
 
+### Planner Valhalla HTTP transport
+- `reqwest 0.13.5` — MIT або Apache-2.0; уже є в dependency graph Control Gateway, тепер напряму використовується Planner geo layer для HTTPS/HTTP звернень до налаштованого оператором Valhalla.
+- Runtime transport звертається лише до Valhalla `/status` для доступності/версії tileset і `/route` для маршруту. URL Valhalla та ідентифікатор набору карт задаються runtime-конфігурацією; код не підставляє вигаданих параметрів автомобіля.
+- Маршрутний запит передає налаштованому Valhalla координати точок і лише ті обмеження автомобіля, які реально задані. Реальні production endpoint/дані/секрети в репозиторії не зберігаються.
+
 ### Control loopback HTTP boundary
 - `axum 0.8.9` — MIT, crates.io / upstream `tokio-rs/axum`; HTTP router/server boundary усередині Control.
 - `tokio 1.54.1` — MIT, crates.io / upstream `tokio-rs/tokio`; TCP/runtime, async file streaming та graceful shutdown.
