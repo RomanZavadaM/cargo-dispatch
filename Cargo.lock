@@ -493,6 +493,7 @@ dependencies = [
  "axum",
  "cargo-dispatch-contracts",
  "cargo-dispatch-domain",
+ "cargo-dispatch-geo",
  "cargo-dispatch-planner",
  "cargo-dispatch-trip-files",
  "futures-util",
