@@ -2,7 +2,7 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · **🇪🇸 Español** · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Estado:** desarrollo activo. La versión estable actual es **v0.1.0**. La localización completa en 8 idiomas está integrada; el siguiente gran foco es el Planner de rutas.
+> **Estado:** desarrollo activo. La versión estable actual es **v0.1.0**. El prerelease de prueba actual es **v0.1.0-preview.7**, que ya incluye un Planner separado para Windows, macOS y Linux. La localización completa en 8 idiomas está integrada.
 
 ## Acerca del producto
 
@@ -13,6 +13,7 @@ El lenguaje principal de desarrollo es **Rust**.
 ## Funciones ya disponibles
 
 - aplicación de escritorio **Control** separada basada en Tauri/Leptos;
+- una aplicación desktop **Planner** separada basada en Tauri/Leptos: borrador manual de ruta, añadir/eliminar/reordenar puntos, coordenadas de navegación y revisión gestionada por Planner core;
 - almacenamiento local persistente del viaje activo y recuperación tras reinicio;
 - paquete de viaje versionado entre Planner y Control;
 - un único **Driver Browser** adaptable para teléfono, tableta, portátil y navegador de escritorio;
@@ -52,6 +53,26 @@ La rama `main` ya contiene una canalización versionada de geometría vial (sche
 
 La dirección de Valhalla, el ID del conjunto de mapas y los tiempos de espera se configuran directamente en Desktop Control; la disponibilidad puede comprobarse mediante `/status` o se puede desactivar el routing de forma explícita. Si Valhalla no está configurado o está temporalmente no disponible, Control conserva igualmente el nuevo orden de puntos y la geometría derivada puede quedar ausente.
 
+## Test v0.1.0-preview.7
+
+[Abrir Test v0.1.0-preview.7](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.7).
+
+Es un **prerelease**, no Stable. Es el primer preview integrado que publica un Planner desktop separado junto con el resto del producto desde una misma fuente exacta.
+
+El release contiene:
+- Windows Control x64 ZIP;
+- macOS Control universal ZIP — Intel + Apple Silicon;
+- Linux Control x64 tar.gz;
+- Windows Planner x64 ZIP;
+- macOS Planner universal ZIP — Intel + Apple Silicon;
+- Linux Planner x64 tar.gz;
+- Android Driver debug APK;
+- iOS/iPadOS Driver Simulator ZIP;
+- Linux Addressing Gateway x64 package;
+- SHA256SUMS.
+
+El primer slice de Planner permite trabajar con un borrador manual de ruta y editar puntos. En preview.7, el borrador de Planner todavía no se conserva entre reinicios; ese es el siguiente paso.
+
 ## Stable v0.1.0
 
 [Abrir Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
@@ -71,7 +92,7 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 
 ## Qué falta
 
-- UI desktop de Planner/editor y builds de release para Windows, macOS y Linux;
+- persistencia duradera del borrador de Planner entre reinicios, seguida de vista previa de mapa/routing y preparación del package export;
 
 - validación manual local en navegador;
 - prueba del mismo Driver Browser en un teléfono real dentro de la misma LAN;
@@ -82,7 +103,7 @@ Los paquetes Android y Apple aún no están firmados para las tiendas. App Store
 
 ## Idiomas de la interfaz
 
-Control, Driver Browser, Android Driver e iOS/iPadOS Driver están implementados y verificados con el mismo **conjunto de 8 idiomas: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control y Driver Browser usan el idioma del sistema más una selección manual persistente, y el CI verifica la cobertura completa de las 8 localizaciones.
+Control, Planner, Driver Browser, Android Driver e iOS/iPadOS Driver están implementados y verificados con el mismo **conjunto de 8 idiomas: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control y Driver Browser usan el idioma del sistema más una selección manual persistente, y el CI verifica la cobertura completa de las 8 localizaciones.
 
 ## Documentación
 
