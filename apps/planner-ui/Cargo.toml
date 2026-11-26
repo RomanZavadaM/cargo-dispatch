@@ -1,0 +1,17 @@
+[package]
+name = "cargo-dispatch-planner-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+cargo-dispatch-planner-ui-contracts = { path = "../../crates/planner-ui-contracts" }
+console_error_panic_hook = "0.1"
+js-sys = "0.3"
+leptos = { version = "=0.8.23", features = ["csr"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"

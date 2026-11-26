@@ -11,8 +11,11 @@ members = [
   "crates/trip-files",
   "crates/control-web",
   "crates/control-ui-contracts",
+  "crates/planner-ui-contracts",
   "apps/control-ui",
   "apps/control-desktop/src-tauri",
+  "apps/planner-ui",
+  "apps/planner-desktop/src-tauri",
 ]
 
 [workspace.package]

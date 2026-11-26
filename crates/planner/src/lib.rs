@@ -661,6 +661,65 @@ pub fn manual_working_route(
     })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ManualWorkingRouteEditError {
+    NotManual,
+    NotDraft(WorkingRouteState),
+    Rejected(Vec<RecalculationHardRejectReason>),
+    RevisionOverflow,
+}
+
+pub fn edit_manual_working_route(
+    route: &WorkingRoute,
+    proposed_point_ids: &[PointId],
+) -> Result<WorkingRoute, ManualWorkingRouteEditError> {
+    if route.origin != WorkingRouteOrigin::Manual {
+        return Err(ManualWorkingRouteEditError::NotManual);
+    }
+    if route.state != WorkingRouteState::Draft {
+        return Err(ManualWorkingRouteEditError::NotDraft(route.state));
+    }
+
+    let validation = validate_recalculation(&route.points, proposed_point_ids);
+    if !validation.hard_reasons.is_empty() {
+        return Err(ManualWorkingRouteEditError::Rejected(
+            validation.hard_reasons,
+        ));
+    }
+
+    let existing: BTreeMap<_, _> = route
+        .points
+        .iter()
+        .map(|point| (point.point_id, *point))
+        .collect();
+    let points = proposed_point_ids
+        .iter()
+        .map(|point_id| {
+            existing
+                .get(point_id)
+                .copied()
+                .unwrap_or(WorkingRoutePoint {
+                    point_id: *point_id,
+                    locked: false,
+                    confirmed: false,
+                })
+        })
+        .collect();
+
+    let current_revision = route
+        .current_revision
+        .checked_add(1)
+        .ok_or(ManualWorkingRouteEditError::RevisionOverflow)?;
+
+    Ok(WorkingRoute {
+        working_route_id: route.working_route_id,
+        origin: route.origin,
+        points,
+        current_revision,
+        state: WorkingRouteState::Draft,
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorkingRouteTransitionError {
     InvalidTransition {
@@ -1960,6 +2019,28 @@ impl<R: RequestRepository> PlannerService<R> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn manual_draft_edit_preserves_state_and_increments_revision() {
+        let route = manual_working_route(
+            working_route_id(91),
+            &[point_id(1), point_id(2), point_id(3)],
+        )
+        .expect("manual route");
+        let edited = edit_manual_working_route(&route, &[point_id(3), point_id(1), point_id(4)])
+            .expect("manual edit");
+
+        assert_eq!(edited.state, WorkingRouteState::Draft);
+        assert_eq!(edited.current_revision, route.current_revision + 1);
+        assert_eq!(
+            edited
+                .points
+                .iter()
+                .map(|point| point.point_id)
+                .collect::<Vec<_>>(),
+            vec![point_id(3), point_id(1), point_id(4)]
+        );
+    }
+
     use super::*;
     use cargo_dispatch_domain::{
         CargoSummary, Place, PlanningAssignment, RequestRevision, SourceKind, SourceMetadata,

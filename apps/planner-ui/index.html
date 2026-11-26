@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Cargo Dispatch — Planner</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #1f2328; background: #f5f6f7; }
+    body { margin: 0; }
+    main { max-width: 1180px; margin: 0 auto; padding: 24px; }
+    header { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+    h1 { margin: 0 0 6px; }
+    section { background: white; border: 1px solid #d8dee4; border-radius: 12px; padding: 18px; margin: 14px 0; }
+    .grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+    label { display: grid; gap: 5px; font-weight: 600; }
+    input, select { padding: 9px 10px; border: 1px solid #b7bec7; border-radius: 7px; font: inherit; }
+    button { padding: 8px 12px; border: 1px solid #8c959f; border-radius: 7px; background: #fff; font: inherit; cursor: pointer; }
+    button.primary { background: #1769aa; color: white; border-color: #1769aa; }
+    button.danger { color: #9a1b1b; }
+    button:disabled { opacity: .45; cursor: default; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .status { padding: 10px; border-radius: 8px; background: #eef3f8; }
+    .error { color: #a40000; }
+    .ok { color: #176b2c; }
+    .note { color: #5f6670; }
+    .route-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 9px; }
+    .route-item { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; border: 1px solid #d8dee4; border-radius: 10px; padding: 11px; }
+    .sequence { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; background: #1769aa; color: white; font-weight: 700; }
+    .point-title { font-weight: 700; }
+    .coords { color: #5f6670; font-size: 13px; margin-top: 3px; }
+    .language { min-width: 170px; }
+    @media (max-width: 760px) {
+      main { padding: 12px; }
+      header { display: grid; }
+      .grid { grid-template-columns: 1fr; }
+      .route-item { grid-template-columns: 42px 1fr; }
+      .route-item .actions { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body></body>
+</html>

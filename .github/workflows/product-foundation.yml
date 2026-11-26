@@ -15,7 +15,10 @@ on:
       - "crates/trip-files/**"
       - "crates/control-web/**"
       - "crates/control-ui-contracts/**"
+      - "crates/planner-ui-contracts/**"
       - "apps/control-ui/**"
+      - "apps/planner-ui/**"
+      - "apps/planner-desktop/**"
       - "apps/control-desktop/**"
       - "THIRD_PARTY_NOTICES.md"
       - "deny.toml"
@@ -63,13 +66,13 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Check
-        run: cargo check --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --all-targets
+        run: cargo check --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --exclude cargo-dispatch-planner-ui --exclude cargo-dispatch-planner-desktop --all-targets
 
       - name: Clippy
-        run: cargo clippy --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --exclude cargo-dispatch-planner-ui --exclude cargo-dispatch-planner-desktop --all-targets -- -D warnings
 
       - name: Tests
-        run: cargo test --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --all-targets
+        run: cargo test --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --exclude cargo-dispatch-planner-ui --exclude cargo-dispatch-planner-desktop --all-targets
 
       - name: Install dependency checker
         run: cargo install cargo-deny --locked --version 0.21.0
@@ -93,7 +96,7 @@ jobs:
           toolchain: "1.91"
 
       - name: Check
-        run: cargo check --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --all-targets
+        run: cargo check --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --exclude cargo-dispatch-planner-ui --exclude cargo-dispatch-planner-desktop --all-targets
 
       - name: Tests
-        run: cargo test --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --all-targets
+        run: cargo test --locked --workspace --exclude cargo-dispatch-control-ui --exclude cargo-dispatch-control-desktop --exclude cargo-dispatch-planner-ui --exclude cargo-dispatch-planner-desktop --all-targets

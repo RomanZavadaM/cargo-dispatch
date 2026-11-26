@@ -1,0 +1,17 @@
+[package]
+name = "cargo-dispatch-planner-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[build-dependencies]
+tauri-build = "=2.7.6"
+
+[dependencies]
+cargo-dispatch-domain = { path = "../../../crates/domain" }
+cargo-dispatch-planner = { path = "../../../crates/planner" }
+cargo-dispatch-planner-ui-contracts = { path = "../../../crates/planner-ui-contracts" }
+serde = { version = "1", features = ["derive"] }
+tauri = "=2.12.7"
