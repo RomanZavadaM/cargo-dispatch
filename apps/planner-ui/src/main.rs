@@ -561,6 +561,7 @@ fn PlannerApp() -> impl IntoView {
     Effect::new(move |_| {
         let _ = routing_profile.get();
         preview.set(None);
+        export_result.set(None);
     });
 
     Effect::new(move |_| {
@@ -622,6 +623,7 @@ fn PlannerApp() -> impl IntoView {
             {
                 Ok(current) => {
                     preview.set(None);
+                    export_result.set(None);
                     route.set(Some(current));
                     title.set(String::new());
                     latitude.set(String::new());
@@ -648,6 +650,7 @@ fn PlannerApp() -> impl IntoView {
             {
                 Ok(current) => {
                     preview.set(None);
+                    export_result.set(None);
                     route.set(Some(current));
                     message.set(strings(locale.get_untracked()).reset_done.to_owned());
                     error.set(false);
@@ -676,6 +679,7 @@ fn PlannerApp() -> impl IntoView {
             {
                 Ok(current) => {
                     preview.set(None);
+                    export_result.set(None);
                     route.set(Some(current));
                     message.set(strings(locale.get_untracked()).removed.to_owned());
                     error.set(false);
@@ -726,6 +730,7 @@ fn PlannerApp() -> impl IntoView {
             {
                 Ok(current) => {
                     preview.set(None);
+                    export_result.set(None);
                     route.set(Some(current));
                     message.set(strings(locale.get_untracked()).reordered.to_owned());
                     error.set(false);
