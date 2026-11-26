@@ -1438,6 +1438,7 @@ fn PlannerApp() -> impl IntoView {
                         <div class="status package-result">
                             <div><strong>{move || strings(locale.get()).package_file}</strong>{format!(": {}", result.path)}</div>
                             <div><strong>{move || strings(locale.get()).package_schema}</strong>{format!(": {}.{}", result.schema_major, result.schema_minor)}</div>
+                            <div><strong>{move || strings(locale.get()).trip_version}</strong>{format!(": {}", result.trip_version)}</div>
                             <div><strong>{move || strings(locale.get()).cargo_count}</strong>{format!(": {}", result.cargo_count)}</div>
                             <div>{geometry}</div>
                         </div>
