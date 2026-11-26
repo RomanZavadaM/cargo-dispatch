@@ -585,7 +585,6 @@ impl DesktopControlService {
         Ok((session_display_name(session), session.token.clone()))
     }
 
-
     async fn configure_routing(
         &self,
         input: ConfigureRoutingInput,
@@ -1086,7 +1085,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn desktop_session_metadata_keeps_endpoint_and_current_vehicle_separate() -> std::io::Result<()> {
+    async fn desktop_session_metadata_keeps_endpoint_and_current_vehicle_separate()
+    -> std::io::Result<()> {
         let tmp = tempfile::tempdir()?;
         let (_trip, folder) = create_trip(tmp.path())?;
         let service = DesktopControlService::default();
@@ -1135,7 +1135,10 @@ mod tests {
             .await
             .expect("operator display name updates");
         assert_eq!(renamed.sessions[0].display_name, "Швеція 01");
-        assert_eq!(renamed.sessions[0].vehicle_label.as_deref(), Some("BC 9999 AA"));
+        assert_eq!(
+            renamed.sessions[0].vehicle_label.as_deref(),
+            Some("BC 9999 AA")
+        );
 
         Ok(())
     }
