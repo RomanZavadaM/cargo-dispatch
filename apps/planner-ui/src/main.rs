@@ -935,7 +935,11 @@ fn PlannerApp() -> impl IntoView {
             return;
         };
         if current.points.is_empty() {
-            message.set(strings(locale.get_untracked()).package_needs_points.to_owned());
+            message.set(
+                strings(locale.get_untracked())
+                    .package_needs_points
+                    .to_owned(),
+            );
             error.set(true);
             return;
         }
@@ -975,11 +979,9 @@ fn PlannerApp() -> impl IntoView {
 
         busy.set(true);
         spawn_local(async move {
-            let selected = invoke::<Option<String>, _>(
-                "planner_pick_export_path",
-                &serde_json::json!({}),
-            )
-            .await;
+            let selected =
+                invoke::<Option<String>, _>("planner_pick_export_path", &serde_json::json!({}))
+                    .await;
             let path = match selected {
                 Ok(Some(path)) => path,
                 Ok(None) => {
