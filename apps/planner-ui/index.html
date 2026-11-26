@@ -13,6 +13,9 @@
     h1 { margin: 0 0 6px; }
     section { background: white; border: 1px solid #d8dee4; border-radius: 12px; padding: 18px; margin: 14px 0; }
     .grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+    .routing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+    .preview-summary { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+    .preview-summary strong { font-weight: 700; }
     label { display: grid; gap: 5px; font-weight: 600; }
     input, select { padding: 9px 10px; border: 1px solid #b7bec7; border-radius: 7px; font: inherit; }
     button { padding: 8px 12px; border: 1px solid #8c959f; border-radius: 7px; background: #fff; font: inherit; cursor: pointer; }
@@ -34,6 +37,8 @@
     .map-tiles, .map-overlays { position: absolute; inset: 0; overflow: hidden; }
     .map-tiles img { position: absolute; width: 256px; height: 256px; max-width: none; user-select: none; pointer-events: none; }
     .map-overlays { pointer-events: none; z-index: 2; }
+    .map-route { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .map-route polyline { fill: none; stroke: #1769aa; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: .85; }
     .map-marker { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid #fff; border-radius: 999px; background: #1769aa; color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 1px 5px #0006; }
     .map-controls { position: absolute; top: 10px; right: 10px; z-index: 4; display: flex; gap: 6px; }
     .map-controls button { min-width: 42px; background: #fff; }
