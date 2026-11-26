@@ -49,9 +49,11 @@ Driver Browser 是**一个产品**，不是分别开发的手机版和桌面版�
 
 Control 和 Driver Browser 已经包含真正的交互式基础地图，可显示行程站点和最后一次被接受的司机位置。
 
-`main` 现在已经集成版本化的道路 geometry 管线（schema 1.3）：Planner 会把派生 geometry 与车辆的实际 routing profile 一起传递，同时仍可读取 schema 1.0–1.2 软件包。Control 保存 geometry，并在站点重新排序后通过已配置的 runtime Valhalla 重新计算道路线。延迟返回的 routing 响应不能覆盖更新的行程状态。
+当前 `main` 使用带有不可变 planning basis 的 schema 1.4，并继续读取旧 schema。Planner routing profile 只是某一次规划计算的输入，不会把行程永久绑定到车辆。Import 之后，Control 会单独维护活动会话真实且可变的 routing context。
 
-Valhalla 地址、地图数据集 ID 和 timeout 可直接在 Desktop Control 中设置；可以通过 `/status` 检查可用性，也可以明确关闭 routing。即使 Valhalla 未配置或暂时不可用，Control 仍会保存新的站点顺序，只是派生 geometry 可以暂时不存在。
+Control 保存派生 geometry，并在站点顺序变化后通过已配置的 runtime Valhalla 重新计算道路线。延迟返回的 routing 响应不能覆盖更新的行程状态。即使 Valhalla 未配置或暂时不可用，新的站点顺序仍会保存，只是派生 geometry 可以暂时不存在。
+
+Planner desktop 现在拥有自己的 runtime Valhalla preview：操作员设置 Valhalla 地址、地图数据集 ID 和 timeout，通过 `/status` 检查可用性，`/route` 只使用明确提供的 planning profile 计算。未知的数值约束不会被猜测。成功结果会在 OSM 上绘制真实道路 polyline；没有结果时不会绘制虚假的直线。Preview 由 route/revision/profile 派生：草稿或 planning profile 改变后旧线路会被清除，延迟响应也会被拒绝。Routing 失败不会修改 Planner 草稿。
 
 ## Test v0.1.0-preview.7
 
@@ -92,7 +94,7 @@ Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight
 
 ## 后续工作
 
-- Planner 中的地图/routing preview，随后从 Planner UI 准备 package export；
+- 通过现有 versioned trip package 从 Planner UI 导出 package；
 
 - 本地浏览器手动验收；
 - 在同一 LAN 中用真实手机测试相同的 Driver Browser；
