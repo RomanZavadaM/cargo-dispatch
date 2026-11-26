@@ -166,11 +166,38 @@ pub struct DashboardRoadGeometry {
     pub points: Vec<DashboardRoadGeometryPoint>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DashboardPlanningCargo {
+    pub cargo_id: String,
+    pub title: String,
+    pub weight_kg: Option<u32>,
+    pub pallets: Option<u16>,
+    pub pickup_point_id: Option<String>,
+    pub unload_point_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DashboardPlanningBasis {
+    pub vehicle_type: String,
+    pub cargos: Vec<DashboardPlanningCargo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DashboardActualContext {
+    pub display_name: Option<String>,
+    pub endpoint_id: Option<String>,
+    pub endpoint_label: Option<String>,
+    pub vehicle_label: Option<String>,
+    pub vehicle_type: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TripDashboard {
     pub trip_id: String,
     pub trip_version: u64,
     pub local_route_revision: u64,
+    pub planning_basis: Option<DashboardPlanningBasis>,
+    pub actual_context: DashboardActualContext,
     pub points: Vec<DashboardPoint>,
     pub road_geometry: Option<DashboardRoadGeometry>,
     pub documents: Vec<DashboardDocument>,
