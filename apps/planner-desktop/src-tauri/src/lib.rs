@@ -835,11 +835,7 @@ mod tests {
         sync::Arc,
         time::{SystemTime, UNIX_EPOCH},
     };
-    use tokio::{
-        net::TcpListener,
-        sync::Notify,
-        task::JoinHandle,
-    };
+    use tokio::{net::TcpListener, sync::Notify, task::JoinHandle};
 
     fn point(title: &str, latitude: f64, longitude: f64) -> PlannerPointInput {
         PlannerPointInput {
@@ -1290,10 +1286,7 @@ mod tests {
             })
             .await
             .expect("unconfigured preview");
-        assert_eq!(
-            preview.state,
-            PlannerRoutingPreviewState::NotConfigured
-        );
+        assert_eq!(preview.state, PlannerRoutingPreviewState::NotConfigured);
         assert!(preview.geometry.is_empty());
         assert_eq!(service.status().expect("draft after failure"), before);
     }
