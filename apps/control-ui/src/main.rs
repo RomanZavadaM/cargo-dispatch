@@ -48,6 +48,12 @@ export function cargoControlSetLocale(locale) {
   localStorage.setItem("cargo-dispatch-control-locale", locale);
   document.documentElement.lang = locale;
 }
+export function cargoControlWindowSessionToken() {
+  return new URLSearchParams(window.location.search).get("session") || "";
+}
+export function cargoControlSetSessionWindowMode(enabled) {
+  document.body.classList.toggle("session-window", enabled);
+}
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = cargoControlInvoke)]
@@ -70,6 +76,12 @@ extern "C" {
 
     #[wasm_bindgen(js_name = cargoControlSetLocale)]
     fn cargo_control_set_locale(locale: &str);
+
+    #[wasm_bindgen(js_name = cargoControlWindowSessionToken)]
+    fn cargo_control_window_session_token() -> String;
+
+    #[wasm_bindgen(js_name = cargoControlSetSessionWindowMode)]
+    fn cargo_control_set_session_window_mode(enabled: bool);
 }
 
 #[wasm_bindgen(inline_js = r#"
@@ -476,6 +488,12 @@ fn ControlApp() -> impl IntoView {
     let routing_request_timeout = RwSignal::new("10000".to_owned());
     let status = RwSignal::new(None::<ControlUiStatus>);
     let selected_token = RwSignal::new(String::new());
+    let window_session_token = cargo_control_window_session_token();
+    let session_window = !window_session_token.is_empty();
+    if session_window {
+        selected_token.set(window_session_token);
+        cargo_control_set_session_window_mode(true);
+    }
     let dashboard = RwSignal::new(None::<TripDashboard>);
     let picked_file = RwSignal::new(None::<PickedFile>);
     let attachment_point = RwSignal::new(String::new());
@@ -934,7 +952,7 @@ fn ControlApp() -> impl IntoView {
                 <p class="note">{move || strings(locale.get()).subtitle}</p>
             </header>
 
-            <section>
+            <section class="manager-only">
                 <h2>{move || strings(locale.get()).connect_trip}</h2>
                 <div class="grid">
                     <label>
@@ -968,7 +986,7 @@ fn ControlApp() -> impl IntoView {
                 </div>
             </section>
 
-            <section>
+            <section class="manager-only">
                 <h2>{move || strings(locale.get()).broadcast}</h2>
                 <div class="actions">
                     <button type="button" on:click=start_loopback disabled=move || busy.get()>
@@ -1118,7 +1136,7 @@ fn ControlApp() -> impl IntoView {
                 <p class="note">{move || strings(locale.get()).routing_note}</p>
             </section>
 
-            <section>
+            <section class="manager-only">
                 <h2>{move || strings(locale.get()).browser_sessions}</h2>
                 <div class="status">
                     {move || {
@@ -1313,6 +1331,30 @@ fn ControlApp() -> impl IntoView {
                                         }
                                     >
                                         {move || strings(locale.get()).open_dashboard}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        on:click=move |_| {
+                                            let token = session.token.clone();
+                                            spawn_local(async move {
+                                                let result = invoke::<(), _>(
+                                                    "open_session_window",
+                                                    &serde_json::json!({
+                                                        "input": SessionInput { token }
+                                                    }),
+                                                )
+                                                .await;
+                                                if let Err(problem) = result {
+                                                    message.set(localize_problem(
+                                                        locale.get_untracked(),
+                                                        &problem,
+                                                    ));
+                                                    error.set(true);
+                                                }
+                                            });
+                                        }
+                                    >
+                                        {move || strings(locale.get()).open_session_window}
                                     </button>
                                 </li>
                             }
