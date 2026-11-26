@@ -9,9 +9,9 @@ use cargo_dispatch_control_ui_contracts::{
     ConfigureRoutingInput, ControlUiStatus, CreateManualTripInput, CreateManualTripPointInput,
     DashboardDocumentDirection, DashboardPoint, DashboardVehicleRoutingProfile, ListenerMode,
     OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
-    RoutingAvailabilityState, RoutingProbeResult,
-    RoutingTollPreference, SaveDocumentInput, SessionInput, StartGatewayInput, StartLanInput,
-    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput,
+    RoutingAvailabilityState, RoutingProbeResult, RoutingTollPreference, SaveDocumentInput,
+    SessionInput, StartGatewayInput, StartLanInput, TripDashboard, UpdateRoutingContextInput,
+    UpdateSessionMetadataInput,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -958,7 +958,11 @@ fn ControlApp() -> impl IntoView {
         {
             Ok(points) if !points.is_empty() => points,
             _ => {
-                message.set(strings(locale.get_untracked()).manual_point_invalid.to_owned());
+                message.set(
+                    strings(locale.get_untracked())
+                        .manual_point_invalid
+                        .to_owned(),
+                );
                 error.set(true);
                 return;
             }
@@ -1001,7 +1005,11 @@ fn ControlApp() -> impl IntoView {
                     manual_token.set(cargo_control_random_token());
                     manual_trip_id.set(cargo_control_random_id());
                     manual_points.set(vec![ManualPointDraft::new(), ManualPointDraft::new()]);
-                    message.set(strings(locale.get_untracked()).manual_trip_created.to_owned());
+                    message.set(
+                        strings(locale.get_untracked())
+                            .manual_trip_created
+                            .to_owned(),
+                    );
                     error.set(false);
                 }
                 Err(problem) => {
