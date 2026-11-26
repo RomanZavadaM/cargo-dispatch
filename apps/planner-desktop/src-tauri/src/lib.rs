@@ -16,8 +16,7 @@ use cargo_dispatch_planner::{
     manual_working_route,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    PlannerPackageCargoInput, PlannerPackageExportInput, PlannerPackageExportResult,
-    PlannerPointInput, PlannerPointView, PlannerRoadGeometryPoint, PlannerRouteView,
+    PlannerPackageExportInput, PlannerPackageExportResult, PlannerPointInput, PlannerPointView, PlannerRoadGeometryPoint, PlannerRouteView,
     PlannerRoutingAvailabilityState, PlannerRoutingConfigInput, PlannerRoutingPreviewInput,
     PlannerRoutingPreviewState, PlannerRoutingPreviewView, PlannerRoutingProbeResult,
     PlannerRoutingProfileInput, PlannerRoutingStatus, PlannerTollPreference, PointActionInput,
@@ -1112,6 +1111,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cargo_dispatch_planner_ui_contracts::PlannerPackageCargoInput;
     use axum::{
         Json, Router,
         extract::State as AxumState,
