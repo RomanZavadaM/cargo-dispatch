@@ -27,6 +27,7 @@ pub enum ProblemKind {
 
 /// Fragments of service messages. The first match wins.
 const FRAGMENTS: &[(&str, ProblemKind)] = &[
+    ("запам'ятати рейси", ProblemKind::TripData),
     ("Некоректна LAN-адреса", ProblemKind::Sharing),
     ("Некоректні налаштування Gateway", ProblemKind::Gateway),
     ("Некоректні налаштування Valhalla", ProblemKind::Routing),

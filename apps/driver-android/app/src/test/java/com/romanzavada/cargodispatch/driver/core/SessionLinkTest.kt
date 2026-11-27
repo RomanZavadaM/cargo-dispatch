@@ -18,10 +18,10 @@ class SessionLinkTest {
     @Test
     fun physical_device_keeps_lan_host() {
         val result = SessionLink.parseDriverUrl(
-            "http://192.168.1.44:43821/driver/trip-1234567890abcdef",
+            "http://192.0.2.10:43821/driver/trip-1234567890abcdef",
             emulatorMode = false,
         )
-        assertEquals("http://192.168.1.44:43821", result.baseUrl)
+        assertEquals("http://192.0.2.10:43821", result.baseUrl)
     }
 
     @Test

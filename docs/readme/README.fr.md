@@ -70,7 +70,7 @@ Tous les programmes existent en українська, English, Français, Deutsc
 - Les applications Android et iPhone/iPad n'ont pas été essayées sur des appareils physiques — seulement sur émulateur, simulateur et tests automatiques.
 - L'internet mobile et le Gateway sur un réseau réel ne sont vérifiés qu'automatiquement.
 - Les paquets ne sont pas signés ; Android est un APK de débogage, iOS uniquement une version pour le simulateur Apple.
-- Après un redémarrage de Control, les trajets et la liaison sont à réactiver à la main.
+- Après un redémarrage de Control, trajets et liens reviennent seuls ; la liaison s'active d'un clic (après v0.2.0).
 - Le régulateur ne peut pas encore modifier les points ni les marquer comme faits.
 
 ## Compilation

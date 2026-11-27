@@ -70,7 +70,7 @@ All programs are available in українська, English, Français, Deutsch,
 - The Android and iPhone/iPad apps have not been tested on physical devices — only in an emulator, a simulator and automated tests.
 - Mobile internet and the Gateway on a real network are verified by automated tests only.
 - Packages are unsigned; Android is a debug APK, iOS is an Apple Simulator build only.
-- After Control restarts, trips and the connection have to be switched on again by hand.
+- After Control restarts, trips and links come back by themselves; sharing is switched on with one press (after v0.2.0).
 - The dispatcher cannot edit stops or mark them as done yet.
 
 ## Building
