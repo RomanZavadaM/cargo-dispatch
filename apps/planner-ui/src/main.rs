@@ -1505,7 +1505,8 @@ fn PlannerApp() -> impl IntoView {
                                                 </option>
                                                 <For
                                                     each=move || route.get().map(|value| value.points).unwrap_or_default()
-                                                    key=|point| point.point_id.clone()
+                                                    // The number is part of the text, so a moved point is drawn anew.
+                                                    key=|point| format!("{}:{}", point.point_id, point.sequence)
                                                     children=move |point| {
                                                         let value = point.point_id.clone();
                                                         let own = value.clone();
@@ -1536,7 +1537,8 @@ fn PlannerApp() -> impl IntoView {
                                                 </option>
                                                 <For
                                                     each=move || route.get().map(|value| value.points).unwrap_or_default()
-                                                    key=|point| point.point_id.clone()
+                                                    // The number is part of the text, so a moved point is drawn anew.
+                                                    key=|point| format!("{}:{}", point.point_id, point.sequence)
                                                     children=move |point| {
                                                         let value = point.point_id.clone();
                                                         let own = value.clone();

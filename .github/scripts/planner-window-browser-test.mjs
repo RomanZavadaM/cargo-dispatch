@@ -229,6 +229,20 @@ try {
   await idle();
   await expect(filled, "the replaced route fills the cargo rows again");
 
+  const ordered = async () => (await service("planner_status")).points.map(point => point.point_id).join();
+  const initial = await ordered();
+  const numbered = `ui.rows().every(row => [...row.querySelectorAll("select")].every(list =>
+    [...list.options].slice(1).length === 4 && [...list.options].slice(1).every((option, index) =>
+      option.textContent.trim().startsWith((index + 1) + "."))))`;
+  await click('document.querySelectorAll(".route-item")[0].querySelectorAll("button")[1]');
+  await idle();
+  if ((await ordered()) === initial) throw new Error("failed: a point moves down");
+  await expect(numbered, "the point lists follow the new order of the route");
+  await expect(filled, "moving a point keeps it attached to its cargo");
+  await click('document.querySelectorAll(".route-item")[1].querySelectorAll("button")[0]');
+  await idle();
+  if ((await ordered()) !== initial) throw new Error("failed: a point moves back");
+
   await type('ui.field(ui.packagePart(), "Тип / клас транспорту для планування")', "тент 22 т");
   await type('ui.field(ui.rows()[0], "Назва вантажу")', "Правка вручну");
   await type('ui.field(ui.rows()[0], "Маса, кг")', "2300");

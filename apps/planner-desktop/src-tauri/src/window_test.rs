@@ -178,7 +178,10 @@ async fn the_window_works_in_a_real_browser() {
     let status = tokio::task::spawn_blocking(move || {
         // Older Node keeps the browser connection behind a flag.
         let ready = Command::new("node")
-            .args(["-e", "process.exit(typeof WebSocket === 'function' ? 0 : 1)"])
+            .args([
+                "-e",
+                "process.exit(typeof WebSocket === 'function' ? 0 : 1)",
+            ])
             .status()?
             .success();
         let mut node = Command::new("node");
