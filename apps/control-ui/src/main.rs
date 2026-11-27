@@ -1126,10 +1126,16 @@ fn ControlApp() -> impl IntoView {
         if busy.get_untracked() {
             return;
         }
+        let listener = status.get_untracked().and_then(|current| current.listener);
+        if listener
+            .as_ref()
+            .is_some_and(|active| active.mode == ListenerMode::Loopback)
+        {
+            dialog.set(None);
+            return;
+        }
         busy.set(true);
-        let running = status
-            .get_untracked()
-            .is_some_and(|current| current.listener.is_some());
+        let running = listener.is_some();
         spawn_local(async move {
             let result: Result<ControlUiStatus, String> =
                 match stop_running_listener(running).await {
@@ -1158,19 +1164,26 @@ fn ControlApp() -> impl IntoView {
             }
         };
         let ip = lan_ip.get_untracked().trim().to_owned();
-        if ip.parse::<std::net::IpAddr>().is_err() {
+        let Ok(address) = ip.parse::<std::net::IpAddr>() else {
             message.set(localize_problem(
                 locale.get_untracked(),
                 "Некоректна LAN-адреса",
             ));
             error.set(true);
             return;
+        };
+        let requested = std::net::SocketAddr::new(address, port).to_string();
+        let listener = status.get_untracked().and_then(|current| current.listener);
+        if listener
+            .as_ref()
+            .is_some_and(|active| active.mode == ListenerMode::Lan && active.address == requested)
+        {
+            dialog.set(None);
+            return;
         }
         busy.set(true);
         let input = StartLanInput { ip, port };
-        let running = status
-            .get_untracked()
-            .is_some_and(|current| current.listener.is_some());
+        let running = listener.is_some();
         spawn_local(async move {
             let result: Result<ControlUiStatus, String> =
                 match stop_running_listener(running).await {
