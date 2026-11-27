@@ -38,6 +38,7 @@ Control est la seule source de vérité d'un trajet en cours. Il fournit au cond
 - messages d'erreur dans la langue de l'interface ; heure de position, taille de fichier et nom du point en clair.
 
 **Planner**
+- fichier de commandes (JSON, pour l'humain et l'IA) ou saisie manuelle ; jusqu'à trois variantes d'itinéraire selon la capacité, choix et reprise dans le trajet ; la saisie est conservée (après v0.2.0).
 - brouillon d'itinéraire : ajouter, retirer, réordonner des points par coordonnées ; le brouillon survit à un redémarrage ;
 - aperçu de l'itinéraire et tracé routier via votre serveur Valhalla avec des paramètres de véhicule saisis explicitement (les valeurs inconnues ne sont pas inventées) ;
 - export d'un paquet de trajet (ZIP, schéma 1.4) avec les marchandises et la base de planification ; un fichier existant n'est jamais écrasé.

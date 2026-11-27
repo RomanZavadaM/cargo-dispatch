@@ -38,6 +38,7 @@ Control es la única fuente de verdad de un viaje activo. Entrega al conductor l
 - mensajes de error en el idioma de la interfaz; hora de la posición, tamaño del archivo y nombre del punto en lenguaje claro.
 
 **Planner**
+- archivo de pedidos (JSON, para personas e IA) o entrada manual; hasta tres variantes de ruta según la capacidad, elección y paso al viaje; lo escrito se conserva (después de v0.2.0).
 - borrador de ruta: añadir, quitar y reordenar puntos por coordenadas; el borrador sobrevive a un reinicio;
 - vista previa de la ruta y línea de carretera mediante su servidor Valhalla con parámetros del vehículo introducidos expresamente (lo desconocido no se inventa);
 - exportación del paquete de viaje (ZIP, esquema 1.4) con la carga y la base de planificación; nunca se sobrescribe un archivo existente.

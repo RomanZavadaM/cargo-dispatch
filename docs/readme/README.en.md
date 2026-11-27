@@ -38,6 +38,7 @@ Control is the only source of truth for an active trip. It serves the page, rout
 - error messages in the interface language; position time, file size and stop name in plain words.
 
 **Planner**
+- an order file (JSON, for people and AI) or manual entry; up to three route variants respecting capacity, choosing one and turning it into the trip; input is kept between starts (after v0.2.0).
 - route draft: add, remove and reorder points by coordinates; the draft survives a restart;
 - route preview and road line from your Valhalla server with explicitly entered vehicle parameters (unknown values are not invented);
 - export of a trip package (ZIP, schema 1.4) with cargo and planning basis; an existing file is never overwritten.
