@@ -312,7 +312,8 @@ try {
   if (after !== before) throw new Error(`failed: the package form comes back\n before ${before}\n after  ${after}`);
   console.log("PASS the package form comes back exactly as left");
   await expect('ui.field(ui.orders()[0], "Маса, кг").value === "2400"', "the corrected orders come back");
-  await expect('ui.field(ui.routingPart(), "Адреса Valhalla").value === "http://127.0.0.1:9"',
+  await expect(`ui.field(ui.routingPart(), "Адреса Valhalla").value === "http://127.0.0.1:9/"
+    && ui.field(ui.routingPart(), "ID набору карт").value === "synthetic"`,
     "the routing settings come back");
 
   await click('ui.button(ui.packagePart(), "Додати вантаж")');
