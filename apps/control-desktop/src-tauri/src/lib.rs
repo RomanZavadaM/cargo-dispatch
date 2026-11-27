@@ -1326,7 +1326,13 @@ mod tests {
 
         let second = DesktopControlService::with_memory(memory);
         second.restore().await;
-        assert!(second.sessions.lock().expect("sessions").contains_key(token));
+        assert!(
+            second
+                .sessions
+                .lock()
+                .expect("sessions")
+                .contains_key(token)
+        );
         assert!(second.server.lock().await.is_none(), "sharing stays off");
     }
 
