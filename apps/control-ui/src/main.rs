@@ -11,8 +11,8 @@ use cargo_dispatch_control_ui_contracts::{
     DashboardVehicleRoutingProfile, ListenerMode, OperatorDocumentInput, PickedFile,
     RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
     RoutingTollPreference, SaveDocumentInput, SessionInput, StartGatewayInput, StartLanInput,
-    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput,
-    format_file_size, is_supported_max_speed_kmh, point_label,
+    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput, format_file_size,
+    is_supported_max_speed_kmh, point_label,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
