@@ -21,6 +21,8 @@ data class PendingMediaMetadata(
     val pointId: String? = null,
     val createdAtUnixMs: Long,
     val payloadFile: String,
+    /** HTTP status of a refusal that is not retried until the driver asks. */
+    val rejectedStatus: Int? = null,
 )
 
 data class QueuedMediaUpload(
@@ -30,7 +32,9 @@ data class QueuedMediaUpload(
 
 @Serializable
 private data class PendingOutboundState(
+    // Written by 0.2.0 and earlier: only the newest position. Read once and moved to [track].
     val location: LocationUpdate? = null,
+    val track: List<LocationUpdate> = emptyList(),
     val media: List<PendingMediaMetadata> = emptyList(),
 )
 
@@ -48,25 +52,26 @@ class PendingOutboundQueue(
 
     private var state: PendingOutboundState = loadState()
 
+    /** Keeps the positions recorded without a connection, oldest first. */
     suspend fun enqueueLocation(update: LocationUpdate) = withContext(Dispatchers.IO) {
         synchronized(lock) {
-            val current = state.location
-            if (current == null || update.observedAtUnixMs >= current.observedAtUnixMs) {
-                state = state.copy(location = update)
+            val newest = state.track.lastOrNull()
+            if (newest == null || update.observedAtUnixMs > newest.observedAtUnixMs) {
+                state = state.copy(track = (state.track + update).takeLast(MAX_TRACK))
                 saveState()
             }
         }
     }
 
-    suspend fun pendingLocation(): LocationUpdate? = withContext(Dispatchers.IO) {
-        synchronized(lock) { state.location }
+    suspend fun oldestLocation(): LocationUpdate? = withContext(Dispatchers.IO) {
+        synchronized(lock) { state.track.firstOrNull() }
     }
 
     suspend fun removeLocationThrough(observedAtUnixMs: Long) = withContext(Dispatchers.IO) {
         synchronized(lock) {
-            val current = state.location ?: return@synchronized
-            if (current.observedAtUnixMs <= observedAtUnixMs) {
-                state = state.copy(location = null)
+            val remaining = state.track.filter { it.observedAtUnixMs > observedAtUnixMs }
+            if (remaining.size != state.track.size) {
+                state = state.copy(track = remaining)
                 saveState()
             }
         }
@@ -107,18 +112,40 @@ class PendingOutboundQueue(
         }
     }
 
-    suspend fun pendingMedia(): List<QueuedMediaUpload> = withContext(Dispatchers.IO) {
-        synchronized(lock) {
-            state.media.mapNotNull { entry ->
+    /** Files still to be sent. Their content is read one at a time by [readMedia]. */
+    suspend fun pendingMedia(): List<PendingMediaMetadata> = withContext(Dispatchers.IO) {
+        synchronized(lock) { state.media.filter { it.rejectedStatus == null } }
+    }
+
+    suspend fun rejectedMedia(): List<PendingMediaMetadata> = withContext(Dispatchers.IO) {
+        synchronized(lock) { state.media.filter { it.rejectedStatus != null } }
+    }
+
+    suspend fun readMedia(entry: PendingMediaMetadata): QueuedMediaUpload? =
+        withContext(Dispatchers.IO) {
+            synchronized(lock) {
                 val payload = File(mediaDirectory, entry.payloadFile)
-                if (payload.isFile) {
-                    QueuedMediaUpload(entry, payload.readBytes())
-                } else {
-                    null
-                }
+                if (payload.isFile) QueuedMediaUpload(entry, payload.readBytes()) else null
             }
         }
-    }
+
+    suspend fun markRejected(documentId: String, status: Int) =
+        setRejection(documentId, status)
+
+    suspend fun retryRejected(documentId: String) =
+        setRejection(documentId, null)
+
+    private suspend fun setRejection(documentId: String, status: Int?) =
+        withContext(Dispatchers.IO) {
+            synchronized(lock) {
+                state = state.copy(
+                    media = state.media.map {
+                        if (it.documentId == documentId) it.copy(rejectedStatus = status) else it
+                    },
+                )
+                saveState()
+            }
+        }
 
     suspend fun removeMedia(documentId: String) = withContext(Dispatchers.IO) {
         synchronized(lock) {
@@ -130,17 +157,23 @@ class PendingOutboundQueue(
         }
     }
 
+    /** Items waiting to be sent; refused files are listed separately. */
     suspend fun pendingCount(): Int = withContext(Dispatchers.IO) {
         synchronized(lock) {
-            state.media.size + if (state.location == null) 0 else 1
+            state.media.count { it.rejectedStatus == null } + state.track.size
         }
     }
 
     private fun loadState(): PendingOutboundState {
         if (!metadata.isFile) return PendingOutboundState()
-        return runCatching {
+        val loaded = runCatching {
             json.decodeFromString<PendingOutboundState>(metadata.readText())
         }.getOrDefault(PendingOutboundState())
+        val legacy = loaded.location ?: return loaded
+        return loaded.copy(
+            location = null,
+            track = (loaded.track + legacy).sortedBy { it.observedAtUnixMs },
+        )
     }
 
     private fun saveState() {
@@ -168,6 +201,9 @@ class PendingOutboundQueue(
     }
 
     companion object {
+        /** About two hours of tracking at one position every 15 seconds. */
+        const val MAX_TRACK = 500
+
         private val sessionInstances = ConcurrentHashMap<String, PendingOutboundQueue>()
 
         fun forSession(baseRoot: File, baseUrl: String, token: String): PendingOutboundQueue {

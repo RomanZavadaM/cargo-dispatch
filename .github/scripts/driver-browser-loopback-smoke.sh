@@ -209,4 +209,11 @@ assert any(d["direction"] == "from_driver" for d in trip["documents"])
 print("Refresh/reconnect state: PASS")
 PY
 
+# The page itself in a real browser: rendering, confirmation, file, messages, languages.
+NODE_FLAGS=()
+if ! node -e 'process.exit(typeof WebSocket === "function" ? 0 : 1)'; then
+  NODE_FLAGS=(--experimental-websocket)
+fi
+node "${NODE_FLAGS[@]}" .github/scripts/driver-page-browser-test.mjs "$DRIVER_URL" 2>&1   | tee driver-browser-loopback-results/browser-test.log
+
 echo "Driver Browser loopback acceptance: PASS"

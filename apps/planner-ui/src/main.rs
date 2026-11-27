@@ -9,7 +9,7 @@ use cargo_dispatch_planner_ui_contracts::{
     PlannerRoutingConfigInput, PlannerRoutingPreviewInput, PlannerRoutingPreviewState,
     PlannerRoutingPreviewView, PlannerRoutingProbeResult, PlannerRoutingProfileInput,
     PlannerRoutingStatus, PlannerTollPreference, PointActionInput, ReorderPointsInput,
-    is_supported_max_speed_kmh,
+    is_supported_max_speed_kmh, localize_problem,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -556,7 +556,7 @@ fn PlannerApp() -> impl IntoView {
             match invoke::<PlannerRouteView, _>("planner_status", &serde_json::json!({})).await {
                 Ok(current) => route.set(Some(current)),
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }
@@ -581,7 +581,7 @@ fn PlannerApp() -> impl IntoView {
                     routing_status.set(current);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }
@@ -662,7 +662,7 @@ fn PlannerApp() -> impl IntoView {
                     error.set(false);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }
@@ -686,7 +686,7 @@ fn PlannerApp() -> impl IntoView {
                     error.set(false);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }
@@ -715,7 +715,7 @@ fn PlannerApp() -> impl IntoView {
                     error.set(false);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }
@@ -766,7 +766,7 @@ fn PlannerApp() -> impl IntoView {
                     error.set(false);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }
@@ -815,7 +815,7 @@ fn PlannerApp() -> impl IntoView {
                     error.set(false);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }
@@ -837,7 +837,7 @@ fn PlannerApp() -> impl IntoView {
                     error.set(false);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }
@@ -863,7 +863,7 @@ fn PlannerApp() -> impl IntoView {
                     error.set(!is_ok);
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }
@@ -942,7 +942,7 @@ fn PlannerApp() -> impl IntoView {
                 }
                 Err(problem) => {
                     preview.set(None);
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }
@@ -1064,7 +1064,7 @@ fn PlannerApp() -> impl IntoView {
                     return;
                 }
                 Err(problem) => {
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                     busy.set(false);
                     return;
@@ -1091,7 +1091,7 @@ fn PlannerApp() -> impl IntoView {
                 }
                 Err(problem) => {
                     export_result.set(None);
-                    message.set(problem);
+                    message.set(localize_problem(locale.get_untracked().code(), &problem));
                     error.set(true);
                 }
             }

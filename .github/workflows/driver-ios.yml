@@ -245,6 +245,18 @@ jobs:
             exit 1
           fi
 
+          # The open screen refreshes by itself.
+          count_reads() { grep -c '^GET /api/trip/native-smoke-session-00000001 ' apps/driver-ios/native-proxy-requests.log || true; }
+          sleep 5
+          BEFORE_WAIT="$(count_reads)"
+          sleep 35
+          AFTER_WAIT="$(count_reads)"
+          if [ "$((AFTER_WAIT - BEFORE_WAIT))" -lt 2 ]; then
+            echo "Apple Driver did not refresh the open screen: $BEFORE_WAIT -> $AFTER_WAIT reads." >&2
+            exit 1
+          fi
+          echo "PASS periodic refresh: $BEFORE_WAIT -> $AFTER_WAIT reads"
+
           xcrun simctl io "$DEVICE" screenshot apps/driver-ios/driver-ios-smoke.png
           xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
           sleep 1

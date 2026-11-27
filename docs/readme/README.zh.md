@@ -2,118 +2,84 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · **🇨🇳 简体中文**
 
-> **状态：** 正在积极开发。当前稳定版本为 **v0.1.0**。当前测试 prerelease 为 **v0.1.0-preview.8**，已经包含面向 Windows、macOS 和 Linux 的独立 Planner。完整的 8 语言本地化已集成。
+货运车队调度系统：规划行程、交付执行、与司机保持联系，并记录实际情况。主要开发语言为 **Rust**。
 
-## 产品简介
+**稳定版本：[v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0)。** 开发仍在继续；测试版本见 [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases)。
 
-**cargo-dispatch** 是面向货运车队的调度系统。目标包括选择货源、创建和重新规划行程、将行程交付执行，并让调度员掌握实际执行进度。
+## 组成
 
-主要开发语言为 **Rust**。
+| 程序 | 使用者 | 平台 |
+|---|---|---|
+| **Control** | 调度员：管理进行中的行程 | Windows、macOS、Linux |
+| **Planner** | 计划员：编制路线和行程包 | Windows、macOS、Linux |
+| **司机页面** | 司机，任意浏览器，无需安装 | 手机、平板、电脑 |
+| **Android 版 Driver** | 司机 | Android 8.0 及以上 |
+| **iPhone 和 iPad 版 Driver** | 司机 | iOS / iPadOS 17 及以上 |
+| **Addressing Gateway** | 通过互联网连接 | Linux 服务器 |
 
-## 当前已实现
+进行中行程的实际状态只以 Control 为准。它直接向司机提供页面、路线和文件，并接收完成标记、位置和附件。没有中央行程数据库。
 
-- 基于 Tauri/Leptos 的独立桌面 **Control** 应用；
-- 基于 Tauri/Leptos 的独立桌面 **Planner**：手动路线草稿、站点添加/删除/重排、导航坐标，以及由 Planner core 管理的 revision；草稿保存在 app-data 中的 versioned append-only journal，并可在重启后恢复；
-- 活跃行程的持久本地存储与重启恢复；
-- Planner 与 Control 之间的版本化 trip package；
-- 一个自适应 **Driver Browser**，适用于手机、平板、笔记本和桌面浏览器；
-- 在 Control 和 Driver Browser 中调整未完成站点顺序；
-- PDF 和普通文件 **Control → Driver Browser**；
-- 文件、照片和视频 **Driver Browser → Control**，并可本地保存；
-- 同一行程可同时连接两个浏览器客户端，并在无独立浏览器数据库的情况下重新连接；
-- Control 和 Driver Browser 中的交互式 OpenStreetMap 地图；
-- 用于测试和本地工作的 loopback 与显式 LAN 模式；
-- 自动化 Driver Browser 验收会分别通过 loopback 和显式 private-LAN bind 验证真实 Control session；
-- 自动化 public HTTPS Gateway 验收会验证真实的 `Control ↔ public HTTPS Gateway ↔ Driver Browser` 链路、仅出站的 Control、浏览器 shell/snapshot/location 以及双向文件。
+## 快速开始
 
-## 原生 Driver App
+1. 从发布页面下载压缩包，解压后启动 **Control**。Control 安装包内含虚构的测试数据（`local-browser-test-data`）。
+2. **“添加行程”** →“打开现有行程”（行程文件夹或 Planner 行程包）或“手动创建新行程”。
+3. **“连接司机”** →“本机”“同一 Wi-Fi 网络”或“任何地点，通过互联网”。
+4. 把 **“下一步”** 区域中的链接交给司机：“打开”或“复制”。
+5. 司机在浏览器中打开链接，或将其粘贴到 Driver 应用。
 
-两个原生客户端都已经集成到 `main`：
+## 功能
 
-- **Android** — Jetpack Compose、路线/完成/重排、文件/照片/视频、前台 GPS、会话恢复、原生 MapLibre + OpenStreetMap、当前道路 geometry、站点/最新位置和系统照片/视频拍摄；Emulator build/install/launch/screenshot PASS。
-- **iPhone/iPad** — SwiftUI、路线/完成/重排、文件/照片/视频、前台 CoreLocation、会话恢复、原生 MapKit、当前 geometry、站点/最新位置和系统照片/视频拍摄；Simulator build/install/launch/screenshot PASS。
+**Control**
+- 同时管理多个行程，每个行程可单独开窗口；
+- 行程来自 Planner 行程包或手动创建；状态保存在本地，重启后恢复；
+- 未完成地点的顺序、地图、司机最新位置、计划与实际对比；
+- 向司机发送文件；接收司机的文件、照片和视频；
+- 自动识别本机在局域网中的地址；切换连接方式无需手动关闭；
+- 错误提示使用界面语言；位置时间、文件大小和地点名称以易懂方式显示。
 
-两者使用同一个 Control API，不创建独立的行程数据库。
+**Planner**
+- 路线草稿：按坐标添加、删除、重新排序地点；草稿在重启后保留；
+- 使用明确填写的车辆参数，通过您自己的 Valhalla 服务器预览路线和道路线（未知数值不会编造）；
+- 导出包含货物和计划依据的行程包（ZIP，架构 1.4）；从不覆盖已有文件。
 
-r4/r5 之后，两个原生客户端还具备用于位置和媒体的持久重试队列。Android r5 增加了通过前台定位服务进行的显式 Start/Stop 后台行程跟踪、常驻 Stop 通知以及 15 秒 / 25 米策略。Apple r5 增加显式 Start/Stop CoreLocation 后台跟踪、`UIBackgroundModes=location`、25 米过滤，并且没有独立需求时不会请求 `Always` 权限。
+**司机：浏览器、Android、iPhone 和 iPad**
+- 路线和地图、标记地点完成、调整未完成地点顺序；
+- 接收文件资料；发送文件、照片和视频；
+- 上报位置；应用中还支持后台上报，需明确开启和关闭，并带有重发队列；
+- 标记地点完成前需要确认；应用还提供导航按钮、将文件关联到地点、界面自动刷新、无网络时保存行驶轨迹（最多 500 个位置）以及显示被拒收的文件。
 
-## Driver Browser
+## 连接与安全
 
-Driver Browser 是**一个产品**，不是分别开发的手机版和桌面版。它有三种标准布局：
+- **本机**和**局域网**方式不加密（HTTP）：只在可信网络中使用。网络访问不会自行开启，也不会打开路由器端口。
+- 带有密钥的链接即可访问行程：只发给该行程的司机。
+- 手机浏览器通常只在 HTTPS（即通过 Gateway）下允许定位。
+- 要让手机在网络中访问 Control，请在电脑防火墙中放行该程序。
+- **通过互联网：** 在 HTTPS 反向代理后部署您自己的 Gateway。由 Control 主动连接，电脑无需开放入站端口。Gateway 不保存行程、文件、媒体或位置。默认单次请求中继上限为 64 MiB（最高可设为 512 MiB）。
 
-- 窄屏手机；
-- 平板；
-- 宽屏桌面/笔记本。
+## 地图与路线
 
-数据、路线操作、文件和 backend 完全共用，仅根据屏幕大小调整布局。
+Control、Planner、浏览器和 Android 使用 [OpenStreetMap](https://www.openstreetmap.org/copyright)（© OpenStreetMap contributors）地图；iPhone 和 iPad 使用 Apple MapKit。地图提供方可以看到设备 IP 地址和所显示的区域。道路线需要您自己的 Valhalla 服务器；没有它行程照常工作，只是不显示道路线。
 
-## 地图
+## 语言
 
-Control 和 Driver Browser 已经包含真正的交互式基础地图，可显示行程站点和最后一次被接受的司机位置。
+所有程序支持 українська、English、Français、Deutsch、Español、한국어、日本語和简体中文。CI 检查翻译是否完整；错误信息中的系统技术细节仍为英文。
 
-当前 `main` 使用带有不可变 planning basis 的 schema 1.4，并继续读取旧 schema。Planner routing profile 只是某一次规划计算的输入，不会把行程永久绑定到车辆。Import 之后，Control 会单独维护活动会话真实且可变的 routing context。
+## 尚未验证的内容与限制
 
-Control 保存派生 geometry，并在站点顺序变化后通过已配置的 runtime Valhalla 重新计算道路线。延迟返回的 routing 响应不能覆盖更新的行程状态。即使 Valhalla 未配置或暂时不可用，新的站点顺序仍会保存，只是派生 geometry 可以暂时不存在。
+- Android 和 iPhone/iPad 应用尚未在实体设备上测试，仅经过模拟器和自动测试。
+- 移动网络以及真实网络中的 Gateway 仅经过自动测试。
+- 安装包未签名；Android 为调试版 APK，iOS 仅有 Apple 模拟器版本。
+- Control 重启后，需手动重新启用行程和连接。
+- 调度员暂时无法编辑地点或标记完成。
 
-Planner desktop 现在拥有自己的 runtime Valhalla preview：操作员设置 Valhalla 地址、地图数据集 ID 和 timeout，通过 `/status` 检查可用性，`/route` 只使用明确提供的 planning profile 计算。未知的数值约束不会被猜测。成功结果会在 OSM 上绘制真实道路 polyline；没有结果时不会绘制虚假的直线。Preview 由 route/revision/profile 派生：草稿或 planning profile 改变后旧线路会被清除，延迟响应也会被拒绝。Routing 失败不会修改 Planner 草稿。
+## 构建
 
-Planner desktop 现在还可以通过原生 Save As 将现有 versioned trip package 导出为 schema 1.4。Package 包含明确的 planning basis（车辆类型/级别与货物）、站点顺序，以及在存在时仅包含与本次计算匹配的 planning routing profile/Valhalla geometry snapshot。同一草稿的 TripId 保持稳定，TripVersion 可跨重启继续递增，CargoId 不依赖行位置，并且绝不会覆盖已有 ZIP。
-
-## Test v0.1.0-preview.8
-
-[打开 Test v0.1.0-preview.8](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8)。
-
-这是 **prerelease**，不是 Stable。它是从同一精确源码构建的当前产品集成测试版本。
-
-Release 包含：
-- Windows Control x64 ZIP；
-- macOS Control universal ZIP — Intel + Apple Silicon；
-- Linux Control x64 tar.gz；
-- Windows Planner x64 ZIP；
-- macOS Planner universal ZIP — Intel + Apple Silicon；
-- Linux Planner x64 tar.gz；
-- Android Driver debug APK；
-- iOS/iPadOS Driver Simulator ZIP；
-- Linux Addressing Gateway x64 package；
-- SHA256SUMS。
-
-preview.8 已包含 durable Planner 草稿、真实 Valhalla 道路预览、带 planning basis 的 versioned schema 1.4 ZIP export，以及无需 Planner ZIP 即可在 Control 中手动创建活动行程。Planner profile 不是行程→车辆的永久绑定；真实车辆/设备 context 由 Control 单独维护。
-
-## Stable v0.1.0
-
-[打开 Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0)。
-
-Stable 从同一个精确源码重新构建并发布：
-- Windows Control x64 ZIP；
-- macOS Control universal ZIP — Intel + Apple Silicon；
-- Linux Control x64 tar.gz；
-- 用于测试安装的 Android Driver debug APK；
-- iOS/iPadOS Driver Simulator ZIP；
-- 带 Docker/Compose 的 Linux Addressing Gateway x64 包；
-- SHA256SUMS。
-
-**Linux Control** 是操作员桌面应用。**Linux Addressing Gateway** 是独立的服务器 relay 模块，两者是不同的软件包。
-
-Android 和 Apple 软件包目前尚未进行商店签名。App Store/TestFlight/Google Play 和 production signing 将在之后单独处理。
-
-## 后续工作
-
-- 在 narrow phone / tablet / wide desktop 下进行本地浏览器手动视觉验收，包括地图 pan/zoom/fit；
-- 在同一 LAN 中用真实手机测试相同的 Driver Browser；
-- 在独立网络和移动 NAT/CGNAT 中使用真实设备进行 HTTPS 现场验收；
-- 在真实设备上通过 HTTPS 完成浏览器 GPS 验收；
-
-
-## 界面语言
-
-Control、Planner、Driver Browser、Android Driver 和 iOS/iPadOS Driver 已使用同一套 **8 种语言：uk、en、de、fr、es、ko、ja、zh-Hans/zh-CN** 完成实现与验证。Control 和 Driver Browser 支持系统语言与持久化手动选择，CI 会检查全部 8 个本地化的完整性。
+构建、测试和发布在 GitHub Actions 中进行；见 `.github/workflows`。
 
 ## 文档
 
-公开状态入口：[START_HERE.md](../../START_HERE.md)、[HANDOFF_CURRENT.md](../../HANDOFF_CURRENT.md)、[PROJECT_STATE.md](../../PROJECT_STATE.md)。
-
-详细工作文档以私有方式保存。
+项目状态（乌克兰语）：[START_HERE.md](../../START_HERE.md)、[HANDOFF_CURRENT.md](../../HANDOFF_CURRENT.md)、[PROJECT_STATE.md](../../PROJECT_STATE.md)。详细工作文档不公开。
 
 ## 许可证
 
-专有软件 © 2026 Roman Zavada。仓库公开可见并不授予开源权利。请参阅 [LICENSE.md](../../LICENSE.md) 和 [COPYRIGHT.md](../../COPYRIGHT.md)。
+专有软件 © 2026 Roman Zavada (Роман Завада)。仓库公开并不授予开源权利。见 [LICENSE.md](../../LICENSE.md)、[COPYRIGHT.md](../../COPYRIGHT.md) 和 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md)。

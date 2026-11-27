@@ -12,8 +12,8 @@ struct DriverTripMap: View {
     private var signature: String {
         let road = snapshot.roadLine.map { "\($0.latitude),\($0.longitude)" }.joined(separator: ";")
         let stops = snapshot.stops.map { "\($0.sequence):\($0.coordinate.latitude),\($0.coordinate.longitude)" }.joined(separator: ";")
-        let driver = snapshot.driverLocation.map { "\($0.latitude),\($0.longitude)" } ?? ""
-        return "\(trip.localRouteRevision)|\(road)|\(stops)|\(driver)"
+        // The driver position is left out: the camera must not jump with every refresh.
+        return "\(trip.localRouteRevision)|\(road)|\(stops)"
     }
 
     var body: some View {

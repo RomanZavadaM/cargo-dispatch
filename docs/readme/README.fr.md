@@ -2,118 +2,84 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · **🇫🇷 Français** · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Statut :** développement actif. La version stable actuelle est **v0.1.0**. Le prerelease de test actuel est **v0.1.0-preview.8**, avec désormais un Planner séparé pour Windows, macOS et Linux. La localisation complète en 8 langues est intégrée.
+Régulation d'une flotte de fret : planifier un trajet, le confier à l'exécution, rester en contact avec le conducteur et consigner ce qui s'est réellement passé. Le langage principal de développement est **Rust**.
 
-## À propos
+**Version stable : [v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0).** Le développement continue ; les versions d'essai figurent dans [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
-**cargo-dispatch** est un système de dispatch pour les flottes de fret. Il doit sélectionner des chargements, construire et recalculer des tournées, les transmettre à l’exécution et permettre au dispatcheur de suivre l’exécution réelle.
+## Composants
 
-Le principal langage de développement est **Rust**.
+| Programme | Utilisateur | Plateformes |
+|---|---|---|
+| **Control** | régulateur : suit les trajets en cours | Windows, macOS, Linux |
+| **Planner** | planificateur : prépare l'itinéraire et le paquet de trajet | Windows, macOS, Linux |
+| **Page conducteur** | conducteur, dans tout navigateur, sans installation | téléphone, tablette, ordinateur |
+| **Driver pour Android** | conducteur | Android 8.0 ou plus récent |
+| **Driver pour iPhone et iPad** | conducteur | iOS / iPadOS 17 ou plus récent |
+| **Addressing Gateway** | liaison par internet | serveur Linux |
 
-## Fonctionnalités déjà présentes
+Control est la seule source de vérité d'un trajet en cours. Il fournit au conducteur la page, l'itinéraire et les fichiers, et reçoit les validations, les positions et les pièces jointes. Il n'existe pas de base centrale des trajets.
 
-- application desktop **Control** séparée basée sur Tauri/Leptos ; Control peut importer un ZIP Planner ou créer manuellement un nouveau trajet actif sans ZIP Planner en utilisant le même état durable du trajet ;
-- application desktop **Planner** séparée basée sur Tauri/Leptos : brouillon d’itinéraire manuel, ajout/suppression/réorganisation des points, coordonnées de navigation et révision gérée par le cœur Planner ; le brouillon est stocké dans un journal append-only versionné dans les données de l’application et restauré après redémarrage ;
-- stockage local durable du trajet actif et restauration après redémarrage ;
-- paquet de trajet versionné entre Planner et Control ;
-- un seul **Driver Browser** adaptatif pour téléphone, tablette, ordinateur portable et navigateur desktop ;
-- modification de l’ordre des points ouverts dans Control et Driver Browser ;
-- PDF et fichiers **Control → Driver Browser** ;
-- fichiers, photos et vidéos **Driver Browser → Control** avec sauvegarde locale ;
-- deux clients navigateur simultanés pour un même trajet et reconnexion sans base navigateur séparée ;
-- carte interactive OpenStreetMap dans Control et Driver Browser ;
-- modes loopback et LAN explicite pour les tests et l’utilisation locale ;
-- l’acceptation automatisée du Driver Browser vérifie une vraie session Control séparément en loopback et via un bind LAN privé explicite ;
-- l’acceptation automatisée du Gateway HTTPS public vérifie la chaîne réelle `Control ↔ public HTTPS Gateway ↔ Driver Browser` : Control sortant uniquement, shell/snapshot/localisation du navigateur et fichiers bidirectionnels ;
+## Premiers pas
 
-## Applications Driver natives
+1. Téléchargez une archive depuis la page de la version, décompressez-la et lancez **Control**. Le paquet Control contient des données d'essai fictives (`local-browser-test-data`).
+2. **« Ajouter un trajet »** → « Ouvrir un trajet existant » (dossier de trajet ou paquet Planner) ou « Créer un nouveau trajet manuellement ».
+3. **« Connecter les conducteurs »** → « Cet ordinateur », « Même réseau Wi-Fi » ou « Partout, par internet ».
+4. Transmettez au conducteur le lien du bloc **« Que faire ensuite »** : « Ouvrir » ou « Copier ».
+5. Le conducteur ouvre le lien dans un navigateur ou le colle dans l'application Driver.
 
-Les deux clients natifs sont déjà intégrés dans `main` :
+## Fonctions
 
-- **Android** — Jetpack Compose, route/validation/réorganisation, fichiers/photos/vidéos, GPS au premier plan, restauration de session, carte native MapLibre + OpenStreetMap, géométrie routière actuelle, points/dernière position et capture photo/vidéo système ; build/install/lancement/capture Emulator PASS.
-- **iPhone/iPad** — SwiftUI, route/validation/réorganisation, fichiers/photos/vidéos, CoreLocation au premier plan, restauration de session, MapKit natif, géométrie actuelle, points/dernière position et capture photo/vidéo système ; build/install/lancement/capture Simulator PASS.
+**Control**
+- plusieurs trajets à la fois, une fenêtre par trajet ;
+- trajet issu d'un paquet Planner ou créé à la main ; l'état est enregistré localement et rétabli après un redémarrage ;
+- ordre des points ouverts, carte, dernière position du conducteur, comparaison prévu / réalisé ;
+- fichiers vers le conducteur ; fichiers, photos et vidéos reçus du conducteur ;
+- trouve lui-même l'adresse de l'ordinateur sur le réseau local ; le mode de liaison change sans arrêt manuel;
+- messages d'erreur dans la langue de l'interface ; heure de position, taille de fichier et nom du point en clair.
 
-Les deux utilisent la même API Control et ne créent pas de base de trajet séparée.
+**Planner**
+- brouillon d'itinéraire : ajouter, retirer, réordonner des points par coordonnées ; le brouillon survit à un redémarrage ;
+- aperçu de l'itinéraire et tracé routier via votre serveur Valhalla avec des paramètres de véhicule saisis explicitement (les valeurs inconnues ne sont pas inventées) ;
+- export d'un paquet de trajet (ZIP, schéma 1.4) avec les marchandises et la base de planification ; un fichier existant n'est jamais écrasé.
 
-Depuis r4/r5, les deux clients natifs disposent aussi d’une file durable de réessai pour la position et les médias. Android r5 ajoute un suivi d’arrière-plan Start/Stop explicite via un service de localisation au premier plan, une notification Stop persistante et une politique 15 s / 25 m. Apple r5 ajoute un suivi CoreLocation d’arrière-plan Start/Stop explicite, `UIBackgroundModes=location`, un filtre de 25 m et ne demande pas l’autorisation `Always` sans besoin distinct.
+**Conducteur : navigateur, Android, iPhone et iPad**
+- itinéraire et carte, point marqué comme fait, réordonnancement des points ouverts ;
+- réception de documents ; envoi de fichiers, photos et vidéos ;
+- partage de la position ; dans les applications aussi en arrière-plan, activé et arrêté explicitement, avec file de renvoi;
+- la validation d'un point demande une confirmation ; les applications offrent aussi un bouton de navigation, le rattachement d'un fichier à un point, un écran qui s'actualise seul, la conservation du parcours sans réseau (jusqu'à 500 positions) et les fichiers refusés visibles.
 
-## Driver Browser
+## Liaison et sécurité
 
-Driver Browser est **un seul produit**, et non des versions téléphone et desktop séparées. Il possède trois dispositions normales :
+- Les modes **Cet ordinateur** et **réseau local** ne sont pas chiffrés (HTTP) : à utiliser seulement sur un réseau de confiance. L'accès réseau ne s'active jamais seul et aucun port du routeur n'est ouvert.
+- Un lien avec un code secret donne accès au trajet : ne le transmettez qu'au conducteur de ce trajet.
+- Les navigateurs de téléphone n'autorisent généralement la géolocalisation qu'en HTTPS, donc via le Gateway.
+- Pour qu'un téléphone atteigne Control sur le réseau, autorisez le programme dans le pare-feu de l'ordinateur.
+- **Par internet :** votre propre Gateway derrière un proxy inverse HTTPS. Control s'y connecte lui-même, aucun port entrant n'est nécessaire sur l'ordinateur. Le Gateway ne conserve ni trajets, ni documents, ni médias, ni positions. Limite par défaut : 64 Mio par requête (réglable jusqu'à 512 Mio).
 
-- téléphone étroit ;
-- tablette ;
-- desktop/ordinateur portable large.
+## Cartes et itinéraires
 
-Les données, les actions de trajet, les fichiers et le backend sont communs ; seule la disposition change selon la taille de l’écran.
+La carte de Control, Planner, du navigateur et d'Android est [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors) ; sur iPhone et iPad, c'est Apple MapKit. Le fournisseur de cartes voit l'adresse IP de l'appareil et la zone affichée. Le tracé routier nécessite votre propre serveur Valhalla ; sans lui le trajet fonctionne, seul le tracé manque.
 
-## Carte
+## Langues
 
-Control et Driver Browser disposent déjà d’une vraie carte de base interactive avec les points du trajet et la dernière position acceptée du conducteur.
+Tous les programmes existent en українська, English, Français, Deutsch, Español, 한국어, 日本語 et 简体中文. La CI vérifie que les traductions sont complètes ; les détails techniques du système dans les messages d'erreur restent en anglais.
 
-Le `main` actuel utilise le schema 1.4 avec une base de planification immuable ; les anciens schemas restent lisibles. Un profil de routage Planner sert uniquement à un calcul de planification précis et ne crée pas de liaison permanente entre le trajet et un véhicule. Après l’import, Control maintient séparément le contexte de routage réel et modifiable de la session active.
+## Pas encore vérifié, et limites
 
-Control conserve la géométrie dérivée et recalcule la ligne routière via le service Valhalla runtime configuré après un changement d’ordre. Une réponse de routage tardive ne peut pas écraser un état de trajet plus récent. Si Valhalla n’est pas configuré ou est temporairement indisponible, le nouvel ordre des points est tout de même enregistré et la géométrie dérivée peut être absente.
+- Les applications Android et iPhone/iPad n'ont pas été essayées sur des appareils physiques — seulement sur émulateur, simulateur et tests automatiques.
+- L'internet mobile et le Gateway sur un réseau réel ne sont vérifiés qu'automatiquement.
+- Les paquets ne sont pas signés ; Android est un APK de débogage, iOS uniquement une version pour le simulateur Apple.
+- Après un redémarrage de Control, les trajets et la liaison sont à réactiver à la main.
+- Le régulateur ne peut pas encore modifier les points ni les marquer comme faits.
 
-Planner desktop possède maintenant son propre aperçu Valhalla runtime : l’opérateur fournit l’adresse Valhalla, l’ID du jeu de cartes et les délais, vérifie `/status`, et `/route` est calculé uniquement avec un profil de planification explicitement fourni. Les contraintes numériques inconnues ne sont pas inventées. Un résultat réussi trace la vraie polyline routière sur OSM ; aucune ligne droite fictive n’est dessinée sans résultat. L’aperçu est dérivé de la route/révision/du profil : modifier le brouillon ou le profil de planification efface l’ancienne ligne, et une réponse tardive est rejetée. Un échec de routage ne modifie pas le brouillon Planner.
+## Compilation
 
-Planner desktop exporte désormais aussi le package de trajet versionné existant en schema 1.4 via une boîte native « Enregistrer sous ». Le package contient une planning basis explicite (type/classe de véhicule et cargaisons), l’ordre des points et, lorsqu’il existe, uniquement le snapshot correspondant du planning routing profile et de la géométrie Valhalla. Le TripId reste stable pour un brouillon, la TripVersion continue après redémarrage, le CargoId ne dépend pas de la position de la ligne et un ZIP existant n’est jamais écrasé.
-
-## Test v0.1.0-preview.8
-
-[Ouvrir Test v0.1.0-preview.8](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8).
-
-Il s’agit d’un **prerelease**, pas de la version Stable. C’est une version de test intégrée du produit actuel, construite depuis une source exacte unique.
-
-Le release contient :
-- Windows Control x64 ZIP ;
-- macOS Control universal ZIP — Intel + Apple Silicon ;
-- Linux Control x64 tar.gz ;
-- Windows Planner x64 ZIP ;
-- macOS Planner universal ZIP — Intel + Apple Silicon ;
-- Linux Planner x64 tar.gz ;
-- Android Driver debug APK ;
-- iOS/iPadOS Driver Simulator ZIP ;
-- Linux Addressing Gateway x64 package ;
-- SHA256SUMS.
-
-preview.8 inclut déjà le brouillon Planner durable, l’aperçu routier réel Valhalla, l’export ZIP versionné schema 1.4 avec planning basis et la création manuelle d’un trajet actif dans Control sans ZIP Planner. Le profil Planner n’est pas une liaison permanente trajet→véhicule ; le contexte véhicule/appareil réel est géré séparément par Control.
-
-## Stable v0.1.0
-
-[Ouvrir Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
-
-La version Stable est reconstruite depuis une seule source exacte et publie :
-- Windows Control x64 ZIP ;
-- macOS Control universal ZIP — Intel + Apple Silicon ;
-- Linux Control x64 tar.gz ;
-- Android Driver debug APK pour installation de test ;
-- iOS/iPadOS Driver Simulator ZIP ;
-- package Linux Addressing Gateway x64 avec Docker/Compose ;
-- SHA256SUMS.
-
-**Linux Control** est l’application desktop de l’opérateur. **Linux Addressing Gateway** est le module serveur relay séparé ; ce sont deux packages différents.
-
-Les packages Android et Apple ne sont pas encore signés pour les stores. App Store/TestFlight/Google Play et la signature de production seront traités séparément plus tard.
-
-## Étapes restantes
-
-- validation visuelle manuelle du navigateur local pour narrow phone / tablet / wide desktop, y compris pan/zoom/fit de la carte ;
-- test du même Driver Browser sur un vrai téléphone dans le même LAN ;
-- validation HTTPS sur appareil réel depuis un réseau distinct et un NAT/CGNAT mobile ;
-- validation GPS complète du navigateur via HTTPS sur un appareil réel ;
-
-
-## Langues de l’interface
-
-Control, Planner, Driver Browser, Android Driver et iOS/iPadOS Driver sont implémentés et vérifiés avec le même **ensemble de 8 langues : uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control et Driver Browser utilisent la langue système avec un choix manuel mémorisé, et le CI vérifie la couverture complète des 8 localisations.
+Les compilations, tests et versions s'exécutent dans GitHub Actions ; voir `.github/workflows`.
 
 ## Documentation
 
-Points d’entrée publics : [START_HERE.md](../../START_HERE.md), [HANDOFF_CURRENT.md](../../HANDOFF_CURRENT.md) et [PROJECT_STATE.md](../../PROJECT_STATE.md).
-
-La documentation de travail détaillée du projet est conservée en privé.
+État du projet (en ukrainien) : [START_HERE.md](../../START_HERE.md), [HANDOFF_CURRENT.md](../../HANDOFF_CURRENT.md), [PROJECT_STATE.md](../../PROJECT_STATE.md). La documentation de travail détaillée est tenue en privé.
 
 ## Licence
 
-Logiciel propriétaire © 2026 Roman Zavada. La visibilité publique du dépôt n’accorde aucun droit de licence ouverte. Voir [LICENSE.md](../../LICENSE.md) et [COPYRIGHT.md](../../COPYRIGHT.md).
+Logiciel propriétaire © 2026 Roman Zavada (Роман Завада). Un dépôt public n'accorde aucun droit de licence libre. Voir [LICENSE.md](../../LICENSE.md), [COPYRIGHT.md](../../COPYRIGHT.md) et [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).

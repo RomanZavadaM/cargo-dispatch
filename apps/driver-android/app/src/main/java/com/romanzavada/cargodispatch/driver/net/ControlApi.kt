@@ -24,7 +24,7 @@ class ControlApi(
 
     init {
         require(this.baseUrl.startsWith("http://") || this.baseUrl.startsWith("https://")) {
-            "Control base URL має бути HTTP(S)"
+            "Control base URL must be HTTP(S)"
         }
     }
 

@@ -2,119 +2,84 @@
 
 **🇺🇦 Українська** · [🇬🇧 English](docs/readme/README.en.md) · [🇫🇷 Français](docs/readme/README.fr.md) · [🇩🇪 Deutsch](docs/readme/README.de.md) · [🇪🇸 Español](docs/readme/README.es.md) · [🇰🇷 한국어](docs/readme/README.ko.md) · [🇯🇵 日本語](docs/readme/README.ja.md) · [🇨🇳 简体中文](docs/readme/README.zh.md)
 
-> **Статус:** активна розробка. Поточна стабільна версія — **v0.1.0**. Поточний тестовий prerelease — **v0.1.0-preview.8**, уже з окремим Planner для Windows, macOS і Linux. Повна локалізація 8 мовами інтегрована.
+Диспетчеризація вантажного парку: планування рейсу, передача його в роботу, зв'язок із водієм і фактичне виконання. Основна мова розробки — **Rust**.
 
-## Про продукт
+**Стабільна версія: [v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0).** Розробка триває; тестові випуски — на сторінці [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
-**cargo-dispatch** — система диспетчеризації вантажного парку. Вона має підбирати вантажі, будувати й перебудовувати рейси, передавати їх у роботу та давати диспетчеру контроль фактичного виконання.
+## Склад
 
-Основна мова розробки — **Rust**.
+| Програма | Хто користується | Платформи |
+|---|---|---|
+| **Control** | диспетчер: веде активні рейси | Windows, macOS, Linux |
+| **Planner** | планувальник: складає маршрут і пакет рейсу | Windows, macOS, Linux |
+| **Сторінка водія** | водій у будь-якому браузері, без встановлення | телефон, планшет, комп'ютер |
+| **Driver для Android** | водій | Android 8.0 і новіший |
+| **Driver для iPhone та iPad** | водій | iOS / iPadOS 17 і новіший |
+| **Addressing Gateway** | зв'язок через інтернет | сервер Linux |
 
-## Що вже є в поточному продукті
+Control — єдине джерело факту активного рейсу. Він сам віддає водієві сторінку, маршрут і файли та приймає відмітки, позиції й вкладення. Центральної бази рейсів немає.
 
-- окремий desktop **Control** на Tauri/Leptos; Control приймає Planner ZIP або створює новий активний рейс вручну без Planner ZIP на тому самому durable trip state;
-- окремий desktop **Planner** на Tauri/Leptos: ручна чернетка маршруту, додавання/видалення/перестановка точок, координати навігації та revision через Planner core; чернетка зберігається у versioned append-only journal в app-data і відновлюється після перезапуску;
-- постійне локальне збереження активного рейсу та відновлення після перезапуску;
-- versioned trip package між Planner і Control;
-- один адаптивний **Driver Browser** для телефона, планшета та ноутбука/desktop browser;
-- зміна порядку відкритих точок у Control і Driver Browser;
-- PDF та звичайні файли **Control → Driver Browser**;
-- файли, фото й відео **Driver Browser → Control** з локальним збереженням;
-- два одночасні browser clients одного рейсу та reconnect без окремої browser-бази;
-- інтерактивна карта OpenStreetMap у Control і Driver Browser;
-- loopback і явний LAN-режим для тестування та локальної роботи;
-- автоматичний Driver Browser acceptance перевіряє реальний Control session окремо через loopback і явний private-LAN bind;
-- автоматичний public HTTPS Gateway acceptance перевіряє реальний ланцюг `Control ↔ public HTTPS Gateway ↔ Driver Browser`: outbound-only Control, Browser shell/snapshot/location та двосторонні файли;
-- нативний **Android Driver App**: route/complete/reorder, foreground location, files/photo/video, restart recovery, native MapLibre map, system camera, Emulator smoke;
-- нативний **iOS/iPadOS Driver App**: route/complete/reorder, CoreLocation foreground location, files/photo/video, restart recovery, native MapKit, system camera, Simulator smoke.
+## Перші кроки
 
-## Нативні Driver Apps
+1. Завантажте архів зі сторінки релізу, розпакуйте й запустіть **Control**. У пакеті Control є вигадані тестові дані (`local-browser-test-data`).
+2. **«Додати рейс»** → «Відкрити існуючий рейс» (тека рейсу або пакет від Planner) чи «Створити новий рейс вручну».
+3. **«Підключити водіїв»** → «Цей комп'ютер», «Та сама мережа Wi-Fi» або «Будь-де, через інтернет».
+4. Передайте водієві посилання з блока **«Що робити далі»**: «Відкрити» або «Копіювати».
+5. Водій відкриває посилання в браузері чи вставляє його в застосунок Driver.
 
-У `main` уже інтегровані обидва нативні клієнти:
+## Що вміє
 
-- **Android** — Jetpack Compose, route/complete/reorder, files/photo/video, foreground GPS, restart recovery, native MapLibre + OpenStreetMap, current road geometry, route markers/latest position, системна фото/відео камера; Emulator build/install/launch/screenshot PASS.
-- **iPhone/iPad** — SwiftUI, route/complete/reorder, files/photo/video, foreground CoreLocation, restart recovery, native MapKit, current road geometry, route markers/latest position, системна фото/відео камера; Simulator build/install/launch/screenshot PASS.
+**Control**
+- кілька рейсів одночасно, окреме вікно рейсу;
+- рейс із пакета Planner або створений вручну; стан зберігається локально й відновлюється після перезапуску;
+- порядок відкритих точок, карта, остання позиція водія, порівняння плану й факту;
+- файли водієві та файли, фото й відео від водія;
+- адресу комп'ютера в локальній мережі визначає сам; спосіб зв'язку перемикається без ручного вимикання;
+- повідомлення про помилки мовою інтерфейсу; час позиції, розмір файла й назва точки звичайними словами.
 
-Обидва працюють через той самий Control API і не мають окремої бази рейсу.
+**Planner**
+- чернетка маршруту: додати, прибрати, переставити точки за координатами; чернетка переживає перезапуск;
+- попередній маршрут і дорожня лінія через ваш сервер Valhalla з явно заданими параметрами авто (невідомі не вигадуються);
+- експорт пакета рейсу (ZIP, схема 1.4) з вантажами та плановою основою; наявний файл не перезаписується.
 
-Після r4/r5 обидва native clients також мають надійну чергу повторної відправки координат і медіа. Android r5 має явний Start/Stop фонового відстеження через foreground location service, постійне повідомлення зі Stop і політику 15 с / 25 м. Apple r5 має явний Start/Stop фонового CoreLocation tracking, `UIBackgroundModes=location`, фільтр 25 м і не просить `Always` без окремої потреби.
+**Водій: браузер, Android, iPhone та iPad**
+- маршрут і карта, позначка виконання, зміна порядку відкритих точок;
+- отримання документів, надсилання файлів, фото й відео;
+- передача позиції; у застосунках — також фонова, з явним увімкненням і вимкненням, та черга повторного надсилання;
+- перед позначкою виконання — підтвердження; у застосунках також кнопка навігатора, прив'язка файла до точки, самооновлення екрана, збереження пройденого шляху без зв'язку (до 500 позицій) і видимі неприйняті файли.
 
-## Driver Browser
+## Зв'язок і безпека
 
-Driver Browser — **один продукт**, а не окремі телефонна й desktop-версії. Він має три штатні компонування:
+- **Цей комп'ютер** і **локальна мережа** працюють без шифрування (HTTP): користуйтеся ними лише в мережі, якій довіряєте. Доступ із мережі не вмикається сам, порти на роутері не відкриваються.
+- Доступ до рейсу дає посилання з секретним кодом: передавайте його тільки водієві цього рейсу.
+- Браузер телефона зазвичай дозволяє геолокацію лише через HTTPS, тобто через Gateway.
+- Щоб телефон бачив Control у мережі, дозвольте програму в брандмауері комп'ютера.
+- **Через інтернет:** ваш Gateway за HTTPS reverse proxy. Control сам з'єднується з ним, вхідний порт на комп'ютері не потрібен. Gateway не зберігає рейсів, документів, медіа чи позицій. Типова межа пересилання — 64 МіБ на запит (налаштовується до 512 МіБ).
 
-- narrow phone;
-- tablet;
-- wide desktop/laptop.
+## Карти й маршрути
 
-Дані, маршрут, файли та backend однакові. Змінюється лише компонування під розмір екрана.
+Карта в Control, Planner, браузері та Android — [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors); в iPhone та iPad — Apple MapKit. Постачальник карти бачить IP-адресу пристрою й ділянку, яку показано. Дорожня лінія потребує власного сервера Valhalla; без нього рейс працює, лише лінії немає.
 
-## Карта
+## Мови
 
-У Control і Driver Browser вже є справжня інтерактивна базова карта з точками рейсу та останньою прийнятою позицією водія.
+Інтерфейс усіх програм: українська, English, Français, Deutsch, Español, 한국어, 日本語, 简体中文. Повноту перекладів перевіряє CI; технічні подробиці системи в повідомленнях про помилки лишаються англійською.
 
-У поточному `main` використовується schema 1.4 з immutable planning basis; старі schema залишаються читабельними. Planner routing profile — це лише параметри конкретного планового розрахунку, а не постійна прив'язка рейсу до автомобіля. Після імпорту Control веде окремий mutable actual routing context для активної сесії.
+## Що ще не перевірено й обмеження
 
-Control зберігає derived geometry й після reorder через налаштований runtime Valhalla перераховує дорожню лінію. Запізніла відповідь маршрутизатора не може перезаписати новіший стан рейсу. Якщо Valhalla не налаштована чи тимчасово недоступна, новий порядок точок усе одно зберігається, а derived geometry може бути відсутня.
+- Застосунки Android та iPhone/iPad не перевірені на фізичних пристроях — лише в емуляторі, симуляторі та тестами.
+- Зв'язок через мобільний інтернет і Gateway у реальній мережі перевірені лише автоматично.
+- Пакети не підписані; Android — debug APK, iOS — лише збірка для Apple Simulator.
+- Після перезапуску Control рейси та зв'язок вмикаються знову вручну.
+- Диспетчер ще не може редагувати точки чи позначати їх виконаними.
 
-Planner desktop тепер має власний runtime Valhalla preview: оператор задає адресу Valhalla, ID набору карт і таймаути, перевіряє `/status`, а `/route` рахується тільки з явно заданим planning profile. Невідомі числові параметри не вигадуються. Успішний розрахунок малює реальну дорожню polyline поверх OSM; без результату умовна пряма не малюється. Preview є похідним від route/revision/profile: зміна чернетки або planning profile прибирає стару лінію, а запізніла відповідь не приймається. Невдалий routing не змінює Planner draft.
+## Збірка
 
-Planner desktop також уже експортує чинний versioned trip package у schema 1.4 через native Save As. Пакет містить явний planning basis (тип/клас транспорту та вантажі), порядок точок і, за наявності, лише matching snapshot planning routing profile/Valhalla geometry. TripId стабільний для однієї чернетки, TripVersion продовжується між перезапусками, CargoId не залежить від позиції рядка, а існуючий ZIP ніколи не перезаписується.
-
-## Test v0.1.0-preview.8
-
-[Відкрити Test v0.1.0-preview.8](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8).
-
-Це **prerelease**, не Stable. Це інтегрована тестова версія поточного продукту з одного exact source.
-
-Release містить:
-- Windows Control x64 ZIP;
-- macOS Control universal ZIP — Intel + Apple Silicon;
-- Linux Control x64 tar.gz;
-- Windows Planner x64 ZIP;
-- macOS Planner universal ZIP — Intel + Apple Silicon;
-- Linux Planner x64 tar.gz;
-- Android Driver debug APK;
-- iOS/iPadOS Driver Simulator ZIP;
-- Linux Addressing Gateway x64 package;
-- SHA256SUMS.
-
-У preview.8 уже є durable Planner draft, real Valhalla road preview, versioned schema 1.4 ZIP export із planning basis та ручне створення активного рейсу в Control без Planner ZIP. Planner profile не є постійною прив'язкою рейсу до автомобіля; фактичний vehicle/device context ведеться окремо в Control.
-
-## Stable v0.1.0
-
-[Відкрити Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
-
-Stable збирається з одного exact source і публікує:
-- Windows Control x64 ZIP;
-- macOS Control universal ZIP — Intel + Apple Silicon;
-- Linux Control x64 tar.gz;
-- Android Driver debug APK для тестового встановлення;
-- iOS/iPadOS Driver Simulator ZIP;
-- Linux Addressing Gateway x64 package з Docker/Compose;
-- SHA256SUMS.
-
-**Linux Control** — desktop-застосунок оператора. **Linux Addressing Gateway** — окремий серверний relay-модуль; це не один і той самий пакет.
-
-Android та Apple пакети поки не підписані для магазинів. App Store/TestFlight/Google Play і production signing опрацюємо окремо пізніше.
-
-## Що ще попереду
-
-- ручне візуальне local browser acceptance для narrow phone / tablet / wide desktop, включно з pan/zoom/fit карти;
-- перевірка того самого Driver Browser на реальному телефоні в LAN;
-- польова HTTPS-перевірка з реальним телефоном/планшетом в окремій мережі та мобільному NAT/CGNAT;
-- повний browser GPS acceptance через HTTPS на реальному пристрої;
-
-## Мови інтерфейсу
-
-Control, Planner, Driver Browser, Android Driver та iOS/iPadOS Driver реалізовано й перевірено в одному наборі з **8 мов: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Для Control і Driver Browser є системний вибір мови та ручне перемикання зі збереженням; CI окремо контролює повноту всіх 8 локалізацій.
+Збірки, тести й релізи виконуються в GitHub Actions; сценарії — у `.github/workflows`.
 
 ## Документація
 
-Короткий публічний стан: [START_HERE.md](START_HERE.md), [HANDOFF_CURRENT.md](HANDOFF_CURRENT.md), [PROJECT_STATE.md](PROJECT_STATE.md).
-
-Розширена робоча документація проєкту ведеться приватно.
+Стан проєкту: [START_HERE.md](START_HERE.md), [HANDOFF_CURRENT.md](HANDOFF_CURRENT.md), [PROJECT_STATE.md](PROJECT_STATE.md). Розширена робоча документація ведеться приватно.
 
 ## Ліцензія
 
-Власницьке програмне забезпечення © 2026 Roman Zavada (Роман Завада). Публічність репозиторію не надає прав відкритої ліцензії. Див. [LICENSE.md](LICENSE.md) і [COPYRIGHT.md](COPYRIGHT.md).
+Власницьке програмне забезпечення © 2026 Roman Zavada (Роман Завада). Публічність репозиторію не надає прав відкритої ліцензії. Див. [LICENSE.md](LICENSE.md), [COPYRIGHT.md](COPYRIGHT.md) і [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

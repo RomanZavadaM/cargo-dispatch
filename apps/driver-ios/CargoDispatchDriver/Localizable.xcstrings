@@ -58,49 +58,49 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Нативний iPhone/iPad-клієнт використовує той самий Control API, що й Driver Browser."
+            "value": "Ваш рейс: маршрут, документи й позиція."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The native iPhone/iPad client uses the same Control API as Driver Browser."
+            "value": "Your trip: route, documents and position."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Der native iPhone/iPad-Client verwendet dieselbe Control-API wie der Driver Browser."
+            "value": "Ihre Tour: Route, Dokumente und Position."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le client natif iPhone/iPad utilise la même API Control que Driver Browser."
+            "value": "Votre trajet : itinéraire, documents et position."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El cliente nativo de iPhone/iPad usa la misma API de Control que Driver Browser."
+            "value": "Su viaje: ruta, documentos y posición."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "네이티브 iPhone/iPad 클라이언트는 Driver Browser와 동일한 Control API를 사용합니다."
+            "value": "내 운행: 경로, 문서, 위치."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ネイティブ iPhone/iPad クライアントは Driver Browser と同じ Control API を使用します。"
+            "value": "運行：経路、書類、位置。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "原生 iPhone/iPad 客户端使用与 Driver Browser 相同的 Control API。"
+            "value": "您的行程：路线、文件和位置。"
           }
         }
       }
@@ -110,49 +110,49 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Підключення до Control"
+            "value": "Підключення"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connect to Control"
+            "value": "Connection"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mit Control verbinden"
+            "value": "Verbindung"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connexion à Control"
+            "value": "Connexion"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Conectar con Control"
+            "value": "Conexión"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Control에 연결"
+            "value": "연결"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Control に接続"
+            "value": "接続"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连接到 Control"
+            "value": "连接"
           }
         }
       }
@@ -162,49 +162,49 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Driver URL з Control"
+            "value": "Посилання від диспетчера"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Driver URL from Control"
+            "value": "Link from the dispatcher"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Driver-URL aus Control"
+            "value": "Link vom Disponenten"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "URL Driver fournie par Control"
+            "value": "Lien du régulateur"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Driver URL de Control"
+            "value": "Enlace del despachador"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Control의 Driver URL"
+            "value": "배차 담당자가 보낸 링크"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Control の Driver URL"
+            "value": "配車担当から届いたリンク"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Control 提供的 Driver URL"
+            "value": "调度员发来的链接"
           }
         }
       }
@@ -266,49 +266,49 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Підключення…"
+            "value": "Зачекайте…"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connecting…"
+            "value": "Please wait…"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verbindung…"
+            "value": "Bitte warten…"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connexion…"
+            "value": "Veuillez patienter…"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Conectando…"
+            "value": "Espere…"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "연결 중…"
+            "value": "잠시만 기다리세요…"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "接続中…"
+            "value": "お待ちください…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在连接…"
+            "value": "请稍候…"
           }
         }
       }
@@ -365,366 +365,54 @@
         }
       }
     },
-    "error.invalid_driver_url": {
-      "localizations": {
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Некоректний Driver URL."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Invalid Driver URL."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ungültige Driver-URL."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "URL Driver incorrecte."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Driver URL no válida."
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Driver URL이 올바르지 않습니다."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Driver URL が正しくありません。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Driver URL 无效。"
-          }
-        }
-      }
-    },
-    "error.connection": {
-      "localizations": {
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Не вдалося зв’язатися з Control. Перевірте адресу й з’єднання."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not reach Control. Check the address and connection."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Control ist nicht erreichbar. Adresse und Verbindung prüfen."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossible de joindre Control. Vérifiez l’adresse et la connexion."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se pudo conectar con Control. Comprueba la dirección y la conexión."
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Control에 연결할 수 없습니다. 주소와 연결을 확인하세요."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Control に接続できません。アドレスと接続を確認してください。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法连接到 Control。请检查地址和网络连接。"
-          }
-        }
-      }
-    },
     "trip.title.format": {
       "localizations": {
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Рейс %@…"
+            "value": "Рейс %@"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trip %@…"
+            "value": "Trip %@"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tour %@…"
+            "value": "Tour %@"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trajet %@…"
+            "value": "Trajet %@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Viaje %@…"
+            "value": "Viaje %@"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "운행 %@…"
+            "value": "운행 %@"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "運行 %@…"
+            "value": "運行 %@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "行程 %@…"
-          }
-        }
-      }
-    },
-    "trip.version_revision.format": {
-      "localizations": {
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Версія %1$llu; local revision %2$llu"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Version %1$llu; local revision %2$llu"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Version %1$llu; lokale Revision %2$llu"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Version %1$llu ; révision locale %2$llu"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Versión %1$llu; revisión local %2$llu"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "버전 %1$llu; 로컬 리비전 %2$llu"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "バージョン %1$llu; ローカルリビジョン %2$llu"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "版本 %1$llu；本地修订 %2$llu"
-          }
-        }
-      }
-    },
-    "trip.points_documents.format": {
-      "localizations": {
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Точки: %1$ld; документи: %2$ld"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stops: %1$ld; documents: %2$ld"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stopps: %1$ld; Dokumente: %2$ld"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Arrêts : %1$ld ; documents : %2$ld"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paradas: %1$ld; documentos: %2$ld"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "지점: %1$ld; 문서: %2$ld"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "地点: %1$ld; 書類: %2$ld"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "站点：%1$ld；文档：%2$ld"
-          }
-        }
-      }
-    },
-    "trip.geometry.format": {
-      "localizations": {
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Дорожня geometry: %1$ld точок (%2$@ %3$@)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Road geometry: %1$ld points (%2$@ %3$@)"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Straßengeometrie: %1$ld Punkte (%2$@ %3$@)"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Géométrie routière : %1$ld points (%2$@ %3$@)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Geometría vial: %1$ld puntos (%2$@ %3$@)"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "도로 경로 형상: %1$ld개 지점 (%2$@ %3$@)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "道路形状: %1$ld 地点 (%2$@ %3$@)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "道路几何：%1$ld 个点（%2$@ %3$@）"
-          }
-        }
-      }
-    },
-    "trip.geometry.none": {
-      "localizations": {
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Дорожня geometry: немає / інвалідована"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Road geometry: unavailable / invalidated"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Straßengeometrie: nicht verfügbar / ungültig"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Géométrie routière : indisponible / invalidée"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Geometría vial: no disponible / invalidada"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "도로 경로 형상: 없음 / 무효화됨"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "道路形状: なし / 無効化済み"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "道路几何：无 / 已失效"
+            "value": "行程 %@"
           }
         }
       }
@@ -792,7 +480,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Completed"
+            "value": "Done"
           }
         },
         "de": {
@@ -804,13 +492,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Terminé"
+            "value": "Fait"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Completado"
+            "value": "Hecho"
           }
         },
         "ko": {
@@ -838,49 +526,49 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Відкрита точка"
+            "value": "Ще не виконано"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open stop"
+            "value": "Not done yet"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Offener Stopp"
+            "value": "Noch offen"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Arrêt ouvert"
+            "value": "Pas encore fait"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parada abierta"
+            "value": "Pendiente"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "열린 지점"
+            "value": "미완료"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "未完了地点"
+            "value": "未完了"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "未完成站点"
+            "value": "未完成"
           }
         }
       }
@@ -994,49 +682,49 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Виконано"
+            "value": "Позначити виконаною"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Complete"
+            "value": "Mark as done"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Erledigen"
+            "value": "Als erledigt markieren"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Terminer"
+            "value": "Marquer comme fait"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Completar"
+            "value": "Marcar como hecho"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "완료 처리"
+            "value": "완료로 표시"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "完了"
+            "value": "完了にする"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "完成"
+            "value": "标记完成"
           }
         }
       }
@@ -1098,31 +786,31 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Геолокація"
+            "value": "Позиція"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Location"
+            "value": "Position"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Standort"
+            "value": "Position"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Localisation"
+            "value": "Position"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ubicación"
+            "value": "Posición"
           }
         },
         "ko": {
@@ -1134,7 +822,7 @@
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "位置情報"
+            "value": "位置"
           }
         },
         "zh-Hans": {
@@ -1202,49 +890,49 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$.6f, %2$.6f · ±%3$.0f м"
+            "value": "Остання передана: %1$@ (±%2$.0f м)"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$.6f, %2$.6f · ±%3$.0f m"
+            "value": "Last sent: %1$@ (±%2$.0f m)"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$.6f, %2$.6f · ±%3$.0f m"
+            "value": "Zuletzt gesendet: %1$@ (±%2$.0f m)"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$.6f, %2$.6f · ±%3$.0f m"
+            "value": "Dernier envoi : %1$@ (±%2$.0f m)"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$.6f, %2$.6f · ±%3$.0f m"
+            "value": "Último envío: %1$@ (±%2$.0f m)"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$.6f, %2$.6f · ±%3$.0f m"
+            "value": "마지막 전송: %1$@ (±%2$.0f m)"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$.6f, %2$.6f · ±%3$.0f m"
+            "value": "最終送信：%1$@（±%2$.0f m）"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$.6f, %2$.6f · ±%3$.0f 米"
+            "value": "最近发送：%1$@（±%2$.0f 米）"
           }
         }
       }
@@ -1306,49 +994,49 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Документи / фото / відео"
+            "value": "Документи, фото, відео"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Documents / photos / video"
+            "value": "Documents, photos, videos"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dokumente / Fotos / Video"
+            "value": "Dokumente, Fotos, Videos"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Documents / photos / vidéo"
+            "value": "Documents, photos, vidéos"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Documentos / fotos / vídeo"
+            "value": "Documentos, fotos, vídeos"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "문서 / 사진 / 동영상"
+            "value": "문서, 사진, 동영상"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "書類 / 写真 / 動画"
+            "value": "書類・写真・動画"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "文档 / 照片 / 视频"
+            "value": "文件、照片、视频"
           }
         }
       }
@@ -1462,13 +1150,13 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Передати файл"
+            "value": "Надіслати файл"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Send file"
+            "value": "Send a file"
           }
         },
         "de": {
@@ -1492,13 +1180,13 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "파일 전송"
+            "value": "파일 보내기"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ファイルを送信"
+            "value": "ファイルを送る"
           }
         },
         "zh-Hans": {
@@ -1514,153 +1202,49 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Передати фото / відео"
+            "value": "Фото чи відео"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Send photo / video"
+            "value": "Photo or video"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Foto / Video senden"
+            "value": "Foto oder Video"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Envoyer photo / vidéo"
+            "value": "Photo ou vidéo"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enviar foto / vídeo"
+            "value": "Foto o vídeo"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사진 / 동영상 전송"
+            "value": "사진/동영상"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "写真 / 動画を送信"
+            "value": "写真・動画"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送照片 / 视频"
-          }
-        }
-      }
-    },
-    "error.location": {
-      "localizations": {
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Не вдалося отримати або передати позицію."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not get or send the location."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Standort konnte nicht ermittelt oder gesendet werden."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossible d’obtenir ou d’envoyer la position."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se pudo obtener o enviar la ubicación."
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "위치를 가져오거나 전송할 수 없습니다."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "位置情報を取得または送信できませんでした。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法获取或发送位置。"
-          }
-        }
-      }
-    },
-    "error.file": {
-      "localizations": {
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Не вдалося прочитати, передати або зберегти файл."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not read, send, or save the file."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Datei konnte nicht gelesen, gesendet oder gespeichert werden."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossible de lire, envoyer ou enregistrer le fichier."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se pudo leer, enviar o guardar el archivo."
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "파일을 읽거나 전송하거나 저장할 수 없습니다."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ファイルを読み込み、送信、または保存できませんでした。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法读取、发送或保存文件。"
+            "value": "照片或视频"
           }
         }
       }
@@ -1722,49 +1306,49 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Дорожня лінія показується лише для актуальної geometry; точки й позиція беруться з Control."
+            "value": "Лінія дороги з’являється, коли диспетчер її порахував."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The road line is shown only for current geometry; stops and position come from Control."
+            "value": "The road line appears once the dispatcher has calculated it."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die Straßenlinie wird nur für aktuelle Geometrie angezeigt; Stopps und Position kommen aus Control."
+            "value": "Die Straßenlinie erscheint, sobald der Disponent sie berechnet hat."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La ligne routière n’est affichée que pour la géométrie actuelle ; les arrêts et la position viennent de Control."
+            "value": "Le tracé routier apparaît une fois calculé par le régulateur."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La línea vial se muestra solo para la geometría actual; las paradas y la posición vienen de Control."
+            "value": "La línea de carretera aparece cuando el despachador la calcula."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "도로 선은 현재 경로 형상이 있을 때만 표시되며 지점과 위치는 Control에서 가져옵니다."
+            "value": "배차 담당자가 계산하면 도로선이 표시됩니다."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "道路ラインは現在の geometry がある場合だけ表示し、地点と位置は Control から取得します。"
+            "value": "道路線は配車担当が計算すると表示されます。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅在道路几何仍为当前版本时显示路线；站点和位置来自 Control。"
+            "value": "调度员计算后显示道路线。"
           }
         }
       }
@@ -2029,58 +1613,6 @@
         }
       }
     },
-    "error.camera": {
-      "localizations": {
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Не вдалося отримати фото або відео з камери."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not capture photo or video."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Foto oder Video konnte nicht aufgenommen werden."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossible de capturer la photo ou la vidéo."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se pudo capturar la foto o el vídeo."
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "카메라에서 사진 또는 동영상을 가져오지 못했습니다."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "カメラから写真または動画を取得できませんでした。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法从相机获取照片或视频。"
-          }
-        }
-      }
-    },
     "queue.pending.format": {
       "localizations": {
         "uk": {
@@ -2092,13 +1624,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pending to send: %ld"
+            "value": "Waiting to be sent: %ld"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ausstehend: %ld"
+            "value": "Wartet auf Versand: %ld"
           }
         },
         "fr": {
@@ -2122,7 +1654,7 @@
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "送信待ち: %ld"
+            "value": "送信待ち：%ld"
           }
         },
         "zh-Hans": {
@@ -2294,49 +1826,1505 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Поки відстеження активне, iPhone/iPad може передавати позицію в Control і у фоні. Stop повністю вимикає безперервний GPS."
+            "value": "Поки відстеження увімкнене, позиція передається й у фоні. «Зупинити» повністю вимикає безперервний GPS."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "While tracking is active, iPhone/iPad can send location to Control in the background. Stop fully disables continuous GPS."
+            "value": "While tracking is on, your position is also sent in the background. “Stop” turns continuous GPS off completely."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bei aktivem Tracking kann iPhone/iPad den Standort auch im Hintergrund an Control senden. Stop deaktiviert den kontinuierlichen GPS-Empfang vollständig."
+            "value": "Solange die Verfolgung läuft, wird die Position auch im Hintergrund gesendet. „Beenden“ schaltet das Dauer-GPS ganz ab."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quand le suivi est actif, l’iPhone/iPad peut envoyer la position à Control en arrière-plan. Arrêter désactive complètement le GPS continu."
+            "value": "Tant que le suivi est actif, la position est aussi envoyée en arrière-plan. « Arrêter » coupe complètement le GPS continu."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mientras el seguimiento está activo, iPhone/iPad puede enviar la ubicación a Control en segundo plano. Detener desactiva por completo el GPS continuo."
+            "value": "Con el seguimiento activo, la posición se envía también en segundo plano. «Detener» apaga el GPS continuo por completo."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "추적이 활성화되어 있으면 iPhone/iPad가 백그라운드에서도 위치를 Control로 보낼 수 있습니다. 중지하면 연속 GPS가 완전히 꺼집니다."
+            "value": "추적 중에는 백그라운드에서도 위치를 전송합니다. ‘중지’를 누르면 연속 GPS가 완전히 꺼집니다."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "追跡中は iPhone/iPad がバックグラウンドでも位置を Control に送信できます。停止すると連続 GPS は完全に無効になります。"
+            "value": "追跡中はバックグラウンドでも位置を送信します。「停止」で連続 GPS は完全にオフになります。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "跟踪启用时，iPhone/iPad 可在后台向 Control 发送位置。停止后会完全关闭连续 GPS。"
+            "value": "追踪开启时后台也会发送位置。点击“停止”将完全关闭持续定位。"
+          }
+        }
+      }
+    },
+    "status.connected": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Підключено. Зміни з’являються самі."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected. Changes appear automatically."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbunden. Änderungen erscheinen automatisch."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecté. Les changements apparaissent automatiquement."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conectado. Los cambios aparecen solos."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "연결됨. 변경 사항이 자동으로 표시됩니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接続中。変更は自動で反映されます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已连接。更改会自动显示。"
+          }
+        }
+      }
+    },
+    "status.offline": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Немає зв’язку з диспетчером. Спробуємо ще раз."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No connection to the dispatcher. Trying again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Verbindung zum Disponenten. Neuer Versuch folgt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas de liaison avec le régulateur. Nouvel essai en cours."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin conexión con el despachador. Se volverá a intentar."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "배차 담당자와 연결되지 않습니다. 다시 시도합니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配車担当に接続できません。再試行します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法连接调度员，将再次尝试。"
+          }
+        }
+      }
+    },
+    "trip.progress.format": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Виконано точок: %1$ld з %2$ld"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stops done: %1$ld of %2$ld"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erledigte Punkte: %1$ld von %2$ld"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Points effectués : %1$ld sur %2$ld"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puntos hechos: %1$ld de %2$ld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "완료한 지점: %2$ld곳 중 %1$ld곳"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了した地点：%1$ld / %2$ld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已完成地点：%1$ld / %2$ld"
+          }
+        }
+      }
+    },
+    "navigate": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відкрити в навігаторі"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in navigator"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im Navigator öffnen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir dans le navigateur GPS"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir en el navegador GPS"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "내비게이션으로 열기"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ナビで開く"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在导航中打开"
+          }
+        }
+      }
+    },
+    "navigate.apple": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Карти"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Maps"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Karten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plans d’Apple"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mapas de Apple"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple 지도"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple マップ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple 地图"
+          }
+        }
+      }
+    },
+    "navigate.google": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Maps"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Maps"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Maps"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Maps"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Maps"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 지도"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google マップ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 地图"
+          }
+        }
+      }
+    },
+    "confirm.done.title": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Точку виконано?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop done?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Punkt erledigt?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point effectué ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Punto hecho?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지점을 완료했습니까?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地点は完了しましたか？"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该地点已完成？"
+          }
+        }
+      }
+    },
+    "confirm.done.format": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$ld. %2$@. Скасувати цю позначку з телефона не можна."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$ld. %2$@. You cannot undo this mark from the phone."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$ld. %2$@. Diese Markierung lässt sich am Telefon nicht zurücknehmen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$ld. %2$@. Cette validation ne peut pas être annulée depuis le téléphone."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$ld. %2$@. Esta marca no se puede deshacer desde el teléfono."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$ld. %2$@. 이 표시는 휴대전화에서 취소할 수 없습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$ld. %2$@。この記録はスマートフォンから取り消せません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$ld. %2$@。此标记无法在手机上撤销。"
+          }
+        }
+      }
+    },
+    "confirm.done.button": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Так, виконано"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes, done"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ja, erledigt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oui, c’est fait"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sí, hecho"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "예, 완료"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "はい、完了"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "是，已完成"
+          }
+        }
+      }
+    },
+    "cancel": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скасувати"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abbrechen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "취소"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンセル"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
+    "problem.linkInvalid": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Посилання не розпізнано. Вставте його повністю."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The link was not recognised. Paste it in full."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Link wurde nicht erkannt. Bitte vollständig einfügen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lien non reconnu. Collez-le en entier."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se reconoce el enlace. Péguelo completo."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "링크를 인식할 수 없습니다. 전체를 붙여 넣으세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リンクを認識できません。全体を貼り付けてください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法识别链接，请完整粘贴。"
+          }
+        }
+      }
+    },
+    "problem.linkScheme": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Посилання має починатися з http:// або https://"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The link must start with http:// or https://"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Link muss mit http:// oder https:// beginnen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le lien doit commencer par http:// ou https://"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El enlace debe empezar por http:// o https://"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "링크는 http:// 또는 https:// 로 시작해야 합니다"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リンクは http:// または https:// で始まる必要があります"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "链接必须以 http:// 或 https:// 开头"
+          }
+        }
+      }
+    },
+    "problem.linkShape": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Це не посилання водія. Попросіть його в диспетчера."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is not a driver link. Ask the dispatcher for it."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das ist kein Fahrerlink. Bitten Sie den Disponenten darum."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce n’est pas un lien conducteur. Demandez-le au régulateur."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No es un enlace de conductor. Pídalo al despachador."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "운전자 링크가 아닙니다. 배차 담당자에게 요청하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ドライバー用のリンクではありません。配車担当に依頼してください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这不是司机链接，请向调度员索取。"
+          }
+        }
+      }
+    },
+    "problem.noConnection": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Немає зв’язку з диспетчером. Перевірте мережу."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No connection to the dispatcher. Check the network."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Verbindung zum Disponenten. Netzwerk prüfen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas de liaison avec le régulateur. Vérifiez le réseau."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin conexión con el despachador. Revise la red."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "배차 담당자와 연결되지 않습니다. 네트워크를 확인하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配車担当に接続できません。ネットワークを確認してください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法连接调度员，请检查网络。"
+          }
+        }
+      }
+    },
+    "problem.linkExpired": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Посилання не діє. Попросіть у диспетчера нове."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The link no longer works. Ask the dispatcher for a new one."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Link gilt nicht mehr. Bitten Sie um einen neuen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le lien n’est plus valable. Demandez-en un nouveau."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El enlace ya no funciona. Pida uno nuevo."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "링크가 더 이상 유효하지 않습니다. 새 링크를 요청하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リンクは無効です。新しいリンクを依頼してください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "链接已失效，请向调度员索取新链接。"
+          }
+        }
+      }
+    },
+    "problem.routeChanged": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Рейс щойно змінився. Дані оновлено, перевірте й повторіть."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The trip has just changed. It was refreshed; check and try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Tour wurde gerade geändert. Aktualisiert; bitte prüfen und wiederholen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le trajet vient de changer. Il est actualisé ; vérifiez et recommencez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El viaje acaba de cambiar. Se ha actualizado; revise y repita."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "운행이 방금 변경되었습니다. 새로 불러왔으니 확인 후 다시 시도하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運行が変更されました。更新したので確認してやり直してください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "行程刚刚变更，已刷新，请核对后重试。"
+          }
+        }
+      }
+    },
+    "problem.fileTooLarge": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Файл завеликий."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file is too large."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei ist zu groß."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le fichier est trop volumineux."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El archivo es demasiado grande."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일이 너무 큽니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルが大きすぎます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件过大。"
+          }
+        }
+      }
+    },
+    "problem.rejected": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Диспетчерська програма не прийняла запит."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The dispatch program refused the request."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Dispositionsprogramm hat die Anfrage abgelehnt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le programme de régulation a refusé la demande."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El programa de despacho rechazó la solicitud."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "배차 프로그램이 요청을 거부했습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配車プログラムが要求を受け付けませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调度程序拒绝了该请求。"
+          }
+        }
+      }
+    },
+    "problem.fileUnreadable": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося прочитати файл."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file could not be read."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei konnte nicht gelesen werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de lire le fichier."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo leer el archivo."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일을 읽을 수 없습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルを読み込めませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取文件。"
+          }
+        }
+      }
+    },
+    "problem.fileNotSaved": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося зберегти файл."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file could not be saved."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei konnte nicht gespeichert werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’enregistrer le fichier."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo guardar el archivo."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일을 저장할 수 없습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルを保存できませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存文件。"
+          }
+        }
+      }
+    },
+    "problem.locationUnavailable": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося визначити позицію. Перевірте дозвіл на геолокацію."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your position could not be determined. Check the location permission."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position nicht bestimmbar. Standortberechtigung prüfen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position introuvable. Vérifiez l’autorisation de localisation."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo obtener la posición. Revise el permiso de ubicación."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "위치를 확인할 수 없습니다. 위치 권한을 확인하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置を取得できません。位置情報の許可を確認してください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法确定位置，请检查定位权限。"
+          }
+        }
+      }
+    },
+    "problem.camera": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося отримати фото чи відео з камери."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The camera did not deliver a photo or video."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera lieferte kein Foto oder Video."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La caméra n’a fourni ni photo ni vidéo."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La cámara no entregó foto ni vídeo."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "카메라에서 사진이나 동영상을 가져오지 못했습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カメラから写真・動画を取得できませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法从相机获取照片或视频。"
+          }
+        }
+      }
+    },
+    "problem.unknown": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося виконати дію. Спробуйте ще раз."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The action failed. Try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktion fehlgeschlagen. Bitte erneut versuchen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’action a échoué. Réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo completar la acción. Inténtelo de nuevo."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "작업에 실패했습니다. 다시 시도하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作に失敗しました。もう一度お試しください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作失败，请重试。"
+          }
+        }
+      }
+    },
+    "rejected.title": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не прийняті файли"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files not accepted"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht angenommene Dateien"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fichiers refusés"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archivos no aceptados"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "접수되지 않은 파일"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受け付けられなかったファイル"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未被接收的文件"
+          }
+        }
+      }
+    },
+    "retry": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Спробувати ще"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erneut senden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 시도"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再試行"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试"
+          }
+        }
+      }
+    },
+    "discard": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прибрати"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entfernen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "삭제"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除"
+          }
+        }
+      }
+    },
+    "attach.to": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нові файли прив’язати до"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attach new files to"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neue Dateien zuordnen zu"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rattacher les nouveaux fichiers à"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asociar los archivos nuevos a"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 파일 연결 대상"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しいファイルの関連先"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新文件关联到"
+          }
+        }
+      }
+    },
+    "attach.trip": {
+      "localizations": {
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Увесь рейс"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whole trip"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesamte Tour"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout le trajet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo el viaje"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "운행 전체"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運行全体"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整个行程"
           }
         }
       }

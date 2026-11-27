@@ -2,26 +2,9 @@
 
 Публічний вхід у проєкт.
 
-1. Опис продукту, Stable/Test release і мовні версії: [README.md](README.md).
-2. Короткий публічний якір стану: [HANDOFF_CURRENT.md](HANDOFF_CURRENT.md) і [PROJECT_STATE.md](PROJECT_STATE.md).
+1. Опис продукту й мовні версії: [README.md](README.md).
+2. Стан: [HANDOFF_CURRENT.md](HANDOFF_CURRENT.md) і [PROJECT_STATE.md](PROJECT_STATE.md).
 3. Ліцензія та сторонні компоненти: [LICENSE.md](LICENSE.md), [COPYRIGHT.md](COPYRIGHT.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-4. Розширені правила, журнали, плани й архітектура: private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
-5. Перед продовженням роботи звірити live GitHub: `main`, open PR, Actions, branches і Releases. GitHub має пріоритет.
-6. Stable checkpoint — `v0.1.0`.
-7. Поточний Test/prerelease — `v0.1.0-preview.8`, exact source `47352ca341a2d3747d503164de0555b891db6bf1`.
-8. У `preview.8` опубліковані:
-   - Control desktop для Windows x64, macOS universal і Linux x64;
-   - Planner desktop для Windows x64, macOS universal і Linux x64;
-   - Driver Android;
-   - Driver iPhone/iPad Simulator build;
-   - Addressing Gateway для Linux;
-   - `SHA256SUMS.txt`.
-9. `preview.8` уже містить: durable Planner draft, real Valhalla road preview, versioned schema 1.4 ZIP export через native Save As; Control імпортує цей ZIP або створює новий активний рейс вручну без Planner ZIP. TripId не прив'язаний до автомобіля чи endpoint.
-10. Control залишається єдиним джерелом фактичного стану активного рейсу. Gateway не зберігає trip DB, документи, медіа чи історію позицій.
-11. Повна локалізація 8 мовами інтегрована й захищена CI, включно з Planner UI.
-12. Ручне створення рейсу в Control уже інтегроване й використовує той самий durable trip state без вигаданого planning basis. `v0.1.0-preview.8` уже опублікований у GitHub Releases з Control/Planner Windows/macOS/Linux, Android, iOS Simulator, Gateway і SHA256SUMS.
-13. Автоматичний Driver Browser acceptance уже інтегрований окремо для loopback і явного private-LAN bind через реальний Control session. Це не замінює ручну візуальну перевірку narrow phone / tablet / wide desktop та реальний телефон у фізичній LAN/VPN.
-14. Автоматичний public Gateway acceptance уже підтверджує шлях `Control ↔ public HTTPS Gateway ↔ Driver Browser`: Control відкриває лише вихідне з’єднання, а через тимчасову публічну HTTPS-адресу перевірені Driver Browser shell, snapshot, location update і двосторонні файли. Це public HTTPS/NAT-style CI checkpoint; реальний окремий пристрій у конкретній мобільній мережі/CGNAT лишається польовою перевіркою.
-15. У `main` після `preview.8` (у жоден реліз ще не входить): запит Valhalla передає вибір щодо платних доріг (`use_tolls`) і задану максимальну швидкість (`top_speed`); для нового розрахунку вона має бути в межах 10–252 км/год. «Уникати» не гарантує маршрут без платних доріг. Збережені пакети читаються, як і раніше. Перевірено автоматичними тестами, без живого сервера Valhalla.
-15а. Також у `main` після `preview.8`: вікно підключення водіїв у Control перебудоване (чотири випадні вікна, помічник «Що робити далі», посилання водія на видноті); адресу комп'ютера в мережі визначає програма; спосіб зв'язку перемикається без ручного вимикання. Перевірено автоматичними тестами; вручну — обмін із планшетом у локальній мережі (Windows). У релізи ще не входить.
-16. Наступний крок: усунення невідповідностей, знайдених перевіркою на стратегію розробки та ліцензії.
+4. Стабільна версія — [v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0).
+5. Правила, журнали, плани й архітектура ведуться приватно: `RomanZavadaM/dev-strategy`, гілка `profile/cargo-dispatch`.
+6. Перед продовженням роботи звірити live GitHub: `main`, відкриті запити на злиття, Actions, гілки й релізи. GitHub має пріоритет над документами.
