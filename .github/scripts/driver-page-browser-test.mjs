@@ -133,11 +133,12 @@ try {
   expect(true, "the connection state turns red when offline and recovers afterwards");
 
   for (const [locale, label] of [["en", "Mark as done"], ["de", "Als erledigt markieren"], ["ja", "完了にする"], ["zh-Hans", "标记完成"]]) {
-    await evaluate(`
+    // A block: every evaluation shares one global scope.
+    await evaluate(`{
       const select = document.getElementById("languageSelect");
       select.value = "${locale}";
       select.dispatchEvent(new Event("change"));
-      true`);
+    } true`);
     await waitFor(`${locale} texts`, pageHas(`document.getElementById("points").innerText.includes("${label}")`));
     expect(true, `the page switches to ${locale}`);
   }
