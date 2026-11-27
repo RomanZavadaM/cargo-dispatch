@@ -69,7 +69,7 @@ Alle Programme gibt es in українська, English, Français, Deutsch, Esp
 - Die Apps für Android und iPhone/iPad wurden nicht auf echten Geräten getestet – nur im Emulator, im Simulator und mit automatischen Tests.
 - Mobiles Internet und das Gateway in einem echten Netz sind nur automatisch geprüft.
 - Die Pakete sind nicht signiert; Android ist ein Debug-APK, iOS nur ein Build für den Apple-Simulator.
-- Nach einem Neustart von Control müssen Touren und Verbindung von Hand neu aktiviert werden.
+- Nach einem Neustart von Control sind Touren und Links wieder da; die Verbindung wird mit einem Klick aktiviert (nach v0.2.0).
 - Der Disponent kann Punkte noch nicht bearbeiten oder als erledigt markieren.
 
 ## Build

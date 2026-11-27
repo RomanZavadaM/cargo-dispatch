@@ -69,7 +69,7 @@ Control、Planner、浏览器和 Android 使用 [OpenStreetMap](https://www.open
 - Android 和 iPhone/iPad 应用尚未在实体设备上测试，仅经过模拟器和自动测试。
 - 移动网络以及真实网络中的 Gateway 仅经过自动测试。
 - 安装包未签名；Android 为调试版 APK，iOS 仅有 Apple 模拟器版本。
-- Control 重启后，需手动重新启用行程和连接。
+- Control 重启后行程和链接自动恢复，连接方式点一次即可开启（v0.2.0 之后）。
 - 调度员暂时无法编辑地点或标记完成。
 
 ## 构建

@@ -69,7 +69,7 @@ Todos los programas están en українська, English, Français, Deutsch,
 - Las aplicaciones para Android y iPhone/iPad no se han probado en dispositivos físicos: solo en emulador, simulador y pruebas automáticas.
 - Internet móvil y el Gateway en una red real solo se han verificado automáticamente.
 - Los paquetes no están firmados; Android es un APK de depuración e iOS solo una compilación para el simulador de Apple.
-- Tras reiniciar Control, hay que volver a activar a mano los viajes y la conexión.
+- Tras reiniciar Control, los viajes y enlaces vuelven solos; la conexión se activa con una pulsación (después de v0.2.0).
 - El despachador todavía no puede editar puntos ni marcarlos como hechos.
 
 ## Compilación

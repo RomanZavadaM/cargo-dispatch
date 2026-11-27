@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+mod restore;
+
 use cargo_dispatch_contracts::{
     TripNavigationTarget, TripPlanningBasis, TripPointKind, TripRoutePoint,
 };
@@ -71,6 +73,9 @@ struct DesktopControlService {
     server: AsyncMutex<Option<LoopbackControlServer>>,
     gateway: AsyncMutex<Option<GatewayRelayRuntime>>,
     sessions: Mutex<BTreeMap<String, RegisteredSession>>,
+    /// Where connected trips are remembered; `None` keeps nothing.
+    memory: Option<PathBuf>,
+    memory_lock: Mutex<()>,
 }
 
 impl Default for DesktopControlService {
@@ -80,6 +85,8 @@ impl Default for DesktopControlService {
             server: AsyncMutex::new(None),
             gateway: AsyncMutex::new(None),
             sessions: Mutex::new(BTreeMap::new()),
+            memory: None,
+            memory_lock: Mutex::new(()),
         }
     }
 }
@@ -1118,7 +1125,10 @@ async fn register_trip(
     input: RegisterTripInput,
     state: State<'_, DesktopControlService>,
 ) -> Result<ControlUiStatus, String> {
-    state.register_trip(input).await
+    let (token, folder) = (input.token.clone(), input.folder_path.clone());
+    let status = state.register_trip(input).await?;
+    state.remember_session(&token, &folder)?;
+    Ok(status)
 }
 
 #[tauri::command]
@@ -1126,7 +1136,10 @@ async fn create_manual_trip(
     input: CreateManualTripInput,
     state: State<'_, DesktopControlService>,
 ) -> Result<ControlUiStatus, String> {
-    state.create_manual_trip(input).await
+    let (token, folder) = (input.token.clone(), input.folder_path.clone());
+    let status = state.create_manual_trip(input).await?;
+    state.remember_session(&token, &folder)?;
+    Ok(status)
 }
 
 #[tauri::command]
@@ -1209,7 +1222,9 @@ async fn configure_routing(
     input: ConfigureRoutingInput,
     state: State<'_, DesktopControlService>,
 ) -> Result<ControlUiStatus, String> {
-    state.configure_routing(input).await
+    let status = state.configure_routing(input.clone()).await?;
+    state.remember_routing(Some(input))?;
+    Ok(status)
 }
 
 #[tauri::command]
@@ -1223,7 +1238,9 @@ async fn test_routing(
 async fn disable_routing(
     state: State<'_, DesktopControlService>,
 ) -> Result<ControlUiStatus, String> {
-    state.disable_routing().await
+    let status = state.disable_routing().await?;
+    state.remember_routing(None)?;
+    Ok(status)
 }
 
 #[tauri::command]
@@ -1242,7 +1259,13 @@ async fn stop_gateway(state: State<'_, DesktopControlService>) -> Result<Control
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(DesktopControlService::default())
+        .setup(|app| {
+            let path = app.path().app_data_dir()?.join("control-state-v1.json");
+            let service = DesktopControlService::with_memory(path);
+            tauri::async_runtime::block_on(service.restore());
+            app.manage(service);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             control_status,
             register_trip,
@@ -1281,6 +1304,31 @@ mod tests {
     use cargo_dispatch_planner::PlannerTripExportDraft;
     use cargo_dispatch_trip_files::export_package;
     use tokio::net::TcpListener;
+
+    #[tokio::test]
+    async fn connected_trips_come_back_with_the_same_link_after_a_restart() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let (_, folder) = create_trip(workspace.path()).expect("trip");
+        let folder = folder.to_string_lossy().into_owned();
+        let memory = workspace.path().join("control-state-v1.json");
+        let token = "restart-session-token-0001";
+
+        let first = DesktopControlService::with_memory(memory.clone());
+        first
+            .register_trip(RegisterTripInput {
+                folder_path: folder.clone(),
+                token: token.to_owned(),
+            })
+            .await
+            .expect("registered");
+        first.remember_session(token, &folder).expect("remembered");
+        drop(first);
+
+        let second = DesktopControlService::with_memory(memory);
+        second.restore().await;
+        assert!(second.sessions.lock().expect("sessions").contains_key(token));
+        assert!(second.server.lock().await.is_none(), "sharing stays off");
+    }
 
     fn create_trip(root: &std::path::Path) -> std::io::Result<(TripId, PathBuf)> {
         let trip = TripId::from_bytes([21; 16]).expect("trip");
