@@ -12,7 +12,7 @@
     h1 { margin-top: 0; }
     section { background: white; border: 1px solid #d8dee4; border-radius: 12px; padding: 18px; margin: 14px 0; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    label { display: grid; gap: 5px; font-weight: 600; }
+    label { display: grid; gap: 5px; font-weight: 600; align-content: start; }
     input { padding: 9px 10px; border: 1px solid #b7bec7; border-radius: 7px; font: inherit; }
     button { padding: 9px 13px; border: 1px solid #8c959f; border-radius: 7px; background: #fff; font: inherit; cursor: pointer; }
     button.primary { background: #1769aa; color: white; border-color: #1769aa; }
@@ -21,7 +21,28 @@
     .status { padding: 10px; border-radius: 8px; background: #eef3f8; }
     .error { color: #a40000; }
     .ok { color: #176b2c; }
+    main > p[role="status"] { position: sticky; bottom: 8px; z-index: 30; padding: 10px 14px; border: 1px solid #d8dee4; border-radius: 8px; background: #fff; box-shadow: 0 2px 12px #0003; }
     code { overflow-wrap: anywhere; }
+    .toolbar, .access-line { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+    .access-line { justify-content: space-between; background: white; border: 1px solid #d8dee4; border-radius: 10px; padding: 10px 14px; }
+    .access-dialog { display: none; }
+    .access-dialog.open { display: flex; position: fixed; inset: 0; z-index: 20; justify-content: center; align-items: flex-start; overflow: auto; padding: 24px 24px 90px; background: #0008; }
+    .access-box { width: min(780px, 100%); background: white; border-radius: 12px; padding: 18px; }
+    .access-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .access-head h2 { margin: 0; }
+    .choice { display: flex; gap: 10px; align-items: flex-start; border: 1px solid #d8dee4; border-radius: 10px; padding: 10px 12px; margin: 8px 0; cursor: pointer; font-weight: 400; }
+    .choice.selected { border: 2px solid #1769aa; background: #eef5fb; }
+    .choice input { margin-top: 4px; }
+    .hint { display: block; color: #5f6670; font-weight: 400; font-size: 13px; }
+    .warn { background: #fdeeee; border: 1px solid #e8b4b4; border-radius: 8px; padding: 4px 12px 12px; margin: 10px 0; }
+    .steps { display: flex; gap: 8px; flex-wrap: wrap; list-style: none; padding: 0; }
+    .steps li { flex: 1 1 200px; border: 1px solid #d8dee4; border-radius: 8px; padding: 10px; color: #5f6670; }
+    .steps li.now { border: 2px solid #1769aa; background: #eef5fb; color: #1f2328; }
+    .steps li.done { color: #176b2c; }
+    .link-text { display: block; background: #f1f4f6; border-radius: 6px; padding: 6px 8px; margin: 4px 0; user-select: all; }
+    details { margin-top: 10px; }
+    summary { cursor: pointer; }
+    .hidden { display: none !important; }
     ul { padding-left: 20px; }
     .note { color: #5f6670; }
     .context-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }

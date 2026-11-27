@@ -164,6 +164,46 @@ pub struct ControlUiStatus {
     pub sessions: Vec<SessionStatus>,
 }
 
+/// One address the dispatcher can hand to a driver.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DriverLink {
+    pub trip_name: String,
+    pub url: String,
+    pub through_internet: bool,
+}
+
+impl ControlUiStatus {
+    /// The current state of one session. A rendered session card reads what it
+    /// shows through this lookup, so it follows changes such as the Driver URL
+    /// appearing after the listener starts without being rebuilt.
+    #[must_use]
+    pub fn session(&self, token: &str) -> Option<&SessionStatus> {
+        self.sessions.iter().find(|session| session.token == token)
+    }
+
+    /// Every Driver URL that is available now, per trip, the internet one first.
+    #[must_use]
+    pub fn driver_links(&self) -> Vec<DriverLink> {
+        self.sessions
+            .iter()
+            .flat_map(|session| {
+                [
+                    (session.public_driver_url.as_ref(), true),
+                    (session.driver_url.as_ref(), false),
+                ]
+                .into_iter()
+                .filter_map(|(url, through_internet)| {
+                    url.map(|url| DriverLink {
+                        trip_name: session.display_name.clone(),
+                        url: url.clone(),
+                        through_internet,
+                    })
+                })
+            })
+            .collect()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DashboardNavigation {
     pub latitude: f64,
@@ -298,4 +338,176 @@ pub struct PickedFile {
     pub path: String,
     pub original_name: String,
     pub mime_type: String,
+}
+
+/// One step of the "what to do next" helper in the Control access area.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccessStep {
+    Connect,
+    AddTrip,
+    ShareLink,
+}
+
+/// Order of the helper steps and which of them are already done.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AccessGuide {
+    pub order: [AccessStep; 3],
+    pub connected: bool,
+    pub has_trip: bool,
+}
+
+impl AccessGuide {
+    /// The Gateway refuses to start without a trip and refuses new trips while it
+    /// runs, so over the internet trips come first. Locally sharing comes first.
+    #[must_use]
+    pub fn new(
+        through_internet: bool,
+        has_trip: bool,
+        listener_on: bool,
+        gateway_on: bool,
+    ) -> Self {
+        let (order, connected) = if through_internet {
+            (
+                [
+                    AccessStep::AddTrip,
+                    AccessStep::Connect,
+                    AccessStep::ShareLink,
+                ],
+                gateway_on,
+            )
+        } else {
+            (
+                [
+                    AccessStep::Connect,
+                    AccessStep::AddTrip,
+                    AccessStep::ShareLink,
+                ],
+                listener_on,
+            )
+        };
+        Self {
+            order,
+            connected,
+            has_trip,
+        }
+    }
+
+    #[must_use]
+    pub fn is_done(&self, step: AccessStep) -> bool {
+        match step {
+            AccessStep::Connect => self.connected,
+            AccessStep::AddTrip => self.has_trip,
+            AccessStep::ShareLink => false,
+        }
+    }
+
+    #[must_use]
+    pub fn current(&self) -> AccessStep {
+        self.order
+            .into_iter()
+            .find(|step| !self.is_done(*step))
+            .unwrap_or(AccessStep::ShareLink)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn session() -> SessionStatus {
+        SessionStatus {
+            trip_id: "41".repeat(16),
+            token: "trip-0000000000000001".to_owned(),
+            display_name: "trip-41414141".to_owned(),
+            endpoint_id: None,
+            endpoint_label: None,
+            vehicle_label: None,
+            vehicle_type: None,
+            routing_profile: None,
+            driver_url: None,
+            public_driver_url: None,
+        }
+    }
+
+    fn status(sessions: Vec<SessionStatus>) -> ControlUiStatus {
+        ControlUiStatus {
+            listener: None,
+            gateway: None,
+            routing: None,
+            sessions,
+        }
+    }
+
+    #[test]
+    fn session_is_found_by_token_with_its_new_driver_url() {
+        let before = status(vec![session()]);
+        let token = session().token;
+        assert_eq!(before.session(&token).unwrap().driver_url, None);
+
+        let mut local = session();
+        local.driver_url = Some("http://local.invalid/driver/t".to_owned());
+        let after = status(vec![local.clone()]);
+        assert_eq!(after.session(&token), Some(&local));
+        assert_eq!(after.session("trip-unknown-000000"), None);
+    }
+
+    #[test]
+    fn driver_links_list_every_available_address() {
+        assert!(status(vec![session()]).driver_links().is_empty());
+
+        let mut first = session();
+        first.driver_url = Some("http://local.invalid/driver/a".to_owned());
+        first.public_driver_url = Some("https://public.invalid/driver/a".to_owned());
+        let mut second = session();
+        second.display_name = "second".to_owned();
+        second.driver_url = Some("http://local.invalid/driver/b".to_owned());
+
+        let current = status(vec![first, second]);
+        let links = current.driver_links();
+        let shown: Vec<_> = links
+            .iter()
+            .map(|link| (link.url.as_str(), link.through_internet))
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                ("https://public.invalid/driver/a", true),
+                ("http://local.invalid/driver/a", false),
+                ("http://local.invalid/driver/b", false),
+            ]
+        );
+        assert_eq!(links[0].trip_name, "trip-41414141");
+        assert_eq!(links[2].trip_name, "second");
+    }
+
+    #[test]
+    fn local_access_switches_sharing_on_before_adding_a_trip() {
+        let start = AccessGuide::new(false, false, false, false);
+        assert_eq!(start.current(), AccessStep::Connect);
+        assert_eq!(
+            AccessGuide::new(false, false, true, false).current(),
+            AccessStep::AddTrip
+        );
+        assert_eq!(
+            AccessGuide::new(false, true, true, false).current(),
+            AccessStep::ShareLink
+        );
+    }
+
+    #[test]
+    fn internet_access_adds_trips_before_the_gateway() {
+        assert_eq!(
+            AccessGuide::new(true, false, false, false).current(),
+            AccessStep::AddTrip
+        );
+        // Local sharing does not count as an internet connection.
+        assert_eq!(
+            AccessGuide::new(true, true, true, false).current(),
+            AccessStep::Connect
+        );
+        assert_eq!(
+            AccessGuide::new(true, true, false, true).current(),
+            AccessStep::ShareLink
+        );
+    }
 }

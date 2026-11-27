@@ -17,6 +17,7 @@ use cargo_dispatch_control_ui_contracts::{
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
+    local_lan_addresses,
 };
 use cargo_dispatch_domain::{DocumentId, DriverEndpointId, PointId, TripId};
 use cargo_dispatch_geo::{
@@ -1189,6 +1190,14 @@ async fn start_lan(
 }
 
 #[tauri::command]
+fn lan_addresses() -> Vec<String> {
+    local_lan_addresses()
+        .iter()
+        .map(ToString::to_string)
+        .collect()
+}
+
+#[tauri::command]
 async fn stop_browser_server(
     state: State<'_, DesktopControlService>,
 ) -> Result<ControlUiStatus, String> {
@@ -1242,6 +1251,7 @@ pub fn run() {
             open_session_window,
             start_loopback,
             start_lan,
+            lan_addresses,
             stop_browser_server,
             configure_routing,
             test_routing,
