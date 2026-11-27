@@ -1,8 +1,6 @@
 #![forbid(unsafe_code)]
 
 mod planning;
-#[cfg(test)]
-mod window_test;
 
 use cargo_dispatch_contracts::{
     CURRENT_SCHEMA_VERSION, PlannedCargoBasis, TripNavigationTarget, TripPackageHeader,
@@ -1275,6 +1273,9 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");
 }
+
+#[cfg(test)]
+mod window_test;
 
 #[cfg(test)]
 mod tests {

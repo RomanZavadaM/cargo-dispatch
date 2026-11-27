@@ -519,8 +519,9 @@ pub(crate) fn planner_planning_status(
     state.planning_view()
 }
 
+/// Called after every change of the form, so the file is written off the window's thread.
 #[tauri::command]
-pub(crate) fn planner_planning_package(
+pub(crate) async fn planner_planning_package(
     input: PackageDraft,
     state: State<'_, PlannerDesktopService>,
 ) -> Result<(), String> {

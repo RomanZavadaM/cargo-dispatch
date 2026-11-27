@@ -178,6 +178,28 @@ try {
   if (state.input.orders[0].cargo.weight_kg !== 2400) throw new Error("failed: the corrected weight is kept");
   console.log("PASS the corrected weight is kept");
 
+  await click('ui.button(ui.orderPart(), "Додати заявку")');
+  await waitFor("a third order", "ui.orders().length === 3");
+  await idle();
+  await type('ui.field(ui.orders()[2], "Вантаж")', "Вантаж вручну");
+  await expect('ui.field(ui.orders()[2], "Вантаж").value === "Вантаж вручну"', "text can be typed into a new order");
+  await key("Tab", 9);
+  await idle();
+  state = await service("planner_planning_status");
+  if (state.input.orders[2]?.id !== "M3" || state.input.orders[2].cargo.title !== "Вантаж вручну")
+    throw new Error("failed: the order added by hand is kept");
+  console.log("PASS an order added by hand is kept");
+  await click('ui.button(ui.orders()[2], "Прибрати")');
+  await waitFor("two orders again", "ui.orders().length === 2");
+  await idle();
+  if ((await service("planner_planning_status")).input.orders.length !== 2)
+    throw new Error("failed: the removed order is gone");
+  console.log("PASS an order can be removed");
+  await click('ui.button(ui.orderPart(), "Зберегти у файл")');
+  await waitFor("the saved file", 'document.body.innerText.includes("saved-orders.json")');
+  await idle();
+  console.log("PASS the orders are saved to a file");
+
   await click('ui.button(ui.orderPart(), "Запропонувати маршрути")');
   await waitFor("variants for the complete order", "ui.variants().length >= 1");
   await idle();
@@ -229,6 +251,16 @@ try {
   await idle();
   await expect(filled, "the replaced route fills the cargo rows again");
 
+  await expect(`(() => {
+    const items = [...document.querySelectorAll(".route-item")];
+    return items.every((item, index) => {
+      const [up, down] = item.querySelectorAll("button");
+      return item.querySelector(".sequence").textContent === String(index + 1)
+        && up.textContent.trim() === "Вище" && down.textContent.trim() === "Нижче"
+        && up.disabled === (index === 0) && down.disabled === (index === items.length - 1);
+    });
+  })()`, "the route buttons are named and enabled according to the place of the point");
+
   const ordered = async () => (await service("planner_status")).points.map(point => point.point_id).join();
   const initial = await ordered();
   const numbered = `ui.rows().every(row => [...row.querySelectorAll("select")].every(list =>
@@ -246,6 +278,9 @@ try {
   await type('ui.field(ui.packagePart(), "Тип / клас транспорту для планування")', "тент 22 т");
   await type('ui.field(ui.rows()[0], "Назва вантажу")', "Правка вручну");
   await type('ui.field(ui.rows()[0], "Маса, кг")', "2300");
+  await expect(`ui.field(ui.packagePart(), "Тип / клас транспорту для планування").value === "тент 22 т"
+    && ui.field(ui.rows()[0], "Назва вантажу").value === "Правка вручну"
+    && ui.field(ui.rows()[0], "Маса, кг").value === "2300"`, "manual corrections of the package are typed in");
   await click('ui.button(ui.packagePart(), "Додати вантаж")');
   await waitFor("a third row", "ui.rows().length === 3");
   await idle();

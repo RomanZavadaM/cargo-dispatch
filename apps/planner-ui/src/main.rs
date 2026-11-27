@@ -1628,8 +1628,8 @@ fn PlannerApp() -> impl IntoView {
                                             <span class="sequence">{point.sequence}</span>
                                             <div><div class="point-title">{point.title}</div><div class="coords">{format!("{:.6}, {:.6}", point.latitude, point.longitude)}</div></div>
                                             <div class="actions">
-                                                <button type="button" disabled=index == 0 on:click=move |_| move_point(id_up.clone(), -1)>{move || strings(locale.get()).move_up}</button>
-                                                <button type="button" disabled=index + 1 >= total on:click=move |_| move_point(id_down.clone(), 1)>{move || strings(locale.get()).move_down}</button>
+                                                <button type="button" disabled={index == 0} on:click=move |_| move_point(id_up.clone(), -1)>{move || strings(locale.get()).move_up}</button>
+                                                <button type="button" disabled={index + 1 >= total} on:click=move |_| move_point(id_down.clone(), 1)>{move || strings(locale.get()).move_down}</button>
                                                 <button class="danger" type="button" on:click=move |_| remove_point(id_remove.clone())>{move || strings(locale.get()).remove}</button>
                                             </div>
                                         </li>

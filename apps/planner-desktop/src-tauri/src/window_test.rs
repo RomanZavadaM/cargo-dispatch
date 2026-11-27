@@ -201,5 +201,10 @@ async fn the_window_works_in_a_real_browser() {
         .filter(|entry| entry.path().extension().is_some_and(|kind| kind == "zip"))
         .count();
     assert_eq!(exported, 1, "the trip package was written");
+    let saved = fs::read_to_string(folder.join("saved-orders.json")).expect("saved orders");
+    let saved: Value = serde_json::from_str(&saved).expect("saved orders are JSON");
+    assert_eq!(saved["schema"], "cargo-dispatch.planning-input");
+    assert_eq!(saved["orders"].as_array().map(Vec::len), Some(2));
+    assert_eq!(saved["orders"][0]["cargo"]["weight_kg"], 2400);
     let _ = fs::remove_dir_all(folder);
 }
