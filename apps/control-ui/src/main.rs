@@ -41,6 +41,9 @@ export function cargoControlNow() {
 export function cargoControlSetInterval(callback, ms) {
   return window.setInterval(callback, ms);
 }
+export function cargoControlSetTimeout(callback, ms) {
+  return window.setTimeout(callback, ms);
+}
 export function cargoControlInitialLocale() {
   const saved = localStorage.getItem("cargo-dispatch-control-locale");
   const locale = saved || navigator.language || "en";
@@ -73,6 +76,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = cargoControlSetInterval)]
     fn cargo_control_set_interval(callback: &js_sys::Function, milliseconds: i32) -> i32;
+
+    #[wasm_bindgen(js_name = cargoControlSetTimeout)]
+    fn cargo_control_set_timeout(callback: &js_sys::Function, milliseconds: i32) -> i32;
 
     #[wasm_bindgen(js_name = cargoControlInitialLocale)]
     fn cargo_control_initial_locale() -> String;
@@ -895,6 +901,19 @@ fn ControlApp() -> impl IntoView {
         }
     });
 
+    Effect::new(move |_| {
+        let shown = message.get();
+        if shown.is_empty() || error.get() {
+            return;
+        }
+        let hide = Closure::once_into_js(move || {
+            if !error.get_untracked() && message.get_untracked() == shown {
+                message.set(String::new());
+            }
+        });
+        cargo_control_set_timeout(hide.unchecked_ref(), 5_000);
+    });
+
     let set_status_result = move |result: Result<ControlUiStatus, String>,
                                   success: &'static str| {
         busy.set(false);
@@ -973,6 +992,8 @@ fn ControlApp() -> impl IntoView {
                 invoke("register_trip", &serde_json::json!({ "input": input })).await;
             if result.is_ok() {
                 dialog.set(None);
+                folder.set(String::new());
+                token.set(cargo_control_random_token());
             }
             set_status_result(result, strings(locale.get_untracked()).trip_registered);
         });
@@ -1395,7 +1416,7 @@ fn ControlApp() -> impl IntoView {
                 ListenerMode::Loopback => text.mode_local,
                 ListenerMode::Lan => text.mode_lan,
             };
-            parts.push(format!("{mode} ({})", listener.address));
+            parts.push(mode.to_owned());
         }
         if current.gateway.is_some() {
             parts.push(text.mode_internet.to_owned());
@@ -1504,6 +1525,49 @@ fn ControlApp() -> impl IntoView {
                     }}
                 </ol>
                 <p>{move || access_step_hint(access_guide().current(), strings(locale.get()))}</p>
+                <ul class:hidden=move || access_guide().current() != AccessStep::ShareLink>
+                    {move || {
+                        status
+                            .get()
+                            .map(|current| current.driver_links())
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|link| {
+                                let href = link.url.clone();
+                                let copy_url = link.url.clone();
+                                let through_internet = link.through_internet;
+                                view! {
+                                    <li>
+                                        <div><strong>{link.trip_name}</strong></div>
+                                        <div>
+                                            {move || {
+                                                let text = strings(locale.get());
+                                                if through_internet {
+                                                    text.public_driver_url
+                                                } else {
+                                                    text.local_driver_url
+                                                }
+                                            }}
+                                        </div>
+                                        <code class="link-text">{link.url}</code>
+                                        <div class="actions">
+                                            <a href=href target="_blank" rel="noopener">{move || strings(locale.get()).open}</a>
+                                            <button
+                                                type="button"
+                                                on:click=move |_| cargo_control_copy_text(
+                                                    &copy_url,
+                                                    strings(locale.get_untracked()).copy_driver_url,
+                                                )
+                                            >
+                                                {move || strings(locale.get()).copy}
+                                            </button>
+                                        </div>
+                                    </li>
+                                }
+                            })
+                            .collect_view()
+                    }}
+                </ul>
                 <div class="actions">
                     <button
                         class="primary"
@@ -1529,17 +1593,15 @@ fn ControlApp() -> impl IntoView {
                 <ul>
                     <For
                         each=move || status.get().map(|current| current.sessions).unwrap_or_default()
-                        key=|session| session.card_key()
+                        key=|session| session.token.clone()
                         children=move |session| {
                             let trip = session.trip_id.clone();
                             let session_token = session.token.clone();
                             let dashboard_token = session.token.clone();
-                            let local_url = session.driver_url.clone();
-                            let public_url = session.public_driver_url.clone();
-                            let display_name = session.display_name.clone();
-                            let endpoint_label = session.endpoint_label.clone();
-                            let vehicle_label = session.vehicle_label.clone();
-                            let vehicle_type = session.vehicle_type.clone();
+                            let live_token = session.token.clone();
+                            let live = Memo::new(move |_| {
+                                status.get().and_then(|current| current.session(&live_token).cloned())
+                            });
                             let edit_display_name = RwSignal::new(session.display_name.clone());
                             let edit_endpoint_id =
                                 RwSignal::new(session.endpoint_id.clone().unwrap_or_default());
@@ -1557,18 +1619,18 @@ fn ControlApp() -> impl IntoView {
                             let routing_token_clear = session.token.clone();
                             view! {
                                 <li>
-                                    <div><strong>{display_name}</strong></div>
-                                    {vehicle_label.map(|value| view! {
+                                    <div><strong>{move || live.get().map(|value| value.display_name)}</strong></div>
+                                    {move || live.get().and_then(|value| value.vehicle_label).map(|value| view! {
                                         <div><strong>{move || format!("{}: ", strings(locale.get()).vehicle_label)}</strong>{value}</div>
                                     })}
-                                    {vehicle_type.map(|value| view! {
+                                    {move || live.get().and_then(|value| value.vehicle_type).map(|value| view! {
                                         <div><strong>{move || format!("{}: ", strings(locale.get()).vehicle_type)}</strong>{value}</div>
                                     })}
-                                    {endpoint_label.map(|value| view! {
+                                    {move || live.get().and_then(|value| value.endpoint_label).map(|value| view! {
                                         <div><strong>{move || format!("{}: ", strings(locale.get()).endpoint_label)}</strong>{value}</div>
                                     })}
                                     <div><strong>{move || format!("{}: ", strings(locale.get()).trip)}</strong><code>{trip}</code></div>
-                                    {public_url.map(|driver_url| {
+                                    {move || live.get().and_then(|value| value.public_driver_url).map(|driver_url| {
                                         let href = driver_url.clone();
                                         let copy_url = driver_url.clone();
                                         let shown_url = driver_url.clone();
@@ -1591,7 +1653,7 @@ fn ControlApp() -> impl IntoView {
                                             </div>
                                         }
                                     })}
-                                    {local_url.map(|driver_url| {
+                                    {move || live.get().and_then(|value| value.driver_url).map(|driver_url| {
                                         let href = driver_url.clone();
                                         let copy_url = driver_url.clone();
                                         let shown_url = driver_url.clone();

@@ -106,16 +106,6 @@ pub struct SessionStatus {
     pub public_driver_url: Option<String>,
 }
 
-impl SessionStatus {
-    /// Identity of one rendered session card. The Control UI keys its session list
-    /// with it, so a card is rebuilt whenever anything it shows changes, such as
-    /// the Driver URL appearing after the listener starts.
-    #[must_use]
-    pub fn card_key(&self) -> String {
-        format!("{self:?}")
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UpdateSessionMetadataInput {
     pub token: String,
@@ -172,6 +162,46 @@ pub struct ControlUiStatus {
     pub gateway: Option<GatewayStatus>,
     pub routing: Option<RoutingStatus>,
     pub sessions: Vec<SessionStatus>,
+}
+
+/// One address the dispatcher can hand to a driver.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DriverLink {
+    pub trip_name: String,
+    pub url: String,
+    pub through_internet: bool,
+}
+
+impl ControlUiStatus {
+    /// The current state of one session. A rendered session card reads what it
+    /// shows through this lookup, so it follows changes such as the Driver URL
+    /// appearing after the listener starts without being rebuilt.
+    #[must_use]
+    pub fn session(&self, token: &str) -> Option<&SessionStatus> {
+        self.sessions.iter().find(|session| session.token == token)
+    }
+
+    /// Every Driver URL that is available now, per trip, the internet one first.
+    #[must_use]
+    pub fn driver_links(&self) -> Vec<DriverLink> {
+        self.sessions
+            .iter()
+            .flat_map(|session| {
+                [
+                    (session.public_driver_url.as_ref(), true),
+                    (session.driver_url.as_ref(), false),
+                ]
+                .into_iter()
+                .filter_map(|(url, through_internet)| {
+                    url.map(|url| DriverLink {
+                        trip_name: session.display_name.clone(),
+                        url: url.clone(),
+                        through_internet,
+                    })
+                })
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -399,22 +429,55 @@ mod tests {
         }
     }
 
+    fn status(sessions: Vec<SessionStatus>) -> ControlUiStatus {
+        ControlUiStatus {
+            listener: None,
+            gateway: None,
+            routing: None,
+            sessions,
+        }
+    }
+
     #[test]
-    fn session_card_is_rebuilt_when_what_it_shows_changes() {
-        let before = session();
-        assert_eq!(before.card_key(), session().card_key());
+    fn session_is_found_by_token_with_its_new_driver_url() {
+        let before = status(vec![session()]);
+        let token = session().token;
+        assert_eq!(before.session(&token).unwrap().driver_url, None);
 
         let mut local = session();
         local.driver_url = Some("http://local.invalid/driver/t".to_owned());
-        assert_ne!(before.card_key(), local.card_key());
+        let after = status(vec![local.clone()]);
+        assert_eq!(after.session(&token), Some(&local));
+        assert_eq!(after.session("trip-unknown-000000"), None);
+    }
 
-        let mut public = session();
-        public.public_driver_url = Some("https://public.invalid/driver/t".to_owned());
-        assert_ne!(before.card_key(), public.card_key());
+    #[test]
+    fn driver_links_list_every_available_address() {
+        assert!(status(vec![session()]).driver_links().is_empty());
 
-        let mut renamed = session();
-        renamed.vehicle_label = Some("synthetic truck".to_owned());
-        assert_ne!(before.card_key(), renamed.card_key());
+        let mut first = session();
+        first.driver_url = Some("http://local.invalid/driver/a".to_owned());
+        first.public_driver_url = Some("https://public.invalid/driver/a".to_owned());
+        let mut second = session();
+        second.display_name = "second".to_owned();
+        second.driver_url = Some("http://local.invalid/driver/b".to_owned());
+
+        let current = status(vec![first, second]);
+        let links = current.driver_links();
+        let shown: Vec<_> = links
+            .iter()
+            .map(|link| (link.url.as_str(), link.through_internet))
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                ("https://public.invalid/driver/a", true),
+                ("http://local.invalid/driver/a", false),
+                ("http://local.invalid/driver/b", false),
+            ]
+        );
+        assert_eq!(links[0].trip_name, "trip-41414141");
+        assert_eq!(links[2].trip_name, "second");
     }
 
     #[test]
