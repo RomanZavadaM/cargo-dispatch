@@ -12,7 +12,7 @@ use cargo_dispatch_control_ui_contracts::{
     RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
     RoutingTollPreference, SaveDocumentInput, SessionInput, StartGatewayInput, StartLanInput,
     TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput,
-    is_supported_max_speed_kmh,
+    format_file_size, is_supported_max_speed_kmh, point_label,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -404,6 +404,12 @@ async fn load_dashboard(token: String) -> Result<TripDashboard, String> {
         &serde_json::json!({ "input": SessionInput { token } }),
     )
     .await
+}
+
+/// The moment in the date and time format of the interface language.
+fn local_time(locale: UiLocale, unix_ms: u64) -> String {
+    let moment = js_sys::Date::new(&JsValue::from_f64(unix_ms as f64));
+    String::from(moment.to_locale_string(locale.code(), &JsValue::UNDEFINED))
 }
 
 fn reordered_open_point_ids(
@@ -2514,6 +2520,7 @@ fn ControlApp() -> impl IntoView {
                         .collect::<Vec<_>>();
                     let route_rows = trip.points.clone();
                     let documents = trip.documents.clone();
+                    let document_points = trip.points.clone();
                     let location = trip.latest_location.clone();
                     let planning_basis = trip.planning_basis.clone();
                     let planning_basis_missing = planning_basis.is_none();
@@ -2713,7 +2720,11 @@ fn ControlApp() -> impl IntoView {
                                             format!(" · ±{accuracy:.1} {}", strings(locale.get()).meter_unit)
                                         }).unwrap_or_default()}
                                         " · "
-                                        {format!("{} {}", strings(locale.get()).timestamp, location.observed_at_unix_ms)}
+                                        {format!(
+                                            "{} {}",
+                                            strings(locale.get()).timestamp,
+                                            local_time(locale.get(), location.observed_at_unix_ms),
+                                        )}
                                     </p>
                                 }.into_any(),
                                 None => view! { <p class="note">{move || strings(locale.get()).no_position}</p> }.into_any(),
@@ -2730,14 +2741,19 @@ fn ControlApp() -> impl IntoView {
                                             DashboardDocumentDirection::FromOperator => strings(locale.get_untracked()).from_operator,
                                             DashboardDocumentDirection::FromDriver => strings(locale.get_untracked()).from_driver,
                                         };
+                                        let size = document.size;
+                                        let attached = document
+                                            .point_id
+                                            .as_deref()
+                                            .map(|id| point_label(&document_points, id));
                                         view! {
                                             <li>
                                                 <strong>{document.original_name}</strong>
                                                 " · " {direction}
                                                 " · " {document.mime_type}
-                                                " · " {document.size} " " {move || strings(locale.get()).bytes}
-                                                {document.point_id.map(|point| view! {
-                                                    <span>{move || format!(" · {} ", strings(locale.get()).point)} <code>{point}</code></span>
+                                                " · " {move || format_file_size(locale.get().code(), size)}
+                                                {attached.map(|label| view! {
+                                                    <span>{move || format!(" · {} {label}", strings(locale.get()).point)}</span>
                                                 })}
                                                 <button
                                                     type="button"

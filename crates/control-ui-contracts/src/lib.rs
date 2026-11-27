@@ -413,6 +413,37 @@ impl AccessGuide {
     }
 }
 
+/// A file size the dispatcher can read, with the units of the interface language.
+#[must_use]
+pub fn format_file_size(locale: &str, bytes: u64) -> String {
+    let [plain, kilo, mega] = if locale.starts_with("uk") {
+        ["Б", "КБ", "МБ"]
+    } else if locale.starts_with("fr") {
+        ["o", "Ko", "Mo"]
+    } else {
+        ["B", "KB", "MB"]
+    };
+    if bytes < 1024 {
+        format!("{bytes} {plain}")
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} {kilo}", bytes as f64 / 1024.0)
+    } else {
+        format!("{:.1} {mega}", bytes as f64 / (1024.0 * 1024.0))
+    }
+}
+
+/// The number and name of a stop; the internal code only when the stop is unknown.
+#[must_use]
+pub fn point_label(points: &[DashboardPoint], point_id: &str) -> String {
+    points
+        .iter()
+        .find(|point| point.point_id == point_id)
+        .map_or_else(
+            || point_id.to_owned(),
+            |point| format!("{}. {}", point.sequence, point.title),
+        )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -512,5 +543,25 @@ mod tests {
             AccessGuide::new(true, true, false, true).current(),
             AccessStep::ShareLink
         );
+    }
+
+    #[test]
+    fn file_sizes_are_shown_in_readable_units() {
+        assert_eq!(format_file_size("uk", 900), "900 Б");
+        assert_eq!(format_file_size("en", 1536), "1.5 KB");
+        assert_eq!(format_file_size("fr", 2 * 1024 * 1024), "2.0 Mo");
+    }
+
+    #[test]
+    fn a_document_names_its_stop_instead_of_the_internal_code() {
+        let points = [DashboardPoint {
+            point_id: "51515151".to_owned(),
+            sequence: 2,
+            title: "Depot".to_owned(),
+            completed: false,
+            navigation: None,
+        }];
+        assert_eq!(point_label(&points, "51515151"), "2. Depot");
+        assert_eq!(point_label(&points, "ffff"), "ffff");
     }
 }
