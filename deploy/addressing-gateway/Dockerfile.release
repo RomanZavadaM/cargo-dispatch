@@ -1,0 +1,7 @@
+# Dockerfile for the release package: uses the prebuilt binary next to it.
+FROM debian:bookworm-slim
+RUN useradd --create-home --uid 10001 cargo-gateway
+COPY --chmod=0755 cargo-dispatch-addressing-gateway /usr/local/bin/cargo-dispatch-addressing-gateway
+USER cargo-gateway
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/cargo-dispatch-addressing-gateway"]
