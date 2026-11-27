@@ -55,6 +55,6 @@ class DriverParityTest {
         }
         assertEquals(DriverProblem.LinkScheme, scheme.problem)
         assertTrue(SessionLink.isLoopback("http://127.0.0.1:1/driver/x"))
-        assertFalse(SessionLink.isLoopback("http://192.168.1.44:1/driver/x"))
+        assertFalse(SessionLink.isLoopback("http://192.0.2.10:1/driver/x"))
     }
 }
