@@ -38,6 +38,7 @@ Control ist die einzige verbindliche Quelle für den Stand einer aktiven Tour. E
 - Fehlermeldungen in der Oberflächensprache; Positionszeit, Dateigröße und Punktname in Klartext.
 
 **Planner**
+- Auftragsdatei (JSON, für Mensch und KI) oder Handeingabe; bis zu drei Routenvarianten unter Beachtung der Kapazität, Auswahl und Übernahme in die Tour; Eingaben bleiben erhalten (nach v0.2.0).
 - Routenentwurf: Punkte per Koordinaten hinzufügen, entfernen, umstellen; der Entwurf übersteht einen Neustart;
 - Routenvorschau und Straßenlinie über Ihren Valhalla-Server mit ausdrücklich eingegebenen Fahrzeugdaten (Unbekanntes wird nicht erfunden);
 - Export eines Tourpakets (ZIP, Schema 1.4) mit Ladung und Planungsgrundlage; eine vorhandene Datei wird nie überschrieben.
