@@ -7,10 +7,10 @@ use cargo_dispatch_planner::proposals::{
     propose_routes,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    AppliedPlanView, ApplyPlanInput, InputOrder, InputPlace, Money, PlanKind,
-    PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopView, PlannerPackageCargoInput,
-    PlanningInput, PlanningStateView, ProposeInput, RoadState, SkipReason, SkippedOrder,
-    parse_moment, validate_input,
+    AppliedPlanView, ApplyPlanInput, InputOrder, InputPlace, Money, PlanKind, PlanProposalSetView,
+    PlanProposalView, PlanStopAction, PlanStopView, PlannerPackageCargoInput, PlanningInput,
+    PlanningStateView, ProposeInput, RoadState, SkipReason, SkippedOrder, parse_moment,
+    validate_input,
 };
 
 const PLANNING_FILE: &str = "planner-input-v1.json";
@@ -122,10 +122,7 @@ fn plan_kind(kind: ProposalKind) -> PlanKind {
 }
 
 impl PlannerDesktopService {
-    fn change_planning(
-        &self,
-        change: impl FnOnce(&mut StoredPlanning),
-    ) -> Result<(), String> {
+    fn change_planning(&self, change: impl FnOnce(&mut StoredPlanning)) -> Result<(), String> {
         let mut stored = self
             .planning
             .lock()
@@ -200,8 +197,7 @@ impl PlannerDesktopService {
         let input = self.stored_planning()?.input;
         let text = serde_json::to_string_pretty(&input)
             .map_err(|error| format!("Could not save input file: {error}"))?;
-        write_atomically(path, &text)
-            .map_err(|error| format!("Could not save input file: {error}"))
+        write_atomically(path, &text).map_err(|error| format!("Could not save input file: {error}"))
     }
 
     pub(crate) async fn propose(
@@ -323,8 +319,10 @@ impl PlannerDesktopService {
             let mut road_km = None;
             let mut road_hours = None;
             if let Some((client, profile)) = &road {
-                let mut points: Vec<GeoPoint> =
-                    places.iter().filter_map(|place| coordinates(place)).collect();
+                let mut points: Vec<GeoPoint> = places
+                    .iter()
+                    .filter_map(|place| coordinates(place))
+                    .collect();
                 if let Some(start) = start {
                     points.insert(0, start);
                     if input.vehicle.return_to_start {
@@ -710,10 +708,7 @@ mod tests {
         let second = PlannerDesktopService::open(journal).expect("reopen");
         let view = second.planning_view().expect("view");
         assert_eq!(view.input, input());
-        assert_eq!(
-            view.routing_profile.expect("profile").height_m,
-            Some(4.0)
-        );
+        assert_eq!(view.routing_profile.expect("profile").height_m, Some(4.0));
         assert!(second.routing.lock().expect("routing").is_some());
         let _ = fs::remove_dir_all(folder);
     }
