@@ -4,7 +4,7 @@
 
 Dispatching for a cargo fleet: planning a trip, handing it over for execution, staying in touch with the driver, and recording what actually happened. The main development language is **Rust**.
 
-**Stable version: [v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0).** Development continues; test builds are listed under [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
+**Stable version: [v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0).** Development continues; test builds are listed under [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
 ## Components
 
@@ -38,7 +38,7 @@ Control is the only source of truth for an active trip. It serves the page, rout
 - error messages in the interface language; position time, file size and stop name in plain words.
 
 **Planner**
-- an order file (JSON, for people and AI) or manual entry; up to three route variants respecting capacity, choosing one and turning it into the trip; input is kept between starts (after v0.2.0).
+- an order file (JSON, for people and AI) or manual entry; up to three route variants respecting capacity, choosing one and turning it into the trip; input is kept between starts.
 - route draft: add, remove and reorder points by coordinates; the draft survives a restart;
 - route preview and road line from your Valhalla server with explicitly entered vehicle parameters (unknown values are not invented);
 - export of a trip package (ZIP, schema 1.4) with cargo and planning basis; an existing file is never overwritten.
@@ -70,7 +70,7 @@ All programs are available in українська, English, Français, Deutsch,
 - The Android and iPhone/iPad apps have not been tested on physical devices — only in an emulator, a simulator and automated tests.
 - Mobile internet and the Gateway on a real network are verified by automated tests only.
 - Packages are unsigned; Android is a debug APK, iOS is an Apple Simulator build only.
-- After Control restarts, trips and links come back by themselves; sharing is switched on with one press (after v0.2.0).
+- After Control restarts, trips and links come back by themselves; sharing is switched on with one press. For the Gateway, enter its address and secret again first.
 - The dispatcher cannot edit stops or mark them as done yet.
 
 ## Building

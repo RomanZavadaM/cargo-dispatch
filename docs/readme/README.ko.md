@@ -4,7 +4,7 @@
 
 화물 차량 배차 시스템입니다. 운행을 계획하고, 실행에 넘기고, 운전자와 연락하며, 실제 진행 상황을 기록합니다. 주 개발 언어는 **Rust**입니다.
 
-**안정 버전: [v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0).** 개발은 계속되며, 테스트 빌드는 [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases)에 있습니다.
+**안정 버전: [v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0).** 개발은 계속되며, 테스트 빌드는 [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases)에 있습니다.
 
 ## 구성
 
@@ -38,7 +38,7 @@
 - 오류 메시지는 인터페이스 언어로 표시되며, 위치 시각·파일 크기·지점 이름을 알기 쉽게 보여 줍니다.
 
 **Planner**
-- 주문 파일(JSON, 사람과 AI 공용) 또는 직접 입력; 적재 한도를 고려한 최대 3개의 경로안, 선택 후 운행에 반영; 입력 내용은 유지됩니다(v0.2.0 이후).
+- 주문 파일(JSON, 사람과 AI 공용) 또는 직접 입력; 적재 한도를 고려한 최대 3개의 경로안, 선택 후 운행에 반영; 입력 내용은 유지됩니다.
 - 경로 초안: 좌표로 지점 추가, 삭제, 순서 변경; 초안은 재시작 후에도 유지됩니다;
 - 직접 입력한 차량 제원으로 자체 Valhalla 서버를 통한 경로 미리보기와 도로선(모르는 값은 지어내지 않습니다);
 - 화물과 계획 근거를 담은 운행 패키지(ZIP, 스키마 1.4) 내보내기; 기존 파일은 덮어쓰지 않습니다.
@@ -70,7 +70,7 @@ Control, Planner, 브라우저, Android의 지도는 [OpenStreetMap](https://www
 - Android 및 iPhone/iPad 앱은 실제 기기에서 시험하지 않았으며 에뮬레이터, 시뮬레이터, 자동 테스트로만 확인했습니다.
 - 모바일 인터넷과 실제 네트워크의 Gateway는 자동 테스트로만 확인했습니다.
 - 패키지는 서명되지 않았습니다. Android는 디버그 APK이고 iOS는 Apple 시뮬레이터용 빌드뿐입니다.
-- Control을 다시 시작하면 운행과 링크가 자동으로 복원되며, 연결은 한 번만 누르면 켜집니다(v0.2.0 이후).
+- Control을 다시 시작하면 운행과 링크가 자동으로 복원되며, 연결은 한 번만 누르면 켜집니다. Gateway는 먼저 주소와 비밀 값을 다시 입력해야 합니다.
 - 배차 담당자는 아직 지점을 편집하거나 완료 표시를 할 수 없습니다.
 
 ## 빌드

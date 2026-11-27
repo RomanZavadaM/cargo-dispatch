@@ -4,7 +4,7 @@
 
 Disposition für eine Frachtflotte: Tour planen, zur Durchführung übergeben, mit dem Fahrer in Verbindung bleiben und den tatsächlichen Ablauf festhalten. Hauptentwicklungssprache ist **Rust**.
 
-**Stabile Version: [v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0).** Die Entwicklung geht weiter; Testversionen stehen unter [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
+**Stabile Version: [v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0).** Die Entwicklung geht weiter; Testversionen stehen unter [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
 ## Bestandteile
 
@@ -38,7 +38,7 @@ Control ist die einzige verbindliche Quelle für den Stand einer aktiven Tour. E
 - Fehlermeldungen in der Oberflächensprache; Positionszeit, Dateigröße und Punktname in Klartext.
 
 **Planner**
-- Auftragsdatei (JSON, für Mensch und KI) oder Handeingabe; bis zu drei Routenvarianten unter Beachtung der Kapazität, Auswahl und Übernahme in die Tour; Eingaben bleiben erhalten (nach v0.2.0).
+- Auftragsdatei (JSON, für Mensch und KI) oder Handeingabe; bis zu drei Routenvarianten unter Beachtung der Kapazität, Auswahl und Übernahme in die Tour; Eingaben bleiben erhalten.
 - Routenentwurf: Punkte per Koordinaten hinzufügen, entfernen, umstellen; der Entwurf übersteht einen Neustart;
 - Routenvorschau und Straßenlinie über Ihren Valhalla-Server mit ausdrücklich eingegebenen Fahrzeugdaten (Unbekanntes wird nicht erfunden);
 - Export eines Tourpakets (ZIP, Schema 1.4) mit Ladung und Planungsgrundlage; eine vorhandene Datei wird nie überschrieben.
@@ -70,7 +70,7 @@ Alle Programme gibt es in українська, English, Français, Deutsch, Esp
 - Die Apps für Android und iPhone/iPad wurden nicht auf echten Geräten getestet – nur im Emulator, im Simulator und mit automatischen Tests.
 - Mobiles Internet und das Gateway in einem echten Netz sind nur automatisch geprüft.
 - Die Pakete sind nicht signiert; Android ist ein Debug-APK, iOS nur ein Build für den Apple-Simulator.
-- Nach einem Neustart von Control sind Touren und Links wieder da; die Verbindung wird mit einem Klick aktiviert (nach v0.2.0).
+- Nach einem Neustart von Control sind Touren und Links wieder da; die Verbindung wird mit einem Klick aktiviert. Beim Gateway sind zuvor Adresse und Geheimnis erneut einzugeben.
 - Der Disponent kann Punkte noch nicht bearbeiten oder als erledigt markieren.
 
 ## Build

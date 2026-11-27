@@ -4,7 +4,7 @@
 
 Despacho de una flota de carga: planificar un viaje, entregarlo para su ejecución, mantener contacto con el conductor y registrar lo que realmente ocurrió. El lenguaje principal de desarrollo es **Rust**.
 
-**Versión estable: [v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0).** El desarrollo continúa; las versiones de prueba están en [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
+**Versión estable: [v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0).** El desarrollo continúa; las versiones de prueba están en [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
 ## Componentes
 
@@ -38,7 +38,7 @@ Control es la única fuente de verdad de un viaje activo. Entrega al conductor l
 - mensajes de error en el idioma de la interfaz; hora de la posición, tamaño del archivo y nombre del punto en lenguaje claro.
 
 **Planner**
-- archivo de pedidos (JSON, para personas e IA) o entrada manual; hasta tres variantes de ruta según la capacidad, elección y paso al viaje; lo escrito se conserva (después de v0.2.0).
+- archivo de pedidos (JSON, para personas e IA) o entrada manual; hasta tres variantes de ruta según la capacidad, elección y paso al viaje; lo escrito se conserva.
 - borrador de ruta: añadir, quitar y reordenar puntos por coordenadas; el borrador sobrevive a un reinicio;
 - vista previa de la ruta y línea de carretera mediante su servidor Valhalla con parámetros del vehículo introducidos expresamente (lo desconocido no se inventa);
 - exportación del paquete de viaje (ZIP, esquema 1.4) con la carga y la base de planificación; nunca se sobrescribe un archivo existente.
@@ -70,7 +70,7 @@ Todos los programas están en українська, English, Français, Deutsch,
 - Las aplicaciones para Android y iPhone/iPad no se han probado en dispositivos físicos: solo en emulador, simulador y pruebas automáticas.
 - Internet móvil y el Gateway en una red real solo se han verificado automáticamente.
 - Los paquetes no están firmados; Android es un APK de depuración e iOS solo una compilación para el simulador de Apple.
-- Tras reiniciar Control, los viajes y enlaces vuelven solos; la conexión se activa con una pulsación (después de v0.2.0).
+- Tras reiniciar Control, los viajes y enlaces vuelven solos; la conexión se activa con una pulsación. Para Gateway, antes hay que volver a introducir su dirección y su secreto.
 - El despachador todavía no puede editar puntos ni marcarlos como hechos.
 
 ## Compilación

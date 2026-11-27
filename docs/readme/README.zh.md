@@ -4,7 +4,7 @@
 
 货运车队调度系统：规划行程、交付执行、与司机保持联系，并记录实际情况。主要开发语言为 **Rust**。
 
-**稳定版本：[v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0)。** 开发仍在继续；测试版本见 [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases)。
+**稳定版本：[v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0)。** 开发仍在继续；测试版本见 [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases)。
 
 ## 组成
 
@@ -38,7 +38,7 @@
 - 错误提示使用界面语言；位置时间、文件大小和地点名称以易懂方式显示。
 
 **Planner**
-- 订单文件（JSON，人与 AI 通用）或手动录入；按载量给出最多三个路线方案，选定后生成行程；输入内容重启后保留（v0.2.0 之后）。
+- 订单文件（JSON，人与 AI 通用）或手动录入；按载量给出最多三个路线方案，选定后生成行程；输入内容重启后保留。
 - 路线草稿：按坐标添加、删除、重新排序地点；草稿在重启后保留；
 - 使用明确填写的车辆参数，通过您自己的 Valhalla 服务器预览路线和道路线（未知数值不会编造）；
 - 导出包含货物和计划依据的行程包（ZIP，架构 1.4）；从不覆盖已有文件。
@@ -70,7 +70,7 @@ Control、Planner、浏览器和 Android 使用 [OpenStreetMap](https://www.open
 - Android 和 iPhone/iPad 应用尚未在实体设备上测试，仅经过模拟器和自动测试。
 - 移动网络以及真实网络中的 Gateway 仅经过自动测试。
 - 安装包未签名；Android 为调试版 APK，iOS 仅有 Apple 模拟器版本。
-- Control 重启后行程和链接自动恢复，连接方式点一次即可开启（v0.2.0 之后）。
+- Control 重启后行程和链接自动恢复，连接方式点一次即可开启。使用 Gateway 时，需先重新输入其地址和密钥。
 - 调度员暂时无法编辑地点或标记完成。
 
 ## 构建

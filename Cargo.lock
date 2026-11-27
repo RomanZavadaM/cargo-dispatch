@@ -410,7 +410,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-addressing-gateway"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "reqwest",
@@ -420,14 +420,14 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-contracts"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cargo-dispatch-domain",
 ]
 
 [[package]]
 name = "cargo-dispatch-control"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cargo-dispatch-contracts",
  "cargo-dispatch-domain",
@@ -435,7 +435,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-control-desktop"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "cargo-dispatch-addressing-gateway",
@@ -459,7 +459,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-control-gateway-client"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "cargo-dispatch-addressing-gateway",
@@ -469,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-control-ui"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cargo-dispatch-control-ui-contracts",
  "console_error_panic_hook",
@@ -483,14 +483,14 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-control-ui-contracts"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "cargo-dispatch-control-web"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "cargo-dispatch-contracts",
@@ -508,11 +508,11 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-domain"
-version = "0.2.0"
+version = "0.3.0"
 
 [[package]]
 name = "cargo-dispatch-geo"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "reqwest",
@@ -524,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-planner-desktop"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "cargo-dispatch-contracts",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-planner-ui"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cargo-dispatch-planner-ui-contracts",
  "console_error_panic_hook",
@@ -557,14 +557,14 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-planner-ui-contracts"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "cargo-dispatch-planner"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cargo-dispatch-contracts",
  "cargo-dispatch-domain",
@@ -573,7 +573,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-dispatch-trip-files"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cargo-dispatch-contracts",
  "cargo-dispatch-control",

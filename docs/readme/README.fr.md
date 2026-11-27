@@ -4,7 +4,7 @@
 
 Régulation d'une flotte de fret : planifier un trajet, le confier à l'exécution, rester en contact avec le conducteur et consigner ce qui s'est réellement passé. Le langage principal de développement est **Rust**.
 
-**Version stable : [v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0).** Le développement continue ; les versions d'essai figurent dans [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
+**Version stable : [v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0).** Le développement continue ; les versions d'essai figurent dans [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
 ## Composants
 
@@ -38,7 +38,7 @@ Control est la seule source de vérité d'un trajet en cours. Il fournit au cond
 - messages d'erreur dans la langue de l'interface ; heure de position, taille de fichier et nom du point en clair.
 
 **Planner**
-- fichier de commandes (JSON, pour l'humain et l'IA) ou saisie manuelle ; jusqu'à trois variantes d'itinéraire selon la capacité, choix et reprise dans le trajet ; la saisie est conservée (après v0.2.0).
+- fichier de commandes (JSON, pour l'humain et l'IA) ou saisie manuelle ; jusqu'à trois variantes d'itinéraire selon la capacité, choix et reprise dans le trajet ; la saisie est conservée.
 - brouillon d'itinéraire : ajouter, retirer, réordonner des points par coordonnées ; le brouillon survit à un redémarrage ;
 - aperçu de l'itinéraire et tracé routier via votre serveur Valhalla avec des paramètres de véhicule saisis explicitement (les valeurs inconnues ne sont pas inventées) ;
 - export d'un paquet de trajet (ZIP, schéma 1.4) avec les marchandises et la base de planification ; un fichier existant n'est jamais écrasé.
@@ -70,7 +70,7 @@ Tous les programmes existent en українська, English, Français, Deutsc
 - Les applications Android et iPhone/iPad n'ont pas été essayées sur des appareils physiques — seulement sur émulateur, simulateur et tests automatiques.
 - L'internet mobile et le Gateway sur un réseau réel ne sont vérifiés qu'automatiquement.
 - Les paquets ne sont pas signés ; Android est un APK de débogage, iOS uniquement une version pour le simulateur Apple.
-- Après un redémarrage de Control, trajets et liens reviennent seuls ; la liaison s'active d'un clic (après v0.2.0).
+- Après un redémarrage de Control, trajets et liens reviennent seuls ; la liaison s'active d'un clic. Pour le Gateway, saisissez d'abord de nouveau son adresse et son secret.
 - Le régulateur ne peut pas encore modifier les points ni les marquer comme faits.
 
 ## Compilation
