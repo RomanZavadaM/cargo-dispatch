@@ -1,6 +1,11 @@
 #![forbid(unsafe_code)]
 
+mod input;
 mod problems;
+pub use input::{
+    INPUT_SCHEMA, INPUT_SCHEMA_VERSION, InputCargo, InputOrder, InputPlace, InputProblem,
+    InputProblemKind, InputVehicle, Money, PlanningInput, parse_moment, validate_input,
+};
 pub use problems::{ProblemKind, classify_problem, localize_problem};
 
 use serde::{Deserialize, Serialize};

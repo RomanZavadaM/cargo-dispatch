@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+pub mod proposals;
+
 use cargo_dispatch_contracts::{
     ContractError, ReplanRequest, TripGeometryContractError, TripPackageHeader, TripPlanningBasis,
     TripRoadGeometry, TripRoadGeometryPoint, TripRoutingIdentity, TripVersion,
