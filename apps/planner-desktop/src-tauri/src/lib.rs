@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+mod planning;
+
 use cargo_dispatch_contracts::{
     CURRENT_SCHEMA_VERSION, PlannedCargoBasis, TripNavigationTarget, TripPackageHeader,
     TripPlanningBasis, TripPointKind, TripRoadGeometry, TripRoadGeometryPoint, TripRoutePoint,
@@ -35,6 +37,8 @@ use std::{
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
+use planning::{StoredPlanning, load_planning, planning_path};
+
 const PLANNER_JOURNAL_SCHEMA: u32 = 1;
 const PLANNER_JOURNAL_FILE: &str = "planner-draft-v1.jsonl";
 
@@ -44,6 +48,17 @@ struct ManualPoint {
     title: String,
     latitude: f64,
     longitude: f64,
+    kind: PointKind,
+}
+
+/// What happens at a stop; journals written earlier know only manual points.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum PointKind {
+    #[default]
+    Manual,
+    Load,
+    Unload,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +91,8 @@ enum PlannerDraftEvent {
         title: String,
         latitude: f64,
         longitude: f64,
+        #[serde(default)]
+        kind: PointKind,
     },
     RemovePoint {
         point_id: [u8; 16],
@@ -100,6 +117,7 @@ struct PlannerDesktopService {
     journal_path: Option<PathBuf>,
     operator_id: OperatorId,
     routing: Mutex<Option<ValhallaRuntimeConfig>>,
+    planning: Mutex<StoredPlanning>,
 }
 
 impl Default for PlannerDesktopService {
@@ -110,6 +128,7 @@ impl Default for PlannerDesktopService {
             operator_id: OperatorId::from_bytes(id_bytes(0x4f, 1))
                 .expect("default Planner operator id is non-nil"),
             routing: Mutex::new(None),
+            planning: Mutex::new(StoredPlanning::default()),
         }
     }
 }
@@ -118,12 +137,16 @@ impl PlannerDesktopService {
     fn open(journal_path: PathBuf) -> Result<Self, String> {
         let state = recover_journal(&journal_path)?;
         let operator_id = load_or_create_operator_id(&journal_path)?;
-        Ok(Self {
+        let planning = load_planning(&planning_path(&journal_path));
+        let service = Self {
             inner: Mutex::new(state),
             journal_path: Some(journal_path),
             operator_id,
             routing: Mutex::new(None),
-        })
+            planning: Mutex::new(planning),
+        };
+        service.restore_routing();
+        Ok(service)
     }
 
     fn append_event(&self, event: &PlannerDraftEvent) -> Result<(), String> {
@@ -214,6 +237,7 @@ impl PlannerDesktopService {
             title: input.title.trim().to_owned(),
             latitude: input.latitude,
             longitude: input.longitude,
+            kind: PointKind::Manual,
         };
         self.commit_event(&mut state, event)
     }
@@ -822,6 +846,7 @@ fn apply_event(state: &mut PlannerState, event: &PlannerDraftEvent) -> Result<()
             title,
             latitude,
             longitude,
+            kind,
         } => {
             let input = PlannerPointInput {
                 title: title.clone(),
@@ -847,6 +872,7 @@ fn apply_event(state: &mut PlannerState, event: &PlannerDraftEvent) -> Result<()
                     title: title.clone(),
                     latitude: *latitude,
                     longitude: *longitude,
+                    kind: *kind,
                 },
             );
             state.route = updated;
@@ -1019,7 +1045,11 @@ fn package_route_points(state: &PlannerState) -> Result<Vec<TripRoutePoint>, Str
                 point_id: point.point_id,
                 sequence: u32::try_from(index + 1)
                     .map_err(|_| "Planner route contains too many points".to_owned())?,
-                kind: TripPointKind::Custom("manual".to_owned()),
+                kind: match point.kind {
+                    PointKind::Manual => TripPointKind::Custom("manual".to_owned()),
+                    PointKind::Load => TripPointKind::Load,
+                    PointKind::Unload => TripPointKind::Unload,
+                },
                 title: point.title.clone(),
                 navigation: Some(TripNavigationTarget {
                     latitude_e7: coordinate_e7(point.latitude, 90.0, "latitude")?,
@@ -1151,12 +1181,15 @@ fn planner_configure_routing(
     input: PlannerRoutingConfigInput,
     state: State<'_, PlannerDesktopService>,
 ) -> Result<PlannerRoutingStatus, String> {
-    state.configure_routing(input)
+    let status = state.configure_routing(input.clone())?;
+    state.remember_routing(Some(input))?;
+    Ok(status)
 }
 
 #[tauri::command]
 fn planner_disable_routing(state: State<'_, PlannerDesktopService>) -> Result<(), String> {
-    state.disable_routing()
+    state.disable_routing()?;
+    state.remember_routing(None)
 }
 
 #[tauri::command]
@@ -1228,7 +1261,13 @@ pub fn run() {
             planner_test_routing,
             planner_preview_route,
             planner_export_package,
-            planner_pick_export_path
+            planner_pick_export_path,
+            planning::planner_planning_status,
+            planning::planner_planning_update,
+            planning::planner_planning_open,
+            planning::planner_planning_save,
+            planning::planner_planning_propose,
+            planning::planner_planning_apply
         ])
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");
