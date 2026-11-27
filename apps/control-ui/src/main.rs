@@ -794,6 +794,13 @@ enum ConnectChoice {
     Internet,
 }
 
+async fn stop_running_listener(running: bool) -> Result<(), String> {
+    if running {
+        invoke::<ControlUiStatus, _>("stop_browser_server", &serde_json::json!({})).await?;
+    }
+    Ok(())
+}
+
 fn access_step_title(step: AccessStep, text: &ControlStrings) -> &'static str {
     match step {
         AccessStep::Connect => text.broadcast,
@@ -821,6 +828,7 @@ fn ControlApp() -> impl IntoView {
     let manual_display_name = RwSignal::new(String::new());
     let manual_points = RwSignal::new(vec![ManualPointDraft::new(), ManualPointDraft::new()]);
     let lan_ip = RwSignal::new(String::new());
+    let lan_candidates = RwSignal::new(Vec::<String>::new());
     let lan_port = RwSignal::new("8080".to_owned());
     let gateway_url = RwSignal::new(String::new());
     let gateway_secret = RwSignal::new(String::new());
@@ -912,6 +920,29 @@ fn ControlApp() -> impl IntoView {
             }
         });
         cargo_control_set_timeout(hide.unchecked_ref(), 5_000);
+    });
+
+    // The program finds this computer's network address; typing stays possible.
+    Effect::new(move |_| {
+        if dialog.get() != Some(AccessDialog::Connect) {
+            return;
+        }
+        spawn_local(async move {
+            let Ok(found) =
+                invoke::<Vec<String>, _>("lan_addresses", &serde_json::json!({})).await
+            else {
+                return;
+            };
+            let current = lan_ip.get_untracked();
+            let outdated =
+                lan_candidates.get_untracked().contains(&current) && !found.contains(&current);
+            if (current.is_empty() || outdated)
+                && let Some(first) = found.first()
+            {
+                lan_ip.set(first.clone());
+            }
+            lan_candidates.set(found);
+        });
     });
 
     let set_status_result = move |result: Result<ControlUiStatus, String>,
@@ -1096,11 +1127,19 @@ fn ControlApp() -> impl IntoView {
             return;
         }
         busy.set(true);
+        let running = status
+            .get_untracked()
+            .is_some_and(|current| current.listener.is_some());
         spawn_local(async move {
             let result: Result<ControlUiStatus, String> =
-                invoke("start_loopback", &serde_json::json!({})).await;
+                match stop_running_listener(running).await {
+                    Ok(()) => invoke("start_loopback", &serde_json::json!({})).await,
+                    Err(problem) => Err(problem),
+                };
             if result.is_ok() {
                 dialog.set(None);
+            } else if let Ok(current) = load_status().await {
+                status.set(Some(current));
             }
             set_status_result(result, strings(locale.get_untracked()).loopback_started);
         });
@@ -1118,16 +1157,30 @@ fn ControlApp() -> impl IntoView {
                 return;
             }
         };
+        let ip = lan_ip.get_untracked().trim().to_owned();
+        if ip.parse::<std::net::IpAddr>().is_err() {
+            message.set(localize_problem(
+                locale.get_untracked(),
+                "Некоректна LAN-адреса",
+            ));
+            error.set(true);
+            return;
+        }
         busy.set(true);
-        let input = StartLanInput {
-            ip: lan_ip.get_untracked(),
-            port,
-        };
+        let input = StartLanInput { ip, port };
+        let running = status
+            .get_untracked()
+            .is_some_and(|current| current.listener.is_some());
         spawn_local(async move {
             let result: Result<ControlUiStatus, String> =
-                invoke("start_lan", &serde_json::json!({ "input": input })).await;
+                match stop_running_listener(running).await {
+                    Ok(()) => invoke("start_lan", &serde_json::json!({ "input": input })).await,
+                    Err(problem) => Err(problem),
+                };
             if result.is_ok() {
                 dialog.set(None);
+            } else if let Ok(current) = load_status().await {
+                status.set(Some(current));
             }
             set_status_result(result, strings(locale.get_untracked()).lan_started);
         });
@@ -2150,7 +2203,7 @@ fn ControlApp() -> impl IntoView {
                         <input type="radio" name="connect-choice" prop:checked=move || connect_choice.get() == ConnectChoice::Internet on:change=move |_| connect_choice.set(ConnectChoice::Internet) />
                         <span><strong>{move || strings(locale.get()).mode_internet}</strong><span class="hint">{move || strings(locale.get()).mode_internet_hint}</span></span>
                     </label>
-                <p class="note" class:hidden=move || status.get().and_then(|current| current.listener).is_none()>
+                <p class="note" class:hidden=move || status.get().and_then(|current| current.listener).is_none() || connect_choice.get() == ConnectChoice::Internet>
                     {move || strings(locale.get()).listener_busy}
                 </p>
 
@@ -2173,7 +2226,14 @@ fn ControlApp() -> impl IntoView {
                                 prop:value=move || lan_ip.get()
                                 on:input=move |event| lan_ip.set(event_target_value(&event))
                             />
-                            <span class="hint">{move || format!("{} {}", strings(locale.get()).example_prefix, r"192.168.1.25")}</span>
+                            <span class="hint">{move || {
+                                let text = strings(locale.get());
+                                if lan_candidates.get().is_empty() {
+                                    format!("{} {} 192.168.1.25", text.lan_not_found, text.example_prefix)
+                                } else {
+                                    text.lan_found.to_owned()
+                                }
+                            }}</span>
                         </label>
                         <label>
                             {move || strings(locale.get()).port}
@@ -2186,6 +2246,28 @@ fn ControlApp() -> impl IntoView {
                                 on:input=move |event| lan_port.set(event_target_value(&event))
                             />
                         </label>
+                    </div>
+                    <div class="actions" class:hidden=move || { lan_candidates.get().len() < 2 }>
+                        <span class="hint">{move || strings(locale.get()).lan_other}</span>
+                        {move || {
+                            lan_candidates
+                                .get()
+                                .into_iter()
+                                .map(|address| {
+                                    let chosen = address.clone();
+                                    let shown = address.clone();
+                                    view! {
+                                        <button
+                                            type="button"
+                                            class:primary=move || lan_ip.get() == shown
+                                            on:click=move |_| lan_ip.set(chosen.clone())
+                                        >
+                                            {address}
+                                        </button>
+                                    }
+                                })
+                                .collect_view()
+                        }}
                     </div>
                     <p class="note">{move || strings(locale.get()).lan_note}</p>
                     <div class="actions">
@@ -2230,13 +2312,15 @@ fn ControlApp() -> impl IntoView {
                 </div>
 
                 <div class="actions">
-                    <button class="danger" type="button" on:click=stop disabled=move || busy.get()>
+                    <button class="danger" type="button" class:hidden=move || status.get().and_then(|current| current.listener).is_none() on:click=stop disabled=move || busy.get()>
                         {move || strings(locale.get()).stop_broadcast}
                     </button>
-                    <button type="button" on:click=stop_gateway disabled=move || busy.get()>
+                    <button type="button" class:hidden=move || status.get().and_then(|current| current.gateway).is_none() on:click=stop_gateway disabled=move || busy.get()>
                         {move || strings(locale.get()).disable_gateway}
                     </button>
                 </div>
+                <details>
+                <summary>{move || strings(locale.get()).advanced}</summary>
                 <div class="status">
                     {move || {
                         status.get().map(|current| {
@@ -2269,6 +2353,7 @@ fn ControlApp() -> impl IntoView {
                         }).unwrap_or_else(|| strings(locale.get()).reading_state.to_owned())
                     }}
                 </div>
+                </details>
                 </div>
             </div>
 

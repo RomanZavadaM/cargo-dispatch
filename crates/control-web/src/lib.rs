@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     io,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
     path::{Path as FsPath, PathBuf},
     sync::{Arc, Mutex, RwLock},
 };
@@ -1929,6 +1929,65 @@ fn is_private_lan_ip(ip: IpAddr) -> bool {
     }
 }
 
+/// Private IPv4 addresses of this computer, the most likely local network first.
+///
+/// The operating system is asked which own address it would use to reach a set
+/// of private destinations. Connecting a UDP socket only selects a route; no
+/// packet is sent.
+#[must_use]
+pub fn local_lan_addresses() -> Vec<Ipv4Addr> {
+    let default_route = source_address_for(Ipv4Addr::new(192, 0, 2, 1));
+    let on_subnet: Vec<Ipv4Addr> = (0..=u8::MAX)
+        .map(|third| Ipv4Addr::new(192, 168, third, 1))
+        .chain([
+            Ipv4Addr::new(10, 0, 0, 1),
+            Ipv4Addr::new(10, 0, 1, 1),
+            Ipv4Addr::new(172, 16, 0, 1),
+            Ipv4Addr::new(172, 20, 10, 1),
+        ])
+        .filter_map(|target| {
+            source_address_for(target)
+                .filter(|source| source.octets()[..3] == target.octets()[..3])
+        })
+        .collect();
+    rank_lan_addresses(default_route, &on_subnet)
+}
+
+fn source_address_for(target: Ipv4Addr) -> Option<Ipv4Addr> {
+    let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).ok()?;
+    socket.connect((target, 9)).ok()?;
+    match socket.local_addr().ok()?.ip() {
+        IpAddr::V4(address) => Some(address),
+        IpAddr::V6(_) => None,
+    }
+}
+
+fn rank_lan_addresses(default_route: Option<Ipv4Addr>, on_subnet: &[Ipv4Addr]) -> Vec<Ipv4Addr> {
+    let mut ranked: Vec<Ipv4Addr> = default_route
+        .into_iter()
+        .chain(on_subnet.iter().copied())
+        .filter(|address| is_private_lan_ip(IpAddr::V4(*address)))
+        .collect();
+    ranked.sort_by_key(|address| (lan_rank(*address, default_route), *address));
+    ranked.dedup();
+    ranked
+}
+
+/// Lower is better. A VPN may own the default route, so a connected 192.168
+/// network goes before a default route in another range. An own address ending
+/// in `.1` usually belongs to a virtual adapter.
+fn lan_rank(address: Ipv4Addr, default_route: Option<Ipv4Addr>) -> u8 {
+    let home = address.octets()[..2] == [192, 168];
+    let is_default = default_route == Some(address);
+    match (home, is_default, address.octets()[3] == 1) {
+        (true, true, _) => 0,
+        (true, false, false) => 1,
+        (false, true, _) => 2,
+        (false, false, false) => 3,
+        (_, false, true) => 4,
+    }
+}
+
 fn validate_lan_address(address: SocketAddr) -> io::Result<()> {
     if address.port() == 0 {
         return Err(io::Error::new(
@@ -2218,6 +2277,26 @@ mod tests {
         }
         serde_json::from_slice(&body)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    }
+
+    #[test]
+    fn lan_addresses_put_the_local_network_first() {
+        let vpn = Ipv4Addr::new(10, 8, 0, 2);
+        let wifi = Ipv4Addr::new(192, 168, 1, 25);
+        let virtual_adapter = Ipv4Addr::new(192, 168, 56, 1);
+        assert_eq!(
+            rank_lan_addresses(Some(vpn), &[virtual_adapter, wifi]),
+            [wifi, vpn, virtual_adapter]
+        );
+        assert_eq!(
+            rank_lan_addresses(Some(wifi), &[virtual_adapter, wifi]),
+            [wifi, virtual_adapter]
+        );
+        let public = Ipv4Addr::new(203, 0, 113, 5);
+        assert!(rank_lan_addresses(Some(public), &[Ipv4Addr::LOCALHOST]).is_empty());
+        for found in local_lan_addresses() {
+            assert!(is_private_lan_ip(IpAddr::V4(found)));
+        }
     }
 
     #[tokio::test]
