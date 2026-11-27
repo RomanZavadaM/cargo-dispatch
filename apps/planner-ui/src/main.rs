@@ -632,9 +632,8 @@ fn PlannerApp() -> impl IntoView {
         let Some(current) = route.get() else {
             return;
         };
-        let gone = |id: &str| {
-            !id.is_empty() && !current.points.iter().any(|point| point.point_id == id)
-        };
+        let gone =
+            |id: &str| !id.is_empty() && !current.points.iter().any(|point| point.point_id == id);
         if export_cargos.with_untracked(|rows| {
             rows.iter()
                 .any(|row| gone(&row.pickup_point_id) || gone(&row.unload_point_id))

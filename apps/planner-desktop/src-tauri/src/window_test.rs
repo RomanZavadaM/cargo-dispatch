@@ -133,10 +133,7 @@ async fn file(AxumState(window): AxumState<Arc<Window>>, uri: Uri) -> Response {
         "" => "index.html",
         name => name,
     };
-    let kind = match Path::new(name)
-        .extension()
-        .and_then(|value| value.to_str())
-    {
+    let kind = match Path::new(name).extension().and_then(|value| value.to_str()) {
         Some("html") => "text/html; charset=utf-8",
         Some("js") => "text/javascript",
         Some("wasm") => "application/wasm",
@@ -178,12 +175,11 @@ async fn the_window_works_in_a_real_browser() {
     let url = format!("http://{}/", listener.local_addr().expect("address"));
     let server = tokio::spawn(async move { axum::serve(listener, app).await });
 
-    let status = tokio::task::spawn_blocking(move || {
-        Command::new("node").arg(script).arg(url).status()
-    })
-    .await
-    .expect("browser task")
-    .expect("node");
+    let status =
+        tokio::task::spawn_blocking(move || Command::new("node").arg(script).arg(url).status())
+            .await
+            .expect("browser task")
+            .expect("node");
     server.abort();
     assert!(status.success(), "the browser test of the window failed");
     let exported = fs::read_dir(&folder)
