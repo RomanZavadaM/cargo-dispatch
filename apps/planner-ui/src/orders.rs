@@ -146,7 +146,12 @@ fn end_of(order: &mut InputOrder, delivery: bool) -> &mut InputPlace {
     }
 }
 
-fn place_fields(panel: Panel, index: usize, delivery: bool, place: &InputPlace) -> impl IntoView {
+fn place_fields(
+    panel: Panel,
+    index: usize,
+    delivery: bool,
+    place: &InputPlace,
+) -> impl IntoView + use<> {
     let title = if delivery { K::Delivery } else { K::Pickup };
     let edit = move |input: &mut PlanningInput, change: &dyn Fn(&mut InputPlace)| {
         if let Some(order) = input.orders.get_mut(index) {
@@ -262,7 +267,7 @@ fn order_card(panel: Panel, index: usize, order: InputOrder) -> impl IntoView {
     }
 }
 
-fn vehicle_fields(panel: Panel, document: &PlanningInput) -> impl IntoView {
+fn vehicle_fields(panel: Panel, document: &PlanningInput) -> impl IntoView + use<> {
     let vehicle = document.vehicle.clone();
     let start = vehicle.start.clone().unwrap_or_default();
     let cost = vehicle.cost_per_km.clone().unwrap_or_default();
