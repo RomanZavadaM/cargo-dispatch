@@ -1,6 +1,6 @@
 # Актуальний стан — cargo-dispatch
 
-Оновлено: 2026-11-26, Europe/Kyiv.
+Оновлено: 2026-11-27, Europe/Kyiv.
 
 Короткий public state; деталі — private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
 
@@ -19,6 +19,7 @@
 - Control/Driver Browser, Addressing Gateway, Android Driver, iOS/iPadOS Driver і 8-language localization інтегровані.
 - Автоматичний Driver Browser acceptance інтегрований для двох прямих шляхів без Gateway: loopback і явний private-LAN bind. Він перевіряє реальний Control session, HTTP/state, snapshot і mutation; ручна візуальна responsive-перевірка та фізичний телефон у LAN/VPN лишаються окремим acceptance.
 - Автоматичний public Gateway acceptance інтегрований для шляху `Control ↔ public HTTPS Gateway ↔ Driver Browser`: Control використовує лише outbound-з’єднання, а через тимчасову публічну HTTPS-адресу перевіряються browser shell, snapshot, location update і двосторонні файли. Реальний окремий пристрій у конкретній мобільній мережі/NAT/CGNAT лишається польовим acceptance.
+- У `main` після `preview.8`: вікно підключення водіїв у Control перебудоване (чотири випадні вікна, помічник «Що робити далі», посилання водія на видноті); адресу комп'ютера в мережі визначає програма; спосіб зв'язку перемикається без ручного вимикання. Перевірено автоматичними тестами; вручну — обмін із планшетом у локальній мережі (Windows). У релізи ще не входить.
 - Control лишається authoritative source фактичного стану активного рейсу.
 - Planner/routing foundation має:
   - Valhalla adapter і real runtime HTTP transport;

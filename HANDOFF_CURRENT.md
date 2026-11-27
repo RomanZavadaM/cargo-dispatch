@@ -1,6 +1,6 @@
 # HANDOFF_CURRENT — cargo-dispatch
 
-Оновлено: 2026-11-26, Europe/Kyiv.
+Оновлено: 2026-11-27, Europe/Kyiv.
 
 Це короткий public anchor. Повний стан і журнали — private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
 
@@ -19,6 +19,7 @@
 
 ## Інтегровано
 - Control + Driver Browser з durable trip state, maps, files/media, location, route reorder і reconnect.
+- У `main` після `preview.8`: вікно підключення водіїв у Control перебудоване (чотири випадні вікна, помічник «Що робити далі», посилання водія на видноті); адресу комп'ютера в мережі визначає програма; спосіб зв'язку перемикається без ручного вимикання. Перевірено автоматичними тестами; вручну — обмін із планшетом у локальній мережі (Windows). У релізи ще не входить.
 - Android/iOS Driver із native maps, camera/files, durable retry, background tracking і secure session storage.
 - Addressing Gateway — RAM-only relay; Control лишається джерелом активного рейсу. Автоматичний public HTTPS acceptance підтверджує outbound-only Control connection, Driver Browser shell/snapshot/location та двосторонні файли через публічну адресу.
 - Control desktop: Windows + macOS + Linux.
