@@ -2,118 +2,82 @@
 
 [🇺🇦 Українська](../../README.md) · [🇬🇧 English](README.en.md) · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · **🇯🇵 日本語** · [🇨🇳 简体中文](README.zh.md)
 
-> **ステータス:** 開発中です。現在の安定版は **v0.1.0** です。現在のテスト prerelease は **v0.1.0-preview.8** で、Windows・macOS・Linux 向けの独立した Planner を含みます。8言語の完全なローカライズを統合済みです。
+貨物車両の配車システムです。運行を計画し、実行に引き渡し、ドライバーと連絡を取り、実際の経過を記録します。主な開発言語は **Rust** です。
 
-## 製品について
+**安定版：[v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0)。** 開発は継続中で、テスト版は [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases) にあります。
 
-**cargo-dispatch** は貨物車両群向けの配車システムです。貨物の選定、運行の作成・再計画、実行への引き渡し、そして配車担当者による実際の進行管理を目的としています。
+## 構成
 
-主な開発言語は **Rust** です。
+| プログラム | 利用者 | 対応環境 |
+|---|---|---|
+| **Control** | 配車担当：進行中の運行を管理 | Windows、macOS、Linux |
+| **Planner** | 計画担当：経路と運行パッケージを作成 | Windows、macOS、Linux |
+| **ドライバーページ** | ドライバー、インストール不要で任意のブラウザー | スマートフォン、タブレット、パソコン |
+| **Android 版 Driver** | ドライバー | Android 8.0 以降 |
+| **iPhone・iPad 版 Driver** | ドライバー | iOS / iPadOS 17 以降 |
+| **Addressing Gateway** | インターネット経由の接続 | Linux サーバー |
 
-## 現在実装されている機能
+進行中の運行の実績を持つのは Control だけです。Control がドライバーにページ、経路、ファイルを直接配信し、完了の記録、位置、添付ファイルを受け取ります。中央の運行データベースはありません。
 
-- Tauri/Leptos ベースの独立した desktop **Control** アプリ;
-- Tauri/Leptos ベースの独立した desktop **Planner**：手動ルート下書き、地点の追加/削除/並べ替え、ナビゲーション座標、Planner core による revision 管理。下書きは app-data の versioned append-only journal に保存され、再起動後に復元されます;
-- アクティブな運行の永続ローカル保存と再起動後の復旧;
-- Planner と Control 間のバージョン付き trip package;
-- 電話・タブレット・ノート PC・desktop browser 向けの単一の適応型 **Driver Browser**;
-- Control と Driver Browser の両方から開いている地点の順序変更;
-- PDF/通常ファイル **Control → Driver Browser**;
-- ファイル・写真・動画 **Driver Browser → Control** とローカル保存;
-- 同一運行の 2 つの同時 browser client と、別 browser DB を使わない reconnect;
-- Control と Driver Browser のインタラクティブ OpenStreetMap;
-- テストとローカル運用用の loopback および明示的 LAN モード;
-- 自動 Driver Browser acceptance は実際の Control session を loopback と明示的な private-LAN bind で個別に検証します;
-- 自動 public HTTPS Gateway acceptance は実際の `Control ↔ public HTTPS Gateway ↔ Driver Browser` チェーン、outbound-only Control、Browser shell/snapshot/location、双方向ファイルを検証します.
+## はじめに
 
-## ネイティブ Driver App
+1. リリースページからアーカイブをダウンロードして展開し、**Control** を起動します。Control のパッケージには架空のテストデータ（`local-browser-test-data`）が入っています。
+2. **「運行を追加」** →「既存の運行を開く」（運行フォルダーまたは Planner のパッケージ）、または「新しい運行を手動で作成」。
+3. **「ドライバーを接続」** →「このコンピュータ」「同じ Wi-Fi ネットワーク」「どこからでもインターネット経由」。
+4. **「次にすること」** のリンクをドライバーに渡します：「開く」または「コピー」。
+5. ドライバーはリンクをブラウザーで開くか、Driver アプリに貼り付けます。
 
-2 つのネイティブクライアントはすでに `main` に統合されています。
+## 機能
 
-- **Android** — Jetpack Compose、route/complete/reorder、ファイル/写真/動画、foreground GPS、session recovery、native MapLibre + OpenStreetMap、現在の road geometry、地点/最新位置、システム写真・動画撮影；Emulator build/install/launch/screenshot PASS。
-- **iPhone/iPad** — SwiftUI、route/complete/reorder、ファイル/写真/動画、foreground CoreLocation、session recovery、native MapKit、現在の geometry、地点/最新位置、システム写真・動画撮影；Simulator build/install/launch/screenshot PASS。
+**Control**
+- 複数の運行を同時に管理し、運行ごとに別ウィンドウ；
+- Planner のパッケージから、または手動で作成した運行。状態はローカルに保存され、再起動後に復元されます；
+- 未完了地点の順序、地図、ドライバーの最新位置、計画と実績の比較；
+- ドライバーへのファイル送信、ドライバーからのファイル・写真・動画の受信；
+- ローカルネットワーク内のコンピュータのアドレスを自動で調べ、接続方法は手動で停止せずに切り替えられます。
 
-両方とも同じ Control API を使用し、別の運行データベースは作りません。
+**Planner**
+- 経路の下書き：座標で地点を追加・削除・並べ替え。下書きは再起動後も残ります；
+- 明示的に入力した車両条件を使い、自分の Valhalla サーバーで経路と道路線をプレビュー（不明な値は作り出しません）；
+- 貨物と計画根拠を含む運行パッケージ（ZIP、スキーマ 1.4）の書き出し。既存ファイルは上書きしません。
 
-r4/r5 以降、両方の native client は位置情報とメディア用の durable retry queue も備えています。Android r5 は foreground location service、常時表示の Stop 通知、15 秒 / 25 m のポリシーによる明示的な Start/Stop バックグラウンド運行追跡を追加します。Apple r5 は明示的な Start/Stop CoreLocation バックグラウンド追跡、`UIBackgroundModes=location`、25 m フィルタを追加し、別の必要性がない限り `Always` 権限を要求しません。
+**ドライバー：ブラウザー、Android、iPhone・iPad**
+- 経路と地図、地点の完了記録、未完了地点の並べ替え；
+- 書類の受信、ファイル・写真・動画の送信；
+- 位置の送信。アプリではバックグラウンド送信も可能で、明示的に開始・停止し、再送キューがあります。
 
-## Driver Browser
+## 接続とセキュリティ
 
-Driver Browser は電話版と desktop 版に分かれた製品ではなく、**1 つの製品**です。標準レイアウトは次の 3 つです。
+- **このコンピュータ**と**ローカルネットワーク**は暗号化されません（HTTP）。信頼できるネットワークでのみ使用してください。ネットワークからのアクセスが自動で有効になることはなく、ルーターのポートも開きません。
+- 秘密のコードを含むリンクで運行にアクセスします。その運行のドライバーにだけ渡してください。
+- スマートフォンのブラウザーは、通常 HTTPS（つまり Gateway 経由）でのみ位置情報を許可します。
+- スマートフォンからネットワーク内の Control に接続するには、パソコンのファイアウォールでプログラムを許可してください。
+- **インターネット経由：** HTTPS リバースプロキシの背後に自分の Gateway を置きます。Control の側から接続するため、パソコンに受信ポートは不要です。Gateway は運行、書類、メディア、位置を保存しません。中継の既定上限は 1 リクエスト 64 MiB です（512 MiB まで設定可能）。
 
-- narrow phone;
-- tablet;
-- wide desktop/laptop.
+## 地図と経路
 
-データ、経路操作、ファイル、backend は共通で、画面サイズに応じて配置だけが変わります。
+Control、Planner、ブラウザー、Android の地図は [OpenStreetMap](https://www.openstreetmap.org/copyright)（© OpenStreetMap contributors）、iPhone・iPad では Apple MapKit です。地図の提供者には端末の IP アドレスと表示範囲が分かります。道路線には自分の Valhalla サーバーが必要です。なくても運行は動作し、線だけが表示されません。
 
-## 地図
+## 言語
 
-Control と Driver Browser には、運行地点と最後に受理されたドライバー位置を表示する実際のインタラクティブなベースマップがあります。
+すべてのプログラムは українська、English、Français、Deutsch、Español、한국어、日本語、简体中文に対応しています。翻訳の抜けは CI で確認します。一部のシステムエラーメッセージは未翻訳です。
 
-現在の `main` は不変の planning basis を持つ schema 1.4 を使用し、旧 schema も引き続き読み込めます。Planner routing profile は特定の計画計算の入力にすぎず、運行を車両へ恒久的に結び付けるものではありません。Import 後は Control がアクティブセッションの実際の mutable routing context を別に管理します。
+## 未確認の事項と制限
 
-Control は派生 geometry を保持し、地点順変更後に設定済み runtime Valhalla で道路線を再計算します。遅れて届いた routing 応答が新しい運行状態を上書きすることはありません。Valhalla が未設定または一時的に利用できない場合も新しい地点順は保存され、派生 geometry だけがない状態になれます。
+- Android と iPhone/iPad のアプリは、実機での手動テストをしていません。
+- モバイル回線と実ネットワーク上の Gateway は自動テストでのみ確認しています。
+- パッケージは未署名です。Android はデバッグ APK、iOS は Apple シミュレーター用ビルドのみです。
+- Control の再起動後は、運行と接続を手動で有効にし直す必要があります。
+- 配車担当はまだ地点の編集や完了の記録ができません。
 
-Planner desktop には独自の runtime Valhalla preview が追加されています。オペレーターが Valhalla アドレス、地図データセット ID、timeout を指定し、`/status` を確認し、`/route` は明示的に入力された planning profile だけで計算されます。不明な数値制約を推測しません。成功時は OSM 上に実際の道路 polyline を描画し、結果がない場合は仮の直線を描きません。Preview は route/revision/profile から派生するため、下書きまたは planning profile が変わると古い線を消し、遅れた応答も拒否します。Routing 失敗は Planner の下書きを変更しません。
+## ビルド
 
-Planner desktop は native Save As から既存の versioned trip package を schema 1.4 としてエクスポートできるようになりました。Package には明示的な planning basis（車両タイプ/クラスと貨物）、地点順、存在する場合に限り一致する planning routing profile/Valhalla geometry の snapshot が含まれます。1つの下書きでは TripId が安定し、TripVersion は再起動後も継続し、CargoId は行位置に依存せず、既存 ZIP は上書きしません。
-
-## Test v0.1.0-preview.8
-
-[Test v0.1.0-preview.8 を開く](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8)。
-
-これは Stable ではなく **prerelease** です。1つの正確なソースからビルドされた現在の製品の統合テスト版です。
-
-Release には以下が含まれます:
-- Windows Control x64 ZIP;
-- macOS Control universal ZIP — Intel + Apple Silicon;
-- Linux Control x64 tar.gz;
-- Windows Planner x64 ZIP;
-- macOS Planner universal ZIP — Intel + Apple Silicon;
-- Linux Planner x64 tar.gz;
-- Android Driver debug APK;
-- iOS/iPadOS Driver Simulator ZIP;
-- Linux Addressing Gateway x64 package;
-- SHA256SUMS。
-
-preview.8 には、durable な Planner 下書き、実際の Valhalla 道路 preview、planning basis を含む versioned schema 1.4 ZIP export、Planner ZIP なしで Control からアクティブ運行を手動作成する機能が含まれます。Planner profile は運行→車両の恒久的な結び付けではなく、実際の車両/端末 context は Control が別に管理します。
-
-## Stable v0.1.0
-
-[Stable v0.1.0 を開く](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0)。
-
-Stable は 1 つの正確なソースから再ビルドされ、次を公開します。
-- Windows Control x64 ZIP;
-- macOS Control universal ZIP — Intel + Apple Silicon;
-- Linux Control x64 tar.gz;
-- テストインストール用 Android Driver debug APK;
-- iOS/iPadOS Driver Simulator ZIP;
-- Docker/Compose を含む Linux Addressing Gateway x64 パッケージ;
-- SHA256SUMS。
-
-**Linux Control** はオペレーター用デスクトップアプリです。**Linux Addressing Gateway** は別のサーバー relay モジュールであり、異なるパッケージです。
-
-Android と Apple のパッケージはまだストア用署名を行っていません。App Store/TestFlight/Google Play と production signing は後で別途対応します。
-
-## 今後の作業
-
-- narrow phone / tablet / wide desktop で地図の pan/zoom/fit を含むローカル browser の手動ビジュアル受け入れ;
-- 同じ Driver Browser を実機の電話で同一 LAN 内テスト;
-- 別ネットワークおよびモバイル NAT/CGNAT での実機 HTTPS フィールド受け入れ;
-- 実機での HTTPS 経由 browser GPS 完全受け入れ;
-
-
-## インターフェース言語
-
-Control、Planner、Driver Browser、Android Driver、iOS/iPadOS Driver は共通の **8言語セット: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN** で実装・検証済みです。Control と Driver Browser はシステム言語と保存される手動選択をサポートし、CI が8言語すべての完全性を確認します。
+ビルド、テスト、リリースは GitHub Actions で実行します。`.github/workflows` を参照してください。
 
 ## ドキュメント
 
-公開状態の入口: [START_HERE.md](../../START_HERE.md)、[HANDOFF_CURRENT.md](../../HANDOFF_CURRENT.md)、[PROJECT_STATE.md](../../PROJECT_STATE.md)。
-
-詳細な作業ドキュメントは非公開で管理されています。
+プロジェクトの状況（ウクライナ語）：[START_HERE.md](../../START_HERE.md)、[HANDOFF_CURRENT.md](../../HANDOFF_CURRENT.md)、[PROJECT_STATE.md](../../PROJECT_STATE.md)。詳細な作業文書は非公開で管理しています。
 
 ## ライセンス
 
-プロプライエタリソフトウェア © 2026 Roman Zavada。リポジトリが公開されていてもオープンソースの権利は付与されません。[LICENSE.md](../../LICENSE.md) と [COPYRIGHT.md](../../COPYRIGHT.md) を参照してください。
+プロプライエタリソフトウェア © 2026 Roman Zavada (Роман Завада)。リポジトリが公開されていても、オープンソースの権利は付与されません。[LICENSE.md](../../LICENSE.md)、[COPYRIGHT.md](../../COPYRIGHT.md)、[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) を参照してください。

@@ -2,118 +2,82 @@
 
 [🇺🇦 Українська](../../README.md) · **🇬🇧 English** · [🇫🇷 Français](README.fr.md) · [🇩🇪 Deutsch](README.de.md) · [🇪🇸 Español](README.es.md) · [🇰🇷 한국어](README.ko.md) · [🇯🇵 日本語](README.ja.md) · [🇨🇳 简体中文](README.zh.md)
 
-> **Status:** active development. The current stable version is **v0.1.0**. The current test prerelease is **v0.1.0-preview.8**, now including a separate Planner for Windows, macOS, and Linux. Full 8-language localization is integrated.
+Dispatching for a cargo fleet: planning a trip, handing it over for execution, staying in touch with the driver, and recording what actually happened. The main development language is **Rust**.
 
-## About
+**Stable version: [v0.2.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.2.0).** Development continues; test builds are listed under [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
-**cargo-dispatch** is a dispatch system for cargo fleets. It is intended to select loads, build and re-plan trips, hand trips over for execution, and give the dispatcher control over actual progress.
+## Components
 
-The main development language is **Rust**.
+| Program | Who uses it | Platforms |
+|---|---|---|
+| **Control** | dispatcher: runs the active trips | Windows, macOS, Linux |
+| **Planner** | planner: builds the route and the trip package | Windows, macOS, Linux |
+| **Driver page** | driver in any browser, nothing to install | phone, tablet, computer |
+| **Driver for Android** | driver | Android 8.0 or later |
+| **Driver for iPhone and iPad** | driver | iOS / iPadOS 17 or later |
+| **Addressing Gateway** | connection over the internet | Linux server |
 
-## What already exists
+Control is the only source of truth for an active trip. It serves the page, route and files to the driver and receives marks, positions and attachments. There is no central trip database.
 
-- a separate desktop **Control** application built with Tauri/Leptos;
-- a separate desktop **Planner** built with Tauri/Leptos: manual route draft, point add/remove/reorder, navigation coordinates, and Planner-core revision tracking; the draft is stored in a versioned append-only journal in app data and recovered after restart;
-- durable local storage of the active trip and restart recovery;
-- a versioned trip package between Planner and Control;
-- one adaptive **Driver Browser** for phone, tablet, laptop, and desktop browsers;
-- reordering of open stops from both Control and Driver Browser;
-- PDF and regular files **Control → Driver Browser**;
-- files, photos, and videos **Driver Browser → Control** with local saving;
-- two simultaneous browser clients for one trip and reconnect without a separate browser database;
-- an interactive OpenStreetMap map in both Control and Driver Browser;
-- loopback and explicit LAN modes for testing and local operation;
-- automated Driver Browser acceptance verifies a real Control session separately over loopback and an explicit private-LAN bind;
-- automated public HTTPS Gateway acceptance verifies the real `Control ↔ public HTTPS Gateway ↔ Driver Browser` chain: outbound-only Control, Browser shell/snapshot/location, and bidirectional files;
+## Getting started
 
-## Native Driver Apps
+1. Download an archive from the release page, unpack it and start **Control**. The Control package contains made-up test data (`local-browser-test-data`).
+2. **“Add trip”** → “Open an existing trip” (a trip folder or a Planner package) or “Create a new trip manually”.
+3. **“Connect drivers”** → “This computer”, “Same Wi-Fi network” or “Anywhere, over the internet”.
+4. Give the driver the link from the **“What to do next”** block: “Open” or “Copy”.
+5. The driver opens the link in a browser or pastes it into the Driver app.
 
-Both native clients are already integrated in `main`:
+## Features
 
-- **Android** — Jetpack Compose, route/complete/reorder, files/photo/video, foreground GPS, restart recovery, native MapLibre + OpenStreetMap, current road geometry, route markers/latest position, and system photo/video capture; Emulator build/install/launch/screenshot PASS.
-- **iPhone/iPad** — SwiftUI, route/complete/reorder, files/photo/video, foreground CoreLocation, restart recovery, native MapKit, current road geometry, route markers/latest position, and system photo/video capture; Simulator build/install/launch/screenshot PASS.
+**Control**
+- several trips at once, a separate window per trip;
+- a trip from a Planner package or created manually; state is stored locally and restored after a restart;
+- order of open stops, map, latest driver position, plan versus fact;
+- files to the driver; files, photos and videos from the driver;
+- finds the computer's local network address itself; the connection mode switches without stopping it by hand.
 
-Both use the same Control API and do not create a separate trip database.
+**Planner**
+- route draft: add, remove and reorder points by coordinates; the draft survives a restart;
+- route preview and road line from your Valhalla server with explicitly entered vehicle parameters (unknown values are not invented);
+- export of a trip package (ZIP, schema 1.4) with cargo and planning basis; an existing file is never overwritten.
 
-After r4/r5, both native clients also have a durable retry queue for location and media. Android r5 adds explicit Start/Stop background trip tracking through a foreground location service, a persistent Stop notification, and a 15 s / 25 m policy. Apple r5 adds explicit Start/Stop CoreLocation background tracking, `UIBackgroundModes=location`, a 25 m distance filter, and does not request `Always` permission without a separate need.
+**Driver: browser, Android, iPhone and iPad**
+- route and map, marking a stop as done, reordering open stops;
+- receiving documents; sending files, photos and videos;
+- position sharing; in the apps also in the background, switched on and off explicitly, with a retry queue.
 
-## Driver Browser
+## Connection and security
 
-Driver Browser is **one product**, not separate phone and desktop versions. It has three normal layouts:
+- **This computer** and **local network** modes are unencrypted (HTTP): use them only on a network you trust. Network access is never switched on by itself and no router ports are opened.
+- A link with a secret code gives access to the trip: share it only with that trip's driver.
+- Phone browsers usually allow geolocation only over HTTPS, that is, through the Gateway.
+- For a phone to reach Control on the network, allow the program in the computer's firewall.
+- **Over the internet:** your own Gateway behind an HTTPS reverse proxy. Control connects to it itself, so no inbound port is needed on the computer. The Gateway stores no trips, documents, media or positions. The default relay limit is 64 MiB per request (configurable up to 512 MiB).
 
-- narrow phone;
-- tablet;
-- wide desktop/laptop.
+## Maps and routes
 
-Trip data, route actions, files, and backend calls are shared; only layout changes with screen size.
+The map in Control, Planner, the browser and Android is [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors); on iPhone and iPad it is Apple MapKit. The map provider sees the device's IP address and the area shown. The road line needs your own Valhalla server; without it the trip works, only the line is missing.
 
-## Map
+## Languages
 
-Control and Driver Browser already contain a real interactive basemap with trip points and the latest accepted driver position.
+All programs are available in українська, English, Français, Deutsch, Español, 한국어, 日本語 and 简体中文. CI checks that translations are complete; some system error messages are not translated yet.
 
-The current `main` uses schema 1.4 with an immutable planning basis; older schemas remain readable. A Planner routing profile is only the input for a particular planning calculation, not a permanent trip-to-vehicle binding. After import, Control maintains a separate mutable actual routing context for the active session.
+## Not yet verified, and limitations
 
-Control keeps derived geometry and recalculates the road line through its configured runtime Valhalla service after a reorder. A late routing response cannot overwrite newer trip state. If Valhalla is not configured or is temporarily unavailable, the new point order is still stored and derived geometry may be absent.
+- The Android and iPhone/iPad apps have not been tested by hand on physical devices.
+- Mobile internet and the Gateway on a real network are verified by automated tests only.
+- Packages are unsigned; Android is a debug APK, iOS is an Apple Simulator build only.
+- After Control restarts, trips and the connection have to be switched on again by hand.
+- The dispatcher cannot edit stops or mark them as done yet.
 
-Planner desktop now has its own runtime Valhalla preview: the operator supplies the Valhalla address, map dataset ID and timeouts, probes `/status`, and `/route` is calculated only from an explicitly supplied planning profile. Unknown numeric constraints are not invented. A successful result draws the real road polyline over OSM; no fake straight connector is drawn without a route result. The preview is derived from route/revision/profile: editing the draft or planning profile clears the old line, and a late response is rejected. Routing failure does not mutate the Planner draft.
+## Building
 
-Planner desktop now also exports the existing versioned trip package as schema 1.4 through a native Save As dialog. The package carries an explicit planning basis (vehicle type/class and cargos), ordered points and, when available, only the matching planning routing profile/Valhalla geometry snapshot. TripId remains stable for one draft, TripVersion continues across restarts, CargoId is independent of row position, and an existing ZIP is never overwritten.
-
-## Test v0.1.0-preview.8
-
-[Open Test v0.1.0-preview.8](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0-preview.8).
-
-This is a **prerelease**, not Stable. It is an integrated test build of the current product from one exact source.
-
-The release includes:
-- Windows Control x64 ZIP;
-- macOS Control universal ZIP — Intel + Apple Silicon;
-- Linux Control x64 tar.gz;
-- Windows Planner x64 ZIP;
-- macOS Planner universal ZIP — Intel + Apple Silicon;
-- Linux Planner x64 tar.gz;
-- Android Driver debug APK;
-- iOS/iPadOS Driver Simulator ZIP;
-- Linux Addressing Gateway x64 package;
-- SHA256SUMS.
-
-preview.8 already includes the durable Planner draft, real Valhalla road preview, versioned schema 1.4 ZIP export with planning basis, and manual active-trip creation in Control without a Planner ZIP. The Planner profile is not a permanent trip-to-vehicle binding; actual vehicle/device context is maintained separately by Control.
-
-## Stable v0.1.0
-
-[Open Stable v0.1.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.1.0).
-
-Stable is rebuilt from one exact source and publishes:
-- Windows Control x64 ZIP;
-- macOS Control universal ZIP — Intel + Apple Silicon;
-- Linux Control x64 tar.gz;
-- Android Driver debug APK for test installation;
-- iOS/iPadOS Driver Simulator ZIP;
-- Linux Addressing Gateway x64 package with Docker/Compose;
-- SHA256SUMS.
-
-**Linux Control** is the operator desktop application. **Linux Addressing Gateway** is the separate server relay module; they are different packages.
-
-Android and Apple packages are not yet store-signed. App Store/TestFlight/Google Play distribution and production signing will be handled separately later.
-
-## What is still ahead
-
-- manual visual local-browser acceptance for narrow phone / tablet / wide desktop, including map pan/zoom/fit;
-- testing the same Driver Browser on a real phone in the same LAN;
-- real-device HTTPS field acceptance from a separate network and mobile NAT/CGNAT;
-- full browser GPS acceptance over HTTPS on a real device;
-
-
-## Interface languages
-
-Control, Planner, Driver Browser, Android Driver, and iOS/iPadOS Driver are implemented and verified with the same **8-language set: uk, en, de, fr, es, ko, ja, zh-Hans/zh-CN**. Control and Driver Browser use system-language selection plus a persisted manual choice, and CI verifies complete coverage for all 8 locales.
+Builds, tests and releases run in GitHub Actions; see `.github/workflows`.
 
 ## Documentation
 
-Public recovery/state entry points: [START_HERE.md](../../START_HERE.md), [HANDOFF_CURRENT.md](../../HANDOFF_CURRENT.md), and [PROJECT_STATE.md](../../PROJECT_STATE.md).
-
-Extended working project documentation is kept privately.
+Project status (in Ukrainian): [START_HERE.md](../../START_HERE.md), [HANDOFF_CURRENT.md](../../HANDOFF_CURRENT.md), [PROJECT_STATE.md](../../PROJECT_STATE.md). Extended working documentation is kept privately.
 
 ## License
 
-Proprietary software © 2026 Roman Zavada. Public visibility of the repository does not grant open-source rights. See [LICENSE.md](../../LICENSE.md) and [COPYRIGHT.md](../../COPYRIGHT.md).
+Proprietary software © 2026 Roman Zavada (Роман Завада). A public repository does not grant open-source rights. See [LICENSE.md](../../LICENSE.md), [COPYRIGHT.md](../../COPYRIGHT.md) and [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).

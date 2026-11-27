@@ -2,42 +2,11 @@
 
 Оновлено: 2026-11-27, Europe/Kyiv.
 
-Короткий public state; деталі — private `RomanZavadaM/dev-strategy`, branch `profile/cargo-dispatch`.
+Короткий публічний стан; деталі — приватно.
 
-- Поточний Stable checkpoint: **v0.1.0**.
-- Поточний Test/prerelease: **v0.1.0-preview.8**, exact source `47352ca341a2d3747d503164de0555b891db6bf1`.
-- Product positioning не обмежується малотонажним парком або масою 7,5 т.
-- Control desktop підтримується для Windows, macOS і Linux.
-- Planner desktop також підтримується для Windows, macOS і Linux; compiled Planner test builds входять у `preview.8`.
-- Planner manual draft у `main` уже durable:
-  - add/remove/reorder;
-  - navigation coordinates;
-  - revision через Planner core;
-  - versioned append-only journal в app-data;
-  - restart recovery;
-  - захист від незавершеного trailing journal record.
-- Control/Driver Browser, Addressing Gateway, Android Driver, iOS/iPadOS Driver і 8-language localization інтегровані.
-- Автоматичний Driver Browser acceptance інтегрований для двох прямих шляхів без Gateway: loopback і явний private-LAN bind. Він перевіряє реальний Control session, HTTP/state, snapshot і mutation; ручна візуальна responsive-перевірка та фізичний телефон у LAN/VPN лишаються окремим acceptance.
-- Автоматичний public Gateway acceptance інтегрований для шляху `Control ↔ public HTTPS Gateway ↔ Driver Browser`: Control використовує лише outbound-з’єднання, а через тимчасову публічну HTTPS-адресу перевіряються browser shell, snapshot, location update і двосторонні файли. Реальний окремий пристрій у конкретній мобільній мережі/NAT/CGNAT лишається польовим acceptance.
-- У `main` після `preview.8`: вікно підключення водіїв у Control перебудоване (чотири випадні вікна, помічник «Що робити далі», посилання водія на видноті); адресу комп'ютера в мережі визначає програма; спосіб зв'язку перемикається без ручного вимикання. Перевірено автоматичними тестами; вручну — обмін із планшетом у локальній мережі (Windows). У релізи ще не входить.
-- Control лишається authoritative source фактичного стану активного рейсу.
-- Planner/routing foundation має:
-  - Valhalla adapter і real runtime HTTP transport;
-  - schema 1.4 planning basis; legacy schema залишаються читабельними;
-  - Planner planning profile використовується лише для конкретного розрахунку і не є постійною прив'язкою рейсу до авто;
-  - Control має окремий mutable actual routing context активної сесії;
-  - runtime endpoint + map dataset id + bounded connect/request timeouts у Desktop Control;
-  - Valhalla `/status` availability + `/route` POST;
-  - у `main` після `preview.8` (ще не в релізі): вибір щодо платних доріг передається як `use_tolls` (це перевага, а не гарантія), задана максимальна швидкість — як `top_speed`; новий розрахунок приймає 10–252 км/год, збережені дані читаються без змін;
-  - normalized timeout/unavailable/dataset-missing/error states;
-  - live geometry recalculation після operator/driver reorder;
-  - stale response protection і для Control, і для Planner preview;
-  - невідомі параметри автомобіля не підставляються;
-  - відмова routing не скасовує Control reorder і не змінює Planner draft;
-  - Planner desktop показує real road geometry поверх OSM через власний runtime Valhalla preview;
-  - Planner desktop експортує versioned schema 1.4 ZIP через native Save As, з explicit planning basis, optional matching routing snapshot, durable TripVersion history та stable CargoId.
-- Control уже вміє **створювати новий активний рейс вручну** без Planner ZIP, на тому самому durable trip state; planning basis при цьому не вигадується, а TripId не прив'язується до автомобіля або endpoint.
-- Поточний Test: **v0.1.0-preview.8** уже опублікований з повним набором Control/Planner Windows/macOS/Linux + Android + iOS Simulator + Linux Gateway + SHA256SUMS.
-- Користувацькі compiled test/stable builds мають публікуватися в GitHub Releases, не залишатися тільки в Actions artifacts.
-
-Для продовження: `START_HERE.md` → private module logs → live GitHub.
+- Стабільна версія: **v0.2.0**.
+- Інтегровано: Control і Planner (Windows, macOS, Linux), сторінка водія в браузері, застосунки Android та iPhone/iPad, Addressing Gateway, вісім мов інтерфейсу.
+- Control лишається єдиним джерелом факту активного рейсу; Gateway не зберігає рейсів, документів, медіа чи позицій.
+- Вручну перевірено: Control для Windows і сторінка водія на планшеті в локальній мережі.
+- Вручну не перевірено: застосунки на фізичних пристроях, Planner, Control для macOS і Linux, Gateway у реальній мережі.
+- Автоматичні перевірки: код і залежності, переклади, loopback, локальна мережа, публічний HTTPS Gateway, Android Emulator, Apple Simulator.
