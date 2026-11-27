@@ -30,7 +30,7 @@ class SessionPreferences(context: Context) {
         if (legacyUrl.isEmpty()) return null
         return SavedDriverSession(
             driverUrl = legacyUrl,
-            emulatorMode = preferences.getBoolean(KEY_EMULATOR, true),
+            emulatorMode = preferences.getBoolean(KEY_EMULATOR, false),
         )
     }
 
@@ -87,7 +87,7 @@ class SessionPreferences(context: Context) {
             )
             SavedDriverSession(
                 driverUrl = "${baseUrl.trimEnd('/')}/driver/$token",
-                emulatorMode = preferences.getBoolean(KEY_EMULATOR, true),
+                emulatorMode = preferences.getBoolean(KEY_EMULATOR, false),
             )
         }.getOrNull()
     }

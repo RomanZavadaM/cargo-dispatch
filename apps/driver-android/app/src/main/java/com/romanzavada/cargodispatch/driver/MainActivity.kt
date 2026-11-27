@@ -1,16 +1,21 @@
 package com.romanzavada.cargodispatch.driver
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,34 +23,52 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.romanzavada.cargodispatch.driver.core.DriverProblem
+import com.romanzavada.cargodispatch.driver.core.FileSize
+import com.romanzavada.cargodispatch.driver.core.NavigationLinks
+import com.romanzavada.cargodispatch.driver.core.SessionLink
+import com.romanzavada.cargodispatch.driver.core.SizeUnit
 import com.romanzavada.cargodispatch.driver.model.DriverDocument
 import com.romanzavada.cargodispatch.driver.model.DriverPoint
+import com.romanzavada.cargodispatch.driver.model.DriverTrip
+import java.text.DateFormat
+import java.util.Date
+import kotlinx.coroutines.delay
 import org.maplibre.android.MapLibre
+
+private const val REFRESH_INTERVAL_MS = 15_000L
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,7 +81,7 @@ class MainActivity : ComponentActivity() {
             ?.let { driverUrl ->
                 SavedDriverSession(
                     driverUrl = driverUrl,
-                    emulatorMode = intent.getBooleanExtra(EXTRA_EMULATOR_MODE, true),
+                    emulatorMode = intent.getBooleanExtra(EXTRA_EMULATOR_MODE, false),
                 )
             }
 
@@ -88,6 +111,14 @@ private fun DriverScreen(
     val locationProvider = remember { ForegroundLocationProvider(context.applicationContext) }
     var pendingSave by remember { mutableStateOf<DriverDocument?>(null) }
     var pendingCapture by remember { mutableStateOf<PendingCapture?>(null) }
+    var attachPointId by rememberSaveable { mutableStateOf<String?>(null) }
+    var confirmPoint by remember { mutableStateOf<DriverPoint?>(null) }
+
+    fun send(read: () -> PickedUpload) {
+        runCatching(read)
+            .onSuccess { viewModel.upload(it, attachPointId) }
+            .onFailure { viewModel.reportProblem(DriverProblem.FileUnreadable) }
+    }
 
     val saveDocument = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("*/*"),
@@ -95,13 +126,15 @@ private fun DriverScreen(
         val selected = pendingSave
         pendingSave = null
         if (uri != null && selected != null) {
-            viewModel.download(selected.documentId) { result ->
-                result.onSuccess { bytes ->
-                    runCatching {
-                        context.contentResolver.openOutputStream(uri, "w")?.use { output ->
-                            output.write(bytes)
-                        } ?: error("Cannot open destination")
-                    }
+            viewModel.download(selected.documentId) { bytes ->
+                runCatching {
+                    context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                        output.write(bytes)
+                    } ?: error("Cannot open destination")
+                }.onSuccess {
+                    Toast.makeText(context, R.string.document_saved, Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    viewModel.reportProblem(DriverProblem.FileNotSaved)
                 }
             }
         }
@@ -111,8 +144,7 @@ private fun DriverScreen(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
-            runCatching { context.contentResolver.readUpload(uri) }
-                .onSuccess(viewModel::upload)
+            send { context.contentResolver.readUpload(uri) }
         }
     }
 
@@ -120,8 +152,7 @@ private fun DriverScreen(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         if (uri != null) {
-            runCatching { context.contentResolver.readUpload(uri) }
-                .onSuccess(viewModel::upload)
+            send { context.contentResolver.readUpload(uri) }
         }
     }
 
@@ -131,8 +162,7 @@ private fun DriverScreen(
         val capture = pendingCapture
         pendingCapture = null
         if (success && capture != null) {
-            runCatching { capture.readUpload(context) }
-                .onSuccess(viewModel::upload)
+            send { capture.readUpload(context) }
         }
     }
 
@@ -142,8 +172,7 @@ private fun DriverScreen(
         val capture = pendingCapture
         pendingCapture = null
         if (success && capture != null) {
-            runCatching { capture.readUpload(context) }
-                .onSuccess(viewModel::upload)
+            send { capture.readUpload(context) }
         }
     }
 
@@ -152,8 +181,12 @@ private fun DriverScreen(
     ) { granted ->
         if (granted) {
             locationProvider.current { result ->
-                result.onSuccess(viewModel::sendLocation)
+                result
+                    .onSuccess(viewModel::sendLocation)
+                    .onFailure { viewModel.reportProblem(DriverProblem.LocationUnavailable) }
             }
+        } else {
+            viewModel.reportProblem(DriverProblem.LocationPermission)
         }
     }
 
@@ -173,7 +206,7 @@ private fun DriverScreen(
         if (allowed) {
             startTrackingService()
         } else {
-            viewModel.reportError(context.getString(R.string.tracking_permission_required))
+            viewModel.reportProblem(DriverProblem.LocationPermission)
         }
     }
 
@@ -235,6 +268,41 @@ private fun DriverScreen(
         }
     }
 
+    // New points, documents and the dispatcher's changes appear by themselves.
+    LaunchedEffect(lifecycleOwner, state.connectedBaseUrl) {
+        if (state.connectedBaseUrl != null) {
+            lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while (true) {
+                    delay(REFRESH_INTERVAL_MS)
+                    viewModel.refreshQuietly()
+                }
+            }
+        }
+    }
+
+    confirmPoint?.let { point ->
+        AlertDialog(
+            onDismissRequest = { confirmPoint = null },
+            title = { Text(stringResource(R.string.confirm_done_title)) },
+            text = { Text(stringResource(R.string.confirm_done_text, point.sequence, point.title)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmPoint = null
+                        viewModel.complete(point.pointId)
+                    },
+                ) {
+                    Text(stringResource(R.string.confirm_done_button))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmPoint = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
     Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -265,9 +333,23 @@ private fun DriverScreen(
                 )
             }
 
-            state.error?.let { problem ->
+            state.problem?.let { problem ->
                 item {
-                    Text(problem, color = MaterialTheme.colorScheme.error)
+                    Text(
+                        stringResource(problemText(problem)),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            if (state.rejected.isNotEmpty()) {
+                item {
+                    RejectedCard(
+                        rejected = state.rejected,
+                        busy = state.busy,
+                        retry = viewModel::retryRejected,
+                        discard = viewModel::discardRejected,
+                    )
                 }
             }
 
@@ -279,17 +361,12 @@ private fun DriverScreen(
                                 stringResource(R.string.trip_title, trip.tripId.take(8)),
                                 style = MaterialTheme.typography.titleMedium,
                             )
-                            Text(stringResource(R.string.version_revision, trip.tripVersion, trip.localRouteRevision))
-                            Text(stringResource(R.string.points_documents, trip.points.size, trip.documents.size))
                             Text(
-                                trip.roadGeometry?.let {
-                                    stringResource(
-                                        R.string.road_geometry_present,
-                                        it.points.size,
-                                        it.routing.engine,
-                                        it.routing.engineVersion,
-                                    )
-                                } ?: stringResource(R.string.road_geometry_missing)
+                                stringResource(
+                                    R.string.points_progress,
+                                    trip.points.count { it.completed },
+                                    trip.points.size,
+                                ),
                             )
                         }
                     }
@@ -313,8 +390,10 @@ private fun DriverScreen(
 
                 item {
                     DocumentsCard(
-                        documents = trip.documents,
+                        trip = trip,
                         busy = state.busy,
+                        attachPointId = attachPointId,
+                        attach = { attachPointId = it },
                         pickFile = { filePicker.launch(arrayOf("*/*")) },
                         pickMedia = {
                             mediaPicker.launch(
@@ -346,7 +425,8 @@ private fun DriverScreen(
                     PointCard(
                         point = point,
                         busy = state.busy,
-                        complete = { viewModel.complete(point.pointId) },
+                        navigate = { openNavigation(context, point) },
+                        complete = { confirmPoint = point },
                         moveUp = { viewModel.moveOpen(point.pointId, -1) },
                         moveDown = { viewModel.moveOpen(point.pointId, 1) },
                     )
@@ -355,6 +435,53 @@ private fun DriverScreen(
         }
     }
 }
+
+private fun problemText(problem: DriverProblem): Int = when (problem) {
+    DriverProblem.LinkInvalid -> R.string.problem_link_invalid
+    DriverProblem.LinkScheme -> R.string.problem_link_scheme
+    DriverProblem.LinkShape -> R.string.problem_link_shape
+    DriverProblem.NoConnection -> R.string.problem_no_connection
+    DriverProblem.LinkExpired -> R.string.problem_link_expired
+    DriverProblem.RouteChanged -> R.string.problem_route_changed
+    DriverProblem.FileTooLarge -> R.string.problem_file_too_large
+    DriverProblem.Rejected -> R.string.problem_rejected
+    DriverProblem.FileUnreadable -> R.string.problem_file_unreadable
+    DriverProblem.FileNotSaved -> R.string.problem_file_not_saved
+    DriverProblem.LocationPermission -> R.string.tracking_permission_required
+    DriverProblem.LocationUnavailable -> R.string.problem_location_unavailable
+    DriverProblem.Unknown -> R.string.problem_unknown
+}
+
+/** Opens any installed navigator; without one, the destination opens in the browser. */
+private fun openNavigation(context: Context, point: DriverPoint) {
+    val destination = point.navigation ?: return
+    val links = listOf(
+        NavigationLinks.geo(destination.latitude, destination.longitude, point.title),
+        NavigationLinks.web(destination.latitude, destination.longitude),
+    )
+    for (link in links) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+            return
+        } catch (_: ActivityNotFoundException) {
+            // Try the next form.
+        }
+    }
+    Toast.makeText(context, R.string.problem_no_navigator, Toast.LENGTH_LONG).show()
+}
+
+@Composable
+private fun fileSizeText(bytes: Long): String {
+    val size = FileSize.of(bytes)
+    val format = when (size.unit) {
+        SizeUnit.Bytes -> R.string.size_bytes
+        SizeUnit.Kilobytes -> R.string.size_kilobytes
+        SizeUnit.Megabytes -> R.string.size_megabytes
+    }
+    return stringResource(format, size.value)
+}
+
+private fun pointLabel(point: DriverPoint): String = "${point.sequence}. ${point.title}"
 
 @Composable
 private fun ConnectionCard(
@@ -379,17 +506,20 @@ private fun ConnectionCard(
                 placeholder = { Text(stringResource(R.string.driver_url_placeholder)) },
                 singleLine = true,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Checkbox(
-                    checked = state.emulatorMode,
-                    onCheckedChange = setEmulatorMode,
-                )
-                Column {
-                    Text(stringResource(R.string.emulator_label))
-                    Text(
-                        stringResource(R.string.emulator_hint),
-                        style = MaterialTheme.typography.bodySmall,
+            // A link to the device itself only makes sense inside an Android emulator.
+            if (SessionLink.isLoopback(state.driverUrl)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Checkbox(
+                        checked = state.emulatorMode,
+                        onCheckedChange = setEmulatorMode,
                     )
+                    Column {
+                        Text(stringResource(R.string.emulator_label))
+                        Text(
+                            stringResource(R.string.emulator_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -400,19 +530,60 @@ private fun ConnectionCard(
                     Button(onClick = refresh, enabled = !state.busy) {
                         Text(stringResource(R.string.refresh))
                     }
-                    Button(onClick = disconnect, enabled = !state.busy) {
+                    OutlinedButton(onClick = disconnect, enabled = !state.busy) {
                         Text(stringResource(R.string.disconnect))
                     }
                 }
             }
-            state.connectedBaseUrl?.let {
-                Text(stringResource(R.string.control_prefix, it), style = MaterialTheme.typography.bodySmall)
+            if (state.offline) {
+                Text(
+                    stringResource(R.string.offline),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else if (state.trip != null) {
+                Text(stringResource(R.string.connected), style = MaterialTheme.typography.bodySmall)
             }
             if (state.pendingOutbound > 0) {
                 Text(
                     stringResource(R.string.pending_outbound, state.pendingOutbound),
                     style = MaterialTheme.typography.bodySmall,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RejectedCard(
+    rejected: List<PendingMediaMetadata>,
+    busy: Boolean,
+    retry: (String) -> Unit,
+    discard: (String) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(stringResource(R.string.rejected_title), style = MaterialTheme.typography.titleMedium)
+            rejected.forEach { item ->
+                Text(item.originalName)
+                Text(
+                    stringResource(
+                        problemText(DriverProblem.fromStatus(item.rejectedStatus ?: 400)),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { retry(item.documentId) }, enabled = !busy) {
+                        Text(stringResource(R.string.retry))
+                    }
+                    OutlinedButton(onClick = { discard(item.documentId) }, enabled = !busy) {
+                        Text(stringResource(R.string.discard))
+                    }
+                }
+                HorizontalDivider()
             }
         }
     }
@@ -439,8 +610,8 @@ private fun LocationCard(
                 Text(
                     stringResource(
                         R.string.location_value,
-                        location.latitude,
-                        location.longitude,
+                        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                            .format(Date(location.observedAtUnixMs)),
                         location.accuracyM ?: 0.0,
                     ),
                     style = MaterialTheme.typography.bodySmall,
@@ -475,32 +646,64 @@ private fun LocationCard(
 
 @Composable
 private fun DocumentsCard(
-    documents: List<DriverDocument>,
+    trip: DriverTrip,
     busy: Boolean,
+    attachPointId: String?,
+    attach: (String?) -> Unit,
     pickFile: () -> Unit,
     pickMedia: () -> Unit,
     capturePhoto: () -> Unit,
     captureVideo: () -> Unit,
     save: (DriverDocument) -> Unit,
 ) {
+    var choosing by remember { mutableStateOf(false) }
+    val attached = trip.points.firstOrNull { it.pointId == attachPointId }
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(stringResource(R.string.documents_title), style = MaterialTheme.typography.titleMedium)
-            if (documents.isEmpty()) {
+            if (trip.documents.isEmpty()) {
                 Text(stringResource(R.string.documents_empty))
             } else {
-                documents.forEach { selected ->
+                trip.documents.forEach { selected ->
+                    val point = trip.points.firstOrNull { it.pointId == selected.pointId }
+                    Text(selected.originalName)
                     Text(
-                        "${selected.originalName} · ${selected.size} B",
+                        listOfNotNull(fileSizeText(selected.size), point?.let(::pointLabel))
+                            .joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Button(onClick = { save(selected) }, enabled = !busy) {
                         Text(stringResource(R.string.save_document))
                     }
                     HorizontalDivider()
+                }
+            }
+            Text(stringResource(R.string.attach_to), style = MaterialTheme.typography.bodySmall)
+            Box {
+                OutlinedButton(onClick = { choosing = true }) {
+                    Text(attached?.let(::pointLabel) ?: stringResource(R.string.whole_trip))
+                }
+                DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.whole_trip)) },
+                        onClick = {
+                            choosing = false
+                            attach(null)
+                        },
+                    )
+                    trip.points.forEach { point ->
+                        DropdownMenuItem(
+                            text = { Text(pointLabel(point)) },
+                            onClick = {
+                                choosing = false
+                                attach(point.pointId)
+                            },
+                        )
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -527,6 +730,7 @@ private fun DocumentsCard(
 private fun PointCard(
     point: DriverPoint,
     busy: Boolean,
+    navigate: () -> Unit,
     complete: () -> Unit,
     moveUp: () -> Unit,
     moveDown: () -> Unit,
@@ -537,7 +741,7 @@ private fun PointCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                "${point.sequence}. ${point.title}",
+                pointLabel(point),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(if (point.completed) stringResource(R.string.completed) else stringResource(R.string.open_point))
@@ -549,11 +753,17 @@ private fun PointCard(
                 )
             }
             if (!point.completed) {
-                HorizontalDivider()
+                if (point.navigation != null) {
+                    Button(onClick = navigate, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.navigate))
+                    }
+                }
+                Button(onClick = complete, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.done_button))
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = moveUp, enabled = !busy) { Text("↑") }
-                    Button(onClick = moveDown, enabled = !busy) { Text("↓") }
-                    Button(onClick = complete, enabled = !busy) { Text(stringResource(R.string.done_button)) }
+                    OutlinedButton(onClick = moveUp, enabled = !busy) { Text("↑") }
+                    OutlinedButton(onClick = moveDown, enabled = !busy) { Text("↓") }
                 }
             }
         }

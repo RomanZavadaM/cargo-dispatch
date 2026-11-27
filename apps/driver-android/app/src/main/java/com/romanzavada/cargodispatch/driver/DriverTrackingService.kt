@@ -20,9 +20,7 @@ import androidx.core.content.ContextCompat
 import com.romanzavada.cargodispatch.driver.core.SessionLink
 import com.romanzavada.cargodispatch.driver.model.LocationUpdate
 import com.romanzavada.cargodispatch.driver.net.ControlApi
-import com.romanzavada.cargodispatch.driver.net.ControlApiException
 import java.io.File
-import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -133,39 +131,16 @@ class DriverTrackingService : Service() {
         )
 
         val pending = queue ?: return
-        val client = api ?: return
 
         pending.enqueueLocation(update)
-        try {
-            val accepted = client.sendLocation(update)
-            pending.removeLocationThrough(accepted.observedAtUnixMs)
-        } catch (problem: ControlApiException) {
-            if (problem.statusCode == 409) {
-                pending.removeLocationThrough(update.observedAtUnixMs)
-            }
-        } catch (_: IOException) {
-            // The durable queue keeps the newest sample for the next retry.
-        } finally {
-            updateNotification()
-        }
+        flushPending()
     }
 
     private suspend fun flushPending() {
         val pending = queue ?: return
         val client = api ?: return
-        val update = pending.pendingLocation() ?: run {
-            updateNotification()
-            return
-        }
         try {
-            val accepted = client.sendLocation(update)
-            pending.removeLocationThrough(accepted.observedAtUnixMs)
-        } catch (problem: ControlApiException) {
-            if (problem.statusCode == 409) {
-                pending.removeLocationThrough(update.observedAtUnixMs)
-            }
-        } catch (_: IOException) {
-            // Keep pending.
+            OutboundSender.sendLocations(pending, client::sendLocation)
         } finally {
             updateNotification()
         }
