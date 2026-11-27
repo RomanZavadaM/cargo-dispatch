@@ -6,8 +6,7 @@ use crate::package_draft::{cargo_rows, profile_from, snapshot};
 use crate::{CargoDraft, RoutingProfileDraft, invoke};
 use cargo_dispatch_planner_ui_contracts::{
     AppliedPlanView, ApplyPlanInput, InputOrder, InputPlace, InputProblem, InputProblemKind, Money,
-    PackageDraft,
-    PlanKind, PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopRef,
+    PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopRef,
     PlannerPackageCargoInput, PlannerRouteView, PlannerRoutingProfileInput, PlannerTollPreference,
     PlanningInput, PlanningStateView, ProposeInput, RoadState, SkipReason, localize_problem,
 };
