@@ -82,104 +82,21 @@ async fn run(window: &Window, call: Call) -> Result<Value, String> {
         "planner_routing_status" => answer(service.routing_status()),
         "planner_configure_routing" => {
             let input: PlannerRoutingConfigInput = argument(args)?;
-            let status = service.configure_routing(input.clone())?;
-            service.remember_routing(Some(input))?;
-            answer(Ok(status))
+            let status = tokio::task::spawn_blocking(move || {
+        // Older Node keeps the browser connection behind a flag.
+        let ready = Command::new("node")
+            .args(["-e", "process.exit(typeof WebSocket === 'function' ? 0 : 1)"])
+            .status()?
+            .success();
+        let mut node = Command::new("node");
+        if !ready {
+            node.arg("--experimental-websocket");
         }
-        "planner_disable_routing" => {
-            service.disable_routing()?;
-            answer(service.remember_routing(None))
-        }
-        "planner_test_routing" => answer(service.test_routing().await),
-        "planner_preview_route" => answer(service.preview_route(argument(args)?).await),
-        "planner_export_package" => answer(service.export_trip_package(argument(args)?)),
-        "planner_pick_export_path" => {
-            let path = window.folder.join(service.suggested_export_file_name()?);
-            answer(Ok(Some(path.to_string_lossy().into_owned())))
-        }
-        "planner_planning_status" => answer(service.planning_view()),
-        "planner_planning_package" => answer(service.remember_package(argument(args)?)),
-        "planner_planning_update" => answer(service.update_planning(argument(args)?)),
-        "planner_planning_open" => answer(
-            service
-                .import_input(&window.folder.join("orders.json"))
-                .map(Some),
-        ),
-        "planner_planning_save" => {
-            let path = window.folder.join("saved-orders.json");
-            service.save_input(&path)?;
-            answer(Ok(Some(path.to_string_lossy().into_owned())))
-        }
-        "planner_planning_propose" => answer(service.propose(argument(args)?).await),
-        "planner_planning_apply" => answer(service.apply_plan(argument(args)?)),
-        // Closing and starting the program again.
-        "test_restart" => {
-            *window.service.write().expect("service") = started(&window.folder);
-            Ok(Value::Null)
-        }
-        other => Err(format!("unknown command {other}")),
-    }
-}
-
-async fn invoke(AxumState(window): AxumState<Arc<Window>>, Json(call): Json<Call>) -> Response {
-    match run(&window, call).await {
-        Ok(value) => Json(json!({ "value": value })).into_response(),
-        Err(error) => (StatusCode::BAD_REQUEST, Json(json!({ "error": error }))).into_response(),
-    }
-}
-
-async fn file(AxumState(window): AxumState<Arc<Window>>, uri: Uri) -> Response {
-    let name = match uri.path().trim_start_matches('/') {
-        "" => "index.html",
-        name => name,
-    };
-    let kind = match Path::new(name).extension().and_then(|value| value.to_str()) {
-        Some("html") => "text/html; charset=utf-8",
-        Some("js") => "text/javascript",
-        Some("wasm") => "application/wasm",
-        _ => "application/octet-stream",
-    };
-    if name.contains("..") {
-        return StatusCode::NOT_FOUND.into_response();
-    }
-    match fs::read(window.interface.join(name)) {
-        Ok(bytes) => ([(header::CONTENT_TYPE, kind)], bytes).into_response(),
-        Err(_) => StatusCode::NOT_FOUND.into_response(),
-    }
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "needs the built interface in apps/planner-ui/dist, Node and Chrome"]
-async fn the_window_works_in_a_real_browser() {
-    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let interface = manifest.join("../../planner-ui/dist");
-    let script = manifest.join("../../../.github/scripts/planner-window-browser-test.mjs");
-    let folder = std::env::temp_dir().join(format!(
-        "cargo-planner-window-{}",
-        unix_time_ms().expect("clock")
-    ));
-    fs::create_dir_all(&folder).expect("folder");
-    fs::write(folder.join("orders.json"), ORDERS).expect("orders");
-    let window = Arc::new(Window {
-        service: RwLock::new(started(&folder)),
-        folder: folder.clone(),
-        interface,
-    });
-    let app = Router::new()
-        .route("/invoke", post(invoke))
-        .fallback(file)
-        .with_state(window);
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("listener");
-    let url = format!("http://{}/", listener.local_addr().expect("address"));
-    let server = tokio::spawn(async move { axum::serve(listener, app).await });
-
-    let status =
-        tokio::task::spawn_blocking(move || Command::new("node").arg(script).arg(url).status())
-            .await
-            .expect("browser task")
-            .expect("node");
+        node.arg(script).arg(url).status()
+    })
+    .await
+    .expect("browser task")
+    .expect("node");
     server.abort();
     assert!(status.success(), "the browser test of the window failed");
     let exported = fs::read_dir(&folder)
