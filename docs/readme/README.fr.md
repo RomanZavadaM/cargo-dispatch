@@ -34,7 +34,8 @@ Control est la seule source de vérité d'un trajet en cours. Il fournit au cond
 - trajet issu d'un paquet Planner ou créé à la main ; l'état est enregistré localement et rétabli après un redémarrage ;
 - ordre des points ouverts, carte, dernière position du conducteur, comparaison prévu / réalisé ;
 - fichiers vers le conducteur ; fichiers, photos et vidéos reçus du conducteur ;
-- trouve lui-même l'adresse de l'ordinateur sur le réseau local ; le mode de liaison change sans arrêt manuel.
+- trouve lui-même l'adresse de l'ordinateur sur le réseau local ; le mode de liaison change sans arrêt manuel;
+- messages d'erreur dans la langue de l'interface ; heure de position, taille de fichier et nom du point en clair.
 
 **Planner**
 - brouillon d'itinéraire : ajouter, retirer, réordonner des points par coordonnées ; le brouillon survit à un redémarrage ;
@@ -44,7 +45,8 @@ Control est la seule source de vérité d'un trajet en cours. Il fournit au cond
 **Conducteur : navigateur, Android, iPhone et iPad**
 - itinéraire et carte, point marqué comme fait, réordonnancement des points ouverts ;
 - réception de documents ; envoi de fichiers, photos et vidéos ;
-- partage de la position ; dans les applications aussi en arrière-plan, activé et arrêté explicitement, avec file de renvoi.
+- partage de la position ; dans les applications aussi en arrière-plan, activé et arrêté explicitement, avec file de renvoi;
+- la validation d'un point demande une confirmation ; les applications offrent aussi un bouton de navigation, le rattachement d'un fichier à un point, un écran qui s'actualise seul, la conservation du parcours sans réseau (jusqu'à 500 positions) et les fichiers refusés visibles.
 
 ## Liaison et sécurité
 
@@ -60,11 +62,11 @@ La carte de Control, Planner, du navigateur et d'Android est [OpenStreetMap](htt
 
 ## Langues
 
-Tous les programmes existent en українська, English, Français, Deutsch, Español, 한국어, 日本語 et 简体中文. La CI vérifie que les traductions sont complètes ; certains messages d'erreur système ne sont pas encore traduits.
+Tous les programmes existent en українська, English, Français, Deutsch, Español, 한국어, 日本語 et 简体中文. La CI vérifie que les traductions sont complètes ; les détails techniques du système dans les messages d'erreur restent en anglais.
 
 ## Pas encore vérifié, et limites
 
-- Les applications Android et iPhone/iPad n'ont pas été essayées à la main sur des appareils physiques.
+- Les applications Android et iPhone/iPad n'ont pas été essayées sur des appareils physiques — seulement sur émulateur, simulateur et tests automatiques.
 - L'internet mobile et le Gateway sur un réseau réel ne sont vérifiés qu'automatiquement.
 - Les paquets ne sont pas signés ; Android est un APK de débogage, iOS uniquement une version pour le simulateur Apple.
 - Après un redémarrage de Control, les trajets et la liaison sont à réactiver à la main.

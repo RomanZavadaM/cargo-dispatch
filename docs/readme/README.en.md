@@ -34,7 +34,8 @@ Control is the only source of truth for an active trip. It serves the page, rout
 - a trip from a Planner package or created manually; state is stored locally and restored after a restart;
 - order of open stops, map, latest driver position, plan versus fact;
 - files to the driver; files, photos and videos from the driver;
-- finds the computer's local network address itself; the connection mode switches without stopping it by hand.
+- finds the computer's local network address itself; the connection mode switches without stopping it by hand;
+- error messages in the interface language; position time, file size and stop name in plain words.
 
 **Planner**
 - route draft: add, remove and reorder points by coordinates; the draft survives a restart;
@@ -44,7 +45,8 @@ Control is the only source of truth for an active trip. It serves the page, rout
 **Driver: browser, Android, iPhone and iPad**
 - route and map, marking a stop as done, reordering open stops;
 - receiving documents; sending files, photos and videos;
-- position sharing; in the apps also in the background, switched on and off explicitly, with a retry queue.
+- position sharing; in the apps also in the background, switched on and off explicitly, with a retry queue;
+- marking a stop as done asks for confirmation; the apps also offer a navigator button, attaching a file to a stop, a self-refreshing screen, keeping the travelled track without a connection (up to 500 positions) and visible refused files.
 
 ## Connection and security
 
@@ -60,11 +62,11 @@ The map in Control, Planner, the browser and Android is [OpenStreetMap](https://
 
 ## Languages
 
-All programs are available in українська, English, Français, Deutsch, Español, 한국어, 日本語 and 简体中文. CI checks that translations are complete; some system error messages are not translated yet.
+All programs are available in українська, English, Français, Deutsch, Español, 한국어, 日本語 and 简体中文. CI checks that translations are complete; technical system details in error messages stay in English.
 
 ## Not yet verified, and limitations
 
-- The Android and iPhone/iPad apps have not been tested by hand on physical devices.
+- The Android and iPhone/iPad apps have not been tested on physical devices — only in an emulator, a simulator and automated tests.
 - Mobile internet and the Gateway on a real network are verified by automated tests only.
 - Packages are unsigned; Android is a debug APK, iOS is an Apple Simulator build only.
 - After Control restarts, trips and the connection have to be switched on again by hand.

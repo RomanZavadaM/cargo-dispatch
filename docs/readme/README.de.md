@@ -34,7 +34,8 @@ Control ist die einzige verbindliche Quelle für den Stand einer aktiven Tour. E
 - Tour aus einem Planner-Paket oder manuell erstellt; der Stand wird lokal gespeichert und nach einem Neustart wiederhergestellt;
 - Reihenfolge der offenen Punkte, Karte, letzte Fahrerposition, Vergleich Plan und Ist;
 - Dateien an den Fahrer; Dateien, Fotos und Videos vom Fahrer;
-- ermittelt die Adresse des Computers im lokalen Netz selbst; die Verbindungsart lässt sich ohne manuelles Abschalten wechseln.
+- ermittelt die Adresse des Computers im lokalen Netz selbst; die Verbindungsart lässt sich ohne manuelles Abschalten wechseln;
+- Fehlermeldungen in der Oberflächensprache; Positionszeit, Dateigröße und Punktname in Klartext.
 
 **Planner**
 - Routenentwurf: Punkte per Koordinaten hinzufügen, entfernen, umstellen; der Entwurf übersteht einen Neustart;
@@ -44,7 +45,8 @@ Control ist die einzige verbindliche Quelle für den Stand einer aktiven Tour. E
 **Fahrer: Browser, Android, iPhone und iPad**
 - Route und Karte, Punkt als erledigt markieren, offene Punkte umstellen;
 - Dokumente empfangen; Dateien, Fotos und Videos senden;
-- Position übertragen; in den Apps auch im Hintergrund, ausdrücklich ein- und ausschaltbar, mit Warteschlange für erneutes Senden.
+- Position übertragen; in den Apps auch im Hintergrund, ausdrücklich ein- und ausschaltbar, mit Warteschlange für erneutes Senden;
+- vor dem Erledigt-Markieren wird nachgefragt; die Apps bieten außerdem eine Navigator-Schaltfläche, die Zuordnung einer Datei zu einem Punkt, eine selbstaktualisierende Ansicht, die Speicherung der Strecke ohne Verbindung (bis 500 Positionen) und sichtbare abgelehnte Dateien.
 
 ## Verbindung und Sicherheit
 
@@ -60,11 +62,11 @@ Die Karte in Control, Planner, Browser und Android ist [OpenStreetMap](https://w
 
 ## Sprachen
 
-Alle Programme gibt es in українська, English, Français, Deutsch, Español, 한국어, 日本語 und 简体中文. Die CI prüft die Vollständigkeit der Übersetzungen; einige Systemfehlermeldungen sind noch nicht übersetzt.
+Alle Programme gibt es in українська, English, Français, Deutsch, Español, 한국어, 日本語 und 简体中文. Die CI prüft die Vollständigkeit der Übersetzungen; technische Systemdetails in Fehlermeldungen bleiben englisch.
 
 ## Noch nicht geprüft, Einschränkungen
 
-- Die Apps für Android und iPhone/iPad wurden noch nicht von Hand auf echten Geräten getestet.
+- Die Apps für Android und iPhone/iPad wurden nicht auf echten Geräten getestet – nur im Emulator, im Simulator und mit automatischen Tests.
 - Mobiles Internet und das Gateway in einem echten Netz sind nur automatisch geprüft.
 - Die Pakete sind nicht signiert; Android ist ein Debug-APK, iOS nur ein Build für den Apple-Simulator.
 - Nach einem Neustart von Control müssen Touren und Verbindung von Hand neu aktiviert werden.

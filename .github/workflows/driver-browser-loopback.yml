@@ -10,6 +10,7 @@ on:
       - "crates/control-web/**"
       - "crates/trip-files/**"
       - ".github/scripts/driver-browser-loopback-smoke.sh"
+      - ".github/scripts/driver-page-browser-test.mjs"
       - ".github/workflows/driver-browser-loopback.yml"
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - "crates/control-web/**"
       - "crates/trip-files/**"
       - ".github/scripts/driver-browser-loopback-smoke.sh"
+      - ".github/scripts/driver-page-browser-test.mjs"
       - ".github/workflows/driver-browser-loopback.yml"
 
 permissions:

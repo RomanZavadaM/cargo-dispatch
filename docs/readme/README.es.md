@@ -34,7 +34,8 @@ Control es la única fuente de verdad de un viaje activo. Entrega al conductor l
 - viaje de un paquete de Planner o creado a mano; el estado se guarda localmente y se recupera tras reiniciar;
 - orden de los puntos abiertos, mapa, última posición del conductor, comparación entre plan y realidad;
 - archivos para el conductor; archivos, fotos y vídeos del conductor;
-- averigua por sí mismo la dirección del equipo en la red local; el modo de conexión cambia sin apagarlo a mano.
+- averigua por sí mismo la dirección del equipo en la red local; el modo de conexión cambia sin apagarlo a mano;
+- mensajes de error en el idioma de la interfaz; hora de la posición, tamaño del archivo y nombre del punto en lenguaje claro.
 
 **Planner**
 - borrador de ruta: añadir, quitar y reordenar puntos por coordenadas; el borrador sobrevive a un reinicio;
@@ -44,7 +45,8 @@ Control es la única fuente de verdad de un viaje activo. Entrega al conductor l
 **Conductor: navegador, Android, iPhone y iPad**
 - ruta y mapa, marcar un punto como hecho, reordenar puntos abiertos;
 - recibir documentos; enviar archivos, fotos y vídeos;
-- compartir la posición; en las aplicaciones también en segundo plano, activado y detenido expresamente, con cola de reenvío.
+- compartir la posición; en las aplicaciones también en segundo plano, activado y detenido expresamente, con cola de reenvío;
+- marcar un punto como hecho pide confirmación; las aplicaciones ofrecen además un botón de navegador, asociar un archivo a un punto, una pantalla que se actualiza sola, la conservación del recorrido sin conexión (hasta 500 posiciones) y los archivos rechazados visibles.
 
 ## Conexión y seguridad
 
@@ -60,11 +62,11 @@ El mapa de Control, Planner, el navegador y Android es [OpenStreetMap](https://w
 
 ## Idiomas
 
-Todos los programas están en українська, English, Français, Deutsch, Español, 한국어, 日本語 y 简体中文. La CI comprueba que las traducciones estén completas; algunos mensajes de error del sistema aún no están traducidos.
+Todos los programas están en українська, English, Français, Deutsch, Español, 한국어, 日本語 y 简体中文. La CI comprueba que las traducciones estén completas; los detalles técnicos del sistema en los errores siguen en inglés.
 
 ## Aún sin verificar, y limitaciones
 
-- Las aplicaciones para Android y iPhone/iPad no se han probado a mano en dispositivos físicos.
+- Las aplicaciones para Android y iPhone/iPad no se han probado en dispositivos físicos: solo en emulador, simulador y pruebas automáticas.
 - Internet móvil y el Gateway en una red real solo se han verificado automáticamente.
 - Los paquetes no están firmados; Android es un APK de depuración e iOS solo una compilación para el simulador de Apple.
 - Tras reiniciar Control, hay que volver a activar a mano los viajes y la conexión.

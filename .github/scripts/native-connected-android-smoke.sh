@@ -212,7 +212,83 @@ if [ "$LOCATION_ACCEPTED" -ne 1 ]; then
   exit 1
 fi
 
+location_is() {
+  python3 - "$(curl --silent "$API_TRIP_URL" || true)" "$1" "$2" <<'PY'
+import json, sys
+try:
+    location = json.loads(sys.argv[1])["latest_location"]
+    near = abs(location["latitude"] - float(sys.argv[2])) < 0.005 and abs(location["longitude"] - float(sys.argv[3])) < 0.005
+except Exception:
+    near = False
+raise SystemExit(0 if near else 1)
+PY
+}
+
+# Without a connection the position waits in the queue and is delivered later.
+adb reverse --remove "tcp:$HOST_PORT"
+sleep 16
+adb emu geo fix 24.1000 49.9000
+sleep 5
+if location_is 49.9000 24.1000; then
+  echo "Control received a position although the connection was cut." >&2
+  exit 1
+fi
+adb reverse "tcp:$HOST_PORT" "tcp:$HOST_PORT"
+DELIVERED=0
+for _ in $(seq 1 60); do
+  if location_is 49.9000 24.1000; then
+    DELIVERED=1
+    break
+  fi
+  sleep 1
+done
+if [ "$DELIVERED" -ne 1 ]; then
+  echo "The position recorded offline was not delivered after the connection returned." >&2
+  curl --silent "$API_TRIP_URL" || true
+  adb logcat -d -t 400 || true
+  exit 1
+fi
+echo "PASS offline position delivered after reconnect"
+
 find_and_tap_text "Stop tracking" || true
+
+# A stop is marked done only after the confirmation.
+completed_count() {
+  curl --silent "$API_TRIP_URL" |
+    python3 -c 'import json, sys; print(sum(p["completed"] for p in json.load(sys.stdin)["points"]))'
+}
+test "$(completed_count)" = "0"
+find_and_tap_text "Mark as done"
+sleep 1
+adb shell uiautomator dump /sdcard/cargo-driver-window.xml >/dev/null 2>&1 || true
+adb exec-out cat /sdcard/cargo-driver-window.xml >"$WINDOW_XML"
+grep -q 'text="Yes, done"' "$WINDOW_XML"
+test "$(completed_count)" = "0"
+find_and_tap_text "Yes, done"
+MARKED=0
+for _ in $(seq 1 20); do
+  if [ "$(completed_count)" = "1" ]; then
+    MARKED=1
+    break
+  fi
+  sleep 1
+done
+if [ "$MARKED" -ne 1 ]; then
+  echo "The confirmed stop was not marked done in Control." >&2
+  adb logcat -d -t 400 || true
+  exit 1
+fi
+echo "PASS stop marked done after confirmation"
+adb shell uiautomator dump /sdcard/cargo-driver-window.xml >/dev/null 2>&1 || true
+adb exec-out cat /sdcard/cargo-driver-window.xml >"$WINDOW_XML"
+if ! grep -q 'text="Open in navigator"' "$WINDOW_XML"; then
+  adb shell input swipe 540 1850 540 900 300
+  sleep 1
+  adb shell uiautomator dump /sdcard/cargo-driver-window.xml >/dev/null 2>&1 || true
+  adb exec-out cat /sdcard/cargo-driver-window.xml >"$WINDOW_XML"
+  grep -q 'text="Open in navigator"' "$WINDOW_XML"
+fi
+echo "PASS navigator button shown for open stops"
 
 adb exec-out screencap -p > android-driver-smoke.png
 test -s android-driver-smoke.png
