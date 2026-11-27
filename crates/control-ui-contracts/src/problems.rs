@@ -39,7 +39,10 @@ const FRAGMENTS: &[(&str, ProblemKind)] = &[
     ("Забагато точок", ProblemKind::TripIncomplete),
     ("Список сесій", ProblemKind::SessionsUnavailable),
     ("Сесію не знайдено", ProblemKind::SessionsUnavailable),
-    ("Спочатку вимкніть публічну Gateway", ProblemKind::GatewayOrder),
+    (
+        "Спочатку вимкніть публічну Gateway",
+        ProblemKind::GatewayOrder,
+    ),
     ("Спочатку підключіть хоча б один", ProblemKind::GatewayOrder),
     ("Публічна Gateway-трансляція вже", ProblemKind::GatewayOrder),
     ("створити папку рейсу", ProblemKind::TripFolder),
@@ -244,7 +247,8 @@ fn texts(kind: ProblemKind) -> [&'static str; 8] {
 }
 
 fn has_cyrillic(text: &str) -> bool {
-    text.chars().any(|ch| ('\u{0400}'..='\u{04ff}').contains(&ch))
+    text.chars()
+        .any(|ch| ('\u{0400}'..='\u{04ff}').contains(&ch))
 }
 
 /// The message to show for `problem` in the interface language `locale`
@@ -307,7 +311,11 @@ mod tests {
     #[test]
     fn every_service_message_has_a_kind() {
         let messages = service_messages();
-        assert!(messages.len() > 40, "only {} messages found", messages.len());
+        assert!(
+            messages.len() > 40,
+            "only {} messages found",
+            messages.len()
+        );
         let unknown: Vec<_> = messages
             .iter()
             .filter(|message| classify_problem(message).is_none())

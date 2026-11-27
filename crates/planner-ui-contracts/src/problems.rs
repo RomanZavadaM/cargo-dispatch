@@ -265,7 +265,11 @@ mod tests {
     #[test]
     fn every_service_message_has_a_kind() {
         let messages = service_messages();
-        assert!(messages.len() > 50, "only {} messages found", messages.len());
+        assert!(
+            messages.len() > 50,
+            "only {} messages found",
+            messages.len()
+        );
         let unknown: Vec<_> = messages
             .iter()
             .filter(|message| classify_problem(message).is_none())
@@ -292,7 +296,10 @@ mod tests {
     fn related_messages_do_not_fall_into_a_broader_kind() {
         for (message, kind) in [
             ("Planner trip version overflow", ProblemKind::Internal),
-            ("Planner journal contains invalid point id: x", ProblemKind::Recovery),
+            (
+                "Planner journal contains invalid point id: x",
+                ProblemKind::Recovery,
+            ),
             ("Package path already exists", ProblemKind::PackageExists),
             ("Package path is required", ProblemKind::PackagePath),
             ("Could not attach routing profile: x", ProblemKind::Export),

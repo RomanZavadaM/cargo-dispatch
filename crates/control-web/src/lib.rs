@@ -2897,7 +2897,10 @@ mod tests {
             }
             let call = &DRIVER_HTML[at + 3..];
             let key = &call[..call.find('"').expect("closing quote")];
-            assert!(ukrainian.contains(&format!(" {key}:\"")), "missing text: {key}");
+            assert!(
+                ukrainian.contains(&format!(" {key}:\"")),
+                "missing text: {key}"
+            );
         }
         assert!(DRIVER_HTML.contains("confirm(t(\"confirmDone\")"));
         assert!(DRIVER_HTML.contains("problemText(error)"));
