@@ -2,10 +2,11 @@
 
 use crate::i18n::UiLocale;
 use crate::orders_i18n::{K, text};
+use crate::package_draft::{cargo_rows, profile_from, snapshot};
 use crate::{CargoDraft, RoutingProfileDraft, invoke};
 use cargo_dispatch_planner_ui_contracts::{
     AppliedPlanView, ApplyPlanInput, InputOrder, InputPlace, InputProblem, InputProblemKind, Money,
-    PlanKind, PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopRef,
+    PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopRef,
     PlannerPackageCargoInput, PlannerRouteView, PlannerRoutingProfileInput, PlannerTollPreference,
     PlanningInput, PlanningStateView, ProposeInput, RoadState, SkipReason, localize_problem,
 };
@@ -456,6 +457,42 @@ pub(crate) fn OrdersPanel(
         }
     };
 
+    // Nothing is saved before the saved form is back, or defaults would replace it.
+    let restored = RwSignal::new(false);
+    // One save at a time and always the newest form, so an older one never lands last.
+    let waiting = StoredValue::new(None::<PackageDraft>);
+    let sending = StoredValue::new(false);
+    Effect::new(move |_| {
+        if !restored.get() {
+            return;
+        }
+        let draft = snapshot(
+            &vehicle_type.get(),
+            &cargos.get(),
+            next_cargo_row.get(),
+            &profile.get(),
+        );
+        waiting.set_value(Some(draft));
+        if sending.get_value() {
+            return;
+        }
+        sending.set_value(true);
+        spawn_local(async move {
+            loop {
+                let mut next = None;
+                waiting.update_value(|draft| next = draft.take());
+                let Some(draft) = next else {
+                    break;
+                };
+                let args = serde_json::json!({ "input": draft });
+                if let Err(problem) = invoke::<(), _>("planner_planning_package", &args).await {
+                    panel.report(&problem);
+                }
+            }
+            sending.set_value(false);
+        });
+    });
+
     // What was typed before the last exit comes back.
     spawn_local(async move {
         let args = serde_json::json!({});
@@ -468,7 +505,15 @@ pub(crate) fn OrdersPanel(
                     vehicle_type.set(saved.clone());
                 }
                 fill_cargos(view.cargos.clone());
+                if let Some(draft) = &view.package {
+                    vehicle_type.set(draft.vehicle_type.clone());
+                    let (rows, next) = cargo_rows(draft);
+                    next_cargo_row.set(next);
+                    cargos.set(rows);
+                    profile.set(profile_from(&draft.profile));
+                }
                 panel.show(view);
+                restored.set(true);
             }
             Err(problem) => panel.report(&problem),
         }

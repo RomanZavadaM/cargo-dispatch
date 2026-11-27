@@ -3,6 +3,7 @@
 mod i18n;
 mod orders;
 mod orders_i18n;
+mod package_draft;
 
 use crate::i18n::{UiLocale, strings};
 use crate::orders::OrdersPanel;
@@ -333,6 +334,7 @@ impl RoutingProfileDraft {
             return Ok(None);
         }
         let parsed = value
+            .replace(',', ".")
             .parse::<f64>()
             .map_err(|_| RoutingDraftError::InvalidNumber)?;
         if !parsed.is_finite() || parsed <= 0.0 {
@@ -487,6 +489,34 @@ impl CargoDraft {
     }
 }
 
+/// Each option carries the selection, so a saved language shows from the start.
+const LANGUAGES: [(&str, &str); 8] = [
+    ("uk", "Українська"),
+    ("en", "English"),
+    ("de", "Deutsch"),
+    ("fr", "Français"),
+    ("es", "Español"),
+    ("ko", "한국어"),
+    ("ja", "日本語"),
+    ("zh-Hans", "简体中文"),
+];
+
+/// One text of a cargo row, followed as the row changes.
+fn cargo_value(
+    rows: RwSignal<Vec<CargoDraft>>,
+    row_id: u64,
+    pick: fn(&CargoDraft) -> &String,
+) -> impl Fn() -> String + Copy {
+    move || {
+        rows.with(|rows| {
+            rows.iter()
+                .find(|row| row.row_id == row_id)
+                .map(|row| pick(row).clone())
+                .unwrap_or_default()
+        })
+    }
+}
+
 fn probe_message(state: PlannerRoutingAvailabilityState, locale: UiLocale) -> &'static str {
     let text = strings(locale);
     match state {
@@ -595,6 +625,30 @@ fn PlannerApp() -> impl IntoView {
         let _ = routing_profile.get();
         preview.set(None);
         export_result.set(None);
+    });
+
+    // A point that left the route cannot stay attached to a cargo.
+    Effect::new(move |_| {
+        let Some(current) = route.get() else {
+            return;
+        };
+        let gone =
+            |id: &str| !id.is_empty() && !current.points.iter().any(|point| point.point_id == id);
+        if export_cargos.with_untracked(|rows| {
+            rows.iter()
+                .any(|row| gone(&row.pickup_point_id) || gone(&row.unload_point_id))
+        }) {
+            export_cargos.update(|rows| {
+                for row in rows {
+                    if gone(&row.pickup_point_id) {
+                        row.pickup_point_id.clear();
+                    }
+                    if gone(&row.unload_point_id) {
+                        row.unload_point_id.clear();
+                    }
+                }
+            });
+        }
     });
 
     Effect::new(move |_| {
@@ -1108,15 +1162,19 @@ fn PlannerApp() -> impl IntoView {
                 <div><h1>{move || strings(locale.get()).app_title}</h1><div class="note">{move || strings(locale.get()).subtitle}</div></div>
                 <label class="language">
                     {move || strings(locale.get()).language}
-                    <select prop:value=move || locale.get().code() on:change=move |event| {
+                    <select on:change=move |event| {
                         let chosen = UiLocale::parse(&event_target_value(&event));
                         cargo_planner_set_locale(chosen.code());
                         locale.set(chosen);
                     }>
-                        <option value="uk">"Українська"</option><option value="en">"English"</option>
-                        <option value="de">"Deutsch"</option><option value="fr">"Français"</option>
-                        <option value="es">"Español"</option><option value="ko">"한국어"</option>
-                        <option value="ja">"日本語"</option><option value="zh-Hans">"简体中文"</option>
+                        {LANGUAGES
+                            .into_iter()
+                            .map(|(code, name)| view! {
+                                <option value=code prop:selected=move || { locale.get().code() == code }>
+                                    {name}
+                                </option>
+                            })
+                            .collect_view()}
                     </select>
                 </label>
             </header>
@@ -1215,37 +1273,37 @@ fn PlannerApp() -> impl IntoView {
                 <p class="note">{move || strings(locale.get()).planning_profile_note}</p>
                 <div class="routing-grid">
                     <label>{move || strings(locale.get()).height_m}
-                        <input type="number" step="0.01" min="0"
+                        <input inputmode="decimal"
                             prop:value=move || routing_profile.get().height_m
                             on:input=move |event| routing_profile.update(|draft| draft.height_m = event_target_value(&event))
                         />
                     </label>
                     <label>{move || strings(locale.get()).width_m}
-                        <input type="number" step="0.01" min="0"
+                        <input inputmode="decimal"
                             prop:value=move || routing_profile.get().width_m
                             on:input=move |event| routing_profile.update(|draft| draft.width_m = event_target_value(&event))
                         />
                     </label>
                     <label>{move || strings(locale.get()).length_m}
-                        <input type="number" step="0.01" min="0"
+                        <input inputmode="decimal"
                             prop:value=move || routing_profile.get().length_m
                             on:input=move |event| routing_profile.update(|draft| draft.length_m = event_target_value(&event))
                         />
                     </label>
                     <label>{move || strings(locale.get()).gross_weight_t}
-                        <input type="number" step="0.01" min="0"
+                        <input inputmode="decimal"
                             prop:value=move || routing_profile.get().gross_weight_t
                             on:input=move |event| routing_profile.update(|draft| draft.gross_weight_t = event_target_value(&event))
                         />
                     </label>
                     <label>{move || strings(locale.get()).axle_load_t}
-                        <input type="number" step="0.01" min="0"
+                        <input inputmode="decimal"
                             prop:value=move || routing_profile.get().axle_load_t
                             on:input=move |event| routing_profile.update(|draft| draft.axle_load_t = event_target_value(&event))
                         />
                     </label>
                     <label>{move || strings(locale.get()).axle_count}
-                        <input type="number" step="1" min="1" max="255"
+                        <input inputmode="numeric"
                             prop:value=move || routing_profile.get().axle_count
                             on:input=move |event| routing_profile.update(|draft| draft.axle_count = event_target_value(&event))
                         />
@@ -1302,7 +1360,7 @@ fn PlannerApp() -> impl IntoView {
                         </select>
                     </label>
                     <label>{move || strings(locale.get()).max_speed_kmh}
-                        <input type="number" step="0.1" min="10" max="252"
+                        <input inputmode="decimal"
                             prop:value=move || routing_profile.get().max_speed_kmh
                             on:input=move |event| routing_profile.update(|draft| draft.max_speed_kmh = event_target_value(&event))
                         />
@@ -1370,13 +1428,17 @@ fn PlannerApp() -> impl IntoView {
                         key=|cargo| cargo.row_id
                         children=move |cargo| {
                             let row_id = cargo.row_id;
-                            let row_title = cargo.title.clone();
-                            let row_weight = cargo.weight_kg.clone();
-                            let row_pallets = cargo.pallets.clone();
-                            let row_pickup = cargo.pickup_point_id.clone();
-                            let row_unload = cargo.unload_point_id.clone();
+                            let row_title = cargo_value(export_cargos, row_id, |row| &row.title);
+                            let row_weight =
+                                cargo_value(export_cargos, row_id, |row| &row.weight_kg);
+                            let row_pallets =
+                                cargo_value(export_cargos, row_id, |row| &row.pallets);
+                            let row_pickup =
+                                cargo_value(export_cargos, row_id, |row| &row.pickup_point_id);
+                            let row_unload =
+                                cargo_value(export_cargos, row_id, |row| &row.unload_point_id);
                             view! {
-                                <div class="cargo-card">
+                                <div class="cargo-card package-cargo">
                                     <div class="cargo-grid">
                                         <label>
                                             {move || strings(locale.get()).cargo_title}
@@ -1396,9 +1458,7 @@ fn PlannerApp() -> impl IntoView {
                                         <label>
                                             {move || strings(locale.get()).cargo_weight_kg}
                                             <input
-                                                type="number"
-                                                min="1"
-                                                step="1"
+                                                inputmode="numeric"
                                                 prop:value=row_weight
                                                 on:input=move |event| {
                                                     let value = event_target_value(&event);
@@ -1414,9 +1474,7 @@ fn PlannerApp() -> impl IntoView {
                                         <label>
                                             {move || strings(locale.get()).cargo_pallets}
                                             <input
-                                                type="number"
-                                                min="1"
-                                                step="1"
+                                                inputmode="numeric"
                                                 prop:value=row_pallets
                                                 on:input=move |event| {
                                                     let value = event_target_value(&event);
@@ -1432,7 +1490,6 @@ fn PlannerApp() -> impl IntoView {
                                         <label>
                                             {move || strings(locale.get()).pickup_point}
                                             <select
-                                                prop:value=row_pickup
                                                 on:change=move |event| {
                                                     let value = event_target_value(&event);
                                                     export_cargos.update(|rows| {
@@ -1443,13 +1500,21 @@ fn PlannerApp() -> impl IntoView {
                                                     export_result.set(None);
                                                 }
                                             >
-                                                <option value="">{move || strings(locale.get()).choose_point}</option>
+                                                <option value="" prop:selected=move || row_pickup().is_empty()>
+                                                    {move || strings(locale.get()).choose_point}
+                                                </option>
                                                 <For
                                                     each=move || route.get().map(|value| value.points).unwrap_or_default()
-                                                    key=|point| point.point_id.clone()
+                                                    // The number is part of the text, so a moved point is drawn anew.
+                                                    key=|point| format!("{}:{}", point.point_id, point.sequence)
                                                     children=move |point| {
                                                         let value = point.point_id.clone();
-                                                        view! { <option value=value>{format!("{}. {}", point.sequence, point.title)}</option> }
+                                                        let own = value.clone();
+                                                        view! {
+                                                            <option value=value prop:selected=move || { row_pickup() == own }>
+                                                                {format!("{}. {}", point.sequence, point.title)}
+                                                            </option>
+                                                        }
                                                     }
                                                 />
                                             </select>
@@ -1457,7 +1522,6 @@ fn PlannerApp() -> impl IntoView {
                                         <label>
                                             {move || strings(locale.get()).unload_point}
                                             <select
-                                                prop:value=row_unload
                                                 on:change=move |event| {
                                                     let value = event_target_value(&event);
                                                     export_cargos.update(|rows| {
@@ -1468,13 +1532,21 @@ fn PlannerApp() -> impl IntoView {
                                                     export_result.set(None);
                                                 }
                                             >
-                                                <option value="">{move || strings(locale.get()).choose_point}</option>
+                                                <option value="" prop:selected=move || row_unload().is_empty()>
+                                                    {move || strings(locale.get()).choose_point}
+                                                </option>
                                                 <For
                                                     each=move || route.get().map(|value| value.points).unwrap_or_default()
-                                                    key=|point| point.point_id.clone()
+                                                    // The number is part of the text, so a moved point is drawn anew.
+                                                    key=|point| format!("{}:{}", point.point_id, point.sequence)
                                                     children=move |point| {
                                                         let value = point.point_id.clone();
-                                                        view! { <option value=value>{format!("{}. {}", point.sequence, point.title)}</option> }
+                                                        let own = value.clone();
+                                                        view! {
+                                                            <option value=value prop:selected=move || { row_unload() == own }>
+                                                                {format!("{}. {}", point.sequence, point.title)}
+                                                            </option>
+                                                        }
                                                     }
                                                 />
                                             </select>
@@ -1556,8 +1628,8 @@ fn PlannerApp() -> impl IntoView {
                                             <span class="sequence">{point.sequence}</span>
                                             <div><div class="point-title">{point.title}</div><div class="coords">{format!("{:.6}, {:.6}", point.latitude, point.longitude)}</div></div>
                                             <div class="actions">
-                                                <button type="button" disabled=index == 0 on:click=move |_| move_point(id_up.clone(), -1)>{move || strings(locale.get()).move_up}</button>
-                                                <button type="button" disabled=index + 1 >= total on:click=move |_| move_point(id_down.clone(), 1)>{move || strings(locale.get()).move_down}</button>
+                                                <button type="button" disabled={index == 0} on:click=move |_| move_point(id_up.clone(), -1)>{move || strings(locale.get()).move_up}</button>
+                                                <button type="button" disabled={index + 1 >= total} on:click=move |_| move_point(id_down.clone(), 1)>{move || strings(locale.get()).move_down}</button>
                                                 <button class="danger" type="button" on:click=move |_| remove_point(id_remove.clone())>{move || strings(locale.get()).remove}</button>
                                             </div>
                                         </li>

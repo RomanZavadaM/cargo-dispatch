@@ -1263,6 +1263,7 @@ pub fn run() {
             planner_export_package,
             planner_pick_export_path,
             planning::planner_planning_status,
+            planning::planner_planning_package,
             planning::planner_planning_update,
             planning::planner_planning_open,
             planning::planner_planning_save,
@@ -1272,6 +1273,9 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");
 }
+
+#[cfg(test)]
+mod window_test;
 
 #[cfg(test)]
 mod tests {
