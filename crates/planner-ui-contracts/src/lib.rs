@@ -8,9 +8,7 @@ pub use input::{
     InputProblemKind, InputVehicle, Money, PlanningInput, parse_moment, validate_input,
 };
 pub use planning::{
-    AppliedPlanView, ApplyPlanInput, PlanKind, PlanProposalSetView, PlanProposalView,
-    PlanStopAction, PlanStopRef, PlanStopView, PlanningStateView, ProposeInput, RoadState,
-    SkipReason, SkippedOrder, UpdatePlanningInput,
+    AppliedPlanView, ApplyPlanInput, CargoRowDraft, PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopRef, PlanStopView, PlanningStateView, ProfileDraft, ProposeInput, RoadState, SkipReason, SkippedOrder, UpdatePlanningInput,
 };
 pub use problems::{ProblemKind, classify_problem, localize_problem};
 

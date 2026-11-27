@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
 mod planning;
+#[cfg(test)]
+mod window_test;
 
 use cargo_dispatch_contracts::{
     CURRENT_SCHEMA_VERSION, PlannedCargoBasis, TripNavigationTarget, TripPackageHeader,
@@ -1263,6 +1265,7 @@ pub fn run() {
             planner_export_package,
             planner_pick_export_path,
             planning::planner_planning_status,
+            planning::planner_planning_package,
             planning::planner_planning_update,
             planning::planner_planning_open,
             planning::planner_planning_save,

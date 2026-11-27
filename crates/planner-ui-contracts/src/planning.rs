@@ -15,6 +15,48 @@ pub struct PlanningStateView {
     pub routing_profile: Option<PlannerRoutingProfileInput>,
     /// Cargo rows of the route chosen last.
     pub cargos: Vec<PlannerPackageCargoInput>,
+    /// The trip package section as the operator left it; wins over `cargos`.
+    pub package: Option<PackageDraft>,
+}
+
+/// The trip package section exactly as typed, so that a half-filled form comes back.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PackageDraft {
+    pub vehicle_type: String,
+    pub cargos: Vec<CargoRowDraft>,
+    /// Row numbers give cargo its identity in a package, so none is used twice.
+    pub next_cargo_row: u64,
+    pub profile: ProfileDraft,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct CargoRowDraft {
+    pub row_id: u64,
+    pub title: String,
+    pub weight_kg: String,
+    pub pallets: String,
+    pub pickup_point_id: String,
+    pub unload_point_id: String,
+}
+
+/// Vehicle parameters of the calculation as typed or chosen.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ProfileDraft {
+    pub height_m: String,
+    pub width_m: String,
+    pub length_m: String,
+    pub gross_weight_t: String,
+    pub axle_load_t: String,
+    pub axle_count: String,
+    pub hazmat: String,
+    pub hgv: String,
+    pub exclude_unpaved: String,
+    pub prefer_truck_routes: String,
+    pub toll_preference: String,
+    pub max_speed_kmh: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -7,10 +7,10 @@ use cargo_dispatch_planner::proposals::{
     propose_routes,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    AppliedPlanView, ApplyPlanInput, InputOrder, InputPlace, Money, PlanKind, PlanProposalSetView,
-    PlanProposalView, PlanStopAction, PlanStopView, PlannerPackageCargoInput, PlanningInput,
-    PlanningStateView, ProposeInput, RoadState, SkipReason, SkippedOrder, parse_moment,
-    validate_input,
+    AppliedPlanView, ApplyPlanInput, InputOrder, InputPlace, Money, PackageDraft, PlanKind,
+    PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopView, PlannerPackageCargoInput,
+    PlanningInput, PlanningStateView, ProposeInput, RoadState, SkipReason, SkippedOrder,
+    parse_moment, validate_input,
 };
 
 const PLANNING_FILE: &str = "planner-input-v1.json";
@@ -26,6 +26,8 @@ pub(crate) struct StoredPlanning {
     routing_profile: Option<PlannerRoutingProfileInput>,
     #[serde(default)]
     cargos: Vec<PlannerPackageCargoInput>,
+    #[serde(default)]
+    package: Option<PackageDraft>,
 }
 
 pub(crate) fn planning_path(journal_path: &Path) -> PathBuf {
@@ -174,7 +176,13 @@ impl PlannerDesktopService {
             routing: stored.routing,
             routing_profile: stored.routing_profile,
             cargos: stored.cargos,
+            package: stored.package,
         })
+    }
+
+    /// Keeps the trip package section as typed; nothing in it is checked here.
+    pub(crate) fn remember_package(&self, package: PackageDraft) -> Result<(), String> {
+        self.change_planning(|stored| stored.package = Some(package))
     }
 
     pub(crate) fn update_planning(
@@ -512,6 +520,14 @@ pub(crate) fn planner_planning_status(
 }
 
 #[tauri::command]
+pub(crate) fn planner_planning_package(
+    input: PackageDraft,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<(), String> {
+    state.remember_package(input)
+}
+
+#[tauri::command]
 pub(crate) fn planner_planning_update(
     input: PlanningInput,
     state: State<'_, PlannerDesktopService>,
@@ -564,7 +580,9 @@ pub(crate) fn planner_planning_apply(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cargo_dispatch_planner_ui_contracts::{InputCargo, PlanStopRef, PlannerTollPreference};
+    use cargo_dispatch_planner_ui_contracts::{
+        CargoRowDraft, InputCargo, PlanStopRef, PlannerTollPreference, ProfileDraft,
+    };
 
     fn order(id: &str, from: f64, to: f64) -> InputOrder {
         let place = |name: &str, lon: f64| InputPlace {
@@ -667,6 +685,39 @@ mod tests {
             .expect_err("rejected");
         assert!(problem.starts_with("A route needs"));
         assert!(service.status().expect("status").points.is_empty());
+    }
+
+    #[test]
+    fn the_half_filled_package_form_survives_a_restart() {
+        let folder = std::env::temp_dir().join(format!(
+            "cargo-planner-package-{}",
+            unix_time_ms().expect("clock")
+        ));
+        let journal = folder.join(PLANNER_JOURNAL_FILE);
+        // A file written before the form was kept has no such field.
+        fs::create_dir_all(&folder).expect("folder");
+        fs::write(planning_path(&journal), r#"{"cargos":[]}"#).expect("old file");
+        let first = PlannerDesktopService::open(journal.clone()).expect("open");
+        assert!(first.planning_view().expect("view").package.is_none());
+        let draft = PackageDraft {
+            vehicle_type: "box".to_owned(),
+            cargos: vec![CargoRowDraft {
+                row_id: 3,
+                weight_kg: "12 0".to_owned(),
+                ..CargoRowDraft::default()
+            }],
+            next_cargo_row: 7,
+            profile: ProfileDraft {
+                height_m: "4,".to_owned(),
+                ..ProfileDraft::default()
+            },
+        };
+        first.remember_package(draft.clone()).expect("remembered");
+        drop(first);
+
+        let second = PlannerDesktopService::open(journal).expect("reopen");
+        assert_eq!(second.planning_view().expect("view").package, Some(draft));
+        let _ = fs::remove_dir_all(folder);
     }
 
     #[test]
