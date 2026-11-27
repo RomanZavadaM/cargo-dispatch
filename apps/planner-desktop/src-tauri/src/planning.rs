@@ -600,7 +600,8 @@ mod tests {
         let mut without_coordinates = order("B", 31.0, 32.0);
         without_coordinates.pickup.lat = None;
         without_coordinates.pickup.lon = None;
-        input.orders = vec![order("A", 30.0, 31.0), without_coordinates];
+        input.orders.push(order("A", 30.0, 31.0));
+        input.orders.push(without_coordinates);
         input
     }
 

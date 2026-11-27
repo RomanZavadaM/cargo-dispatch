@@ -342,8 +342,10 @@ mod tests {
 
     #[test]
     fn a_complete_document_has_no_problems() {
-        let mut input = PlanningInput::default();
-        input.orders = vec![order("A1"), order("A2")];
+        let input = PlanningInput {
+            orders: vec![order("A1"), order("A2")],
+            ..PlanningInput::default()
+        };
         assert_eq!(validate_input(&input), []);
     }
 
