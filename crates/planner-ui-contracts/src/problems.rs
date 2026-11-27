@@ -19,10 +19,20 @@ pub enum ProblemKind {
     Storage,
     Recovery,
     Internal,
+    InputFile,
+    Orders,
 }
 
 /// Fragments of service messages. The first match wins.
 const FRAGMENTS: &[(&str, ProblemKind)] = &[
+    ("input file", ProblemKind::InputFile),
+    ("Input file", ProblemKind::InputFile),
+    ("planning input", ProblemKind::Storage),
+    ("vehicle data", ProblemKind::Orders),
+    ("order selected", ProblemKind::Orders),
+    ("orders for one calculation", ProblemKind::Orders),
+    ("Order has no coordinates", ProblemKind::Orders),
+    ("of every order", ProblemKind::Orders),
     ("Planner journal contains", ProblemKind::Recovery),
     ("Planner journal removes", ProblemKind::Recovery),
     ("journal export revision", ProblemKind::Recovery),
@@ -196,6 +206,24 @@ fn texts(kind: ProblemKind) -> [&'static str; 7] {
             "저장된 초안을 복원하지 못했습니다. 기록이 손상되었습니다.",
             "保存した下書きを復元できません。記録が破損しています。",
             "无法恢复已保存的草稿：记录已损坏。",
+        ],
+        ProblemKind::InputFile => [
+            "Файл заявок не вдалося прочитати чи записати. Перевірте його вміст за описом формату.",
+            "Die Auftragsdatei konnte nicht gelesen oder geschrieben werden. Prüfen Sie ihren Inhalt anhand der Formatbeschreibung.",
+            "Impossible de lire ou d’écrire le fichier des commandes. Vérifiez son contenu selon la description du format.",
+            "No se pudo leer o escribir el archivo de pedidos. Revise su contenido según la descripción del formato.",
+            "주문 파일을 읽거나 쓸 수 없습니다. 형식 설명에 따라 내용을 확인하세요.",
+            "注文ファイルを読み書きできません。形式の説明に沿って内容を確認してください。",
+            "无法读取或写入订单文件。请按格式说明检查内容。",
+        ],
+        ProblemKind::Orders => [
+            "Перевірте вибрані заявки: дані авто, координати, обидві зупинки кожної та не більше 12 за раз.",
+            "Prüfen Sie die gewählten Aufträge: Fahrzeugdaten, Koordinaten, beide Stopps je Auftrag, höchstens 12 auf einmal.",
+            "Vérifiez les commandes choisies : données du véhicule, coordonnées, les deux arrêts de chacune, 12 au maximum.",
+            "Revise los pedidos elegidos: datos del vehículo, coordenadas, las dos paradas de cada uno y 12 como máximo.",
+            "선택한 주문을 확인하세요: 차량 정보, 좌표, 주문별 두 지점, 한 번에 최대 12건.",
+            "選んだ注文を確認してください：車両情報、座標、各注文の2地点、一度に12件まで。",
+            "请检查所选订单：车辆信息、坐标、每单两个地点，一次最多 12 单。",
         ],
         ProblemKind::Internal => [
             "Внутрішня помилка Planner. Перезапустіть програму.",
