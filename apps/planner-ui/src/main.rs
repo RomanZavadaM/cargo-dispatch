@@ -1,8 +1,11 @@
 #![forbid(unsafe_code)]
 
 mod i18n;
+mod orders;
+mod orders_i18n;
 
 use crate::i18n::{UiLocale, strings};
+use crate::orders::OrdersPanel;
 use cargo_dispatch_planner_ui_contracts::{
     PlannerPackageCargoInput, PlannerPackageExportInput, PlannerPackageExportResult,
     PlannerPointInput, PlannerRouteView, PlannerRoutingAvailabilityState,
@@ -1117,6 +1120,17 @@ fn PlannerApp() -> impl IntoView {
                     </select>
                 </label>
             </header>
+
+            <OrdersPanel
+                locale=locale
+                message=message
+                error=error
+                route=route
+                profile=routing_profile
+                vehicle_type=export_vehicle_type
+                cargos=export_cargos
+                next_cargo_row=next_cargo_row
+            />
 
             <section>
                 <h2>{move || strings(locale.get()).manual_route}</h2>
