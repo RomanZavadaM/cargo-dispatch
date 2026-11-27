@@ -193,11 +193,7 @@ fn measure(
 }
 
 /// Every order of stops in which each pickup precedes its delivery.
-fn every_order(
-    count: usize,
-    prefix: &mut Vec<ProposalStop>,
-    found: &mut Vec<Vec<ProposalStop>>,
-) {
+fn every_order(count: usize, prefix: &mut Vec<ProposalStop>, found: &mut Vec<Vec<ProposalStop>>) {
     if prefix.len() == count * 2 {
         found.push(prefix.clone());
         return;

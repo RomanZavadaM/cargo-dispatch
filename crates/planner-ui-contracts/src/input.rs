@@ -209,7 +209,10 @@ fn check_place(place: &InputPlace, path: &str, found: &mut Vec<InputProblem>) {
     if place.lat.is_some_and(|lat| !(-90.0..=90.0).contains(&lat)) {
         add("lat", InputProblemKind::Coordinate);
     }
-    if place.lon.is_some_and(|lon| !(-180.0..=180.0).contains(&lon)) {
+    if place
+        .lon
+        .is_some_and(|lon| !(-180.0..=180.0).contains(&lon))
+    {
         add("lon", InputProblemKind::Coordinate);
     }
     let mut moments = [None, None];
@@ -255,7 +258,10 @@ pub fn validate_input(input: &PlanningInput) -> Vec<InputProblem> {
         found.push(problem("schema".to_owned(), InputProblemKind::Schema));
     }
     if input.schema_version != INPUT_SCHEMA_VERSION {
-        found.push(problem("schema_version".to_owned(), InputProblemKind::Schema));
+        found.push(problem(
+            "schema_version".to_owned(),
+            InputProblemKind::Schema,
+        ));
     }
     let vehicle = &input.vehicle;
     if vehicle.payload_kg == Some(0) {
