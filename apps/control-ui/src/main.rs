@@ -928,8 +928,7 @@ fn ControlApp() -> impl IntoView {
             return;
         }
         spawn_local(async move {
-            let Ok(found) =
-                invoke::<Vec<String>, _>("lan_addresses", &serde_json::json!({})).await
+            let Ok(found) = invoke::<Vec<String>, _>("lan_addresses", &serde_json::json!({})).await
             else {
                 return;
             };
@@ -1137,11 +1136,11 @@ fn ControlApp() -> impl IntoView {
         busy.set(true);
         let running = listener.is_some();
         spawn_local(async move {
-            let result: Result<ControlUiStatus, String> =
-                match stop_running_listener(running).await {
-                    Ok(()) => invoke("start_loopback", &serde_json::json!({})).await,
-                    Err(problem) => Err(problem),
-                };
+            let result: Result<ControlUiStatus, String> = match stop_running_listener(running).await
+            {
+                Ok(()) => invoke("start_loopback", &serde_json::json!({})).await,
+                Err(problem) => Err(problem),
+            };
             if result.is_ok() {
                 dialog.set(None);
             } else if let Ok(current) = load_status().await {
@@ -1185,11 +1184,11 @@ fn ControlApp() -> impl IntoView {
         let input = StartLanInput { ip, port };
         let running = listener.is_some();
         spawn_local(async move {
-            let result: Result<ControlUiStatus, String> =
-                match stop_running_listener(running).await {
-                    Ok(()) => invoke("start_lan", &serde_json::json!({ "input": input })).await,
-                    Err(problem) => Err(problem),
-                };
+            let result: Result<ControlUiStatus, String> = match stop_running_listener(running).await
+            {
+                Ok(()) => invoke("start_lan", &serde_json::json!({ "input": input })).await,
+                Err(problem) => Err(problem),
+            };
             if result.is_ok() {
                 dialog.set(None);
             } else if let Ok(current) = load_status().await {

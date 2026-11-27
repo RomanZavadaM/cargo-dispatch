@@ -1946,8 +1946,7 @@ pub fn local_lan_addresses() -> Vec<Ipv4Addr> {
             Ipv4Addr::new(172, 20, 10, 1),
         ])
         .filter_map(|target| {
-            source_address_for(target)
-                .filter(|source| source.octets()[..3] == target.octets()[..3])
+            source_address_for(target).filter(|source| source.octets()[..3] == target.octets()[..3])
         })
         .collect();
     rank_lan_addresses(default_route, &on_subnet)
