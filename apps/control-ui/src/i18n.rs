@@ -1733,27 +1733,9 @@ static ZH: ControlStrings = ControlStrings {
 };
 
 pub fn localize_problem(locale: UiLocale, problem: &str) -> String {
-    if locale == UiLocale::Uk
-        || !problem
-            .chars()
-            .any(|ch| ('\u{0400}'..='\u{04ff}').contains(&ch))
-    {
-        return problem.to_owned();
-    }
-
-    let detail = problem
-        .split_once(": ")
-        .map(|(_, detail)| detail.trim())
-        .filter(|detail| {
-            !detail
-                .chars()
-                .any(|ch| ('\u{0400}'..='\u{04ff}').contains(&ch))
-        });
-
-    match detail {
-        Some(detail) if !detail.is_empty() => {
-            format!("{}: {detail}", strings(locale).operation_failed)
-        }
-        _ => strings(locale).operation_failed.to_owned(),
-    }
+    cargo_dispatch_control_ui_contracts::localize_problem(
+        locale.code(),
+        problem,
+        strings(locale).operation_failed,
+    )
 }

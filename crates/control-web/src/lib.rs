@@ -182,124 +182,420 @@ const LANGUAGES = [
 
 const I18N = {
   uk: {
-    title:"Cargo Dispatch — рейс", language:"Мова", loading:"Завантаження…", map:"Карта", tripMap:"Карта рейсу",
-    zoomIn:"Збільшити карту", zoomOut:"Зменшити карту", fit:"Рейс",
-    mapNote:"Показані точки рейсу та остання прийнята позиція водія. Дорожня лінія показується лише коли Control має актуальну geometry для поточного порядку точок.",
-    route:"Маршрут", files:"Документи / фото / відео", attach:"Прив'язати до точки", wholeTrip:"Рейс у цілому",
-    file:"Файл", camera:"Фото / відео", sendControl:"Передати в Control", location:"Геолокація", noLocation:"Ще не передавалась",
-    startLocation:"Почати передачу геолокації", stop:"Зупинити", latestPosition:"Остання позиція водія",
-    version:"Версія", change:"зміна", noTrip:"Немає доступу до рейсу", completed:"виконано", open:"відкрито",
-    complete:"Виконано", moveUp:"Перемістити точку вище", moveDown:"Перемістити точку нижче",
-    rejectChange:"Control не прийняв зміну", routeChanged:"Маршрут уже змінився або Control відхилив порядок",
-    openNavigation:"Відкрити навігацію", noDocuments:"Документів ще немає", fromOperator:"Control → водій",
-    fromDriver:"водій → Control", bytes:"байт", chooseMedia:"Спочатку виберіть файл або фото/відео",
-    transferring:"Передача…", fileAccepted:"Файл прийнятий Control",
-    transferFailed:"Передача не вдалася", retrySameId:"Повтор для того самого файла використає той самий ID.",
+    title:"Cargo Dispatch — рейс",
+    language:"Мова",
+    loading:"Завантаження…",
+    map:"Карта",
+    tripMap:"Карта рейсу",
+    zoomIn:"Збільшити карту",
+    zoomOut:"Зменшити карту",
+    fit:"Рейс",
+    mapNote:"Точки рейсу та остання передана позиція. Лінія дороги з’являється, коли диспетчер її порахував.",
+    route:"Маршрут",
+    files:"Документи / фото / відео",
+    attach:"Прив'язати до точки",
+    wholeTrip:"Рейс у цілому",
+    file:"Файл",
+    camera:"Фото / відео",
+    sendControl:"Надіслати диспетчеру",
+    location:"Геолокація",
+    noLocation:"Ще не передавалась",
+    startLocation:"Почати передачу геолокації",
+    stop:"Зупинити",
+    latestPosition:"Остання позиція водія",
+    completed:"виконано",
+    open:"відкрито",
+    complete:"Позначити виконаною",
+    moveUp:"Перемістити точку вище",
+    moveDown:"Перемістити точку нижче",
+    openNavigation:"Відкрити навігацію",
+    noDocuments:"Документів ще немає",
+    fromOperator:"від диспетчера",
+    fromDriver:"від водія",
+    chooseMedia:"Спочатку виберіть файл або фото/відео",
+    transferring:"Передача…",
+    fileAccepted:"Диспетчер отримав файл",
+    transferFailed:"Передача не вдалася",
+    retrySameId:"Надішліть той самий файл ще раз — він не задвоїться.",
     geoUnsupported:"Браузер не підтримує геолокацію",
-    geoHttps:"Для геолокації телефонний браузер зазвичай вимагає HTTPS. LAN HTTP можна використовувати для маршруту й файлів.",
-    positionAccepted:"Позиція прийнята Control", positionRejected:"Control не прийняв позицію", geoUnavailable:"Геолокація недоступна"
+    geoHttps:"Браузер телефона передає позицію лише через захищене з’єднання (HTTPS). Маршрут і файли працюють і без нього.",
+    positionAccepted:"Диспетчер отримав позицію",
+    positionRejected:"Позицію не передано",
+    geoUnavailable:"Позицію визначити не вдалося. Перевірте дозвіл на геолокацію.",
+    connected:"Підключено до диспетчера",
+    confirmDone:"Точку виконано? Скасувати цю позначку не можна.",
+    unitB:"Б",
+    unitKB:"КБ",
+    unitMB:"МБ",
+    problemNoConnection:"Немає зв’язку з диспетчером. Перевірте мережу.",
+    problemExpired:"Посилання не діє. Попросіть у диспетчера нове.",
+    problemRouteChanged:"Рейс щойно змінився. Дані оновлено, перевірте й повторіть.",
+    problemTooLarge:"Файл завеликий.",
+    problemRefused:"Не вдалося виконати дію. Спробуйте ще раз."
   },
   en: {
-    title:"Cargo Dispatch — Trip", language:"Language", loading:"Loading…", map:"Map", tripMap:"Trip map",
-    zoomIn:"Zoom in", zoomOut:"Zoom out", fit:"Trip",
-    mapNote:"Trip points and the latest accepted driver position are shown. The road line appears only when Control has current geometry for the current point order.",
-    route:"Route", files:"Documents / photos / video", attach:"Attach to point", wholeTrip:"Whole trip",
-    file:"File", camera:"Photo / video", sendControl:"Send to Control", location:"Location", noLocation:"Not sent yet",
-    startLocation:"Start location sharing", stop:"Stop", latestPosition:"Latest driver position",
-    version:"Version", change:"change", noTrip:"Trip is unavailable", completed:"completed", open:"open",
-    complete:"Complete", moveUp:"Move point up", moveDown:"Move point down",
-    rejectChange:"Control rejected the change", routeChanged:"The route changed or Control rejected the order",
-    openNavigation:"Open navigation", noDocuments:"No documents yet", fromOperator:"Control → driver",
-    fromDriver:"driver → Control", bytes:"bytes", chooseMedia:"Choose a file or photo/video first",
-    transferring:"Sending…", fileAccepted:"File accepted by Control",
-    transferFailed:"Transfer failed", retrySameId:"Retrying the same file will use the same ID.",
+    title:"Cargo Dispatch — Trip",
+    language:"Language",
+    loading:"Loading…",
+    map:"Map",
+    tripMap:"Trip map",
+    zoomIn:"Zoom in",
+    zoomOut:"Zoom out",
+    fit:"Trip",
+    mapNote:"Trip stops and the last sent position. The road line appears once the dispatcher has calculated it.",
+    route:"Route",
+    files:"Documents / photos / video",
+    attach:"Attach to point",
+    wholeTrip:"Whole trip",
+    file:"File",
+    camera:"Photo / video",
+    sendControl:"Send to dispatcher",
+    location:"Location",
+    noLocation:"Not sent yet",
+    startLocation:"Start location sharing",
+    stop:"Stop",
+    latestPosition:"Latest driver position",
+    completed:"completed",
+    open:"open",
+    complete:"Mark as done",
+    moveUp:"Move point up",
+    moveDown:"Move point down",
+    openNavigation:"Open navigation",
+    noDocuments:"No documents yet",
+    fromOperator:"from the dispatcher",
+    fromDriver:"from the driver",
+    chooseMedia:"Choose a file or photo/video first",
+    transferring:"Sending…",
+    fileAccepted:"The dispatcher received the file",
+    transferFailed:"Transfer failed",
+    retrySameId:"Send the same file again; it will not be duplicated.",
     geoUnsupported:"This browser does not support geolocation",
-    geoHttps:"Phone browsers usually require HTTPS for geolocation. LAN HTTP can still be used for route and files.",
-    positionAccepted:"Position accepted by Control", positionRejected:"Control rejected the position", geoUnavailable:"Geolocation unavailable"
+    geoHttps:"A phone browser shares the position only over a secure (HTTPS) connection. Route and files work without it.",
+    positionAccepted:"The dispatcher received the position",
+    positionRejected:"The position was not sent",
+    geoUnavailable:"The position could not be determined. Check the location permission.",
+    connected:"Connected to the dispatcher",
+    confirmDone:"Stop done? This mark cannot be undone.",
+    unitB:"B",
+    unitKB:"KB",
+    unitMB:"MB",
+    problemNoConnection:"No connection to the dispatcher. Check the network.",
+    problemExpired:"The link no longer works. Ask the dispatcher for a new one.",
+    problemRouteChanged:"The trip has just changed. It was refreshed; check and try again.",
+    problemTooLarge:"The file is too large.",
+    problemRefused:"The action failed. Try again."
   },
   de: {
-    title:"Cargo Dispatch — Tour", language:"Sprache", loading:"Laden…", map:"Karte", tripMap:"Tourkarte",
-    zoomIn:"Vergrößern", zoomOut:"Verkleinern", fit:"Tour", mapNote:"Tourpunkte und die letzte angenommene Fahrerposition werden angezeigt. Die Straßenlinie erscheint nur bei aktueller Geometrie.",
-    route:"Route", files:"Dokumente / Fotos / Videos", attach:"An Punkt anhängen", wholeTrip:"Gesamte Tour", file:"Datei", camera:"Foto / Video",
-    sendControl:"An Control senden", location:"Standort", noLocation:"Noch nicht gesendet", startLocation:"Standortübertragung starten", stop:"Stoppen",
-    latestPosition:"Letzte Fahrerposition", version:"Version", change:"Änderung", noTrip:"Tour nicht verfügbar", completed:"erledigt", open:"offen",
-    complete:"Erledigt", moveUp:"Punkt nach oben", moveDown:"Punkt nach unten", rejectChange:"Control hat die Änderung abgelehnt",
-    routeChanged:"Die Route wurde geändert oder Control hat die Reihenfolge abgelehnt", openNavigation:"Navigation öffnen", noDocuments:"Noch keine Dokumente",
-    fromOperator:"Control → Fahrer", fromDriver:"Fahrer → Control", bytes:"Bytes", chooseMedia:"Zuerst Datei oder Foto/Video wählen",
-    transferring:"Übertragung…", fileAccepted:"Datei von Control angenommen", transferFailed:"Übertragung fehlgeschlagen",
-    retrySameId:"Ein erneuter Versuch derselben Datei verwendet dieselbe ID.", geoUnsupported:"Browser unterstützt keine Geolokalisierung",
-    geoHttps:"Für Geolokalisierung benötigt der Telefonbrowser normalerweise HTTPS. LAN-HTTP kann für Route und Dateien verwendet werden.",
-    positionAccepted:"Position von Control angenommen", positionRejected:"Control hat die Position abgelehnt", geoUnavailable:"Geolokalisierung nicht verfügbar"
+    title:"Cargo Dispatch — Tour",
+    language:"Sprache",
+    loading:"Laden…",
+    map:"Karte",
+    tripMap:"Tourkarte",
+    zoomIn:"Vergrößern",
+    zoomOut:"Verkleinern",
+    fit:"Tour",
+    mapNote:"Tourpunkte und zuletzt gesendete Position. Die Straßenlinie erscheint, sobald der Disponent sie berechnet hat.",
+    route:"Route",
+    files:"Dokumente / Fotos / Videos",
+    attach:"An Punkt anhängen",
+    wholeTrip:"Gesamte Tour",
+    file:"Datei",
+    camera:"Foto / Video",
+    sendControl:"An Disponenten senden",
+    location:"Standort",
+    noLocation:"Noch nicht gesendet",
+    startLocation:"Standortübertragung starten",
+    stop:"Stoppen",
+    latestPosition:"Letzte Fahrerposition",
+    completed:"erledigt",
+    open:"offen",
+    complete:"Als erledigt markieren",
+    moveUp:"Punkt nach oben",
+    moveDown:"Punkt nach unten",
+    openNavigation:"Navigation öffnen",
+    noDocuments:"Noch keine Dokumente",
+    fromOperator:"vom Disponenten",
+    fromDriver:"vom Fahrer",
+    chooseMedia:"Zuerst Datei oder Foto/Video wählen",
+    transferring:"Übertragung…",
+    fileAccepted:"Der Disponent hat die Datei erhalten",
+    transferFailed:"Übertragung fehlgeschlagen",
+    retrySameId:"Dieselbe Datei erneut senden – sie wird nicht doppelt angelegt.",
+    geoUnsupported:"Browser unterstützt keine Geolokalisierung",
+    geoHttps:"Der Telefonbrowser überträgt die Position nur über eine sichere Verbindung (HTTPS). Route und Dateien funktionieren auch ohne.",
+    positionAccepted:"Der Disponent hat die Position erhalten",
+    positionRejected:"Position nicht gesendet",
+    geoUnavailable:"Position nicht bestimmbar. Standortberechtigung prüfen.",
+    connected:"Mit dem Disponenten verbunden",
+    confirmDone:"Punkt erledigt? Diese Markierung lässt sich nicht zurücknehmen.",
+    unitB:"B",
+    unitKB:"KB",
+    unitMB:"MB",
+    problemNoConnection:"Keine Verbindung zum Disponenten. Netzwerk prüfen.",
+    problemExpired:"Der Link gilt nicht mehr. Bitten Sie um einen neuen.",
+    problemRouteChanged:"Die Tour wurde gerade geändert. Aktualisiert; bitte prüfen und wiederholen.",
+    problemTooLarge:"Die Datei ist zu groß.",
+    problemRefused:"Aktion fehlgeschlagen. Bitte erneut versuchen."
   },
   fr: {
-    title:"Cargo Dispatch — Trajet", language:"Langue", loading:"Chargement…", map:"Carte", tripMap:"Carte du trajet",
-    zoomIn:"Zoom avant", zoomOut:"Zoom arrière", fit:"Trajet", mapNote:"Les points du trajet et la dernière position acceptée sont affichés. La ligne routière apparaît seulement avec une géométrie actuelle.",
-    route:"Itinéraire", files:"Documents / photos / vidéos", attach:"Associer au point", wholeTrip:"Trajet entier", file:"Fichier", camera:"Photo / vidéo",
-    sendControl:"Envoyer à Control", location:"Géolocalisation", noLocation:"Pas encore transmise", startLocation:"Démarrer la géolocalisation", stop:"Arrêter",
-    latestPosition:"Dernière position du conducteur", version:"Version", change:"modification", noTrip:"Trajet indisponible", completed:"terminé", open:"ouvert",
-    complete:"Terminé", moveUp:"Monter le point", moveDown:"Descendre le point", rejectChange:"Control a refusé la modification",
-    routeChanged:"Le trajet a changé ou Control a refusé l’ordre", openNavigation:"Ouvrir la navigation", noDocuments:"Aucun document",
-    fromOperator:"Control → conducteur", fromDriver:"conducteur → Control", bytes:"octets", chooseMedia:"Choisissez d’abord un fichier ou une photo/vidéo",
-    transferring:"Envoi…", fileAccepted:"Fichier accepté par Control", transferFailed:"Échec du transfert",
-    retrySameId:"Un nouvel essai du même fichier utilisera le même ID.", geoUnsupported:"Ce navigateur ne prend pas en charge la géolocalisation",
-    geoHttps:"La géolocalisation sur téléphone nécessite généralement HTTPS. Le LAN HTTP reste utilisable pour l’itinéraire et les fichiers.",
-    positionAccepted:"Position acceptée par Control", positionRejected:"Control a refusé la position", geoUnavailable:"Géolocalisation indisponible"
+    title:"Cargo Dispatch — Trajet",
+    language:"Langue",
+    loading:"Chargement…",
+    map:"Carte",
+    tripMap:"Carte du trajet",
+    zoomIn:"Zoom avant",
+    zoomOut:"Zoom arrière",
+    fit:"Trajet",
+    mapNote:"Points du trajet et dernière position envoyée. Le tracé routier apparaît une fois calculé par le régulateur.",
+    route:"Itinéraire",
+    files:"Documents / photos / vidéos",
+    attach:"Associer au point",
+    wholeTrip:"Trajet entier",
+    file:"Fichier",
+    camera:"Photo / vidéo",
+    sendControl:"Envoyer au régulateur",
+    location:"Géolocalisation",
+    noLocation:"Pas encore transmise",
+    startLocation:"Démarrer la géolocalisation",
+    stop:"Arrêter",
+    latestPosition:"Dernière position du conducteur",
+    completed:"terminé",
+    open:"ouvert",
+    complete:"Marquer comme fait",
+    moveUp:"Monter le point",
+    moveDown:"Descendre le point",
+    openNavigation:"Ouvrir la navigation",
+    noDocuments:"Aucun document",
+    fromOperator:"du régulateur",
+    fromDriver:"du conducteur",
+    chooseMedia:"Choisissez d’abord un fichier ou une photo/vidéo",
+    transferring:"Envoi…",
+    fileAccepted:"Le régulateur a reçu le fichier",
+    transferFailed:"Échec du transfert",
+    retrySameId:"Renvoyez le même fichier : il ne sera pas dupliqué.",
+    geoUnsupported:"Ce navigateur ne prend pas en charge la géolocalisation",
+    geoHttps:"Le navigateur du téléphone ne transmet la position qu’en connexion sécurisée (HTTPS). L’itinéraire et les fichiers fonctionnent sans.",
+    positionAccepted:"Le régulateur a reçu la position",
+    positionRejected:"Position non envoyée",
+    geoUnavailable:"Position introuvable. Vérifiez l’autorisation de localisation.",
+    connected:"Connecté au régulateur",
+    confirmDone:"Point effectué ? Cette validation ne peut pas être annulée.",
+    unitB:"o",
+    unitKB:"Ko",
+    unitMB:"Mo",
+    problemNoConnection:"Pas de liaison avec le régulateur. Vérifiez le réseau.",
+    problemExpired:"Le lien n’est plus valable. Demandez-en un nouveau.",
+    problemRouteChanged:"Le trajet vient de changer. Il est actualisé ; vérifiez et recommencez.",
+    problemTooLarge:"Le fichier est trop volumineux.",
+    problemRefused:"L’action a échoué. Réessayez."
   },
   es: {
-    title:"Cargo Dispatch — Viaje", language:"Idioma", loading:"Cargando…", map:"Mapa", tripMap:"Mapa del viaje",
-    zoomIn:"Acercar", zoomOut:"Alejar", fit:"Viaje", mapNote:"Se muestran los puntos del viaje y la última posición aceptada. La línea vial aparece solo con geometría actual.",
-    route:"Ruta", files:"Documentos / fotos / vídeo", attach:"Adjuntar al punto", wholeTrip:"Viaje completo", file:"Archivo", camera:"Foto / vídeo",
-    sendControl:"Enviar a Control", location:"Geolocalización", noLocation:"Aún no enviada", startLocation:"Iniciar geolocalización", stop:"Detener",
-    latestPosition:"Última posición del conductor", version:"Versión", change:"cambio", noTrip:"Viaje no disponible", completed:"completado", open:"abierto",
-    complete:"Completado", moveUp:"Mover punto arriba", moveDown:"Mover punto abajo", rejectChange:"Control rechazó el cambio",
-    routeChanged:"La ruta cambió o Control rechazó el orden", openNavigation:"Abrir navegación", noDocuments:"Aún no hay documentos",
-    fromOperator:"Control → conductor", fromDriver:"conductor → Control", bytes:"bytes", chooseMedia:"Elija primero un archivo o foto/vídeo",
-    transferring:"Enviando…", fileAccepted:"Archivo aceptado por Control", transferFailed:"Falló la transferencia",
-    retrySameId:"Reintentar el mismo archivo usará el mismo ID.", geoUnsupported:"El navegador no admite geolocalización",
-    geoHttps:"La geolocalización en el navegador del teléfono suele requerir HTTPS. LAN HTTP puede usarse para ruta y archivos.",
-    positionAccepted:"Posición aceptada por Control", positionRejected:"Control rechazó la posición", geoUnavailable:"Geolocalización no disponible"
+    title:"Cargo Dispatch — Viaje",
+    language:"Idioma",
+    loading:"Cargando…",
+    map:"Mapa",
+    tripMap:"Mapa del viaje",
+    zoomIn:"Acercar",
+    zoomOut:"Alejar",
+    fit:"Viaje",
+    mapNote:"Puntos del viaje y última posición enviada. La línea de carretera aparece cuando el despachador la calcula.",
+    route:"Ruta",
+    files:"Documentos / fotos / vídeo",
+    attach:"Adjuntar al punto",
+    wholeTrip:"Viaje completo",
+    file:"Archivo",
+    camera:"Foto / vídeo",
+    sendControl:"Enviar al despachador",
+    location:"Geolocalización",
+    noLocation:"Aún no enviada",
+    startLocation:"Iniciar geolocalización",
+    stop:"Detener",
+    latestPosition:"Última posición del conductor",
+    completed:"completado",
+    open:"abierto",
+    complete:"Marcar como hecho",
+    moveUp:"Mover punto arriba",
+    moveDown:"Mover punto abajo",
+    openNavigation:"Abrir navegación",
+    noDocuments:"Aún no hay documentos",
+    fromOperator:"del despachador",
+    fromDriver:"del conductor",
+    chooseMedia:"Elija primero un archivo o foto/vídeo",
+    transferring:"Enviando…",
+    fileAccepted:"El despachador ha recibido el archivo",
+    transferFailed:"Falló la transferencia",
+    retrySameId:"Envíe de nuevo el mismo archivo: no se duplicará.",
+    geoUnsupported:"El navegador no admite geolocalización",
+    geoHttps:"El navegador del teléfono solo envía la posición con conexión segura (HTTPS). La ruta y los archivos funcionan sin ella.",
+    positionAccepted:"El despachador ha recibido la posición",
+    positionRejected:"No se ha enviado la posición",
+    geoUnavailable:"No se pudo obtener la posición. Revise el permiso de ubicación.",
+    connected:"Conectado con el despachador",
+    confirmDone:"¿Punto hecho? Esta marca no se puede deshacer.",
+    unitB:"B",
+    unitKB:"KB",
+    unitMB:"MB",
+    problemNoConnection:"Sin conexión con el despachador. Revise la red.",
+    problemExpired:"El enlace ya no funciona. Pida uno nuevo.",
+    problemRouteChanged:"El viaje acaba de cambiar. Se ha actualizado; revise y repita.",
+    problemTooLarge:"El archivo es demasiado grande.",
+    problemRefused:"No se pudo completar la acción. Inténtelo de nuevo."
   },
   ko: {
-    title:"Cargo Dispatch — 운행", language:"언어", loading:"불러오는 중…", map:"지도", tripMap:"운행 지도", zoomIn:"확대", zoomOut:"축소", fit:"운행",
-    mapNote:"운행 지점과 마지막으로 수신된 운전자 위치를 표시합니다. 현재 geometry가 있을 때만 도로선을 표시합니다.",
-    route:"경로", files:"문서 / 사진 / 동영상", attach:"지점에 연결", wholeTrip:"전체 운행", file:"파일", camera:"사진 / 동영상",
-    sendControl:"Control로 전송", location:"위치", noLocation:"아직 전송되지 않음", startLocation:"위치 전송 시작", stop:"중지",
-    latestPosition:"마지막 운전자 위치", version:"버전", change:"변경", noTrip:"운행에 접근할 수 없음", completed:"완료", open:"열림",
-    complete:"완료", moveUp:"지점 위로", moveDown:"지점 아래로", rejectChange:"Control이 변경을 거부했습니다",
-    routeChanged:"경로가 변경되었거나 Control이 순서를 거부했습니다", openNavigation:"내비게이션 열기", noDocuments:"아직 문서가 없습니다",
-    fromOperator:"Control → 운전자", fromDriver:"운전자 → Control", bytes:"바이트", chooseMedia:"먼저 파일 또는 사진/동영상을 선택하세요",
-    transferring:"전송 중…", fileAccepted:"Control이 파일을 받았습니다", transferFailed:"전송 실패",
-    retrySameId:"같은 파일을 다시 보내면 같은 ID를 사용합니다.", geoUnsupported:"브라우저가 위치 기능을 지원하지 않습니다",
-    geoHttps:"휴대폰 브라우저의 위치 기능은 보통 HTTPS가 필요합니다. LAN HTTP는 경로와 파일에 사용할 수 있습니다.",
-    positionAccepted:"Control이 위치를 받았습니다", positionRejected:"Control이 위치를 거부했습니다", geoUnavailable:"위치를 사용할 수 없습니다"
+    title:"Cargo Dispatch — 운행",
+    language:"언어",
+    loading:"불러오는 중…",
+    map:"지도",
+    tripMap:"운행 지도",
+    zoomIn:"확대",
+    zoomOut:"축소",
+    fit:"운행",
+    mapNote:"운행 지점과 마지막으로 보낸 위치입니다. 도로선은 배차 담당자가 계산하면 표시됩니다.",
+    route:"경로",
+    files:"문서 / 사진 / 동영상",
+    attach:"지점에 연결",
+    wholeTrip:"전체 운행",
+    file:"파일",
+    camera:"사진 / 동영상",
+    sendControl:"배차 담당자에게 보내기",
+    location:"위치",
+    noLocation:"아직 전송되지 않음",
+    startLocation:"위치 전송 시작",
+    stop:"중지",
+    latestPosition:"마지막 운전자 위치",
+    completed:"완료",
+    open:"열림",
+    complete:"완료로 표시",
+    moveUp:"지점 위로",
+    moveDown:"지점 아래로",
+    openNavigation:"내비게이션 열기",
+    noDocuments:"아직 문서가 없습니다",
+    fromOperator:"배차 담당자가 보냄",
+    fromDriver:"운전자가 보냄",
+    chooseMedia:"먼저 파일 또는 사진/동영상을 선택하세요",
+    transferring:"전송 중…",
+    fileAccepted:"배차 담당자가 파일을 받았습니다",
+    transferFailed:"전송 실패",
+    retrySameId:"같은 파일을 다시 보내도 중복되지 않습니다.",
+    geoUnsupported:"브라우저가 위치 기능을 지원하지 않습니다",
+    geoHttps:"휴대전화 브라우저는 보안 연결(HTTPS)에서만 위치를 보냅니다. 경로와 파일은 없어도 작동합니다.",
+    positionAccepted:"배차 담당자가 위치를 받았습니다",
+    positionRejected:"위치를 보내지 못했습니다",
+    geoUnavailable:"위치를 확인할 수 없습니다. 위치 권한을 확인하세요.",
+    connected:"배차 담당자와 연결됨",
+    confirmDone:"지점을 완료했습니까? 이 표시는 취소할 수 없습니다.",
+    unitB:"B",
+    unitKB:"KB",
+    unitMB:"MB",
+    problemNoConnection:"배차 담당자와 연결되지 않습니다. 네트워크를 확인하세요.",
+    problemExpired:"링크가 더 이상 유효하지 않습니다. 새 링크를 요청하세요.",
+    problemRouteChanged:"운행이 방금 변경되었습니다. 새로 불러왔으니 확인 후 다시 시도하세요.",
+    problemTooLarge:"파일이 너무 큽니다.",
+    problemRefused:"작업에 실패했습니다. 다시 시도하세요."
   },
   ja: {
-    title:"Cargo Dispatch — 運行", language:"言語", loading:"読み込み中…", map:"地図", tripMap:"運行マップ", zoomIn:"拡大", zoomOut:"縮小", fit:"運行",
-    mapNote:"運行地点と最後に受信したドライバー位置を表示します。現在の geometry がある場合のみ道路線を表示します。",
-    route:"ルート", files:"文書 / 写真 / 動画", attach:"地点に関連付け", wholeTrip:"運行全体", file:"ファイル", camera:"写真 / 動画",
-    sendControl:"Control へ送信", location:"位置情報", noLocation:"まだ送信されていません", startLocation:"位置送信を開始", stop:"停止",
-    latestPosition:"最新のドライバー位置", version:"バージョン", change:"変更", noTrip:"運行にアクセスできません", completed:"完了", open:"未完了",
-    complete:"完了", moveUp:"地点を上へ", moveDown:"地点を下へ", rejectChange:"Control が変更を拒否しました",
-    routeChanged:"ルートが変更されたか Control が順序を拒否しました", openNavigation:"ナビを開く", noDocuments:"文書はまだありません",
-    fromOperator:"Control → ドライバー", fromDriver:"ドライバー → Control", bytes:"バイト", chooseMedia:"先にファイルまたは写真/動画を選択してください",
-    transferring:"送信中…", fileAccepted:"Control がファイルを受信しました", transferFailed:"送信に失敗しました",
-    retrySameId:"同じファイルの再試行では同じ ID を使用します。", geoUnsupported:"ブラウザは位置情報に対応していません",
-    geoHttps:"スマホブラウザの位置情報は通常 HTTPS が必要です。LAN HTTP はルートとファイルに使用できます。",
-    positionAccepted:"Control が位置を受信しました", positionRejected:"Control が位置を拒否しました", geoUnavailable:"位置情報を利用できません"
+    title:"Cargo Dispatch — 運行",
+    language:"言語",
+    loading:"読み込み中…",
+    map:"地図",
+    tripMap:"運行マップ",
+    zoomIn:"拡大",
+    zoomOut:"縮小",
+    fit:"運行",
+    mapNote:"運行の地点と最後に送信した位置です。道路線は配車担当が計算すると表示されます。",
+    route:"ルート",
+    files:"文書 / 写真 / 動画",
+    attach:"地点に関連付け",
+    wholeTrip:"運行全体",
+    file:"ファイル",
+    camera:"写真 / 動画",
+    sendControl:"配車担当に送る",
+    location:"位置情報",
+    noLocation:"まだ送信されていません",
+    startLocation:"位置送信を開始",
+    stop:"停止",
+    latestPosition:"最新のドライバー位置",
+    completed:"完了",
+    open:"未完了",
+    complete:"完了にする",
+    moveUp:"地点を上へ",
+    moveDown:"地点を下へ",
+    openNavigation:"ナビを開く",
+    noDocuments:"文書はまだありません",
+    fromOperator:"配車担当から",
+    fromDriver:"ドライバーから",
+    chooseMedia:"先にファイルまたは写真/動画を選択してください",
+    transferring:"送信中…",
+    fileAccepted:"配車担当がファイルを受け取りました",
+    transferFailed:"送信に失敗しました",
+    retrySameId:"同じファイルを再送しても重複しません。",
+    geoUnsupported:"ブラウザは位置情報に対応していません",
+    geoHttps:"スマートフォンのブラウザーは安全な接続（HTTPS）でのみ位置を送信します。経路とファイルはなくても使えます。",
+    positionAccepted:"配車担当が位置を受け取りました",
+    positionRejected:"位置を送信できませんでした",
+    geoUnavailable:"位置を取得できません。位置情報の許可を確認してください。",
+    connected:"配車担当に接続中",
+    confirmDone:"地点は完了しましたか？この記録は取り消せません。",
+    unitB:"B",
+    unitKB:"KB",
+    unitMB:"MB",
+    problemNoConnection:"配車担当に接続できません。ネットワークを確認してください。",
+    problemExpired:"リンクは無効です。新しいリンクを依頼してください。",
+    problemRouteChanged:"運行が変更されました。更新したので確認してやり直してください。",
+    problemTooLarge:"ファイルが大きすぎます。",
+    problemRefused:"操作に失敗しました。もう一度お試しください。"
   },
   "zh-Hans": {
-    title:"Cargo Dispatch — 行程", language:"语言", loading:"正在加载…", map:"地图", tripMap:"行程地图", zoomIn:"放大", zoomOut:"缩小", fit:"行程",
-    mapNote:"显示行程站点和最近接收的司机位置。只有存在当前 geometry 时才显示道路线。",
-    route:"路线", files:"文档 / 照片 / 视频", attach:"关联到站点", wholeTrip:"整个行程", file:"文件", camera:"照片 / 视频",
-    sendControl:"发送到 Control", location:"位置", noLocation:"尚未发送", startLocation:"开始发送位置", stop:"停止",
-    latestPosition:"最近司机位置", version:"版本", change:"变更", noTrip:"无法访问行程", completed:"已完成", open:"未完成",
-    complete:"已完成", moveUp:"上移站点", moveDown:"下移站点", rejectChange:"Control 拒绝了变更",
-    routeChanged:"路线已改变或 Control 拒绝了顺序", openNavigation:"打开导航", noDocuments:"尚无文档",
-    fromOperator:"Control → 司机", fromDriver:"司机 → Control", bytes:"字节", chooseMedia:"请先选择文件或照片/视频",
-    transferring:"正在发送…", fileAccepted:"Control 已接收文件", transferFailed:"传输失败",
-    retrySameId:"重试同一文件将使用相同 ID。", geoUnsupported:"浏览器不支持地理位置",
-    geoHttps:"手机浏览器通常要求 HTTPS 才能使用地理位置。LAN HTTP 仍可用于路线和文件。",
-    positionAccepted:"Control 已接收位置", positionRejected:"Control 拒绝了位置", geoUnavailable:"无法使用地理位置"
+    title:"Cargo Dispatch — 行程",
+    language:"语言",
+    loading:"正在加载…",
+    map:"地图",
+    tripMap:"行程地图",
+    zoomIn:"放大",
+    zoomOut:"缩小",
+    fit:"行程",
+    mapNote:"显示行程地点和最近发送的位置。调度员计算后显示道路线。",
+    route:"路线",
+    files:"文档 / 照片 / 视频",
+    attach:"关联到站点",
+    wholeTrip:"整个行程",
+    file:"文件",
+    camera:"照片 / 视频",
+    sendControl:"发送给调度员",
+    location:"位置",
+    noLocation:"尚未发送",
+    startLocation:"开始发送位置",
+    stop:"停止",
+    latestPosition:"最近司机位置",
+    completed:"已完成",
+    open:"未完成",
+    complete:"标记完成",
+    moveUp:"上移站点",
+    moveDown:"下移站点",
+    openNavigation:"打开导航",
+    noDocuments:"尚无文档",
+    fromOperator:"调度员发送",
+    fromDriver:"司机发送",
+    chooseMedia:"请先选择文件或照片/视频",
+    transferring:"正在发送…",
+    fileAccepted:"调度员已收到文件",
+    transferFailed:"传输失败",
+    retrySameId:"重新发送同一文件不会重复保存。",
+    geoUnsupported:"浏览器不支持地理位置",
+    geoHttps:"手机浏览器仅在安全连接（HTTPS）下发送位置。路线和文件不受影响。",
+    positionAccepted:"调度员已收到位置",
+    positionRejected:"位置未发送",
+    geoUnavailable:"无法确定位置，请检查定位权限。",
+    connected:"已连接调度员",
+    confirmDone:"该地点已完成？此标记无法撤销。",
+    unitB:"B",
+    unitKB:"KB",
+    unitMB:"MB",
+    problemNoConnection:"无法连接调度员，请检查网络。",
+    problemExpired:"链接已失效，请向调度员索取新链接。",
+    problemRouteChanged:"行程刚刚变更，已刷新，请核对后重试。",
+    problemTooLarge:"文件过大。",
+    problemRefused:"操作失败，请重试。"
   }
 };
 
@@ -586,22 +882,40 @@ function newDocumentId() {
 
 async function api(path, options) {
   const response = await fetch(endpoint(path), Object.assign({cache: "no-store"}, options || {}));
-  if (!response.ok) throw new Error("HTTP " + response.status);
+  if (!response.ok) {
+    const failure = new Error("HTTP " + response.status);
+    failure.status = response.status;
+    throw failure;
+  }
   return response;
+}
+
+function problemText(error) {
+  if (!error || error.status === undefined) return t("problemNoConnection");
+  if ([401, 403, 404].includes(error.status)) return t("problemExpired");
+  if (error.status === 409) return t("problemRouteChanged");
+  if (error.status === 413) return t("problemTooLarge");
+  return t("problemRefused");
+}
+
+function sizeText(bytes) {
+  if (bytes < 1024) return bytes + " " + t("unitB");
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " " + t("unitKB");
+  return (bytes / (1024 * 1024)).toFixed(1) + " " + t("unitMB");
 }
 
 async function loadTrip() {
   try {
     const response = await api("");
     currentTrip = await response.json();
-    document.getElementById("status").textContent =
-      t("version") + " " + currentTrip.trip_version + ", " + t("change") + " " + currentTrip.local_route_revision;
+    document.getElementById("status").textContent = t("connected");
+    document.getElementById("status").className = "";
     renderRoute();
     renderDocuments();
     renderLocation();
     updateTripMap();
   } catch (error) {
-    document.getElementById("status").textContent = t("noTrip");
+    document.getElementById("status").textContent = problemText(error);
     document.getElementById("status").className = "error";
   }
 }
@@ -645,11 +959,13 @@ function renderRoute() {
       done.type = "button";
       done.textContent = t("complete");
       done.addEventListener("click", async () => {
+        if (!confirm(t("confirmDone") + String.fromCharCode(10) + point.sequence + ". " + point.title)) return;
         try {
           await api("/complete/" + point.point_id, {method: "POST"});
           await loadTrip();
         } catch (error) {
-          alert(t("rejectChange") + ": " + error.message);
+          alert(problemText(error));
+          await loadTrip();
         }
       });
       actions.append(done);
@@ -678,7 +994,7 @@ function renderRoute() {
             });
             await loadTrip();
           } catch (error) {
-            alert(t("routeChanged") + ": " + error.message);
+            alert(problemText(error));
             await loadTrip();
           }
         });
@@ -722,7 +1038,7 @@ function renderDocuments() {
     link.href = endpoint("/documents/" + item.document_id);
     link.textContent = item.original_name;
     const direction = item.direction === "from_operator" ? t("fromOperator") : t("fromDriver");
-    row.append(link, " — " + direction + " — " + item.size + " " + t("bytes"));
+    row.append(link, " — " + direction + " — " + sizeText(item.size));
     list.append(row);
   }
   host.append(list);
@@ -787,7 +1103,7 @@ document.getElementById("sendFile").addEventListener("click", async () => {
     await loadTrip();
   } catch (error) {
     status.textContent =
-      t("transferFailed") + ": " + error.message + ". " + t("retrySameId");
+      t("transferFailed") + ". " + problemText(error) + " " + t("retrySameId");
     status.className = "error";
   }
 });
@@ -824,11 +1140,11 @@ document.getElementById("startLocation").addEventListener("click", () => {
       status.className = "ok";
       await loadTrip();
     } catch (error) {
-      status.textContent = t("positionRejected") + ": " + error.message;
+      status.textContent = t("positionRejected") + ". " + problemText(error);
       status.className = "error";
     }
-  }, error => {
-    status.textContent = t("geoUnavailable") + ": " + error.message;
+  }, () => {
+    status.textContent = t("geoUnavailable");
     status.className = "error";
   }, {enableHighAccuracy: true, maximumAge: 5000, timeout: 15000});
   document.getElementById("startLocation").disabled = true;
@@ -2570,6 +2886,22 @@ mod tests {
 
     #[test]
     fn driver_page_declares_phone_tablet_and_wide_layouts() {
+        // Every text the script asks for exists, failures are shown in the driver's
+        // language, and a stop is marked done only after a confirmation.
+        let catalog = &DRIVER_HTML[DRIVER_HTML.find("const I18N = {").expect("catalog")..];
+        let ukrainian = &catalog[..catalog.find("  en: {").expect("english block")];
+        for (at, _) in DRIVER_HTML.match_indices("t(\"") {
+            let before = DRIVER_HTML[..at].chars().next_back();
+            if before.is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
+                continue; // another function whose name ends with "t"
+            }
+            let call = &DRIVER_HTML[at + 3..];
+            let key = &call[..call.find('"').expect("closing quote")];
+            assert!(ukrainian.contains(&format!(" {key}:\"")), "missing text: {key}");
+        }
+        assert!(DRIVER_HTML.contains("confirm(t(\"confirmDone\")"));
+        assert!(DRIVER_HTML.contains("problemText(error)"));
+        assert!(!DRIVER_HTML.contains("error.message"));
         assert!(DRIVER_HTML.contains("id=\"mapSection\""));
         assert!(DRIVER_HTML.contains("id=\"tripMap\""));
         assert!(DRIVER_HTML.contains("tile.openstreetmap.org"));

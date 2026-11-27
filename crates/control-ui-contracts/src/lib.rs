@@ -1,5 +1,8 @@
 #![forbid(unsafe_code)]
 
+mod problems;
+pub use problems::{ProblemKind, classify_problem, localize_problem};
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
