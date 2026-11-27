@@ -3,14 +3,17 @@ package com.romanzavada.cargodispatch.driver
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.romanzavada.cargodispatch.driver.core.DriverProblem
 import com.romanzavada.cargodispatch.driver.core.RouteOrderPlanner
 import com.romanzavada.cargodispatch.driver.core.SessionLink
+import com.romanzavada.cargodispatch.driver.core.SessionLinkException
 import com.romanzavada.cargodispatch.driver.model.DriverTrip
 import com.romanzavada.cargodispatch.driver.model.LocationUpdate
 import com.romanzavada.cargodispatch.driver.net.ControlApi
 import com.romanzavada.cargodispatch.driver.net.ControlApiException
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,12 +21,14 @@ import kotlinx.coroutines.launch
 
 data class DriverUiState(
     val driverUrl: String = "",
-    val emulatorMode: Boolean = true,
+    val emulatorMode: Boolean = false,
     val connectedBaseUrl: String? = null,
     val trip: DriverTrip? = null,
     val busy: Boolean = false,
+    val offline: Boolean = false,
     val pendingOutbound: Int = 0,
-    val error: String? = null,
+    val rejected: List<PendingMediaMetadata> = emptyList(),
+    val problem: DriverProblem? = null,
 )
 
 class DriverViewModel(application: Application) : AndroidViewModel(application) {
@@ -34,11 +39,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private var api: ControlApi? = null
     private var pendingQueue: PendingOutboundQueue? = null
 
+    /** Grows with every action of the driver, so a slower background refresh is dropped. */
+    private var generation = 0
+
     fun setDriverUrl(value: String) {
         mutableState.value = mutableState.value.copy(
             driverUrl = value,
             pendingOutbound = 0,
-            error = null,
+            problem = null,
         )
     }
 
@@ -46,7 +54,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         mutableState.value = mutableState.value.copy(
             emulatorMode = value,
             pendingOutbound = 0,
-            error = null,
+            problem = null,
         )
     }
 
@@ -54,16 +62,17 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         mutableState.value = mutableState.value.copy(
             driverUrl = saved.driverUrl,
             emulatorMode = saved.emulatorMode,
-            error = null,
+            problem = null,
         )
         connect()
     }
 
-    fun reportError(message: String) {
-        mutableState.value = mutableState.value.copy(error = message)
+    fun reportProblem(problem: DriverProblem) {
+        mutableState.value = mutableState.value.copy(problem = problem)
     }
 
     fun disconnect() {
+        generation += 1
         api = null
         pendingQueue = null
         mutableState.value = DriverUiState(
@@ -74,64 +83,77 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     fun connect() {
         val current = mutableState.value
-        runCatching {
+        val target = try {
             SessionLink.parseDriverUrl(current.driverUrl, current.emulatorMode)
-        }.onFailure {
-            mutableState.value = current.copy(error = it.message ?: "Некоректний Driver URL")
-        }.onSuccess { target ->
-            val client = ControlApi(target.baseUrl, target.token)
-            val queue = PendingOutboundQueue.forSession(queueRoot, target.baseUrl, target.token)
-            api = client
-            pendingQueue = queue
-            mutableState.value = current.copy(busy = true, error = null)
-            viewModelScope.launch {
-                mutableState.value = runCatching {
-                    client.trip()
-                    flushPending(client, queue)
-                    val trip = client.trip()
-                    current.copy(
-                        connectedBaseUrl = target.baseUrl,
-                        trip = trip,
-                        pendingOutbound = queue.pendingCount(),
-                        error = null,
-                    )
-                }.getOrElse { problem ->
-                    current.copy(
-                        pendingOutbound = queue.pendingCount(),
-                        error = problem.message ?: problem::class.java.simpleName,
-                    )
-                }.copy(busy = false)
-            }
+        } catch (invalid: SessionLinkException) {
+            mutableState.value = current.copy(problem = invalid.problem)
+            return
+        }
+        val client = ControlApi(target.baseUrl, target.token)
+        val queue = PendingOutboundQueue.forSession(queueRoot, target.baseUrl, target.token)
+        api = client
+        pendingQueue = queue
+        request {
+            client.trip()
+            flush(client, queue)
+            val trip = client.trip()
+            mutableState.value = mutableState.value.copy(
+                connectedBaseUrl = target.baseUrl,
+                trip = trip,
+            )
         }
     }
 
     fun refresh() {
         val client = api ?: return
-        val queue = pendingQueue
-        mutableState.value = mutableState.value.copy(busy = true, error = null)
-        viewModelScope.launch {
-            mutableState.value = runCatching {
-                if (queue != null) {
-                    flushPending(client, queue)
-                }
-                mutableState.value.copy(
-                    trip = client.trip(),
-                    pendingOutbound = queue?.pendingCount() ?: 0,
-                    error = null,
-                )
-            }.getOrElse { problem ->
-                mutableState.value.copy(
-                    pendingOutbound = queue?.pendingCount() ?: 0,
-                    error = problem.message ?: problem::class.java.simpleName,
-                )
-            }.copy(busy = false)
+        val queue = pendingQueue ?: return
+        request {
+            flush(client, queue)
+            val trip = client.trip()
+            mutableState.value = mutableState.value.copy(trip = trip)
         }
+    }
+
+    /** Periodic update while the screen is open. It never blocks the buttons. */
+    suspend fun refreshQuietly() {
+        val client = api ?: return
+        val queue = pendingQueue ?: return
+        if (mutableState.value.busy || mutableState.value.trip == null) return
+        val startedAt = generation
+        try {
+            flush(client, queue)
+            val trip = client.trip()
+            if (generation != startedAt || api !== client) return
+            val current = mutableState.value
+            mutableState.value = current.copy(
+                trip = trip,
+                offline = false,
+                // A message about a lost connection is no longer true.
+                problem = current.problem.takeUnless { it == DriverProblem.NoConnection },
+            )
+        } catch (_: IOException) {
+            if (generation == startedAt) {
+                mutableState.value = mutableState.value.copy(offline = true)
+            }
+        } catch (failure: ControlApiException) {
+            if (generation == startedAt) {
+                mutableState.value = mutableState.value.copy(
+                    problem = DriverProblem.fromStatus(failure.statusCode),
+                )
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: RuntimeException) {
+            // An unreadable answer must not close the application; the next round retries.
+        }
+        updateQueueState(queue)
     }
 
     fun complete(pointId: String) {
         val client = api ?: return
-        launchRequest {
-            mutableState.value.copy(trip = client.complete(pointId), error = null)
+        request {
+            val trip = client.complete(pointId)
+            mutableState.value = mutableState.value.copy(trip = trip)
         }
     }
 
@@ -139,167 +161,112 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         val client = api ?: return
         val trip = mutableState.value.trip ?: return
         val order = RouteOrderPlanner.movedOpenPointIds(trip.points, pointId, delta) ?: return
-        launchRequest {
-            mutableState.value.copy(
-                trip = client.reorder(trip.localRouteRevision, order),
-                error = null,
-            )
+        request {
+            val updated = client.reorder(trip.localRouteRevision, order)
+            mutableState.value = mutableState.value.copy(trip = updated)
         }
     }
 
     fun sendLocation(update: LocationUpdate) {
         val client = api ?: return
         val queue = pendingQueue ?: return
-        mutableState.value = mutableState.value.copy(busy = true, error = null)
-        viewModelScope.launch {
-            runCatching {
-                queue.enqueueLocation(update)
-                val accepted = client.sendLocation(update)
-                queue.removeLocationThrough(accepted.observedAtUnixMs)
-                val current = mutableState.value
-                current.copy(
-                    trip = current.trip?.copy(latestLocation = accepted),
-                    pendingOutbound = queue.pendingCount(),
-                    error = null,
-                )
-            }.onSuccess {
-                mutableState.value = it.copy(busy = false)
-            }.onFailure { problem ->
-                when (problem) {
-                    is IOException -> {
-                        mutableState.value = mutableState.value.copy(
-                            busy = false,
-                            pendingOutbound = queue.pendingCount(),
-                            error = null,
-                        )
-                    }
-                    is ControlApiException -> {
-                        if (problem.statusCode == 409) {
-                            queue.removeLocationThrough(update.observedAtUnixMs)
-                        }
-                        val refreshed = runCatching { client.trip() }.getOrNull()
-                        mutableState.value = mutableState.value.copy(
-                            busy = false,
-                            trip = refreshed ?: mutableState.value.trip,
-                            pendingOutbound = queue.pendingCount(),
-                            error = if (problem.statusCode == 409) null else problem.message,
-                        )
-                    }
-                    else -> {
-                        mutableState.value = mutableState.value.copy(
-                            busy = false,
-                            pendingOutbound = queue.pendingCount(),
-                            error = problem.message ?: problem::class.java.simpleName,
-                        )
-                    }
-                }
-            }
+        request {
+            queue.enqueueLocation(update)
+            flush(client, queue)
+            val trip = client.trip()
+            mutableState.value = mutableState.value.copy(trip = trip)
         }
     }
 
     fun upload(upload: PickedUpload, pointId: String? = null) {
         val client = api ?: return
         val queue = pendingQueue ?: return
-        mutableState.value = mutableState.value.copy(busy = true, error = null)
-        viewModelScope.launch {
-            val documentId = ControlApi.newDocumentId()
-            val createdAtUnixMs = System.currentTimeMillis()
-            runCatching {
-                queue.enqueueMedia(
-                    documentId = documentId,
-                    upload = upload,
-                    pointId = pointId,
-                    createdAtUnixMs = createdAtUnixMs,
-                )
-                val trip = client.uploadDocument(
-                    documentId = documentId,
-                    originalName = upload.name,
-                    mimeType = upload.mimeType,
-                    bytes = upload.bytes,
-                    pointId = pointId,
-                    createdAtUnixMs = createdAtUnixMs,
-                )
-                queue.removeMedia(documentId)
-                mutableState.value.copy(
-                    trip = trip,
-                    pendingOutbound = queue.pendingCount(),
-                    error = null,
-                )
-            }.onSuccess {
-                mutableState.value = it.copy(busy = false)
-            }.onFailure { problem ->
-                mutableState.value = mutableState.value.copy(
-                    busy = false,
-                    pendingOutbound = queue.pendingCount(),
-                    error = if (problem is IOException) null
-                    else problem.message ?: problem::class.java.simpleName,
-                )
-            }
+        request {
+            val known = mutableState.value.trip?.points?.any { it.pointId == pointId } == true
+            queue.enqueueMedia(
+                documentId = ControlApi.newDocumentId(),
+                upload = upload,
+                pointId = pointId.takeIf { known },
+                createdAtUnixMs = System.currentTimeMillis(),
+            )
+            flush(client, queue)
+            val trip = client.trip()
+            mutableState.value = mutableState.value.copy(trip = trip)
         }
     }
 
-    fun download(documentId: String, onResult: (Result<ByteArray>) -> Unit) {
+    fun retryRejected(documentId: String) {
+        val queue = pendingQueue ?: return
+        viewModelScope.launch {
+            queue.retryRejected(documentId)
+            updateQueueState(queue)
+            refresh()
+        }
+    }
+
+    fun discardRejected(documentId: String) {
+        val queue = pendingQueue ?: return
+        viewModelScope.launch {
+            queue.removeMedia(documentId)
+            updateQueueState(queue)
+        }
+    }
+
+    fun download(documentId: String, onResult: (ByteArray) -> Unit) {
         val client = api ?: return
-        mutableState.value = mutableState.value.copy(busy = true, error = null)
-        viewModelScope.launch {
-            val result = runCatching { client.downloadDocument(documentId) }
-            result.exceptionOrNull()?.let { problem ->
-                mutableState.value = mutableState.value.copy(
-                    error = problem.message ?: problem::class.java.simpleName,
-                )
-            }
-            mutableState.value = mutableState.value.copy(busy = false)
-            onResult(result)
+        request {
+            onResult(client.downloadDocument(documentId))
         }
     }
 
-    private suspend fun flushPending(
-        client: ControlApi,
-        queue: PendingOutboundQueue,
-    ) {
-        queue.pendingLocation()?.let { update ->
-            try {
-                val accepted = client.sendLocation(update)
-                queue.removeLocationThrough(accepted.observedAtUnixMs)
-            } catch (problem: ControlApiException) {
-                if (problem.statusCode == 409) {
-                    queue.removeLocationThrough(update.observedAtUnixMs)
-                }
-            } catch (_: IOException) {
-                return
-            }
-        }
+    private suspend fun flush(client: ControlApi, queue: PendingOutboundQueue) {
+        OutboundSender.sendLocations(queue, client::sendLocation)
+        OutboundSender.sendMedia(client, queue)
+    }
 
-        for (pending in queue.pendingMedia()) {
-            val item = pending.metadata
-            try {
-                client.uploadDocument(
-                    documentId = item.documentId,
-                    originalName = item.originalName,
-                    mimeType = item.mimeType,
-                    bytes = pending.bytes,
-                    pointId = item.pointId,
-                    createdAtUnixMs = item.createdAtUnixMs,
-                )
-                queue.removeMedia(item.documentId)
-            } catch (_: IOException) {
-                return
-            } catch (_: ControlApiException) {
-                // Permanent conflict/rejection remains queued for visible manual attention.
-            }
+    private suspend fun updateQueueState(queue: PendingOutboundQueue) {
+        val pending = queue.pendingCount()
+        val rejected = queue.rejectedMedia()
+        if (pendingQueue === queue) {
+            mutableState.value = mutableState.value.copy(
+                pendingOutbound = pending,
+                rejected = rejected,
+            )
         }
     }
 
-    private fun launchRequest(block: suspend () -> DriverUiState) {
-        mutableState.value = mutableState.value.copy(busy = true, error = null)
+    /** One action of the driver: shows progress and turns failures into a message. */
+    private fun request(block: suspend () -> Unit) {
+        generation += 1
+        val queue = pendingQueue
+        mutableState.value = mutableState.value.copy(busy = true, problem = null)
         viewModelScope.launch {
-            mutableState.value = runCatching { block() }
-                .getOrElse { problem ->
-                    mutableState.value.copy(
-                        error = problem.message ?: problem::class.java.simpleName,
-                    )
+            var problem: DriverProblem? = null
+            var offline = false
+            try {
+                block()
+            } catch (_: IOException) {
+                problem = DriverProblem.NoConnection
+                offline = true
+            } catch (failure: ControlApiException) {
+                problem = DriverProblem.fromStatus(failure.statusCode)
+                if (problem == DriverProblem.RouteChanged) {
+                    runCatching { api?.trip() }.getOrNull()?.let { trip ->
+                        mutableState.value = mutableState.value.copy(trip = trip)
+                    }
                 }
-                .copy(busy = false)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: RuntimeException) {
+                problem = DriverProblem.Unknown
+            }
+            queue?.let { updateQueueState(it) }
+            mutableState.value = mutableState.value.copy(
+                busy = false,
+                offline = offline,
+                // Keep a message that the action itself reported (for example a save failure).
+                problem = problem ?: mutableState.value.problem,
+            )
         }
     }
 }

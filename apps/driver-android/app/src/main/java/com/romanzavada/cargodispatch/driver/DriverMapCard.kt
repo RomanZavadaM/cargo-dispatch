@@ -37,6 +37,10 @@ fun DriverMapCard(trip: DriverTrip) {
             onCreate(null)
         }
     }
+    // The trip is refreshed while the screen is open: redraw only what changed and
+    // move the camera only when the route itself changes, not with every position.
+    val drawn = remember { DrawnMap() }
+    val route = remember(trip) { trip.points.map { it.pointId to it.navigation } }
 
     DisposableEffect(lifecycleOwner, mapView) {
         val observer = LifecycleEventObserver { _, event ->
@@ -82,9 +86,13 @@ fun DriverMapCard(trip: DriverTrip) {
                     modifier = Modifier.fillMaxWidth().height(300.dp),
                     factory = { mapView },
                     update = { view ->
+                        if (drawn.style == styleJson) return@AndroidView
+                        drawn.style = styleJson
                         view.getMapAsync { map ->
                             map.uiSettings.isAttributionEnabled = true
                             map.setStyle(Style.Builder().fromJson(styleJson)) {
+                                if (drawn.route == route) return@setStyle
+                                drawn.route = route
                                 when {
                                     extent.size >= 2 -> {
                                         val bounds = LatLngBounds.Builder()
@@ -118,4 +126,9 @@ fun DriverMapCard(trip: DriverTrip) {
             )
         }
     }
+}
+
+private class DrawnMap {
+    var style: String? = null
+    var route: Any? = null
 }

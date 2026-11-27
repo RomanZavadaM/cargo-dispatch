@@ -6,13 +6,19 @@ final class DriverStore: ObservableObject {
     @Published var driverURL: String
     @Published var trip: DriverTrip?
     @Published var busy = false
+    @Published var offline = false
     @Published var pendingOutbound = 0
-    @Published var errorKey: String?
+    @Published var rejected: [PendingMediaMetadata] = []
+    @Published var problem: DriverProblem?
 
     private var api: ControlAPI?
     private var pendingQueue: PendingOutboundQueue?
+    private let sender = OutboundSender()
     private let sessionStore: SecureSessionStore
     private let queueBaseRoot: URL
+
+    /// Grows with every action of the driver, so a slower background refresh is dropped.
+    private var generation = 0
 
     init(
         defaults: UserDefaults = .standard,
@@ -43,86 +49,101 @@ final class DriverStore: ObservableObject {
     }
 
     func connect() {
+        let target: SessionTarget
         do {
-            let target = try SessionLink.parseDriverURL(driverURL)
-            let client = ControlAPI(baseURL: target.baseURL, token: target.token)
-            let queue = PendingOutboundQueue.forSession(
-                baseRoot: queueBaseRoot,
-                baseURL: target.baseURL,
-                token: target.token
-            )
-            api = client
-            pendingQueue = queue
-            busy = true
-            errorKey = nil
-
-            Task {
-                do {
-                    _ = try await client.trip()
-                    do {
-                        // The first successful authenticated trip read proves the
-                        // Driver session is valid. Persist it securely before any
-                        // queue flushing or follow-up refresh so a fast app stop
-                        // cannot leave the legacy raw URL on disk.
-                        try sessionStore.save(driverURL: driverURL)
-                    } catch {
-                        // Keep the live in-memory session, but never fall back
-                        // to persisting a raw token if Keychain storage fails.
-                        sessionStore.clear()
-                    }
-                    await flushPending(client: client, queue: queue)
-                    trip = try await client.trip()
-                    pendingOutbound = await queue.pendingCount()
-                } catch {
-                    pendingOutbound = await queue.pendingCount()
-                    errorKey = "error.connection"
-                }
-                busy = false
-            }
+            target = try SessionLink.parseDriverURL(driverURL)
+        } catch SessionLinkError.unsupportedScheme {
+            problem = .linkScheme
+            return
+        } catch SessionLinkError.invalidURL {
+            problem = .linkInvalid
+            return
         } catch {
-            errorKey = "error.invalid_driver_url"
+            problem = .linkShape
+            return
+        }
+
+        let client = ControlAPI(baseURL: target.baseURL, token: target.token)
+        let queue = PendingOutboundQueue.forSession(
+            baseRoot: queueBaseRoot,
+            baseURL: target.baseURL,
+            token: target.token
+        )
+        api = client
+        pendingQueue = queue
+
+        perform {
+            _ = try await client.trip()
+            do {
+                // The first successful authenticated trip read proves the Driver
+                // session is valid. Persist it securely before any queue flushing
+                // or follow-up refresh so a fast app stop cannot leave the legacy
+                // raw URL on disk.
+                try self.sessionStore.save(driverURL: self.driverURL)
+            } catch {
+                // Keep the live in-memory session, but never fall back to
+                // persisting a raw token if Keychain storage fails.
+                self.sessionStore.clear()
+            }
+            await self.flush(client: client, queue: queue)
+            self.trip = try await client.trip()
         }
     }
 
     func disconnect() {
+        generation += 1
         api = nil
         pendingQueue = nil
         trip = nil
+        offline = false
+        problem = nil
         pendingOutbound = 0
+        rejected = []
         sessionStore.clear()
     }
 
     func refresh() {
         guard let api, let pendingQueue else { return }
-        busy = true
-        errorKey = nil
-        Task {
-            await flushPending(client: api, queue: pendingQueue)
-            do {
-                trip = try await api.trip()
-            } catch {
-                errorKey = "error.connection"
-            }
-            pendingOutbound = await pendingQueue.pendingCount()
-            busy = false
+        perform {
+            await self.flush(client: api, queue: pendingQueue)
+            self.trip = try await api.trip()
         }
     }
 
-    func retryPending() {
-        guard let api, let pendingQueue else { return }
-        Task {
-            await flushPending(client: api, queue: pendingQueue)
-            if let refreshed = try? await api.trip() {
-                trip = refreshed
+    /// Periodic update while the screen is open. It never blocks the buttons.
+    func refreshQuietly() async {
+        guard let client = api, let queue = pendingQueue, !busy else { return }
+        let startedAt = generation
+        await flush(client: client, queue: queue)
+        do {
+            let fetched = try await client.trip()
+            guard generation == startedAt, api === client else { return }
+            if trip != fetched {
+                trip = fetched
             }
-            pendingOutbound = await pendingQueue.pendingCount()
+            offline = false
+            // A message about a lost connection is no longer true.
+            if problem == .noConnection {
+                problem = nil
+            }
+        } catch is URLError {
+            if generation == startedAt {
+                offline = true
+            }
+        } catch let error as ControlAPIError {
+            if generation == startedAt {
+                problem = Self.problem(for: error)
+            }
+        } catch {
+            // An unreadable answer must not disturb the driver; the next round retries.
         }
+        await updateQueueState(queue)
     }
 
     func complete(pointId: String) {
         guard let api else { return }
-        runTrip {
-            try await api.complete(pointId: pointId)
+        perform {
+            self.trip = try await api.complete(pointId: pointId)
         }
     }
 
@@ -135,56 +156,47 @@ final class DriverStore: ObservableObject {
         ) else {
             return
         }
-        runTrip {
-            try await api.reorder(
+        perform {
+            self.trip = try await api.reorder(
                 basedOnRevision: trip.localRouteRevision,
                 openPointIds: ids
             )
         }
     }
 
-    func sendLocation(_ update: LocationUpdate, showBusy: Bool = true) {
+    func sendLocation(_ update: LocationUpdate) {
         guard let api, let pendingQueue else { return }
-        if showBusy {
-            busy = true
+        perform {
+            try await pendingQueue.enqueueLocation(update)
+            await self.flush(client: api, queue: pendingQueue)
+            self.trip = try await api.trip()
         }
-        errorKey = nil
+    }
+
+    /// A position from background tracking: recorded and sent without touching the screen.
+    func trackLocation(_ update: LocationUpdate) {
+        guard let client = api, let queue = pendingQueue else { return }
         Task {
             do {
-                try await pendingQueue.enqueueLocation(update)
-                let accepted = try await api.sendLocation(update)
-                try await pendingQueue.removeLocation(through: accepted.observedAtUnixMs)
-                if let current = trip {
-                    trip = DriverTrip(
-                        tripId: current.tripId,
-                        tripVersion: current.tripVersion,
-                        localRouteRevision: current.localRouteRevision,
-                        points: current.points,
-                        roadGeometry: current.roadGeometry,
-                        documents: current.documents,
-                        latestLocation: accepted
-                    )
-                }
-            } catch is URLError {
-                errorKey = nil
-            } catch let apiError as ControlAPIError {
-                switch apiError {
-                case let .http(status, _) where status == 409:
-                    try? await pendingQueue.removeLocation(through: update.observedAtUnixMs)
-                    if let refreshed = try? await api.trip() {
-                        trip = refreshed
-                    }
-                    errorKey = nil
-                default:
-                    errorKey = "error.location"
-                }
+                try await queue.enqueueLocation(update)
             } catch {
-                errorKey = "error.location"
+                problem = .unknown
             }
-            pendingOutbound = await pendingQueue.pendingCount()
-            if showBusy {
-                busy = false
+            let accepted = await sender.sendLocations(queue: queue) {
+                try await client.sendLocation($0)
             }
+            if let accepted, let current = trip, api === client {
+                trip = DriverTrip(
+                    tripId: current.tripId,
+                    tripVersion: current.tripVersion,
+                    localRouteRevision: current.localRouteRevision,
+                    points: current.points,
+                    roadGeometry: current.roadGeometry,
+                    documents: current.documents,
+                    latestLocation: accepted
+                )
+            }
+            await updateQueueState(queue)
         }
     }
 
@@ -198,111 +210,99 @@ final class DriverStore: ObservableObject {
 
         let documentId = ControlAPI.newDocumentId()
         let createdAtUnixMs = UInt64(max(0, Date().timeIntervalSince1970 * 1000))
+        let known = trip?.points.contains { $0.pointId == pointId } ?? false
 
-        busy = true
-        errorKey = nil
+        perform {
+            try await pendingQueue.enqueueMedia(
+                documentId: documentId,
+                originalName: name,
+                mimeType: mimeType,
+                data: data,
+                pointId: known ? pointId : nil,
+                createdAtUnixMs: createdAtUnixMs
+            )
+            await self.flush(client: api, queue: pendingQueue)
+            self.trip = try await api.trip()
+        }
+    }
+
+    func retryRejected(documentId: String) {
+        guard let pendingQueue else { return }
         Task {
-            do {
-                try await pendingQueue.enqueueMedia(
-                    documentId: documentId,
-                    originalName: name,
-                    mimeType: mimeType,
-                    data: data,
-                    pointId: pointId,
-                    createdAtUnixMs: createdAtUnixMs
-                )
+            try? await pendingQueue.retryRejected(documentId: documentId)
+            await updateQueueState(pendingQueue)
+            refresh()
+        }
+    }
 
-                trip = try await api.uploadDocument(
-                    documentId: documentId,
-                    originalName: name,
-                    mimeType: mimeType,
-                    data: data,
-                    pointId: pointId,
-                    createdAtUnixMs: createdAtUnixMs
-                )
-                try await pendingQueue.removeMedia(documentId: documentId)
-            } catch is URLError {
-                errorKey = nil
-            } catch {
-                errorKey = "error.file"
-            }
-            pendingOutbound = await pendingQueue.pendingCount()
-            busy = false
+    func discardRejected(documentId: String) {
+        guard let pendingQueue else { return }
+        Task {
+            try? await pendingQueue.removeMedia(documentId: documentId)
+            await updateQueueState(pendingQueue)
         }
     }
 
     func download(
         document: DriverDocument,
-        completion: @escaping (Result<Data, Error>) -> Void
+        completion: @escaping @MainActor (Data) -> Void
     ) {
         guard let api else { return }
-        busy = true
-        errorKey = nil
-        Task {
-            do {
-                completion(.success(try await api.downloadDocument(documentId: document.documentId)))
-            } catch {
-                errorKey = "error.connection"
-                completion(.failure(error))
-            }
-            busy = false
+        perform {
+            completion(try await api.downloadDocument(documentId: document.documentId))
         }
     }
 
-    func reportError(_ key: String) {
-        errorKey = key
+    func report(_ problem: DriverProblem) {
+        self.problem = problem
     }
 
-    private func flushPending(
-        client: ControlAPI,
-        queue: PendingOutboundQueue
-    ) async {
-        if let update = await queue.pendingLocation() {
+    private static func problem(for error: ControlAPIError) -> DriverProblem {
+        if case let .http(status, _) = error {
+            return DriverProblem.fromStatus(status)
+        }
+        return .unknown
+    }
+
+    private func flush(client: ControlAPI, queue: PendingOutboundQueue) async {
+        await sender.sendLocations(queue: queue) {
+            try await client.sendLocation($0)
+        }
+        await sender.sendMedia(client: client, queue: queue)
+    }
+
+    private func updateQueueState(_ queue: PendingOutboundQueue) async {
+        let count = await queue.pendingCount()
+        let refused = await queue.rejectedMedia()
+        if pendingQueue === queue {
+            pendingOutbound = count
+            rejected = refused
+        }
+    }
+
+    /// One action of the driver: shows progress and turns failures into a message.
+    private func perform(_ operation: @escaping @MainActor () async throws -> Void) {
+        generation += 1
+        busy = true
+        problem = nil
+        let queue = pendingQueue
+        Task {
             do {
-                let accepted = try await client.sendLocation(update)
-                try await queue.removeLocation(through: accepted.observedAtUnixMs)
+                try await operation()
+                offline = false
             } catch is URLError {
-                return
-            } catch let apiError as ControlAPIError {
-                if case let .http(status, _) = apiError, status == 409 {
-                    try? await queue.removeLocation(through: update.observedAtUnixMs)
+                problem = .noConnection
+                offline = true
+            } catch let error as ControlAPIError {
+                problem = Self.problem(for: error)
+                if problem == .routeChanged, let api, let refreshed = try? await api.trip() {
+                    trip = refreshed
                 }
             } catch {
-                return
+                problem = .unknown
             }
-        }
-
-        for pending in await queue.pendingMedia() {
-            let item = pending.metadata
-            do {
-                _ = try await client.uploadDocument(
-                    documentId: item.documentId,
-                    originalName: item.originalName,
-                    mimeType: item.mimeType,
-                    data: pending.data,
-                    pointId: item.pointId,
-                    createdAtUnixMs: item.createdAtUnixMs
-                )
-                try await queue.removeMedia(documentId: item.documentId)
-            } catch is URLError {
-                return
-            } catch is ControlAPIError {
-                // Keep permanent server conflicts visible in the queue for manual attention.
-                continue
-            } catch {
-                return
-            }
-        }
-    }
-
-    private func runTrip(_ operation: @escaping () async throws -> DriverTrip) {
-        busy = true
-        errorKey = nil
-        Task {
-            do {
-                trip = try await operation()
-            } catch {
-                errorKey = "error.connection"
+            if let queue {
+                await updateQueueState(queue)
             }
             busy = false
         }
