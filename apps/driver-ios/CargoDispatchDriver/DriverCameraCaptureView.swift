@@ -19,7 +19,7 @@ enum DriverCameraMode: String, Identifiable {
 }
 
 struct DriverCapturedMedia {
-    let data: Data
+    let file: URL
     let name: String
     let mimeType: String
 }
@@ -58,7 +58,7 @@ struct DriverCameraCaptureView: UIViewControllerRepresentable {
                     parent.onResult(
                         .success(
                             DriverCapturedMedia(
-                                data: data,
+                                file: try DriverStaging.write(data),
                                 name: "driver-photo-\(Self.timestamp()).jpg",
                                 mimeType: "image/jpeg"
                             )
@@ -71,7 +71,7 @@ struct DriverCameraCaptureView: UIViewControllerRepresentable {
                     parent.onResult(
                         .success(
                             DriverCapturedMedia(
-                                data: try Data(contentsOf: url),
+                                file: try DriverStaging.copy(url),
                                 name: "driver-video-\(Self.timestamp()).mov",
                                 mimeType: "video/quicktime"
                             )

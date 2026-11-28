@@ -107,7 +107,7 @@ func mediaPayloadAndStableDocumentIdSurviveRestart() async throws {
         documentId: documentId,
         originalName: "proof.jpg",
         mimeType: "image/jpeg",
-        data: bytes,
+        source: try temporaryFile(bytes),
         pointId: "51515151515151515151515151515151",
         createdAtUnixMs: 300
     )
@@ -118,7 +118,8 @@ func mediaPayloadAndStableDocumentIdSurviveRestart() async throws {
     #expect(pending[0].documentId == documentId)
     #expect(pending[0].originalName == "proof.jpg")
     #expect(pending[0].mimeType == "image/jpeg")
-    #expect(await reopened.readMedia(pending[0]) == bytes)
+    let kept = try #require(await reopened.mediaFile(pending[0]))
+    #expect(try Data(contentsOf: kept) == bytes)
     #expect(await reopened.pendingCount() == 1)
 
     try await reopened.removeMedia(documentId: documentId)
@@ -137,7 +138,7 @@ func aRefusedFileStaysVisibleUntilTheDriverDecides() async throws {
         documentId: documentId,
         originalName: "big.mp4",
         mimeType: "video/mp4",
-        data: Data([1]),
+        source: try temporaryFile(Data([1])),
         createdAtUnixMs: 1
     )
     try await queue.markRejected(documentId: documentId, status: 413)
@@ -165,4 +166,11 @@ func sessionQueueDirectoryDoesNotExposeDriverToken() async {
     #expect(await queue.pendingCount() == 0)
     let names = (try? FileManager.default.contentsOfDirectory(atPath: base.path)) ?? []
     #expect(!names.contains(where: { $0.contains(token) }))
+}
+
+private func temporaryFile(_ bytes: Data) throws -> URL {
+    let url = FileManager.default.temporaryDirectory
+        .appending(path: "source-\(UUID().uuidString)")
+    try bytes.write(to: url)
+    return url
 }
