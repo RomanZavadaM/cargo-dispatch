@@ -113,6 +113,65 @@ try {
   expect(sent && sent.direction === "from_driver" && sent.point_id === pointId,
     "a file sent from the page reaches Control attached to the stop");
 
+  // Several megabytes travel in parts; one lost answer costs one part.
+  const bigFile = name => `new File([Uint8Array.from({ length: 2621440 }, (_, i) => i % 251)],
+    "${name}", { type: "video/mp4", lastModified: 1 })`;
+  const choose = name => `{
+    const data = new DataTransfer();
+    data.items.add(${bigFile(name)});
+    document.getElementById("file").files = data.files;
+    document.getElementById("fileStatus").textContent = "";
+    document.getElementById("sendFile").click();
+  } true`;
+  const watch = failure => evaluate(`{
+    window.sentParts = [];
+    window.realFetch = window.realFetch || window.fetch;
+    window.fetch = (url, options) => {
+      const offset = new URL(url, location.href).searchParams.get("offset");
+      if (options && options.method === "POST" && offset !== null) {
+        window.sentParts.push(Number(offset));
+        const answer = (${failure})(Number(offset));
+        if (answer) return answer;
+      }
+      return window.realFetch(url, options);
+    };
+  } true`);
+  const accepted = pageHas('document.getElementById("fileStatus").textContent === "Диспетчер отримав файл"');
+  const arrives = async name => {
+    const item = (await trip()).documents.find(document => document.original_name === name);
+    const bytes = new Uint8Array(await (await fetch(`${apiUrl}/documents/${item.document_id}`)).arrayBuffer());
+    return bytes.length === 2621440 && bytes.every((value, i) => value === i % 251);
+  };
+
+  await watch(`offset => {
+    if (offset !== 1048576 || window.dropped) return null;
+    window.dropped = true;
+    return Promise.reject(new TypeError("connection lost"));
+  }`);
+  await evaluate(choose("dropped.mp4"));
+  await waitFor("file accepted after a lost part", accepted, 30000);
+  expect(JSON.stringify(await evaluate("window.sentParts")) === "[0,1048576,1048576,2097152]",
+    "only the lost part is sent again");
+  expect(await arrives("dropped.mp4"), "the file sent in parts is the same file");
+
+  // A refusal stops the transfer; the same file chosen after a reload continues.
+  await watch(`offset => offset === 1048576
+    ? Promise.resolve(new Response("", { status: 403 })) : null`);
+  await evaluate(choose("reload.mp4"));
+  await waitFor("transfer stopped", pageHas('document.getElementById("fileStatus").className === "error"'));
+  expect(!(await trip()).documents.some(item => item.original_name === "reload.mp4"),
+    "an unfinished file is not a document");
+  await send("Page.reload");
+  await waitFor("page loads again", pageHas(
+    'document.readyState === "complete" && document.querySelectorAll("#points .point").length === 4'));
+  await watch("() => null");
+  await evaluate(choose("reload.mp4"));
+  await waitFor("file accepted after a reload", accepted, 30000);
+  expect(JSON.stringify(await evaluate("window.sentParts")) === "[1048576,2097152]",
+    "the transfer continues where it stopped");
+  expect(await arrives("reload.mp4"), "the resumed file is the same file");
+  await evaluate("window.fetch = window.realFetch; true");
+
   await evaluate(`
     window.shownAlerts = [];
     window.alert = message => window.shownAlerts.push(message);
