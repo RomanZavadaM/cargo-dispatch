@@ -2,10 +2,10 @@
 
 use cargo_dispatch_contracts::{
     CURRENT_SCHEMA_VERSION, PackageContentFingerprint, PlannedCargoBasis, PlannedDistance,
-    PlannedDistanceSource, PlannedRouteEstimate, ReplanRequest,
-    TRIP_PACKAGE_SCHEMA_NAME, TripNavigationTarget, TripPackageHeader, TripPlanningBasis,
-    TripPointKind, TripRoadGeometry, TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity,
-    TripVersion, validate_route_points, validate_trip_planning_basis, validate_trip_road_geometry,
+    PlannedDistanceSource, PlannedRouteEstimate, ReplanRequest, TRIP_PACKAGE_SCHEMA_NAME,
+    TripNavigationTarget, TripPackageHeader, TripPlanningBasis, TripPointKind, TripRoadGeometry,
+    TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity, TripVersion, validate_route_points,
+    validate_trip_planning_basis, validate_trip_road_geometry,
 };
 use cargo_dispatch_control::{
     ImportResult, InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft,

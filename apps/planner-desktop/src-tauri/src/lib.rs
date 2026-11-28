@@ -510,7 +510,14 @@ impl PlannerDesktopService {
 
         // Read before the route is locked; the two are never held together.
         let vehicle = self.vehicle()?;
-        let (working_route_id, revision, route, planning_basis, typed_left_out, last_export_version) = {
+        let (
+            working_route_id,
+            revision,
+            route,
+            planning_basis,
+            typed_left_out,
+            last_export_version,
+        ) = {
             let state = self
                 .inner
                 .lock()
@@ -1317,7 +1324,9 @@ mod tests {
         extract::State as AxumState,
         routing::{get, post},
     };
-    use cargo_dispatch_planner_ui_contracts::{FigureDraft, FiguresDraft, PlannerPackageCargoInput};
+    use cargo_dispatch_planner_ui_contracts::{
+        FigureDraft, FiguresDraft, PlannerPackageCargoInput,
+    };
     use serde_json::{Value, json};
     use std::{
         sync::{Arc, Mutex as StdMutex},
@@ -1846,8 +1855,8 @@ mod tests {
         assert!(!stale.distance_typed && stale.typed_left_out);
         assert_eq!(stale.drive_minutes, None);
 
-        let problem = export("estimate-4.zip", nothing(), typed("9:75", now))
-            .expect_err("unreadable time");
+        let problem =
+            export("estimate-4.zip", nothing(), typed("9:75", now)).expect_err("unreadable time");
         assert!(problem.starts_with("The typed driving time"));
         assert!(!journal.with_extension("estimate-4.zip").exists());
 

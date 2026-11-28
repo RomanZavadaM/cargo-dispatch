@@ -257,7 +257,9 @@ pub fn validate_trip_planning_basis(
         return Err(PlanningBasisError::VehicleTypeRequired);
     }
     if let Some(estimate) = basis.route_estimate
-        && (estimate.distance.is_some_and(|distance| distance.meters == 0)
+        && (estimate
+            .distance
+            .is_some_and(|distance| distance.meters == 0)
             || estimate.drive_minutes == Some(0)
             || (estimate.distance.is_none() && estimate.drive_minutes.is_none()))
     {

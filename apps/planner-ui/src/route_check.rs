@@ -93,7 +93,10 @@ fn figure_field(
 }
 
 /// What the exported package says about distance and time.
-pub(crate) fn package_figures(locale: UiLocale, result: &PlannerPackageExportResult) -> Vec<String> {
+pub(crate) fn package_figures(
+    locale: UiLocale,
+    result: &PlannerPackageExportResult,
+) -> Vec<String> {
     let say = |key| text(locale, key);
     let mut lines = Vec::new();
     if let Some(meters) = result.distance_m {

@@ -8,11 +8,12 @@ use cargo_dispatch_planner::proposals::{
     propose_routes, straight_line_km,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    AppliedPlanView, ApplyPlanInput, FigureDraft, FiguresDraft, InputVehicle, INPUT_SCHEMA_VERSION, InputOrder, InputPlace, MapLinkError,
-    MapService, Money, OLDER_INPUT_SCHEMA_VERSION, PackageDraft, PlanKind, PlanProposalSetView,
-    PlanProposalView, PlanStopAction, PlanStopView, PlannerPackageCargoInput, PlanningInput,
-    PlanningStateView, ProposeInput, RoadState, SkipReason, SkippedOrder, VehicleType,
-    VehicleTypeName, parse_distance_km, parse_drive_minutes, parse_moment, validate_input,
+    AppliedPlanView, ApplyPlanInput, FigureDraft, FiguresDraft, INPUT_SCHEMA_VERSION, InputOrder,
+    InputPlace, InputVehicle, MapLinkError, MapService, Money, OLDER_INPUT_SCHEMA_VERSION,
+    PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopView,
+    PlannerPackageCargoInput, PlanningInput, PlanningStateView, ProposeInput, RoadState,
+    SkipReason, SkippedOrder, VehicleType, VehicleTypeName, parse_distance_km, parse_drive_minutes,
+    parse_moment, validate_input,
 };
 
 const PLANNING_FILE: &str = "planner-input-v1.json";
@@ -770,8 +771,7 @@ pub(crate) fn planner_planning_apply(
 mod tests {
     use super::*;
     use cargo_dispatch_planner_ui_contracts::{
-        CargoRowDraft, InputCargo, PlanStopRef, PlannerTollPreference,
-        ProfileDraft,
+        CargoRowDraft, InputCargo, PlanStopRef, PlannerTollPreference, ProfileDraft,
     };
 
     fn order(id: &str, from: f64, to: f64) -> InputOrder {
