@@ -4,7 +4,7 @@
 
 Dispatching for a cargo fleet: planning a trip, handing it over for execution, staying in touch with the driver, and recording what actually happened. The main development language is **Rust**.
 
-**Stable version: [v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0).** Development continues; test builds are listed under [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
+**Stable version: [v0.4.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.4.0).** Development continues; test builds are listed under [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
 ## Components
 
@@ -46,6 +46,7 @@ Control is the only source of truth for an active trip. It serves the page, rout
 **Driver: browser, Android, iPhone and iPad**
 - route and map, marking a stop as done, reordering open stops;
 - receiving documents; sending files, photos and videos;
+- files travel in parts and continue after a broken connection;
 - position sharing; in the apps also in the background, switched on and off explicitly, with a retry queue;
 - marking a stop as done asks for confirmation; the apps also offer a navigator button, attaching a file to a stop, a self-refreshing screen, keeping the travelled track without a connection (up to 500 positions) and visible refused files.
 

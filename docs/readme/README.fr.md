@@ -4,7 +4,7 @@
 
 Régulation d'une flotte de fret : planifier un trajet, le confier à l'exécution, rester en contact avec le conducteur et consigner ce qui s'est réellement passé. Le langage principal de développement est **Rust**.
 
-**Version stable : [v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0).** Le développement continue ; les versions d'essai figurent dans [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
+**Version stable : [v0.4.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.4.0).** Le développement continue ; les versions d'essai figurent dans [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
 ## Composants
 
@@ -46,6 +46,7 @@ Control est la seule source de vérité d'un trajet en cours. Il fournit au cond
 **Conducteur : navigateur, Android, iPhone et iPad**
 - itinéraire et carte, point marqué comme fait, réordonnancement des points ouverts ;
 - réception de documents ; envoi de fichiers, photos et vidéos ;
+- les fichiers passent par morceaux et reprennent après une coupure ;
 - partage de la position ; dans les applications aussi en arrière-plan, activé et arrêté explicitement, avec file de renvoi;
 - la validation d'un point demande une confirmation ; les applications offrent aussi un bouton de navigation, le rattachement d'un fichier à un point, un écran qui s'actualise seul, la conservation du parcours sans réseau (jusqu'à 500 positions) et les fichiers refusés visibles.
 

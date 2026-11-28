@@ -4,7 +4,7 @@
 
 Despacho de una flota de carga: planificar un viaje, entregarlo para su ejecución, mantener contacto con el conductor y registrar lo que realmente ocurrió. El lenguaje principal de desarrollo es **Rust**.
 
-**Versión estable: [v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0).** El desarrollo continúa; las versiones de prueba están en [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
+**Versión estable: [v0.4.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.4.0).** El desarrollo continúa; las versiones de prueba están en [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
 ## Componentes
 
@@ -46,6 +46,7 @@ Control es la única fuente de verdad de un viaje activo. Entrega al conductor l
 **Conductor: navegador, Android, iPhone y iPad**
 - ruta y mapa, marcar un punto como hecho, reordenar puntos abiertos;
 - recibir documentos; enviar archivos, fotos y vídeos;
+- los archivos van por partes y continúan tras un corte;
 - compartir la posición; en las aplicaciones también en segundo plano, activado y detenido expresamente, con cola de reenvío;
 - marcar un punto como hecho pide confirmación; las aplicaciones ofrecen además un botón de navegador, asociar un archivo a un punto, una pantalla que se actualiza sola, la conservación del recorrido sin conexión (hasta 500 posiciones) y los archivos rechazados visibles.
 
