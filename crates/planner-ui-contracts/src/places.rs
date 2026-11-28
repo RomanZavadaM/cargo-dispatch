@@ -166,10 +166,7 @@ fn coordinates(text: &str) -> Option<(f64, f64)> {
 
 /// `49.5, 24.5`, with or without brackets. Both numbers need a fraction.
 fn decimal_pair(text: &str) -> Option<(f64, f64)> {
-    let plain = text
-        .trim()
-        .trim_start_matches('(')
-        .trim_end_matches(')');
+    let plain = text.trim().trim_start_matches('(').trim_end_matches(')');
     let parts: Vec<&str> = plain
         .split(|ch: char| ch.is_whitespace() || ch == ',' || ch == ';')
         .filter(|part| !part.is_empty())
@@ -272,7 +269,10 @@ mod tests {
             point("33°30'00\"S 70°15'00\"W"),
             Some((-33.5, -70.25, None))
         );
-        assert_eq!(point("49°30'36.0\"N 24°30'00\"E"), Some((49.51, 24.5, None)));
+        assert_eq!(
+            point("49°30'36.0\"N 24°30'00\"E"),
+            Some((49.51, 24.5, None))
+        );
     }
 
     #[test]
@@ -309,10 +309,7 @@ mod tests {
                 "https://maps.app.goo.gl/AbC123",
                 "https://maps.app.goo.gl/AbC123",
             ),
-            (
-                "Склад\nhttp://goo.gl/maps/xyz",
-                "https://goo.gl/maps/xyz",
-            ),
+            ("Склад\nhttp://goo.gl/maps/xyz", "https://goo.gl/maps/xyz"),
         ] {
             assert_eq!(
                 read_pasted_place(text),

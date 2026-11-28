@@ -7,10 +7,9 @@ use crate::paste::paste_field;
 use crate::{CargoDraft, RoutingProfileDraft, invoke};
 use cargo_dispatch_planner_ui_contracts::{
     AppliedPlanView, ApplyPlanInput, FiguresDraft, InputOrder, InputPlace, InputProblem,
-    InputProblemKind, Money, PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView,
-    PlanStopAction, PlanStopRef, PlannerPackageCargoInput, PlannerRouteView,
-    PlaceView, PlannerRoutingProfileInput, PlannerTollPreference, PlanningInput,
-    PlanningStateView,
+    InputProblemKind, Money, PackageDraft, PlaceView, PlanKind, PlanProposalSetView,
+    PlanProposalView, PlanStopAction, PlanStopRef, PlannerPackageCargoInput, PlannerRouteView,
+    PlannerRoutingProfileInput, PlannerTollPreference, PlanningInput, PlanningStateView,
     ProposeInput, RoadState, SkipReason, VehicleType, localize_problem,
 };
 use leptos::{prelude::*, task::spawn_local};

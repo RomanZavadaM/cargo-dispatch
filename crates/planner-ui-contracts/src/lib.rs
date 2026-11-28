@@ -9,12 +9,12 @@ pub use external::{
     FigureDraft, FiguresDraft, GOOGLE_POINT_LIMIT, MapLinkError, MapService, OpenRouteInput,
     OpenedRoute, parse_distance_km, parse_drive_minutes,
 };
-pub use places::{PastedPlace, PlaceInput, PlaceView, read_pasted_place};
 pub use input::{
     INPUT_SCHEMA, INPUT_SCHEMA_VERSION, InputCargo, InputOrder, InputPlace, InputProblem,
     InputProblemKind, InputVehicle, Money, OLDER_INPUT_SCHEMA_VERSION, PlanningInput, parse_moment,
     validate_input,
 };
+pub use places::{PastedPlace, PlaceInput, PlaceView, read_pasted_place};
 pub use planning::{
     AppliedPlanView, ApplyPlanInput, CargoRowDraft, PackageDraft, PlanKind, PlanProposalSetView,
     PlanProposalView, PlanStopAction, PlanStopRef, PlanStopView, PlanningStateView, ProfileDraft,
