@@ -11,7 +11,8 @@ use cargo_dispatch_control_ui_contracts::{
     DashboardDocument, DashboardDocumentDirection, DashboardLocation, DashboardNavigation,
     DashboardPlanningBasis, DashboardPlanningCargo, DashboardPoint, DashboardRoadGeometry,
     DashboardRoadGeometryPoint, DashboardRoutingIdentity, DashboardVehicleRoutingProfile,
-    GatewayStatus, ListenerMode, ListenerStatus, OperatorDocumentInput, PickedFile,
+    GatewayStatus, ListenerMode, ListenerStatus, OpenPackageInput, OpenedPackage,
+    OperatorDocumentInput, PickedFile,
     RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
     RoutingStatus, RoutingTollPreference, SaveDocumentInput, SessionInput, SessionStatus,
     StartGatewayInput, StartLanInput, TripDashboard, UpdateRoutingContextInput,
@@ -27,7 +28,7 @@ use cargo_dispatch_geo::{
 };
 use cargo_dispatch_trip_files::{
     ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, ManualTripCreateDraft,
-    TripFolder,
+    TripFolder, package_header,
 };
 use std::{
     collections::BTreeMap,
@@ -457,6 +458,91 @@ impl DesktopControlService {
             token,
         })
         .await
+    }
+
+    /// Opens a package saved by Planner. A connected trip takes it as its new
+    /// version; otherwise the trip folder is made beside the package and
+    /// connected with `token`.
+    async fn open_package(&self, package: PathBuf, token: String) -> Result<OpenedPackage, String> {
+        let read = package.clone();
+        let header = tokio::task::spawn_blocking(move || package_header(&read))
+            .await
+            .map_err(|error| format!("Не вдалося виконати читання пакета: {error}"))?
+            .map_err(|error| format!("Не вдалося прочитати пакет: {error}"))?;
+        let trip_id_text = id_hex(header.trip_id.as_bytes());
+        let incoming = header.trip_version.get();
+        let connected = self
+            .sessions
+            .lock()
+            .map_err(|_| "Список сесій тимчасово недоступний".to_owned())?
+            .values()
+            .find(|session| session.trip_id == trip_id_text)
+            .map(|session| session.token.clone());
+
+        if let Some(open) = connected {
+            let current = self
+                .browser
+                .session_snapshot(&open)
+                .map_err(|error| format!("Не вдалося прочитати рейс: {error}"))?;
+            if incoming < current.trip_version {
+                return Err("Не підходить версія пакета: у Control уже новіша".to_owned());
+            }
+            let browser = self.browser.clone();
+            let link = open.clone();
+            tokio::task::spawn_blocking(move || browser.apply_package(&link, &package))
+                .await
+                .map_err(|error| format!("Не вдалося виконати читання пакета: {error}"))?
+                .map_err(|error| format!("Не вдалося застосувати пакет: {error}"))?;
+            return Ok(OpenedPackage {
+                status: self.status().await?,
+                token: open,
+                folder: None,
+            });
+        }
+
+        let token = token.trim().to_owned();
+        self.ensure_session_available(&token, Some(&trip_id_text))
+            .await?;
+        let folder = package
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join(format!("cargo-trip-{trip_id_text}"));
+        let target = folder.clone();
+        tokio::task::spawn_blocking(move || -> Result<(), String> {
+            let existed = target.exists();
+            let held = TripFolder::open_detected(&target)
+                .ok()
+                .map(|trip| trip.state().current_version.get());
+            if held.is_some_and(|held| incoming < held) {
+                return Err("Не підходить версія пакета: у Control уже новіша".to_owned());
+            }
+            if held.is_none() && incoming != 1 {
+                return Err("Не підходить версія пакета: спершу відкрийте версію 1".to_owned());
+            }
+            if let Err(error) = TripFolder::import(&target, &package) {
+                if !existed {
+                    // Only an empty folder made just now can be removed this way.
+                    let _ = fs::remove_dir(&target);
+                }
+                return Err(format!("Не вдалося застосувати пакет: {error}"));
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|error| format!("Не вдалося виконати читання пакета: {error}"))??;
+
+        let folder_path = folder.to_string_lossy().into_owned();
+        let status = self
+            .register_trip(RegisterTripInput {
+                folder_path: folder_path.clone(),
+                token: token.clone(),
+            })
+            .await?;
+        Ok(OpenedPackage {
+            status,
+            token,
+            folder: Some(folder_path),
+        })
     }
 
     async fn register_trip(&self, input: RegisterTripInput) -> Result<ControlUiStatus, String> {
@@ -1014,6 +1100,37 @@ impl DesktopControlService {
     }
 }
 
+/// `None` when the dispatcher closed the dialog.
+#[tauri::command]
+async fn open_planner_package(
+    app: AppHandle,
+    input: OpenPackageInput,
+    state: State<'_, DesktopControlService>,
+) -> Result<Option<OpenedPackage>, String> {
+    let picked = tokio::task::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter("ZIP", &["zip"])
+            .blocking_pick_file()
+            .map(|value| {
+                value
+                    .into_path()
+                    .map_err(|error| format!("Не вдалося прочитати вибраний пакет: {error}"))
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|error| format!("Не вдалося відкрити вибір пакета: {error}"))??;
+    let Some(package) = picked else {
+        return Ok(None);
+    };
+    let opened = state.open_package(package, input.token).await?;
+    if let Some(folder) = &opened.folder {
+        state.remember_session(&opened.token, folder)?;
+    }
+    Ok(Some(opened))
+}
+
 #[tauri::command]
 async fn pick_trip_folder(app: AppHandle) -> Result<Option<String>, String> {
     tokio::task::spawn_blocking(move || {
@@ -1291,6 +1408,7 @@ pub fn run() {
             start_gateway,
             stop_gateway,
             pick_trip_folder,
+            open_planner_package,
             pick_operator_file,
             save_session_document,
             trip_dashboard,
@@ -1452,6 +1570,92 @@ mod tests {
         assert!(error.contains("уже зареєстрований"));
         assert!(!new_folder.exists());
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn a_planner_package_becomes_a_trip_and_takes_new_versions() {
+        let root = std::env::temp_dir().join(format!(
+            "cargo-control-package-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).expect("folder");
+        let trip = TripId::from_bytes([71; 16]).expect("trip");
+        let point = PointId::from_bytes([72; 16]).expect("point");
+        let package = |number: u64, title: &str| {
+            let route = vec![TripRoutePoint {
+                point_id: point,
+                sequence: 1,
+                kind: TripPointKind::Load,
+                title: title.to_owned(),
+                navigation: None,
+            }];
+            let base = (number > 1).then(|| TripVersion::new(number - 1).expect("base"));
+            let draft = PlannerTripExportDraft {
+                header: TripPackageHeader::new(trip, TripVersion::new(number).expect("version"), base)
+                    .expect("header"),
+                working_route_id: WorkingRouteId::from_bytes([73; 16]).expect("route"),
+                working_route_revision: number,
+                created_at_unix_ms: number,
+                created_by: OperatorId::from_bytes([74; 16]).expect("operator"),
+                ordered_point_ids: vec![point],
+                planning_basis: Some(TripPlanningBasis {
+                    vehicle_type: "synthetic truck".to_owned(),
+                    cargos: Vec::new(),
+                    route_estimate: None,
+                }),
+                routing_profile: None,
+                route_geometry: None,
+            };
+            let path = root.join(format!("trip-v{number}.zip"));
+            export_package(&path, &draft, &route).expect("package");
+            path
+        };
+        let first = package(1, "Warehouse");
+        let second = package(2, "Warehouse, gate 2");
+        let third = package(3, "Warehouse, gate 3");
+        let service = DesktopControlService::default();
+        let token = "package-token-00000001".to_owned();
+        let folder = root.join(format!("cargo-trip-{}", id_hex(trip.as_bytes())));
+
+        let early = service
+            .open_package(third.clone(), token.clone())
+            .await
+            .expect_err("a later version cannot start a trip");
+        assert!(early.contains("версія пакета"), "{early}");
+        assert!(!folder.exists());
+
+        let opened = service
+            .open_package(first.clone(), token.clone())
+            .await
+            .expect("first version");
+        assert_eq!(opened.folder.as_deref(), folder.to_str());
+        assert_eq!(opened.status.sessions.len(), 1);
+
+        let updated = service
+            .open_package(second, "package-token-00000002".to_owned())
+            .await
+            .expect("second version");
+        assert_eq!((updated.token.as_str(), updated.folder), (token.as_str(), None));
+        let dashboard = service.dashboard(&token).expect("dashboard");
+        assert_eq!(dashboard.trip_version, 2);
+        assert_eq!(dashboard.points[0].title, "Warehouse, gate 2");
+
+        let stale = service
+            .open_package(first, token.clone())
+            .await
+            .expect_err("an older version is refused");
+        assert!(stale.contains("версія пакета"), "{stale}");
+        let broken = root.join("broken.zip");
+        fs::write(&broken, b"not a package").expect("broken");
+        let problem = service
+            .open_package(broken, token)
+            .await
+            .expect_err("not a package");
+        assert!(problem.contains("пакет"), "{problem}");
+        let _ = fs::remove_dir_all(root);
     }
 
     #[tokio::test]

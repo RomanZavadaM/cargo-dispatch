@@ -1024,6 +1024,11 @@ fn read_package(path: &Path) -> io::Result<Manifest> {
     )?)?)
 }
 
+/// The identity and version of a package, read without creating anything.
+pub fn package_header(package: &Path) -> io::Result<TripPackageHeader> {
+    Ok(read_package(package)?.candidate()?.header)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 enum Change {
     Import(Box<Manifest>),
@@ -1484,6 +1489,15 @@ impl TripFolder {
         }
         self.cursor += 1;
         Ok(())
+    }
+
+    /// Applies a package of this trip. The same version again changes nothing.
+    pub fn apply_package(&mut self, package: &Path) -> io::Result<()> {
+        let plan = read_package(package)?;
+        if plan.candidate()?.header.trip_id != self.trip {
+            return Err(invalid("package belongs to another trip"));
+        }
+        self.record(Change::Import(Box::new(plan)))
     }
 
     pub fn complete(&mut self, point: PointId) -> io::Result<()> {
