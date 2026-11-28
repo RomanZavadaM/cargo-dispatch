@@ -5,6 +5,7 @@ use axum::{
     body::{Body, Bytes},
     extract::{Path, Request, State},
     http::{
+        Uri,
         HeaderMap, HeaderValue, StatusCode,
         header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE},
     },
@@ -22,7 +23,7 @@ use cargo_dispatch_geo::{
 use cargo_dispatch_trip_files::{
     ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, DriverLocationSample,
     StoredDocument, TripFolder,
-};
+UploadDescriptor, UploadProgress};
 use futures_util::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -35,13 +36,15 @@ use std::{
 use tempfile::NamedTempFile;
 use tokio::{
     fs::File as TokioFile,
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     net::TcpListener,
     sync::oneshot,
     task::JoinHandle,
 };
 
 const MAX_UPLOAD_BYTES: u64 = 512 * 1024 * 1024;
+/// The largest part of a file accepted or sent in one request.
+const MAX_PART_BYTES: u64 = 8 * 1024 * 1024;
 const STREAM_CHUNK_BYTES: usize = 64 * 1024;
 
 const DRIVER_HTML: &str = r#"<!doctype html>
@@ -148,7 +151,7 @@ small{color:#666}.error{color:#a40000}.ok{color:#176b2c}
 </label>
 <div class="row">
 <label class="file-picker"><span id="fileLabel">File</span>
-<input id="file" type="file" accept="image/*,video/*,application/pdf,*/*">
+<input id="file" type="file" multiple accept="image/*,video/*,application/pdf,*/*">
 </label>
 <label class="file-picker"><span id="cameraLabel">Photo / video</span>
 <input id="camera" type="file" accept="image/*,video/*" capture="environment">
@@ -663,7 +666,6 @@ const token = decodeURIComponent(location.pathname.split("/").pop());
 let currentTrip = null;
 let watchId = null;
 let lastLocationSentAt = 0;
-let pendingUpload = null;
 
 const tripMapState = {
   zoom: 6,
@@ -1057,47 +1059,94 @@ function renderLocation() {
     " — " + new Date(item.observed_at_unix_ms).toLocaleString();
 }
 
+// A file travels in parts, so a broken connection costs one part, not the file.
+const PART_BYTES = 1024 * 1024;
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function partChecksum(part) {
+  // Browsers offer checksums only over a secure connection.
+  if (!window.isSecureContext || !crypto.subtle) return null;
+  const digest = await crypto.subtle.digest("SHA-256", await part.arrayBuffer());
+  return Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("");
+}
+
+// The same file chosen again continues where it stopped.
+function rememberedUpload(file, pointId) {
+  const key = ["cargo-dispatch-upload", token, file.name, file.size, file.lastModified,
+    file.type, pointId].join("|");
+  let documentId = localStorage.getItem(key);
+  if (!documentId) {
+    documentId = newDocumentId();
+    localStorage.setItem(key, documentId);
+  }
+  return {key, documentId};
+}
+
+async function uploadFile(file, pointId, progress) {
+  const {key, documentId} = rememberedUpload(file, pointId);
+  const headers = {
+    "Content-Type": file.type || "application/octet-stream",
+    "X-File-Name": encodeURIComponent(file.name),
+    "X-Created-At-Unix-Ms": String(Date.now())
+  };
+  if (pointId) headers["X-Point-Id"] = pointId;
+  const path = "/uploads/" + documentId;
+  let state = null;
+  let failures = 0;
+  while (!state || !state.complete) {
+    try {
+      if (!state) state = await (await api(path)).json();
+      if (state.complete) break;
+      const part = file.slice(state.received, state.received + PART_BYTES);
+      let query = "?offset=" + state.received + "&total=" + file.size;
+      const checksum = await partChecksum(part);
+      if (checksum) query += "&part_sha256=" + checksum;
+      progress(file.size ? Math.floor(state.received * 100 / file.size) : 0);
+      state = await (await api(path + query, {method: "POST", headers, body: part})).json();
+      failures = 0;
+    } catch (error) {
+      // No answer, a busy server or a part that does not fit: ask what Control
+      // holds and go on. Any other refusal will not change by repeating.
+      const status = error.status;
+      const temporary = status === undefined || status === 408 || status === 409 ||
+        status === 429 || status >= 500;
+      if (!temporary || failures >= RETRY_DELAYS_MS.length) {
+        // A file that Control refuses starts anew next time.
+        if (status === 409) localStorage.removeItem(key);
+        throw error;
+      }
+      await pause(RETRY_DELAYS_MS[failures]);
+      failures += 1;
+      state = null;
+    }
+  }
+  localStorage.removeItem(key);
+}
+
 document.getElementById("sendFile").addEventListener("click", async () => {
   const input = document.getElementById("file");
   const camera = document.getElementById("camera");
+  const button = document.getElementById("sendFile");
   const status = document.getElementById("fileStatus");
-  const file =
-    input.files && input.files.length ? input.files[0] :
-    camera.files && camera.files.length ? camera.files[0] : null;
-  if (!file) {
+  const files = [...(input.files || []), ...(camera.files || [])];
+  if (!files.length) {
     status.textContent = t("chooseMedia");
     status.className = "error";
     return;
   }
   const pointId = document.getElementById("filePoint").value;
-  const signature = [
-    file.name,
-    file.size,
-    file.lastModified,
-    file.type,
-    pointId
-  ].join("|");
-  if (!pendingUpload || pendingUpload.signature !== signature) {
-    pendingUpload = {signature, documentId: newDocumentId()};
-  }
-  const documentId = pendingUpload.documentId;
-  status.textContent = t("transferring");
+  button.disabled = true;
   status.className = "";
   try {
-    const headers = {
-      "Content-Type": file.type || "application/octet-stream",
-      "X-File-Name": encodeURIComponent(file.name),
-      "X-Created-At-Unix-Ms": String(Date.now())
-    };
-    if (pointId) headers["X-Point-Id"] = pointId;
-    await api("/documents/" + documentId, {
-      method: "POST",
-      headers,
-      body: file
-    });
+    for (const [index, file] of files.entries()) {
+      const place = files.length > 1 ? " " + (index + 1) + "/" + files.length : "";
+      await uploadFile(file, pointId, percent => {
+        status.textContent = t("transferring") + place + " " + file.name + " " + percent + "%";
+      });
+    }
     input.value = "";
     camera.value = "";
-    pendingUpload = null;
     status.textContent = t("fileAccepted");
     status.className = "ok";
     await loadTrip();
@@ -1105,6 +1154,8 @@ document.getElementById("sendFile").addEventListener("click", async () => {
     status.textContent =
       t("transferFailed") + ". " + problemText(error) + " " + t("retrySameId");
     status.className = "error";
+  } finally {
+    button.disabled = false;
   }
 });
 
@@ -1241,6 +1292,17 @@ pub struct DriverDocumentSnapshot {
     pub mime_type: String,
     pub size: u64,
     pub point_id: Option<String>,
+    /// Checksum of the whole file, for a receiver that takes it in parts.
+    #[serde(default)]
+    pub sha256: String,
+}
+
+/// How much of a file from the driver Control already holds.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DriverUploadSnapshot {
+    pub received: u64,
+    pub complete: bool,
+    pub sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1805,7 +1867,38 @@ fn document_snapshot(document: &StoredDocument) -> DriverDocumentSnapshot {
         mime_type: document.mime_type.clone(),
         size: document.size,
         point_id: document.point_id.map(|point| id_hex(point.as_bytes())),
+        sha256: sha256_hex(document.sha256),
     }
+}
+
+fn sha256_hex(value: [u8; 32]) -> String {
+    value.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn parse_sha256(value: &str) -> Result<[u8; 32], StatusCode> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let mut bytes = [0_u8; 32];
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16)
+            .map_err(|_| StatusCode::BAD_REQUEST)?;
+    }
+    Ok(bytes)
+}
+
+/// A numeric or text parameter of the request address.
+fn query_value<'a>(query: Option<&'a str>, name: &str) -> Option<&'a str> {
+    query?
+        .split('&')
+        .filter_map(|pair| pair.split_once('='))
+        .find_map(|(key, value)| (key == name).then_some(value))
+}
+
+fn query_number(query: Option<&str>, name: &str) -> Result<u64, StatusCode> {
+    query_value(query, name)
+        .and_then(|value| value.parse().ok())
+        .ok_or(StatusCode::BAD_REQUEST)
 }
 
 fn location_snapshot(sample: DriverLocationSample) -> DriverLocationSnapshot {
@@ -2026,6 +2119,210 @@ async fn update_location(
     Json(location_snapshot(sample)).into_response()
 }
 
+struct UploadHeaders {
+    original_name: String,
+    mime_type: String,
+    created_at_unix_ms: u64,
+    point_id: Option<PointId>,
+}
+
+fn upload_headers(headers: &HeaderMap) -> Result<UploadHeaders, StatusCode> {
+    let original_name = header_text(headers, "x-file-name")
+        .and_then(|value| decode_uri_component(&value))
+        .and_then(|value| {
+            validate_original_name(&value)?;
+            Ok(value)
+        })?;
+    let mime_type = headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.trim().is_empty() && value.len() <= 256)
+        .unwrap_or("application/octet-stream")
+        .to_owned();
+    let created_at_unix_ms = match header_text(headers, "x-created-at-unix-ms")
+        .and_then(|value| value.parse::<u64>().map_err(|_| StatusCode::BAD_REQUEST))
+    {
+        Ok(value) if value > 0 => value,
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
+    let point_id = match headers.get("x-point-id") {
+        Some(value) => Some(
+            value
+                .to_str()
+                .map_err(|_| StatusCode::BAD_REQUEST)
+                .and_then(parse_point_id)?,
+        ),
+        None => None,
+    };
+    Ok(UploadHeaders {
+        original_name,
+        mime_type,
+        created_at_unix_ms,
+        point_id,
+    })
+}
+
+fn upload_snapshot(progress: UploadProgress) -> DriverUploadSnapshot {
+    DriverUploadSnapshot {
+        received: progress.received,
+        complete: progress.complete,
+        sha256: progress.sha256.map(sha256_hex),
+    }
+}
+
+async fn upload_status(
+    State(state): State<ControlBrowserState>,
+    Path((token, document_id)): Path<(String, String)>,
+) -> Response {
+    let document_id = match parse_document_id(&document_id) {
+        Ok(document_id) => document_id,
+        Err(status) => return status.into_response(),
+    };
+    let trip = match state.trip(&token) {
+        Ok(Some(trip)) => trip,
+        Ok(None) => return (StatusCode::NOT_FOUND, "trip session not found").into_response(),
+        Err(status) => return status.into_response(),
+    };
+    // The lock may wait for a large file being stored: not on the async workers.
+    let progress = tokio::task::spawn_blocking(move || {
+        let trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.upload_progress(document_id)
+    })
+    .await;
+    match progress {
+        Ok(Ok(progress)) => Json(upload_snapshot(progress)).into_response(),
+        _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+/// One part of a file from the driver: `?offset=N&total=T[&part_sha256=hex]`.
+async fn upload_part(
+    State(state): State<ControlBrowserState>,
+    Path((token, document_id)): Path<(String, String)>,
+    request: Request,
+) -> Response {
+    let document_id = match parse_document_id(&document_id) {
+        Ok(document_id) => document_id,
+        Err(status) => return status.into_response(),
+    };
+    let trip = match state.trip(&token) {
+        Ok(Some(trip)) => trip,
+        Ok(None) => return (StatusCode::NOT_FOUND, "trip session not found").into_response(),
+        Err(status) => return status.into_response(),
+    };
+    let query = request.uri().query().map(str::to_owned);
+    let query = query.as_deref();
+    let (offset, total_size) = match (query_number(query, "offset"), query_number(query, "total")) {
+        (Ok(offset), Ok(total)) => (offset, total),
+        _ => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    if total_size > MAX_UPLOAD_BYTES {
+        return StatusCode::PAYLOAD_TOO_LARGE.into_response();
+    }
+    let part_sha256 = match query_value(query, "part_sha256").map(parse_sha256).transpose() {
+        Ok(value) => value,
+        Err(status) => return status.into_response(),
+    };
+    let headers = match upload_headers(request.headers()) {
+        Ok(value) => value,
+        Err(status) => return status.into_response(),
+    };
+
+    let mut part = Vec::new();
+    let mut stream = request.into_body().into_data_stream();
+    while let Some(chunk) = stream.next().await {
+        let Ok(chunk) = chunk else {
+            return StatusCode::BAD_REQUEST.into_response();
+        };
+        if u64::try_from(part.len() + chunk.len()).unwrap_or(u64::MAX) > MAX_PART_BYTES {
+            return StatusCode::PAYLOAD_TOO_LARGE.into_response();
+        }
+        part.extend_from_slice(&chunk);
+    }
+
+    let descriptor = UploadDescriptor {
+        original_name: headers.original_name,
+        mime_type: headers.mime_type,
+        point_id: headers.point_id,
+        total_size,
+        created_at_unix_ms: headers.created_at_unix_ms,
+    };
+    let appended = tokio::task::spawn_blocking(move || {
+        let mut trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.append_upload(document_id, &descriptor, offset, &part, part_sha256)
+    })
+    .await;
+    match appended {
+        Ok(Ok(progress)) => Json(upload_snapshot(progress)).into_response(),
+        Ok(Err(error)) if error.kind() == io::ErrorKind::InvalidData => {
+            StatusCode::CONFLICT.into_response()
+        }
+        Ok(Err(error)) if error.kind() == io::ErrorKind::InvalidInput => {
+            StatusCode::BAD_REQUEST.into_response()
+        }
+        _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+/// One part of a document: `?offset=N&length=L`, answered with 206.
+async fn download_part(trip: SharedTrip, document_id: DocumentId, query: &str) -> Response {
+    let (offset, length) = match (
+        query_number(Some(query), "offset"),
+        query_number(Some(query), "length"),
+    ) {
+        (Ok(offset), Ok(length)) if (1..=MAX_PART_BYTES).contains(&length) => (offset, length),
+        _ => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    let found = tokio::task::spawn_blocking(move || {
+        let trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.document_path(document_id)
+    })
+    .await;
+    let (document, path) = match found {
+        Ok(Ok(value)) => value,
+        Ok(Err(error)) if error.kind() == io::ErrorKind::NotFound => {
+            return StatusCode::NOT_FOUND.into_response();
+        }
+        Ok(Err(_)) => return StatusCode::CONFLICT.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+    if offset >= document.size && !(offset == 0 && document.size == 0) {
+        return StatusCode::RANGE_NOT_SATISFIABLE.into_response();
+    }
+    let wanted = length.min(document.size - offset);
+    let Ok(wanted_bytes) = usize::try_from(wanted) else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+    let mut part = vec![0_u8; wanted_bytes];
+    let read = async {
+        let mut file = TokioFile::open(path).await?;
+        file.seek(io::SeekFrom::Start(offset)).await?;
+        file.read_exact(&mut part).await?;
+        Ok::<_, io::Error>(())
+    };
+    if read.await.is_err() {
+        return StatusCode::CONFLICT.into_response();
+    }
+    let mut response = Response::new(Body::from(part));
+    *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+    let headers = response.headers_mut();
+    headers.insert(
+        CONTENT_TYPE,
+        HeaderValue::from_static("application/octet-stream"),
+    );
+    if let Ok(value) = HeaderValue::from_str(&wanted.to_string()) {
+        headers.insert(CONTENT_LENGTH, value);
+    }
+    headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+}
+
 async fn upload_document(
     State(state): State<ControlBrowserState>,
     Path((token, document_id)): Path<(String, String)>,
@@ -2051,37 +2348,14 @@ async fn upload_document(
         return StatusCode::PAYLOAD_TOO_LARGE.into_response();
     }
 
-    let original_name = match header_text(headers, "x-file-name")
-        .and_then(|value| decode_uri_component(&value))
-        .and_then(|value| {
-            validate_original_name(&value)?;
-            Ok(value)
-        }) {
+    let UploadHeaders {
+        original_name,
+        mime_type,
+        created_at_unix_ms,
+        point_id,
+    } = match upload_headers(headers) {
         Ok(value) => value,
         Err(status) => return status.into_response(),
-    };
-    let mime_type = headers
-        .get(CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .filter(|value| !value.trim().is_empty() && value.len() <= 256)
-        .unwrap_or("application/octet-stream")
-        .to_owned();
-    let created_at_unix_ms = match header_text(headers, "x-created-at-unix-ms")
-        .and_then(|value| value.parse::<u64>().map_err(|_| StatusCode::BAD_REQUEST))
-    {
-        Ok(value) if value > 0 => value,
-        _ => return StatusCode::BAD_REQUEST.into_response(),
-    };
-    let point_id = match headers.get("x-point-id") {
-        Some(value) => match value
-            .to_str()
-            .map_err(|_| StatusCode::BAD_REQUEST)
-            .and_then(parse_point_id)
-        {
-            Ok(value) => Some(value),
-            Err(status) => return status.into_response(),
-        },
-        None => None,
     };
 
     let temporary = match NamedTempFile::new() {
@@ -2159,6 +2433,7 @@ fn file_body(file: TokioFile) -> Body {
 async fn download_document(
     State(state): State<ControlBrowserState>,
     Path((token, document_id)): Path<(String, String)>,
+    uri: Uri,
 ) -> Response {
     let document_id = match parse_document_id(&document_id) {
         Ok(document_id) => document_id,
@@ -2169,6 +2444,10 @@ async fn download_document(
         Ok(None) => return (StatusCode::NOT_FOUND, "trip session not found").into_response(),
         Err(status) => return status.into_response(),
     };
+
+    if let Some(query) = uri.query() {
+        return download_part(trip, document_id, query).await;
+    }
 
     let verified = match tokio::task::spawn_blocking(move || {
         let trip = trip
@@ -2229,6 +2508,10 @@ fn router(state: ControlBrowserState) -> Router {
         .route(
             "/api/trip/{token}/documents/{document_id}",
             get(download_document).post(upload_document),
+        )
+        .route(
+            "/api/trip/{token}/uploads/{document_id}",
+            get(upload_status).post(upload_part),
         )
         .with_state(state)
 }
@@ -3373,6 +3656,110 @@ mod tests {
             100
         );
         assert!(recovered.document(oversized_document).is_none());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn files_travel_in_parts_and_survive_a_restart() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (trip_id, route, first) = create_trip(tmp.path(), "parts-trip", 71, 72)?;
+        drop(first);
+        let folder = tmp.path().join("parts-trip");
+        let content: Vec<u8> = (0..3_000_u32).map(|value| (value % 251) as u8).collect();
+        let document = id_hex(DocumentId::from_bytes([83; 16]).unwrap().as_bytes());
+        let path = format!("/api/trip/parts-token-0001/uploads/{document}");
+        let headers = [
+            ("Content-Type", "video/mp4".to_owned()),
+            ("X-File-Name", "long-video.mp4".to_owned()),
+            ("X-Created-At-Unix-Ms", "1795550000300".to_owned()),
+            ("X-Point-Id", id_hex(route[0].point_id.as_bytes())),
+        ];
+
+        let state = ControlBrowserState::new();
+        state.register_trip("parts-token-0001", &folder)?;
+        let server = LoopbackControlServer::start(state).await?;
+        let held: DriverUploadSnapshot = get_json(server.address(), &path).await?;
+        assert_eq!((held.received, held.complete), (0, false));
+        let first = format!("{path}?offset=0&total=3000");
+        let (status, _, _) =
+            http_request(server.address(), "POST", &first, &headers, &content[..1000]).await?;
+        assert_eq!(status, 200);
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            &format!("{path}?offset=2000&total=3000"),
+            &headers,
+            &content[2000..],
+        )
+        .await?;
+        assert_eq!(status, 409, "a gap is refused");
+        server.shutdown().await?;
+
+        // Control starts again: the received part is still there.
+        let state = ControlBrowserState::new();
+        state.register_trip("parts-token-0001", &folder)?;
+        let server = LoopbackControlServer::start(state).await?;
+        let held: DriverUploadSnapshot = get_json(server.address(), &path).await?;
+        assert_eq!((held.received, held.complete), (1000, false));
+        let before: DriverTripSnapshot =
+            get_json(server.address(), "/api/trip/parts-token-0001").await?;
+        assert!(before.documents.is_empty());
+        let (status, _, _) = http_request(
+            server.address(),
+            "POST",
+            &format!("{path}?offset=1000&total=3000&part_sha256={}", "0".repeat(64)),
+            &headers,
+            &content[1000..2000],
+        )
+        .await?;
+        assert_eq!(status, 400, "a damaged part is refused");
+        for offset in [1000_usize, 2000, 2000] {
+            let (status, _, _) = http_request(
+                server.address(),
+                "POST",
+                &format!("{path}?offset={offset}&total=3000"),
+                &headers,
+                &content[offset..offset + 1000],
+            )
+            .await?;
+            assert_eq!(status, 200);
+        }
+        let held: DriverUploadSnapshot = get_json(server.address(), &path).await?;
+        assert!(held.complete);
+
+        let after: DriverTripSnapshot =
+            get_json(server.address(), "/api/trip/parts-token-0001").await?;
+        assert_eq!(after.documents.len(), 1);
+        assert_eq!(Some(&after.documents[0].sha256), held.sha256.as_ref());
+        let download = format!("/api/trip/parts-token-0001/documents/{document}");
+        let mut received = Vec::new();
+        while received.len() < content.len() {
+            let (status, _, part) = http_request(
+                server.address(),
+                "GET",
+                &format!("{download}?offset={}&length=1200", received.len()),
+                &[],
+                &[],
+            )
+            .await?;
+            assert_eq!(status, 206);
+            received.extend(part);
+        }
+        assert_eq!(received, content);
+        let (status, _, _) = http_request(
+            server.address(),
+            "GET",
+            &format!("{download}?offset=3000&length=1"),
+            &[],
+            &[],
+        )
+        .await?;
+        assert_eq!(status, 416);
+        let (status, _, whole) =
+            http_request(server.address(), "GET", &download, &[], &[]).await?;
+        assert_eq!((status, whole), (200, content));
+        server.shutdown().await?;
+        assert_eq!(TripFolder::open(&folder, trip_id)?.documents().len(), 1);
         Ok(())
     }
 }
