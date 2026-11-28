@@ -278,6 +278,15 @@ fn dashboard(
         local_route_revision: snapshot.local_route_revision,
         planning_basis: planning_basis.map(|basis| DashboardPlanningBasis {
             vehicle_type: basis.vehicle_type,
+            route_estimate: basis.route_estimate.map(|estimate| {
+                cargo_dispatch_control_ui_contracts::DashboardRouteEstimate {
+                    distance_m: estimate.distance.map(|distance| distance.meters),
+                    distance_typed: estimate.distance.is_some_and(|distance| {
+                        distance.source == cargo_dispatch_contracts::PlannedDistanceSource::Operator
+                    }),
+                    drive_minutes: estimate.drive_minutes,
+                }
+            }),
             cargos: basis
                 .cargos
                 .into_iter()
@@ -1357,6 +1366,13 @@ mod tests {
             planning_basis: Some(TripPlanningBasis {
                 vehicle_type: "synthetic truck".to_owned(),
                 cargos: Vec::new(),
+                route_estimate: Some(cargo_dispatch_contracts::PlannedRouteEstimate {
+                    distance: Some(cargo_dispatch_contracts::PlannedDistance {
+                        meters: 640_500,
+                        source: cargo_dispatch_contracts::PlannedDistanceSource::Operator,
+                    }),
+                    drive_minutes: Some(555),
+                }),
             }),
             routing_profile: None,
             route_geometry: None,
@@ -1604,6 +1620,10 @@ mod tests {
         let dashboard = service.dashboard(token).expect("dashboard");
         let planned = dashboard.planning_basis.expect("planning basis");
         assert_eq!(planned.vehicle_type, "synthetic truck");
+        let estimate = planned.route_estimate.expect("route estimate");
+        assert_eq!(estimate.distance_m, Some(640_500));
+        assert!(estimate.distance_typed);
+        assert_eq!(estimate.drive_minutes, Some(555));
         assert!(planned.cargos.is_empty());
         assert_eq!(
             dashboard.actual_context.endpoint_label.as_deref(),

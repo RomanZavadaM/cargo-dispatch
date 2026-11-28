@@ -8,7 +8,7 @@ mod route_check;
 
 use crate::i18n::{UiLocale, strings};
 use crate::orders::OrdersPanel;
-use crate::route_check::RouteCheckPanel;
+use crate::route_check::{RouteCheckPanel, package_figures};
 use cargo_dispatch_planner_ui_contracts::{
     FiguresDraft, PlannerPackageCargoInput, PlannerPackageExportInput, PlannerPackageExportResult,
     PlannerPointInput, PlannerRouteView, PlannerRoutingAvailabilityState,
@@ -1138,6 +1138,7 @@ fn PlannerApp() -> impl IntoView {
                 cargos,
                 routing_profile: routing_profile_input,
                 routing_preview,
+                figures: figures.get_untracked(),
             };
             match invoke::<PlannerPackageExportResult, _>(
                 "planner_export_package",
@@ -1617,6 +1618,7 @@ fn PlannerApp() -> impl IntoView {
                 </div>
 
                 {move || export_result.get().map(|result| {
+                    let sent = result.clone();
                     let geometry = if result.geometry_included {
                         strings(locale.get()).geometry_included
                     } else {
@@ -1629,6 +1631,10 @@ fn PlannerApp() -> impl IntoView {
                             <div><strong>{move || strings(locale.get()).trip_version}</strong>{format!(": {}", result.trip_version)}</div>
                             <div><strong>{move || strings(locale.get()).cargo_count}</strong>{format!(": {}", result.cargo_count)}</div>
                             <div>{geometry}</div>
+                            {move || package_figures(locale.get(), &sent)
+                                .into_iter()
+                                .map(|line| view! { <div>{line}</div> })
+                                .collect_view()}
                         </div>
                     }
                 })}

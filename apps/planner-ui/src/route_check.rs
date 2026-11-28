@@ -4,8 +4,8 @@ use crate::i18n::UiLocale;
 use crate::invoke;
 use crate::orders_i18n::{K, text};
 use cargo_dispatch_planner_ui_contracts::{
-    FigureDraft, FiguresDraft, MapService, OpenRouteInput, OpenedRoute, PlannerRouteView,
-    localize_problem, parse_distance_km, parse_drive_minutes,
+    FigureDraft, FiguresDraft, MapService, OpenRouteInput, OpenedRoute, PlannerPackageExportResult,
+    PlannerRouteView, localize_problem, parse_distance_km, parse_drive_minutes,
 };
 use leptos::{prelude::*, task::spawn_local};
 
@@ -90,6 +90,31 @@ fn figure_field(
             }}
         </div>
     }
+}
+
+/// What the exported package says about distance and time.
+pub(crate) fn package_figures(locale: UiLocale, result: &PlannerPackageExportResult) -> Vec<String> {
+    let say = |key| text(locale, key);
+    let mut lines = Vec::new();
+    if let Some(meters) = result.distance_m {
+        let km = f64::from(meters) / 1000.0;
+        let label = say(K::SentDistance);
+        lines.push(if result.distance_typed {
+            format!("{label}: {km:.1} km ({})", say(K::SentTyped))
+        } else {
+            format!("{label}: ≈ {km:.0} km ({})", say(K::SentStraight))
+        });
+    }
+    lines.push(match result.drive_minutes {
+        Some(minutes) => {
+            format!("{}: {}:{:02}", say(K::SentTime), minutes / 60, minutes % 60)
+        }
+        None => say(K::SentNoTime).to_owned(),
+    });
+    if result.typed_left_out {
+        lines.push(say(K::SentLeftOut).to_owned());
+    }
+    lines
 }
 
 #[component]

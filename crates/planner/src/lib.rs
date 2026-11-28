@@ -2095,6 +2095,7 @@ mod tests {
 
     fn planning_basis() -> TripPlanningBasis {
         TripPlanningBasis {
+            route_estimate: None,
             vehicle_type: "synthetic truck".to_owned(),
             cargos: Vec::new(),
         }

@@ -102,6 +102,7 @@ fn main() -> io::Result<()> {
         created_by: OperatorId::from_bytes([0x43; 16]).expect("synthetic operator id"),
         ordered_point_ids: route.iter().map(|item| item.point_id).collect(),
         planning_basis: Some(TripPlanningBasis {
+            route_estimate: None,
             vehicle_type: "synthetic truck".to_owned(),
             cargos: Vec::new(),
         }),

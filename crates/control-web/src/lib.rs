@@ -2754,6 +2754,7 @@ mod tests {
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).expect("operator"),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
             planning_basis: Some(TripPlanningBasis {
+                route_estimate: None,
                 vehicle_type: "synthetic truck".to_owned(),
                 cargos: Vec::new(),
             }),
