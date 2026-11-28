@@ -7,13 +7,12 @@ mod i18n;
 use crate::i18n::{ControlStrings, UiLocale, localize_problem, strings};
 use cargo_dispatch_control_ui_contracts::{
     AccessGuide, AccessStep, ConfigureRoutingInput, ControlUiStatus, CreateManualTripInput,
-    CreateManualTripPointInput, DashboardDocumentDirection, DashboardPoint, OpenPackageInput,
-    OpenedPackage,
-    DashboardVehicleRoutingProfile, ListenerMode, OperatorDocumentInput, PickedFile,
-    RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
-    RoutingTollPreference, SaveDocumentInput, SessionInput, StartGatewayInput, StartLanInput,
-    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput, format_file_size,
-    is_supported_max_speed_kmh, point_label,
+    CreateManualTripPointInput, DashboardDocumentDirection, DashboardPoint,
+    DashboardVehicleRoutingProfile, ListenerMode, OpenPackageInput, OpenedPackage,
+    OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
+    RoutingAvailabilityState, RoutingProbeResult, RoutingTollPreference, SaveDocumentInput,
+    SessionInput, StartGatewayInput, StartLanInput, TripDashboard, UpdateRoutingContextInput,
+    UpdateSessionMetadataInput, format_file_size, is_supported_max_speed_kmh, point_label,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -1024,8 +1023,11 @@ fn ControlApp() -> impl IntoView {
             token: token.get_untracked(),
         };
         spawn_local(async move {
-            let result: Result<Option<OpenedPackage>, String> =
-                invoke("open_planner_package", &serde_json::json!({ "input": input })).await;
+            let result: Result<Option<OpenedPackage>, String> = invoke(
+                "open_planner_package",
+                &serde_json::json!({ "input": input }),
+            )
+            .await;
             match result {
                 Ok(None) => {
                     busy.set(false);

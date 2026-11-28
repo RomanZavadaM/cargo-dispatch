@@ -12,11 +12,10 @@ use cargo_dispatch_control_ui_contracts::{
     DashboardPlanningBasis, DashboardPlanningCargo, DashboardPoint, DashboardRoadGeometry,
     DashboardRoadGeometryPoint, DashboardRoutingIdentity, DashboardVehicleRoutingProfile,
     GatewayStatus, ListenerMode, ListenerStatus, OpenPackageInput, OpenedPackage,
-    OperatorDocumentInput, PickedFile,
-    RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
-    RoutingStatus, RoutingTollPreference, SaveDocumentInput, SessionInput, SessionStatus,
-    StartGatewayInput, StartLanInput, TripDashboard, UpdateRoutingContextInput,
-    UpdateSessionMetadataInput,
+    OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
+    RoutingAvailabilityState, RoutingProbeResult, RoutingStatus, RoutingTollPreference,
+    SaveDocumentInput, SessionInput, SessionStatus, StartGatewayInput, StartLanInput,
+    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput,
 };
 use cargo_dispatch_control_web::{
     ControlAccessMode, ControlBrowserState, DriverTripSnapshot, LoopbackControlServer,
@@ -1594,8 +1593,12 @@ mod tests {
             }];
             let base = (number > 1).then(|| TripVersion::new(number - 1).expect("base"));
             let draft = PlannerTripExportDraft {
-                header: TripPackageHeader::new(trip, TripVersion::new(number).expect("version"), base)
-                    .expect("header"),
+                header: TripPackageHeader::new(
+                    trip,
+                    TripVersion::new(number).expect("version"),
+                    base,
+                )
+                .expect("header"),
                 working_route_id: WorkingRouteId::from_bytes([73; 16]).expect("route"),
                 working_route_revision: number,
                 created_at_unix_ms: number,
@@ -1638,7 +1641,10 @@ mod tests {
             .open_package(second, "package-token-00000002".to_owned())
             .await
             .expect("second version");
-        assert_eq!((updated.token.as_str(), updated.folder), (token.as_str(), None));
+        assert_eq!(
+            (updated.token.as_str(), updated.folder),
+            (token.as_str(), None)
+        );
         let dashboard = service.dashboard(&token).expect("dashboard");
         assert_eq!(dashboard.trip_version, 2);
         assert_eq!(dashboard.points[0].title, "Warehouse, gate 2");
