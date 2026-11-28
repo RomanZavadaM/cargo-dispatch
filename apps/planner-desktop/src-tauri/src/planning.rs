@@ -8,11 +8,10 @@ use cargo_dispatch_planner::proposals::{
 };
 use cargo_dispatch_planner_ui_contracts::{
     AppliedPlanView, ApplyPlanInput, INPUT_SCHEMA_VERSION, InputOrder, InputPlace, MapLinkError,
-    MapService, Money,
-    OLDER_INPUT_SCHEMA_VERSION, PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView,
-    PlanStopAction, PlanStopView, PlannerPackageCargoInput, PlanningInput, PlanningStateView,
-    ProposeInput, RoadState, SkipReason, SkippedOrder, VehicleType, VehicleTypeName, parse_moment,
-    validate_input,
+    MapService, Money, OLDER_INPUT_SCHEMA_VERSION, PackageDraft, PlanKind, PlanProposalSetView,
+    PlanProposalView, PlanStopAction, PlanStopView, PlannerPackageCargoInput, PlanningInput,
+    PlanningStateView, ProposeInput, RoadState, SkipReason, SkippedOrder, VehicleType,
+    VehicleTypeName, parse_moment, validate_input,
 };
 
 const PLANNING_FILE: &str = "planner-input-v1.json";
@@ -798,7 +797,9 @@ mod tests {
         });
         planned.vehicle.return_to_start = true;
         service.update_planning(planned).expect("stored");
-        let problem = service.route_link(MapService::Google).expect_err("no route");
+        let problem = service
+            .route_link(MapService::Google)
+            .expect_err("no route");
         assert!(problem.contains("at least two ordered points"));
         service
             .apply_plan(ApplyPlanInput {
@@ -811,7 +812,9 @@ mod tests {
             })
             .expect("applied");
         assert_eq!(
-            service.route_link(MapService::GraphHopper).expect("address"),
+            service
+                .route_link(MapService::GraphHopper)
+                .expect("address"),
             "https://graphhopper.com/maps/?point=49.000000%2C29.000000\
              &point=50.000000%2C30.000000&point=50.000000%2C31.000000\
              &point=49.000000%2C29.000000&profile=truck"

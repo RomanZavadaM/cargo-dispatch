@@ -2,7 +2,6 @@
 //! Only the Tauri bridge and the file dialogs are replaced.
 
 use super::*;
-use cargo_dispatch_planner_ui_contracts::{OpenRouteInput, OpenedRoute};
 use axum::{
     Json, Router,
     extract::State as AxumState,
@@ -10,6 +9,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::post,
 };
+use cargo_dispatch_planner_ui_contracts::{OpenRouteInput, OpenedRoute};
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use std::{

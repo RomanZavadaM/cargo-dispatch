@@ -5,11 +5,11 @@ use crate::orders_i18n::{K, text};
 use crate::package_draft::{cargo_rows, profile_from, snapshot};
 use crate::{CargoDraft, RoutingProfileDraft, invoke};
 use cargo_dispatch_planner_ui_contracts::{
-    AppliedPlanView, ApplyPlanInput, FiguresDraft, InputOrder, InputPlace, InputProblem, InputProblemKind, Money,
-    PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopRef,
-    PlannerPackageCargoInput, PlannerRouteView, PlannerRoutingProfileInput, PlannerTollPreference,
-    PlanningInput, PlanningStateView, ProposeInput, RoadState, SkipReason, VehicleType,
-    localize_problem,
+    AppliedPlanView, ApplyPlanInput, FiguresDraft, InputOrder, InputPlace, InputProblem,
+    InputProblemKind, Money, PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView,
+    PlanStopAction, PlanStopRef, PlannerPackageCargoInput, PlannerRouteView,
+    PlannerRoutingProfileInput, PlannerTollPreference, PlanningInput, PlanningStateView,
+    ProposeInput, RoadState, SkipReason, VehicleType, localize_problem,
 };
 use leptos::{prelude::*, task::spawn_local};
 use std::collections::BTreeSet;

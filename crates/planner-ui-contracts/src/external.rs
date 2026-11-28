@@ -48,8 +48,7 @@ impl MapService {
                     place(first),
                     place(last)
                 );
-                let between: Vec<String> =
-                    points[1..points.len() - 1].iter().map(place).collect();
+                let between: Vec<String> = points[1..points.len() - 1].iter().map(place).collect();
                 if !between.is_empty() {
                     query.push_str("&waypoints=");
                     query.push_str(&between.join("%7C"));
@@ -142,19 +141,25 @@ mod tests {
              &destination=50.400000,31.500000&travelmode=driving&waypoints=50.100000,30.100000"
         );
         assert_eq!(
-            MapService::Google.route_address(&ROUTE[..2]).expect("route"),
+            MapService::Google
+                .route_address(&ROUTE[..2])
+                .expect("route"),
             "https://www.google.com/maps/dir/?api=1&origin=50.000000,30.000000\
              &destination=50.100000,30.100000&travelmode=driving"
         );
         let two_between = [ROUTE[0], ROUTE[1], ROUTE[1], ROUTE[2]];
-        let address = MapService::Google.route_address(&two_between).expect("route");
+        let address = MapService::Google
+            .route_address(&two_between)
+            .expect("route");
         assert!(address.ends_with("&waypoints=50.100000,30.100000%7C50.100000,30.100000"));
     }
 
     #[test]
     fn graphhopper_lists_every_point_for_a_truck() {
         assert_eq!(
-            MapService::GraphHopper.route_address(&ROUTE).expect("route"),
+            MapService::GraphHopper
+                .route_address(&ROUTE)
+                .expect("route"),
             "https://graphhopper.com/maps/?point=50.000000%2C30.000000\
              &point=50.100000%2C30.100000&point=50.400000%2C31.500000&profile=truck"
         );

@@ -1,7 +1,9 @@
 //! The trip package section as it is kept between starts: every field as typed.
 
 use crate::{CargoDraft, RoutingProfileDraft};
-use cargo_dispatch_planner_ui_contracts::{CargoRowDraft, FiguresDraft, PackageDraft, ProfileDraft};
+use cargo_dispatch_planner_ui_contracts::{
+    CargoRowDraft, FiguresDraft, PackageDraft, ProfileDraft,
+};
 
 pub(crate) fn snapshot(
     vehicle_type: &str,
