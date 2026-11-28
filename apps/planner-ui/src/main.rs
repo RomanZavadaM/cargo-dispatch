@@ -4,11 +4,13 @@ mod i18n;
 mod orders;
 mod orders_i18n;
 mod package_draft;
+mod route_check;
 
 use crate::i18n::{UiLocale, strings};
 use crate::orders::OrdersPanel;
+use crate::route_check::RouteCheckPanel;
 use cargo_dispatch_planner_ui_contracts::{
-    PlannerPackageCargoInput, PlannerPackageExportInput, PlannerPackageExportResult,
+    FiguresDraft, PlannerPackageCargoInput, PlannerPackageExportInput, PlannerPackageExportResult,
     PlannerPointInput, PlannerRouteView, PlannerRoutingAvailabilityState,
     PlannerRoutingConfigInput, PlannerRoutingPreviewInput, PlannerRoutingPreviewState,
     PlannerRoutingPreviewView, PlannerRoutingProbeResult, PlannerRoutingProfileInput,
@@ -581,6 +583,7 @@ fn PlannerApp() -> impl IntoView {
     let routing_profile = RwSignal::new(RoutingProfileDraft::default());
     let export_vehicle_type = RwSignal::new(String::new());
     let vehicle_types = RwSignal::new(Vec::<VehicleType>::new());
+    let figures = RwSignal::new(FiguresDraft::default());
     let export_cargos = RwSignal::new(vec![CargoDraft::new(1)]);
     let next_cargo_row = RwSignal::new(2_u64);
     let export_result = RwSignal::new(None::<PlannerPackageExportResult>);
@@ -1190,6 +1193,7 @@ fn PlannerApp() -> impl IntoView {
                 vehicle_types=vehicle_types
                 cargos=export_cargos
                 next_cargo_row=next_cargo_row
+                typed_figures=figures
             />
 
             <section>
@@ -1214,6 +1218,14 @@ fn PlannerApp() -> impl IntoView {
                     <button type="button" on:click=reset disabled=move || busy.get()>{move || strings(locale.get()).reset_route}</button>
                 </div>
             </section>
+
+            <RouteCheckPanel
+                locale=locale
+                message=message
+                error=error
+                route=route
+                figures=figures
+            />
 
             <section>
                 <h2>{move || strings(locale.get()).routing_title}</h2>

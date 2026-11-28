@@ -5,7 +5,7 @@ use crate::orders_i18n::{K, text};
 use crate::package_draft::{cargo_rows, profile_from, snapshot};
 use crate::{CargoDraft, RoutingProfileDraft, invoke};
 use cargo_dispatch_planner_ui_contracts::{
-    AppliedPlanView, ApplyPlanInput, InputOrder, InputPlace, InputProblem, InputProblemKind, Money,
+    AppliedPlanView, ApplyPlanInput, FiguresDraft, InputOrder, InputPlace, InputProblem, InputProblemKind, Money,
     PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopRef,
     PlannerPackageCargoInput, PlannerRouteView, PlannerRoutingProfileInput, PlannerTollPreference,
     PlanningInput, PlanningStateView, ProposeInput, RoadState, SkipReason, VehicleType,
@@ -604,6 +604,7 @@ pub(crate) fn OrdersPanel(
     vehicle_types: RwSignal<Vec<VehicleType>>,
     cargos: RwSignal<Vec<CargoDraft>>,
     next_cargo_row: RwSignal<u64>,
+    typed_figures: RwSignal<FiguresDraft>,
 ) -> impl IntoView {
     let panel = Panel {
         locale,
@@ -639,6 +640,7 @@ pub(crate) fn OrdersPanel(
             &cargos.get(),
             next_cargo_row.get(),
             &profile.get(),
+            typed_figures.get(),
         );
         waiting.set_value(Some(draft));
         if sending.get_value() {
@@ -679,6 +681,7 @@ pub(crate) fn OrdersPanel(
                     next_cargo_row.set(next);
                     cargos.set(rows);
                     profile.set(profile_from(&draft.profile));
+                    typed_figures.set(draft.figures.clone());
                 }
                 panel.show(view);
                 restored.set(true);

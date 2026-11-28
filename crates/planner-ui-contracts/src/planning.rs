@@ -2,7 +2,7 @@
 
 use crate::input::bad_volume;
 use crate::{
-    InputProblem, InputVehicle, Money, PlannerPackageCargoInput, PlannerRouteView,
+    FiguresDraft, InputProblem, InputVehicle, Money, PlannerPackageCargoInput, PlannerRouteView,
     PlannerRoutingConfigInput, PlannerRoutingProfileInput, PlanningInput,
 };
 use serde::{Deserialize, Serialize};
@@ -86,6 +86,8 @@ pub struct PackageDraft {
     /// Row numbers give cargo its identity in a package, so none is used twice.
     pub next_cargo_row: u64,
     pub profile: ProfileDraft,
+    /// Kilometres and time typed for the route.
+    pub figures: FiguresDraft,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]

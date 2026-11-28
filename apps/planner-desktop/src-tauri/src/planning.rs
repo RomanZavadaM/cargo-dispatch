@@ -7,7 +7,8 @@ use cargo_dispatch_planner::proposals::{
     propose_routes,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    AppliedPlanView, ApplyPlanInput, INPUT_SCHEMA_VERSION, InputOrder, InputPlace, Money,
+    AppliedPlanView, ApplyPlanInput, INPUT_SCHEMA_VERSION, InputOrder, InputPlace, MapLinkError,
+    MapService, Money,
     OLDER_INPUT_SCHEMA_VERSION, PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView,
     PlanStopAction, PlanStopView, PlannerPackageCargoInput, PlanningInput, PlanningStateView,
     ProposeInput, RoadState, SkipReason, SkippedOrder, VehicleType, VehicleTypeName, parse_moment,
@@ -467,6 +468,33 @@ impl PlannerDesktopService {
         })
     }
 
+    /// The address of the working route in a map service: from where the vehicle
+    /// stands, through the points, and back when the vehicle has to return.
+    pub(crate) fn route_link(&self, service: MapService) -> Result<String, String> {
+        let vehicle = self.stored_planning()?.input.vehicle;
+        let mut points: Vec<(f64, f64)> = self
+            .status()?
+            .points
+            .iter()
+            .map(|point| (point.latitude, point.longitude))
+            .collect();
+        let start = vehicle.start.as_ref().and_then(coordinates);
+        if let Some(start) = start.filter(|_| !points.is_empty()) {
+            points.insert(0, (start.lat(), start.lon()));
+            if vehicle.return_to_start {
+                points.push((start.lat(), start.lon()));
+            }
+        }
+        service.route_address(&points).map_err(|error| match error {
+            MapLinkError::TooFewPoints => {
+                "Opening a route needs at least two ordered points".to_owned()
+            }
+            MapLinkError::TooManyPoints => {
+                "The map service takes no more than 11 points".to_owned()
+            }
+        })
+    }
+
     /// Replaces the working route with the chosen order of stops.
     pub(crate) fn apply_plan(&self, plan: ApplyPlanInput) -> Result<AppliedPlanView, String> {
         let input = self.stored_planning()?.input;
@@ -667,7 +695,8 @@ pub(crate) fn planner_planning_apply(
 mod tests {
     use super::*;
     use cargo_dispatch_planner_ui_contracts::{
-        CargoRowDraft, InputCargo, PlanStopRef, PlannerTollPreference, ProfileDraft,
+        CargoRowDraft, FigureDraft, FiguresDraft, InputCargo, PlanStopRef, PlannerTollPreference,
+        ProfileDraft,
     };
 
     fn order(id: &str, from: f64, to: f64) -> InputOrder {
@@ -758,6 +787,38 @@ mod tests {
     }
 
     #[test]
+    fn the_route_address_starts_where_the_vehicle_stands_and_returns() {
+        let service = PlannerDesktopService::default();
+        let mut planned = input();
+        planned.vehicle.start = Some(InputPlace {
+            place: "Base".to_owned(),
+            lat: Some(49.0),
+            lon: Some(29.0),
+            ..InputPlace::default()
+        });
+        planned.vehicle.return_to_start = true;
+        service.update_planning(planned).expect("stored");
+        let problem = service.route_link(MapService::Google).expect_err("no route");
+        assert!(problem.contains("at least two ordered points"));
+        service
+            .apply_plan(ApplyPlanInput {
+                stops: [PlanStopAction::Pickup, PlanStopAction::Delivery]
+                    .map(|action| PlanStopRef {
+                        order_id: "A".to_owned(),
+                        action,
+                    })
+                    .to_vec(),
+            })
+            .expect("applied");
+        assert_eq!(
+            service.route_link(MapService::GraphHopper).expect("address"),
+            "https://graphhopper.com/maps/?point=49.000000%2C29.000000\
+             &point=50.000000%2C30.000000&point=50.000000%2C31.000000\
+             &point=49.000000%2C29.000000&profile=truck"
+        );
+    }
+
+    #[test]
     fn a_delivery_without_its_pickup_leaves_the_route_untouched() {
         let service = PlannerDesktopService::default();
         service.update_planning(input()).expect("stored");
@@ -819,6 +880,14 @@ mod tests {
             profile: ProfileDraft {
                 height_m: "4,".to_owned(),
                 ..ProfileDraft::default()
+            },
+            figures: FiguresDraft {
+                distance_km: FigureDraft {
+                    value: "640,".to_owned(),
+                    route_id: "route".to_owned(),
+                    revision: 2,
+                },
+                ..FiguresDraft::default()
             },
         };
         first.remember_package(draft.clone()).expect("remembered");

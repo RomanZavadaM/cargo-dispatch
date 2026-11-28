@@ -1,8 +1,13 @@
 #![forbid(unsafe_code)]
 
+mod external;
 mod input;
 mod planning;
 mod problems;
+pub use external::{
+    FigureDraft, FiguresDraft, GOOGLE_POINT_LIMIT, MapLinkError, MapService, OpenRouteInput,
+    OpenedRoute, parse_distance_km, parse_drive_minutes,
+};
 pub use input::{
     INPUT_SCHEMA, INPUT_SCHEMA_VERSION, InputCargo, InputOrder, InputPlace, InputProblem,
     InputProblemKind, InputVehicle, Money, OLDER_INPUT_SCHEMA_VERSION, PlanningInput, parse_moment,

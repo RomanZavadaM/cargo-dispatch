@@ -51,6 +51,8 @@ const bridge = `
       .filter(card => card.querySelector("ol")),
     orderPart: () => ui.section("Заявки та варіанти маршруту"),
     packagePart: () => ui.section("Пакет рейсу"),
+    checkPart: () => ui.section("Перевірка маршруту в сторонніх сервісах"),
+    address: () => ui.checkPart().querySelector("input[readonly]")?.value ?? "",
     routingPart: () => ui.section("Valhalla — дорожній preview"),
     typeList: () => ui.field(ui.orderPart(), "Обрати зі списку"),
     types: () => [...ui.typeList().options].slice(1).map(option => option.value).join("|"),
@@ -58,6 +60,7 @@ const bridge = `
     // Everything the operator sees in the package section and the vehicle parameters.
     shown: () => JSON.stringify({
       vehicle: ui.field(ui.packagePart(), "Тип / клас транспорту для планування").value,
+      figures: [...ui.checkPart().querySelectorAll("input:not([readonly])")].map(item => item.value),
       rows: ui.rows().map(row => [...row.querySelectorAll("input, select")].map(item => item.value)),
       profile: [...ui.routingPart().querySelectorAll(".routing-grid")[1]
         .querySelectorAll("input, select")].map(item => item.value),
@@ -348,6 +351,37 @@ try {
   await waitFor("routing configured", 'document.body.innerText.includes("Valhalla налаштовано.")');
   await idle();
 
+  // The route of four points from the place of the vehicle, in both services.
+  await click('ui.button(ui.checkPart(), "Google Maps (легковий)")');
+  await waitFor("the Google address",
+    'ui.address().startsWith("https://www.google.com/maps/dir/?api=1&origin=50.000000,30.000000&")');
+  await idle();
+  await expect('ui.address().split("%7C").length === 4 - 1',
+    "the Google address starts at the vehicle and passes every point");
+  await click('ui.button(ui.checkPart(), "GraphHopper (вантажний)")');
+  await waitFor("the GraphHopper address",
+    'ui.address().startsWith("https://graphhopper.com/maps/?point=50.000000%2C30.000000&")');
+  await idle();
+  await expect('ui.address().split("point=").length === 6 && ui.address().endsWith("&profile=truck")',
+    "the GraphHopper address lists the vehicle and four points for a truck");
+
+  const kilometres = 'ui.field(ui.checkPart(), "Кілометри (вручну)")';
+  const driveTime = 'ui.field(ui.checkPart(), "Час у дорозі, год:хв")';
+  await type(driveTime, "9:75");
+  await expect('ui.checkPart().textContent.includes("Вкажіть час як год:хв")', "a wrong time is pointed out");
+  await type(driveTime, "9:15");
+  await type(kilometres, "640,5");
+  await idle();
+  await expect(`${kilometres}.value === "640,5" && ${driveTime}.value === "9:15"
+    && !ui.checkPart().textContent.includes("Вкажіть час")
+    && !ui.checkPart().textContent.includes("Маршрут змінено")`, "kilometres and time are typed in by hand");
+  state = await service("planner_planning_status");
+  const route = await service("planner_status");
+  if (state.package.figures.distance_km.value !== "640,5" || state.package.figures.drive_time.value !== "9:15"
+    || state.package.figures.distance_km.revision !== route.revision)
+    throw new Error("failed: the typed figures are saved with their route");
+  console.log("PASS the typed figures are saved with their route");
+
   const before = await evaluate("ui.shown()");
   await service("test_restart");
   await send("Page.reload");
@@ -358,6 +392,8 @@ try {
   if (after !== before) throw new Error(`failed: the package form comes back\n before ${before}\n after  ${after}`);
   console.log("PASS the package form comes back exactly as left");
   await expect('ui.field(ui.orders()[0], "Маса, кг").value === "2400"', "the corrected orders come back");
+  await expect('!ui.checkPart().textContent.includes("Маршрут змінено")',
+    "figures of an unchanged route are not marked after a restart");
   await expect('ui.types() === "тент 20 т|реф 10 т" && ui.typeList().value === "тент 20 т"',
     "the vehicle types come back with the last used first");
   await expect(`ui.field(ui.routingPart(), "Адреса Valhalla").value === "http://127.0.0.1:9/"
@@ -387,6 +423,12 @@ try {
   state = await service("planner_planning_status");
   if (state.package.cargos[0].pickup_point_id !== "") throw new Error("failed: the detached point is saved");
   console.log("PASS the detached point is saved");
+  await expect('ui.checkPart().textContent.includes("Маршрут змінено") && ui.address() === ""',
+    "a changed route marks the typed figures and drops the old address");
+  await click('ui.button(ui.checkPart(), "Значення чинні й для цього маршруту")');
+  await waitFor("confirmed figures", '!ui.checkPart().textContent.includes("Маршрут змінено")');
+  await idle();
+  console.log("PASS the operator can confirm the figures for the new route");
   await click('ui.button(ui.orderPart(), "Прибрати тип зі списку")');
   await waitFor("one type left", 'ui.types() === "реф 10 т"');
   await idle();
