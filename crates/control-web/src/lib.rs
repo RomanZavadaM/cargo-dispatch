@@ -5,8 +5,7 @@ use axum::{
     body::{Body, Bytes},
     extract::{Path, Request, State},
     http::{
-        Uri,
-        HeaderMap, HeaderValue, StatusCode,
+        HeaderMap, HeaderValue, StatusCode, Uri,
         header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE},
     },
     response::{Html, IntoResponse, Response},
@@ -22,8 +21,8 @@ use cargo_dispatch_geo::{
 };
 use cargo_dispatch_trip_files::{
     ActiveTripSessionMetadata, DocumentDirection, DocumentStoreDraft, DriverLocationSample,
-    StoredDocument, TripFolder,
-UploadDescriptor, UploadProgress};
+    StoredDocument, TripFolder, UploadDescriptor, UploadProgress,
+};
 use futures_util::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -2221,7 +2220,10 @@ async fn upload_part(
     if total_size > MAX_UPLOAD_BYTES {
         return StatusCode::PAYLOAD_TOO_LARGE.into_response();
     }
-    let part_sha256 = match query_value(query, "part_sha256").map(parse_sha256).transpose() {
+    let part_sha256 = match query_value(query, "part_sha256")
+        .map(parse_sha256)
+        .transpose()
+    {
         Ok(value) => value,
         Err(status) => return status.into_response(),
     };
@@ -3676,7 +3678,9 @@ mod tests {
         ];
 
         let state = ControlBrowserState::new();
-        state.register_trip("parts-token-0001", &folder)?;
+        state
+            .register_trip("parts-token-0001", TripFolder::open(&folder, trip_id)?)
+            .expect("register the trip");
         let server = LoopbackControlServer::start(state).await?;
         let held: DriverUploadSnapshot = get_json(server.address(), &path).await?;
         assert_eq!((held.received, held.complete), (0, false));
@@ -3697,7 +3701,9 @@ mod tests {
 
         // Control starts again: the received part is still there.
         let state = ControlBrowserState::new();
-        state.register_trip("parts-token-0001", &folder)?;
+        state
+            .register_trip("parts-token-0001", TripFolder::open(&folder, trip_id)?)
+            .expect("register the trip");
         let server = LoopbackControlServer::start(state).await?;
         let held: DriverUploadSnapshot = get_json(server.address(), &path).await?;
         assert_eq!((held.received, held.complete), (1000, false));
@@ -3707,7 +3713,10 @@ mod tests {
         let (status, _, _) = http_request(
             server.address(),
             "POST",
-            &format!("{path}?offset=1000&total=3000&part_sha256={}", "0".repeat(64)),
+            &format!(
+                "{path}?offset=1000&total=3000&part_sha256={}",
+                "0".repeat(64)
+            ),
             &headers,
             &content[1000..2000],
         )
@@ -3755,8 +3764,7 @@ mod tests {
         )
         .await?;
         assert_eq!(status, 416);
-        let (status, _, whole) =
-            http_request(server.address(), "GET", &download, &[], &[]).await?;
+        let (status, _, whole) = http_request(server.address(), "GET", &download, &[], &[]).await?;
         assert_eq!((status, whole), (200, content));
         server.shutdown().await?;
         assert_eq!(TripFolder::open(&folder, trip_id)?.documents().len(), 1);
