@@ -3,11 +3,14 @@ package com.romanzavada.cargodispatch.driver
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
+import java.io.IOException
+import java.io.InputStream
 
-data class PickedUpload(
+/** A chosen file. Its content is copied to the queue, never held in memory. */
+class PickedUpload(
     val name: String,
     val mimeType: String,
-    val bytes: ByteArray,
+    val open: () -> InputStream,
 )
 
 fun ContentResolver.readUpload(uri: Uri): PickedUpload {
@@ -19,8 +22,7 @@ fun ContentResolver.readUpload(uri: Uri): PickedUpload {
             ?: "driver-upload"
 
     val mime = getType(uri).orEmpty().ifBlank { "application/octet-stream" }
-    val bytes = openInputStream(uri)?.use { it.readBytes() }
-        ?: error("Selected file cannot be read")
-
-    return PickedUpload(name = name, mimeType = mime, bytes = bytes)
+    return PickedUpload(name = name, mimeType = mime) {
+        openInputStream(uri) ?: throw IOException("Selected file cannot be read")
+    }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 
 enum class CaptureKind(
@@ -31,11 +32,11 @@ fun createCapture(context: Context, kind: CaptureKind): PendingCapture {
 }
 
 fun PendingCapture.readUpload(context: Context): PickedUpload {
-    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        ?: error("Captured media cannot be read")
+    val resolver = context.contentResolver
     return PickedUpload(
         name = "driver-capture-${System.currentTimeMillis()}${kind.extension}",
         mimeType = kind.mimeType,
-        bytes = bytes,
-    )
+    ) {
+        resolver.openInputStream(uri) ?: throw IOException("Captured media cannot be read")
+    }
 }

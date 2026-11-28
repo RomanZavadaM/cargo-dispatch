@@ -25,11 +25,6 @@ data class PendingMediaMetadata(
     val rejectedStatus: Int? = null,
 )
 
-data class QueuedMediaUpload(
-    val metadata: PendingMediaMetadata,
-    val bytes: ByteArray,
-)
-
 @Serializable
 private data class PendingOutboundState(
     // Written by 0.2.0 and earlier: only the newest position. Read once and moved to [track].
@@ -95,7 +90,9 @@ class PendingOutboundQueue(
             val payloadName = "$documentId.bin"
             val payload = File(mediaDirectory, payloadName)
             val temporary = File(mediaDirectory, "$payloadName.tmp")
-            temporary.writeBytes(upload.bytes)
+            upload.open().use { source ->
+                temporary.outputStream().use { target -> source.copyTo(target) }
+            }
             replaceAtomically(temporary, payload)
 
             val entry = PendingMediaMetadata(
@@ -112,7 +109,7 @@ class PendingOutboundQueue(
         }
     }
 
-    /** Files still to be sent. Their content is read one at a time by [readMedia]. */
+    /** Files still to be sent. Their content stays on disk: see [mediaFile]. */
     suspend fun pendingMedia(): List<PendingMediaMetadata> = withContext(Dispatchers.IO) {
         synchronized(lock) { state.media.filter { it.rejectedStatus == null } }
     }
@@ -121,11 +118,10 @@ class PendingOutboundQueue(
         synchronized(lock) { state.media.filter { it.rejectedStatus != null } }
     }
 
-    suspend fun readMedia(entry: PendingMediaMetadata): QueuedMediaUpload? =
+    suspend fun mediaFile(entry: PendingMediaMetadata): File? =
         withContext(Dispatchers.IO) {
             synchronized(lock) {
-                val payload = File(mediaDirectory, entry.payloadFile)
-                if (payload.isFile) QueuedMediaUpload(entry, payload.readBytes()) else null
+                File(mediaDirectory, entry.payloadFile).takeIf { it.isFile }
             }
         }
 

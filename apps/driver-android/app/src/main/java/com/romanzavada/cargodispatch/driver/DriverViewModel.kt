@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.romanzavada.cargodispatch.driver.core.DriverProblem
+import com.romanzavada.cargodispatch.driver.model.DriverDocument
 import com.romanzavada.cargodispatch.driver.core.RouteOrderPlanner
 import com.romanzavada.cargodispatch.driver.core.SessionLink
 import com.romanzavada.cargodispatch.driver.core.SessionLinkException
@@ -36,6 +37,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     val state: StateFlow<DriverUiState> = mutableState.asStateFlow()
 
     private val queueRoot = File(application.filesDir, "outbound-queue")
+    private val downloadRoot = File(application.cacheDir, "downloads")
     private var api: ControlApi? = null
     private var pendingQueue: PendingOutboundQueue? = null
 
@@ -183,12 +185,19 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         val queue = pendingQueue ?: return
         request {
             val known = mutableState.value.trip?.points?.any { it.pointId == pointId } == true
-            queue.enqueueMedia(
-                documentId = ControlApi.newDocumentId(),
-                upload = upload,
-                pointId = pointId.takeIf { known },
-                createdAtUnixMs = System.currentTimeMillis(),
-            )
+            try {
+                queue.enqueueMedia(
+                    documentId = ControlApi.newDocumentId(),
+                    upload = upload,
+                    pointId = pointId.takeIf { known },
+                    createdAtUnixMs = System.currentTimeMillis(),
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                reportProblem(DriverProblem.FileUnreadable)
+                return@request
+            }
             flush(client, queue)
             val trip = client.trip()
             mutableState.value = mutableState.value.copy(trip = trip)
@@ -212,10 +221,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun download(documentId: String, onResult: (ByteArray) -> Unit) {
+    /** Receives a document in parts; saving it again continues a broken transfer. */
+    fun download(document: DriverDocument, onResult: suspend (File) -> Unit) {
         val client = api ?: return
         request {
-            onResult(client.downloadDocument(documentId))
+            val partial = File(downloadRoot, "${document.documentId}.part")
+            FileTransfer.download(client, document.documentId, document.size, document.sha256, partial)
+            onResult(partial)
+            partial.delete()
         }
     }
 

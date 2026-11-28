@@ -65,7 +65,9 @@ import com.romanzavada.cargodispatch.driver.model.DriverPoint
 import com.romanzavada.cargodispatch.driver.model.DriverTrip
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.maplibre.android.MapLibre
 
 private const val REFRESH_INTERVAL_MS = 15_000L
@@ -126,11 +128,13 @@ private fun DriverScreen(
         val selected = pendingSave
         pendingSave = null
         if (uri != null && selected != null) {
-            viewModel.download(selected.documentId) { bytes ->
+            viewModel.download(selected) { file ->
                 runCatching {
-                    context.contentResolver.openOutputStream(uri, "w")?.use { output ->
-                        output.write(bytes)
-                    } ?: error("Cannot open destination")
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                            file.inputStream().use { it.copyTo(output) }
+                        } ?: error("Cannot open destination")
+                    }
                 }.onSuccess {
                     Toast.makeText(context, R.string.document_saved, Toast.LENGTH_SHORT).show()
                 }.onFailure {
