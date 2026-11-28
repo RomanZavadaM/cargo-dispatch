@@ -1,13 +1,16 @@
 //! The trip package section as it is kept between starts: every field as typed.
 
 use crate::{CargoDraft, RoutingProfileDraft};
-use cargo_dispatch_planner_ui_contracts::{CargoRowDraft, PackageDraft, ProfileDraft};
+use cargo_dispatch_planner_ui_contracts::{
+    CargoRowDraft, FiguresDraft, PackageDraft, ProfileDraft,
+};
 
 pub(crate) fn snapshot(
     vehicle_type: &str,
     cargos: &[CargoDraft],
     next_cargo_row: u64,
     profile: &RoutingProfileDraft,
+    figures: FiguresDraft,
 ) -> PackageDraft {
     PackageDraft {
         vehicle_type: vehicle_type.to_owned(),
@@ -37,6 +40,7 @@ pub(crate) fn snapshot(
             toll_preference: profile.toll_preference.clone(),
             max_speed_kmh: profile.max_speed_kmh.clone(),
         },
+        figures,
     }
 }
 

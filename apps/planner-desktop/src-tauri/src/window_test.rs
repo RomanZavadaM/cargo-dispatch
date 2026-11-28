@@ -9,6 +9,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::post,
 };
+use cargo_dispatch_planner_ui_contracts::{OpenRouteInput, OpenedRoute};
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use std::{
@@ -112,6 +113,12 @@ async fn run(window: &Window, call: Call) -> Result<Value, String> {
         }
         "planner_planning_propose" => answer(service.propose(argument(args)?).await),
         "planner_planning_apply" => answer(service.apply_plan(argument(args)?)),
+        // The address is built as usual; no browser is started here.
+        "planner_open_route" => {
+            let input: OpenRouteInput = argument(args)?;
+            let link = service.route_link(input.service);
+            answer(link.map(|url| OpenedRoute { url, opened: true }))
+        }
         "planner_vehicle_type_save" => answer(service.save_vehicle_type(argument(args)?)),
         "planner_vehicle_type_use" => answer(service.use_vehicle_type(argument(args)?)),
         "planner_vehicle_type_remove" => answer(service.remove_vehicle_type(argument(args)?)),
