@@ -11,6 +11,21 @@ pub struct RegisterTripInput {
     pub token: String,
 }
 
+/// Opening a package saved by Planner; the link is used if the trip is new.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OpenPackageInput {
+    pub token: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenedPackage {
+    pub status: ControlUiStatus,
+    /// The link of the trip the package went to.
+    pub token: String,
+    /// The folder of a trip connected just now.
+    pub folder: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CreateManualTripPointInput {
     pub point_id: String,

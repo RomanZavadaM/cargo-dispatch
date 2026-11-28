@@ -8,11 +8,11 @@ use crate::i18n::{ControlStrings, UiLocale, localize_problem, strings};
 use cargo_dispatch_control_ui_contracts::{
     AccessGuide, AccessStep, ConfigureRoutingInput, ControlUiStatus, CreateManualTripInput,
     CreateManualTripPointInput, DashboardDocumentDirection, DashboardPoint,
-    DashboardVehicleRoutingProfile, ListenerMode, OperatorDocumentInput, PickedFile,
-    RegisterTripInput, ReorderRouteInput, RoutingAvailabilityState, RoutingProbeResult,
-    RoutingTollPreference, SaveDocumentInput, SessionInput, StartGatewayInput, StartLanInput,
-    TripDashboard, UpdateRoutingContextInput, UpdateSessionMetadataInput, format_file_size,
-    is_supported_max_speed_kmh, point_label,
+    DashboardVehicleRoutingProfile, ListenerMode, OpenPackageInput, OpenedPackage,
+    OperatorDocumentInput, PickedFile, RegisterTripInput, ReorderRouteInput,
+    RoutingAvailabilityState, RoutingProbeResult, RoutingTollPreference, SaveDocumentInput,
+    SessionInput, StartGatewayInput, StartLanInput, TripDashboard, UpdateRoutingContextInput,
+    UpdateSessionMetadataInput, format_file_size, is_supported_max_speed_kmh, point_label,
 };
 use leptos::{prelude::*, task::spawn_local};
 use serde::{Serialize, de::DeserializeOwned};
@@ -1007,6 +1007,42 @@ fn ControlApp() -> impl IntoView {
                 Err(problem) => {
                     message.set(localize_problem(locale.get_untracked(), &problem));
                     error.set(true);
+                }
+            }
+        });
+    };
+
+    let open_package = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        busy.set(true);
+        message.set(strings(locale.get_untracked()).opening_trip.to_owned());
+        error.set(false);
+        let input = OpenPackageInput {
+            token: token.get_untracked(),
+        };
+        spawn_local(async move {
+            let result: Result<Option<OpenedPackage>, String> = invoke(
+                "open_planner_package",
+                &serde_json::json!({ "input": input }),
+            )
+            .await;
+            match result {
+                Ok(None) => {
+                    busy.set(false);
+                    message.set(String::new());
+                }
+                Ok(Some(opened)) => {
+                    dialog.set(None);
+                    token.set(cargo_control_random_token());
+                    selected_token.set(opened.token);
+                    let done = strings(locale.get_untracked()).package_opened;
+                    set_status_result(Ok(opened.status), done);
+                }
+                Err(problem) => {
+                    let done = strings(locale.get_untracked()).package_opened;
+                    set_status_result(Err(problem), done);
                 }
             }
         });
@@ -2045,6 +2081,12 @@ fn ControlApp() -> impl IntoView {
                         <span><strong>{move || strings(locale.get()).manual_trip}</strong></span>
                     </label>
                 <div class:hidden=move || add_manual.get()>
+                <div class="actions">
+                    <button class="primary" type="button" on:click=open_package disabled=move || busy.get()>
+                        {move || strings(locale.get()).open_package}
+                    </button>
+                </div>
+                <p class="note">{move || strings(locale.get()).open_package_hint}</p>
                 <div class="grid">
                     <label>
                         {move || strings(locale.get()).trip_folder}

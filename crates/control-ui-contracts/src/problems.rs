@@ -23,11 +23,15 @@ pub enum ProblemKind {
     Routing,
     Files,
     Window,
+    Package,
+    PackageVersion,
 }
 
 /// Fragments of service messages. The first match wins.
 const FRAGMENTS: &[(&str, ProblemKind)] = &[
     ("запам'ятати рейси", ProblemKind::TripData),
+    ("версія пакета", ProblemKind::PackageVersion),
+    ("пакет", ProblemKind::Package),
     ("Некоректна LAN-адреса", ProblemKind::Sharing),
     ("Некоректні налаштування Gateway", ProblemKind::Gateway),
     ("Некоректні налаштування Valhalla", ProblemKind::Routing),
@@ -233,6 +237,26 @@ fn texts(kind: ProblemKind) -> [&'static str; 8] {
             "파일을 읽거나 보내거나 저장할 수 없습니다.",
             "ファイルの読み込み・送信・保存に失敗しました。",
             "无法读取、发送或保存文件。",
+        ],
+        ProblemKind::Package => [
+            "Control не зміг прочитати пакет. Виберіть ZIP-файл, збережений у Planner.",
+            "Control could not read the package. Choose the ZIP file saved by Planner.",
+            "Control konnte das Paket nicht lesen. Wählen Sie die in Planner gespeicherte ZIP-Datei.",
+            "Control n’a pas pu lire le paquet. Choisissez le fichier ZIP enregistré par Planner.",
+            "Control no pudo leer el paquete. Elija el archivo ZIP guardado en Planner.",
+            "Control이 패키지를 읽지 못했습니다. Planner에서 저장한 ZIP 파일을 선택하세요.",
+            "パッケージを読み取れません。Planner で保存した ZIP ファイルを選んでください。",
+            "Control 无法读取行程包。请选择 Planner 保存的 ZIP 文件。",
+        ],
+        ProblemKind::PackageVersion => [
+            "Ця версія пакета не підходить: спершу відкрийте версію 1 цього рейсу; старішу за наявну Control не приймає.",
+            "This package version cannot be used: open version 1 of the trip first; an older one than Control holds is not accepted.",
+            "Diese Paketversion passt nicht: zuerst Version 1 der Tour öffnen; eine ältere als die vorhandene wird nicht angenommen.",
+            "Cette version du paquet ne convient pas : ouvrez d’abord la version 1 ; une version plus ancienne est refusée.",
+            "Esta versión del paquete no sirve: abra primero la versión 1; no se acepta una más antigua que la actual.",
+            "이 패키지 버전은 사용할 수 없습니다. 먼저 버전 1을 여세요. 현재보다 오래된 버전은 받지 않습니다.",
+            "この版は使えません。先に版1を開いてください。現在より古い版は受け付けません。",
+            "该行程包版本无法使用：请先打开版本 1；不接受比现有更旧的版本。",
         ],
         ProblemKind::Window => [
             "Не вдалося відкрити чи показати вікно рейсу.",

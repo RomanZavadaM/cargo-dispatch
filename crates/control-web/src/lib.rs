@@ -1505,6 +1505,15 @@ impl ControlBrowserState {
         Ok(trip.session_metadata().clone())
     }
 
+    /// Applies a package of a connected trip; the driver sees it on the next refresh.
+    pub fn apply_package(&self, token: &str, package: &std::path::Path) -> io::Result<()> {
+        let trip = self.shared_trip(token)?;
+        let mut trip = trip
+            .lock()
+            .map_err(|_| io::Error::other("trip state unavailable"))?;
+        trip.apply_package(package)
+    }
+
     pub fn session_planning_basis(&self, token: &str) -> io::Result<Option<TripPlanningBasis>> {
         let trip = self.shared_trip(token)?;
         let trip = trip
