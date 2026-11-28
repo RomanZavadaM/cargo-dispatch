@@ -172,7 +172,8 @@ try {
   expect(JSON.stringify(await evaluate("window.sentParts")) === "[1048576,2097152]",
     "the transfer continues where it stopped");
   expect(await arrives("reload.mp4"), "the resumed file is the same file");
-  await evaluate("window.fetch = window.realFetch; true");
+  // The reload restored the real dialog, which would stop the page for ever.
+  await evaluate("window.fetch = window.realFetch; window.confirm = () => true; true");
 
   await evaluate(`
     window.shownAlerts = [];
