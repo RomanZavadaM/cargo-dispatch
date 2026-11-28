@@ -3,12 +3,14 @@
 use crate::i18n::UiLocale;
 use crate::orders_i18n::{K, text};
 use crate::package_draft::{cargo_rows, profile_from, snapshot};
+use crate::paste::paste_field;
 use crate::{CargoDraft, RoutingProfileDraft, invoke};
 use cargo_dispatch_planner_ui_contracts::{
     AppliedPlanView, ApplyPlanInput, FiguresDraft, InputOrder, InputPlace, InputProblem,
     InputProblemKind, Money, PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView,
     PlanStopAction, PlanStopRef, PlannerPackageCargoInput, PlannerRouteView,
-    PlannerRoutingProfileInput, PlannerTollPreference, PlanningInput, PlanningStateView,
+    PlaceView, PlannerRoutingProfileInput, PlannerTollPreference, PlanningInput,
+    PlanningStateView,
     ProposeInput, RoadState, SkipReason, VehicleType, localize_problem,
 };
 use leptos::{prelude::*, task::spawn_local};
@@ -150,6 +152,15 @@ fn field(
     }
 }
 
+/// Puts the pasted point into a place; a place without a name gets one.
+fn take_point(place: &mut InputPlace, found: &PlaceView) {
+    place.lat = Some(found.latitude);
+    place.lon = Some(found.longitude);
+    if place.place.trim().is_empty() {
+        place.place = found.title();
+    }
+}
+
 /// Which end of an order an edit belongs to.
 fn end_of(order: &mut InputOrder, delivery: bool) -> &mut InputPlace {
     if delivery {
@@ -173,6 +184,9 @@ fn place_fields(
     };
     view! {
         <div class="routing-grid">
+            {paste_field(panel.locale, panel.message, panel.error, move |found| {
+                panel.change(|input| edit(input, &|place| take_point(place, &found)));
+            })}
             {field(panel, title, place.place.clone(), move |input, value| {
                 edit(input, &|place| place.place = value.clone());
             })}
@@ -455,6 +469,9 @@ fn vehicle_fields(panel: Panel, document: &PlanningInput) -> impl IntoView + use
         </div>
         {type_actions(panel, current)}
         <div class="routing-grid">
+            {paste_field(panel.locale, panel.message, panel.error, move |found| {
+                panel.change(|input| begin(input, &|place| take_point(place, &found)));
+            })}
             {field(panel, K::Start, start.place.clone(), move |input, value| {
                 begin(input, &|place| place.place = value.clone());
             })}

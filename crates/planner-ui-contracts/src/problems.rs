@@ -23,6 +23,8 @@ pub enum ProblemKind {
     Orders,
     MapPoints,
     Figures,
+    Place,
+    PlaceNetwork,
 }
 
 /// Fragments of service messages. The first match wins.
@@ -34,6 +36,8 @@ const FRAGMENTS: &[(&str, ProblemKind)] = &[
     ("Vehicle type", ProblemKind::Orders),
     ("map service takes", ProblemKind::MapPoints),
     ("The typed", ProblemKind::Figures),
+    ("Map link has no point", ProblemKind::Place),
+    ("Map link could not be opened", ProblemKind::PlaceNetwork),
     ("order selected", ProblemKind::Orders),
     ("orders for one calculation", ProblemKind::Orders),
     ("Order has no coordinates", ProblemKind::Orders),
@@ -247,6 +251,24 @@ fn texts(kind: ProblemKind) -> [&'static str; 7] {
             "입력한 거리와 시간(시:분)을 확인하거나 칸을 비우세요.",
             "入力した距離と時間（時:分）を確認するか、欄を空にしてください。",
             "请检查输入的公里数和时间（时:分），或清空该栏。",
+        ],
+        ProblemKind::Place => [
+            "Не знайшов точку. Вставте посилання на місце з Google Maps або його координати.",
+            "Kein Punkt gefunden. Fügen Sie den Link zum Ort aus Google Maps oder seine Koordinaten ein.",
+            "Aucun point trouvé. Collez le lien du lieu depuis Google Maps ou ses coordonnées.",
+            "No se encontró el punto. Pegue el enlace del lugar de Google Maps o sus coordenadas.",
+            "지점을 찾지 못했습니다. Google 지도의 장소 링크나 좌표를 붙여넣으세요.",
+            "地点が見つかりません。Google マップの場所のリンクか座標を貼り付けてください。",
+            "未找到地点。请粘贴 Google 地图中的地点链接或坐标。",
+        ],
+        ProblemKind::PlaceNetwork => [
+            "Не вдалося відкрити коротке посилання. Перевірте інтернет або вставте координати.",
+            "Der Kurzlink ließ sich nicht öffnen. Prüfen Sie das Internet oder fügen Sie die Koordinaten ein.",
+            "Impossible d’ouvrir le lien court. Vérifiez Internet ou collez les coordonnées.",
+            "No se pudo abrir el enlace corto. Revise Internet o pegue las coordenadas.",
+            "짧은 링크를 열 수 없습니다. 인터넷을 확인하거나 좌표를 붙여넣으세요.",
+            "短縮リンクを開けません。インターネットを確認するか、座標を貼り付けてください。",
+            "无法打开短链接。请检查网络或粘贴坐标。",
         ],
         ProblemKind::Internal => [
             "Внутрішня помилка Planner. Перезапустіть програму.",

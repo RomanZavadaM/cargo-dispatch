@@ -4,6 +4,7 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+pub mod short_link;
 pub mod valhalla;
 pub mod valhalla_http;
 

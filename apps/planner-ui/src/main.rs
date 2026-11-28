@@ -4,10 +4,12 @@ mod i18n;
 mod orders;
 mod orders_i18n;
 mod package_draft;
+mod paste;
 mod route_check;
 
 use crate::i18n::{UiLocale, strings};
 use crate::orders::OrdersPanel;
+use crate::paste::paste_field;
 use crate::route_check::{RouteCheckPanel, package_figures};
 use cargo_dispatch_planner_ui_contracts::{
     FiguresDraft, PlannerPackageCargoInput, PlannerPackageExportInput, PlannerPackageExportResult,
@@ -1204,6 +1206,13 @@ fn PlannerApp() -> impl IntoView {
                 )).unwrap_or_default()}</div>
                 <p class="note">{move || strings(locale.get()).route_note}</p>
                 <div class="grid">
+                    {paste_field(locale, message, error, move |found| {
+                        latitude.set(found.latitude.to_string());
+                        longitude.set(found.longitude.to_string());
+                        if title.get_untracked().trim().is_empty() {
+                            title.set(found.title());
+                        }
+                    })}
                     <label>{move || strings(locale.get()).point_title}
                         <input prop:value=move || title.get() on:input=move |e| title.set(event_target_value(&e)) />
                     </label>
