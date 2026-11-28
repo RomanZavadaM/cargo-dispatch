@@ -200,8 +200,9 @@ final class DriverStore: ObservableObject {
         }
     }
 
+    /// `file` is the application's own copy and is removed once it is queued.
     func upload(
-        data: Data,
+        file: URL,
         name: String,
         mimeType: String,
         pointId: String? = nil
@@ -213,14 +214,20 @@ final class DriverStore: ObservableObject {
         let known = trip?.points.contains { $0.pointId == pointId } ?? false
 
         perform {
-            try await pendingQueue.enqueueMedia(
-                documentId: documentId,
-                originalName: name,
-                mimeType: mimeType,
-                data: data,
-                pointId: known ? pointId : nil,
-                createdAtUnixMs: createdAtUnixMs
-            )
+            do {
+                try await pendingQueue.enqueueMedia(
+                    documentId: documentId,
+                    originalName: name,
+                    mimeType: mimeType,
+                    source: file,
+                    pointId: known ? pointId : nil,
+                    createdAtUnixMs: createdAtUnixMs
+                )
+            } catch {
+                self.problem = .fileUnreadable
+                return
+            }
+            try? FileManager.default.removeItem(at: file)
             await self.flush(client: api, queue: pendingQueue)
             self.trip = try await api.trip()
         }
@@ -243,13 +250,24 @@ final class DriverStore: ObservableObject {
         }
     }
 
+    /// Receives a document in parts; saving it again continues a broken transfer.
     func download(
         document: DriverDocument,
-        completion: @escaping @MainActor (Data) -> Void
+        completion: @escaping @MainActor (URL) -> Void
     ) {
         guard let api else { return }
         perform {
-            completion(try await api.downloadDocument(documentId: document.documentId))
+            let partial = FileManager.default.temporaryDirectory
+                .appending(path: "downloads", directoryHint: .isDirectory)
+                .appending(path: "\(document.documentId).part")
+            try await FileTransfer.download(
+                api: api,
+                documentId: document.documentId,
+                size: document.size,
+                sha256: document.sha256,
+                partial: partial
+            )
+            completion(partial)
         }
     }
 

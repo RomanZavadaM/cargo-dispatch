@@ -109,12 +109,13 @@ public actor PendingOutboundQueue {
         try persistState()
     }
 
+    /// Keeps a copy of the file until Control has it; it is not read into memory.
     @discardableResult
     public func enqueueMedia(
         documentId: String,
         originalName: String,
         mimeType: String,
-        data: Data,
+        source: URL,
         pointId: String? = nil,
         createdAtUnixMs: UInt64
     ) throws -> PendingMediaMetadata {
@@ -136,7 +137,8 @@ public actor PendingOutboundQueue {
 
         let payloadName = "\(documentId).bin"
         let payloadURL = mediaDirectory.appending(path: payloadName)
-        try data.write(to: payloadURL, options: .atomic)
+        try? FileManager.default.removeItem(at: payloadURL)
+        try FileManager.default.copyItem(at: source, to: payloadURL)
 
         let metadata = PendingMediaMetadata(
             documentId: documentId,
@@ -157,7 +159,7 @@ public actor PendingOutboundQueue {
         return metadata
     }
 
-    /// Files still to be sent. Their content is read one at a time by `readMedia`.
+    /// Files still to be sent. Their content stays on disk: see `mediaFile`.
     public func pendingMedia() -> [PendingMediaMetadata] {
         state.media.filter { $0.rejectedStatus == nil }
     }
@@ -166,8 +168,9 @@ public actor PendingOutboundQueue {
         state.media.filter { $0.rejectedStatus != nil }
     }
 
-    public func readMedia(_ item: PendingMediaMetadata) -> Data? {
-        try? Data(contentsOf: mediaDirectory.appending(path: item.payloadFile))
+    public func mediaFile(_ item: PendingMediaMetadata) -> URL? {
+        let url = mediaDirectory.appending(path: item.payloadFile)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     public func markRejected(documentId: String, status: Int) throws {
@@ -253,25 +256,18 @@ public actor OutboundSender {
         return accepted
     }
 
-    public func sendMedia(client: ControlAPI, queue: PendingOutboundQueue) async {
+    public func sendMedia(client: any FileTransferAPI, queue: PendingOutboundQueue) async {
         guard !sendingMedia else { return }
         sendingMedia = true
         defer { sendingMedia = false }
 
         for item in await queue.pendingMedia() {
-            guard let data = await queue.readMedia(item) else {
+            guard let file = await queue.mediaFile(item) else {
                 try? await queue.removeMedia(documentId: item.documentId)
                 continue
             }
             do {
-                _ = try await client.uploadDocument(
-                    documentId: item.documentId,
-                    originalName: item.originalName,
-                    mimeType: item.mimeType,
-                    data: data,
-                    pointId: item.pointId,
-                    createdAtUnixMs: item.createdAtUnixMs
-                )
+                try await FileTransfer.upload(api: client, item: item, file: file)
                 try await queue.removeMedia(documentId: item.documentId)
             } catch let error as ControlAPIError {
                 guard case let .http(status, _) = error,

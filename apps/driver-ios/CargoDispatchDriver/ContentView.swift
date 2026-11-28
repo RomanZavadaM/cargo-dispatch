@@ -81,7 +81,7 @@ struct ContentView: View {
                         switch result {
                         case let .success(media):
                             store.upload(
-                                data: media.data,
+                                file: media.file,
                                 name: media.name,
                                 mimeType: media.mimeType,
                                 pointId: attachPointId
@@ -295,8 +295,8 @@ struct ContentView: View {
                         Text(verbatim: details(of: document, in: trip))
                             .font(.caption)
                         Button("documents.save") {
-                            store.download(document: document) { data in
-                                exportDocument = DriverFileDocument(data: data)
+                            store.download(document: document) { file in
+                                exportDocument = DriverFileDocument(url: file)
                                 exportName = document.originalName
                                 showFileExporter = true
                             }
@@ -455,7 +455,7 @@ struct ContentView: View {
             }
             let values = try? url.resourceValues(forKeys: [.contentTypeKey])
             store.upload(
-                data: try Data(contentsOf: url),
+                file: try DriverStaging.copy(url),
                 name: url.lastPathComponent,
                 mimeType: values?.contentType?.preferredMIMEType ?? "application/octet-stream",
                 pointId: attachPointId
@@ -469,14 +469,14 @@ struct ContentView: View {
         guard let item else { return }
         Task {
             do {
-                guard let data = try await item.loadTransferable(type: Data.self) else {
+                guard let picked = try await item.loadTransferable(type: PickedMediaFile.self) else {
                     store.report(.fileUnreadable)
                     return
                 }
                 let type = item.supportedContentTypes.first
                 let suffix = type?.preferredFilenameExtension ?? "bin"
                 store.upload(
-                    data: data,
+                    file: picked.url,
                     name: "driver-media.\(suffix)",
                     mimeType: type?.preferredMIMEType ?? "application/octet-stream",
                     pointId: attachPointId

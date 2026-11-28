@@ -42,6 +42,16 @@ data class DriverDocument(
     val size: Long,
     @SerialName("point_id")
     val pointId: String? = null,
+    /** Checksum of the whole file; Control 0.3.0 and earlier does not send it. */
+    val sha256: String? = null,
+)
+
+/** How much of a file from the driver Control already holds. */
+@Serializable
+data class UploadStatus(
+    val received: Long,
+    val complete: Boolean,
+    val sha256: String? = null,
 )
 
 @Serializable

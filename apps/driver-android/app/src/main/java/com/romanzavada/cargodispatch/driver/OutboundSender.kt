@@ -41,22 +41,15 @@ object OutboundSender {
         accepted
     }
 
-    suspend fun sendMedia(client: ControlApi, queue: PendingOutboundQueue) = mediaLock.withLock {
+    suspend fun sendMedia(client: FileTransferApi, queue: PendingOutboundQueue) = mediaLock.withLock {
         for (entry in queue.pendingMedia()) {
-            val item = queue.readMedia(entry)
-            if (item == null) {
+            val file = queue.mediaFile(entry)
+            if (file == null) {
                 queue.removeMedia(entry.documentId)
                 continue
             }
             try {
-                client.uploadDocument(
-                    documentId = entry.documentId,
-                    originalName = entry.originalName,
-                    mimeType = entry.mimeType,
-                    bytes = item.bytes,
-                    pointId = entry.pointId,
-                    createdAtUnixMs = entry.createdAtUnixMs,
-                )
+                FileTransfer.upload(client, entry, file)
                 queue.removeMedia(entry.documentId)
             } catch (_: IOException) {
                 return@withLock

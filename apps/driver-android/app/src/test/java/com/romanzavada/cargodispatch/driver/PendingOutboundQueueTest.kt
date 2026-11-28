@@ -97,11 +97,8 @@ class PendingOutboundQueueTest {
     fun media_payload_and_stable_document_id_survive_restart() = runBlocking<Unit> {
         val root = root()
         val queue = PendingOutboundQueue(root)
-        val upload = PickedUpload(
-            name = "proof.jpg",
-            mimeType = "image/jpeg",
-            bytes = byteArrayOf(1, 2, 3, 4),
-        )
+        val content = byteArrayOf(1, 2, 3, 4)
+        val upload = PickedUpload("proof.jpg", "image/jpeg") { content.inputStream() }
         val documentId = "0123456789abcdef0123456789abcdef"
 
         queue.enqueueMedia(
@@ -116,7 +113,7 @@ class PendingOutboundQueueTest {
         assertEquals(documentId, pending.documentId)
         assertEquals(upload.name, pending.originalName)
         assertEquals(upload.mimeType, pending.mimeType)
-        assertContentEquals(upload.bytes, reopened.readMedia(pending)?.bytes)
+        assertContentEquals(content, reopened.mediaFile(pending)?.readBytes())
         assertEquals(1, reopened.pendingCount())
 
         reopened.removeMedia(documentId)
@@ -131,7 +128,7 @@ class PendingOutboundQueueTest {
         val documentId = "0123456789abcdef0123456789abcdef"
         queue.enqueueMedia(
             documentId,
-            PickedUpload("big.mp4", "video/mp4", byteArrayOf(1)),
+            PickedUpload("big.mp4", "video/mp4") { byteArrayOf(1).inputStream() },
             null,
             1,
         )

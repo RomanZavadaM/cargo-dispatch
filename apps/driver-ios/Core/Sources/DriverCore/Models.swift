@@ -45,6 +45,8 @@ public struct DriverDocument: Codable, Equatable, Identifiable, Sendable {
     public let mimeType: String
     public let size: UInt64
     public let pointId: String?
+    /// Checksum of the whole file; Control 0.3.0 and earlier does not send it.
+    public let sha256: String?
 
     public var id: String { documentId }
 
@@ -55,6 +57,7 @@ public struct DriverDocument: Codable, Equatable, Identifiable, Sendable {
         case mimeType = "mime_type"
         case size
         case pointId = "point_id"
+        case sha256
     }
 }
 
