@@ -23,6 +23,9 @@ use std::{
 use tempfile::NamedTempFile;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
+mod uploads;
+pub use uploads::{UploadDescriptor, UploadProgress};
+
 const LIMIT: u64 = 4 * 1024 * 1024;
 
 fn invalid(message: impl std::fmt::Debug) -> io::Error {
@@ -1622,6 +1625,11 @@ impl TripFolder {
         }
 
         let summary = fresh.execution_summary(completed_at_unix_ms)?;
+        // Files that never arrived in full are not part of the completed trip.
+        match fs::remove_dir_all(fresh.incoming_directory()) {
+            Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
+            _ => {}
+        }
         write_execution_summary(&fresh.path, &summary)?;
         write_checksums(&fresh.path)?;
         verify_checksums(&fresh.path)?;
@@ -2738,6 +2746,94 @@ mod tests {
         let detected = TripFolder::open_detected(&folder)?;
         assert_eq!(detected.trip_id(), trip);
         assert_eq!(detected.state().trip_id, trip);
+        Ok(())
+    }
+
+    fn upload_trip(tmp: &Path) -> io::Result<(PathBuf, TripId, PointId)> {
+        let package = tmp.join("upload.zip");
+        let (trip, route) = create_test_package(&package, 91, 92)?;
+        let folder = tmp.join("upload-trip");
+        TripFolder::import(&folder, &package)?;
+        Ok((folder, trip, route[0].point_id))
+    }
+
+    fn descriptor(point_id: PointId, total_size: u64) -> UploadDescriptor {
+        UploadDescriptor {
+            original_name: "video.mp4".to_owned(),
+            mime_type: "video/mp4".to_owned(),
+            point_id: Some(point_id),
+            total_size,
+            created_at_unix_ms: 5,
+        }
+    }
+
+    #[test]
+    fn a_file_sent_in_parts_continues_after_a_restart() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (folder, trip, point) = upload_trip(tmp.path())?;
+        let id = DocumentId::from_bytes([7; 16]).unwrap();
+        let content = b"0123456789".to_vec();
+        let about = descriptor(point, 10);
+
+        let mut first = TripFolder::open(&folder, trip)?;
+        let progress = first.append_upload(id, &about, 0, &content[..4], None)?;
+        assert_eq!((progress.received, progress.complete), (4, false));
+        assert!(first.documents().is_empty());
+        drop(first);
+
+        let mut second = TripFolder::open(&folder, trip)?;
+        assert_eq!(second.upload_progress(id)?.received, 4);
+        // The same part again changes nothing.
+        assert_eq!(
+            second
+                .append_upload(id, &about, 0, &content[..4], None)?
+                .received,
+            4
+        );
+        // Other bytes, a gap and another size do not fit.
+        for (offset, part, about) in [
+            (0, &b"zzzz"[..], about.clone()),
+            (6, &content[6..], about.clone()),
+            (4, &content[4..], descriptor(point, 11)),
+        ] {
+            let refused = second.append_upload(id, &about, offset, part, None);
+            assert_eq!(refused.unwrap_err().kind(), io::ErrorKind::InvalidData);
+        }
+        let damaged = second.append_upload(id, &about, 4, &content[4..], Some([0; 32]));
+        assert_eq!(damaged.unwrap_err().kind(), io::ErrorKind::InvalidInput);
+        let too_long = second.append_upload(id, &about, 4, b"456789x", None);
+        assert_eq!(too_long.unwrap_err().kind(), io::ErrorKind::InvalidInput);
+
+        let done = second.append_upload(id, &about, 4, &content[4..], None)?;
+        assert!(done.complete);
+        assert_eq!(done.sha256, Some(Sha256::digest(&content).into()));
+        let (document, path) = second.verified_document_path(id)?;
+        assert_eq!(fs::read(path)?, content);
+        assert_eq!(document.point_id, Some(point));
+        assert_eq!(second.documents().len(), 1);
+        assert_eq!(fs::read_dir(folder.join("incoming"))?.count(), 0);
+        // A repeated last part after the answer was lost is not a second file.
+        assert!(
+            second
+                .append_upload(id, &about, 4, &content[4..], None)?
+                .complete
+        );
+        let other = second.append_upload(id, &about, 4, b"xxxxxx", None);
+        assert_eq!(other.unwrap_err().kind(), io::ErrorKind::InvalidData);
+        assert_eq!(TripFolder::open(&folder, trip)?.documents().len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn an_unfinished_file_is_not_archived() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let (folder, trip, point) = upload_trip(tmp.path())?;
+        let mut control = TripFolder::open(&folder, trip)?;
+        let id = DocumentId::from_bytes([8; 16]).unwrap();
+        control.append_upload(id, &descriptor(point, 100), 0, b"half", None)?;
+        let archived = control.archive(&tmp.path().join("completed"), "upload-trip", 9)?;
+        assert!(!archived.join("incoming").exists());
+        verify_archive(&archived, trip)?;
         Ok(())
     }
 }

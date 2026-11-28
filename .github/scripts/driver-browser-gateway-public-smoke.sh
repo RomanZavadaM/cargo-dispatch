@@ -220,4 +220,24 @@ assert document["original_name"] == "public-gateway-upload.txt"
 print("Public Gateway bidirectional files: PASS")
 PY
 
+# A file in parts: Control keeps the first part, takes the rest and gives both back.
+PARTS_ID="c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+head -c 1500000 /dev/urandom > "$RESULT_DIR"/parts.bin
+head -c 1048576 "$RESULT_DIR"/parts.bin > "$RESULT_DIR"/part-1.bin
+tail -c +1048577 "$RESULT_DIR"/parts.bin > "$RESULT_DIR"/part-2.bin
+send_part() {
+  curl --fail --silent --show-error --max-time 120 -X POST -H 'Content-Type: application/octet-stream' \
+    -H 'X-File-Name: parts.bin' -H 'X-Created-At-Unix-Ms: 1795700002000' \
+    --data-binary "@$2" "$BASE/api/trip/$TOKEN/uploads/$PARTS_ID?offset=$1&total=1500000"
+}
+send_part 0 "$RESULT_DIR"/part-1.bin | grep -q '"received":1048576,"complete":false'
+curl --fail --silent --show-error --max-time 120 "$BASE/api/trip/$TOKEN/uploads/$PARTS_ID" | grep -q '"received":1048576'
+send_part 1048576 "$RESULT_DIR"/part-2.bin | grep -q '"complete":true'
+for offset in 0 1048576; do
+  curl --fail --silent --show-error --max-time 120 \
+    "$BASE/api/trip/$TOKEN/documents/$PARTS_ID?offset=$offset&length=1048576" > "$RESULT_DIR"/part-back-$offset.bin
+done
+cat "$RESULT_DIR"/part-back-0.bin "$RESULT_DIR"/part-back-1048576.bin | cmp - "$RESULT_DIR"/parts.bin
+echo "File in parts: PASS"
+
 echo "Control ↔ public HTTPS Gateway ↔ Driver Browser acceptance: PASS"

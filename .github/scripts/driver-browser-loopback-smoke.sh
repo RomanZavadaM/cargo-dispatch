@@ -209,6 +209,26 @@ assert any(d["direction"] == "from_driver" for d in trip["documents"])
 print("Refresh/reconnect state: PASS")
 PY
 
+# A file in parts: Control keeps the first part, takes the rest and gives both back.
+PARTS_ID="c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+head -c 1500000 /dev/urandom > driver-browser-loopback-results/parts.bin
+head -c 1048576 driver-browser-loopback-results/parts.bin > driver-browser-loopback-results/part-1.bin
+tail -c +1048577 driver-browser-loopback-results/parts.bin > driver-browser-loopback-results/part-2.bin
+send_part() {
+  curl --fail --silent --show-error -X POST -H 'Content-Type: application/octet-stream' \
+    -H 'X-File-Name: parts.bin' -H 'X-Created-At-Unix-Ms: 1795700002000' \
+    --data-binary "@$2" "$BASE/api/trip/$TOKEN/uploads/$PARTS_ID?offset=$1&total=1500000"
+}
+send_part 0 driver-browser-loopback-results/part-1.bin | grep -q '"received":1048576,"complete":false'
+curl --fail --silent --show-error "$BASE/api/trip/$TOKEN/uploads/$PARTS_ID" | grep -q '"received":1048576'
+send_part 1048576 driver-browser-loopback-results/part-2.bin | grep -q '"complete":true'
+for offset in 0 1048576; do
+  curl --fail --silent --show-error \
+    "$BASE/api/trip/$TOKEN/documents/$PARTS_ID?offset=$offset&length=1048576" > driver-browser-loopback-results/part-back-$offset.bin
+done
+cat driver-browser-loopback-results/part-back-0.bin driver-browser-loopback-results/part-back-1048576.bin | cmp - driver-browser-loopback-results/parts.bin
+echo "File in parts: PASS"
+
 # The page itself in a real browser: rendering, confirmation, file, messages, languages.
 NODE_FLAGS=()
 if ! node -e 'process.exit(typeof WebSocket === "function" ? 0 : 1)'; then
