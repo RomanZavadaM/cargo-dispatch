@@ -12,7 +12,7 @@ use cargo_dispatch_planner_ui_contracts::{
     PlannerPointInput, PlannerRouteView, PlannerRoutingAvailabilityState,
     PlannerRoutingConfigInput, PlannerRoutingPreviewInput, PlannerRoutingPreviewState,
     PlannerRoutingPreviewView, PlannerRoutingProbeResult, PlannerRoutingProfileInput,
-    PlannerRoutingStatus, PlannerTollPreference, PointActionInput, ReorderPointsInput,
+    PlannerRoutingStatus, PlannerTollPreference, PointActionInput, ReorderPointsInput, VehicleType,
     is_supported_max_speed_kmh, localize_problem,
 };
 use leptos::{prelude::*, task::spawn_local};
@@ -580,6 +580,7 @@ fn PlannerApp() -> impl IntoView {
     let request_timeout_ms = RwSignal::new("10000".to_owned());
     let routing_profile = RwSignal::new(RoutingProfileDraft::default());
     let export_vehicle_type = RwSignal::new(String::new());
+    let vehicle_types = RwSignal::new(Vec::<VehicleType>::new());
     let export_cargos = RwSignal::new(vec![CargoDraft::new(1)]);
     let next_cargo_row = RwSignal::new(2_u64);
     let export_result = RwSignal::new(None::<PlannerPackageExportResult>);
@@ -1186,6 +1187,7 @@ fn PlannerApp() -> impl IntoView {
                 route=route
                 profile=routing_profile
                 vehicle_type=export_vehicle_type
+                vehicle_types=vehicle_types
                 cargos=export_cargos
                 next_cargo_row=next_cargo_row
             />
@@ -1405,13 +1407,41 @@ fn PlannerApp() -> impl IntoView {
                 <div class="routing-grid">
                     <label>
                         {move || strings(locale.get()).vehicle_type}
-                        <input
-                            prop:value=move || export_vehicle_type.get()
-                            on:input=move |event| {
-                                export_vehicle_type.set(event_target_value(&event));
-                                export_result.set(None);
-                            }
-                        />
+                        <select on:change=move |event| {
+                            export_vehicle_type.set(event_target_value(&event));
+                            export_result.set(None);
+                        }>
+                            {move || {
+                                let current = export_vehicle_type.get();
+                                let mut names: Vec<String> = vehicle_types
+                                    .get()
+                                    .into_iter()
+                                    .map(|known| known.name)
+                                    .collect();
+                                // A name from an order file or an earlier version stays
+                                // until another one is chosen.
+                                if !current.is_empty() && !names.contains(&current) {
+                                    names.insert(0, current.clone());
+                                }
+                                names.insert(0, String::new());
+                                names
+                                    .into_iter()
+                                    .map(|name| {
+                                        let selected = name == current;
+                                        let line = if name.is_empty() {
+                                            "—".to_owned()
+                                        } else {
+                                            name.clone()
+                                        };
+                                        view! {
+                                            <option value=name prop:selected=selected>
+                                                {line}
+                                            </option>
+                                        }
+                                    })
+                                    .collect_view()
+                            }}
+                        </select>
                     </label>
                 </div>
 

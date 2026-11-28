@@ -52,6 +52,8 @@ const bridge = `
     orderPart: () => ui.section("Заявки та варіанти маршруту"),
     packagePart: () => ui.section("Пакет рейсу"),
     routingPart: () => ui.section("Valhalla — дорожній preview"),
+    typeList: () => ui.field(ui.orderPart(), "Обрати зі списку"),
+    types: () => [...ui.typeList().options].slice(1).map(option => option.value).join("|"),
     rows: () => [...document.querySelectorAll(".package-cargo")],
     // Everything the operator sees in the package section and the vehicle parameters.
     shown: () => JSON.stringify({
@@ -172,7 +174,7 @@ try {
   await type('ui.field(ui.orders()[0], "Маса, кг")', "2400");
   await key("Tab", 9);
   await idle();
-  await expect('document.activeElement === ui.field(ui.orders()[0], "Палети")',
+  await expect('document.activeElement === ui.field(ui.orders()[0], "Об’єм, м³")',
     "after a correction the cursor stays in the next field");
   let state = await service("planner_planning_status");
   if (state.input.orders[0].cargo.weight_kg !== 2400) throw new Error("failed: the corrected weight is kept");
@@ -199,6 +201,50 @@ try {
   await waitFor("the saved file", 'document.body.innerText.includes("saved-orders.json")');
   await idle();
   console.log("PASS the orders are saved to a file");
+
+  // The first field of the section with such a name belongs to the vehicle.
+  const vehicle = name => `ui.field(ui.orderPart(), "${name}")`;
+  const vehicleShown = `["Назва типу", "Вантажність, кг", "Об’єм, м³", "Палети",
+    "Особливості (напр., рефрижератор)"].map(name => ui.field(ui.orderPart(), name).value).join(";")`;
+  await expect('ui.types() === "" && ui.typeList().value === ""', "the vehicle type list starts empty");
+  await click('ui.button(ui.orderPart(), "Зберегти тип у список")');
+  await waitFor("the first type", 'ui.types() === "тент 20 т"');
+  await idle();
+  await expect('ui.typeList().value === "тент 20 т"',
+    "the vehicle of the order file is saved as a type and shown as chosen");
+  for (const [name, value] of [
+    ["Назва типу", "реф 10 т"], ["Вантажність, кг", "10000"], ["Об’єм, м³", "43,5"],
+    ["Палети", "15"], ["Особливості (напр., рефрижератор)", "рефрижератор"],
+  ]) {
+    await type(vehicle(name), value);
+    await key("Tab", 9);
+    await idle();
+  }
+  await expect('ui.typeList().value === ""', "changed values are not shown as a saved type");
+  await click('ui.button(ui.orderPart(), "Зберегти тип у список")');
+  await waitFor("the second type first", 'ui.types() === "реф 10 т|тент 20 т"');
+  await idle();
+  await expect('ui.typeList().value === "реф 10 т"', "the saved type is shown as chosen");
+
+  await type('ui.field(ui.orders()[0], "Об’єм, м³")', "50");
+  await key("Tab", 9);
+  await idle();
+  await click('ui.button(ui.orderPart(), "Запропонувати маршрути")');
+  await waitFor("the order that does not fit",
+    'ui.orderPart().textContent.includes("S1: перевищує місткість авто")');
+  await idle();
+  await expect("ui.variants().length === 0", "cargo larger than the vehicle gets no route");
+
+  await choose("ui.typeList()", "тент 20 т");
+  await waitFor("the chosen type first", 'ui.types() === "тент 20 т|реф 10 т"');
+  await idle();
+  await expect(`${vehicleShown} === "тент 20 т;20000;;33;" && ui.typeList().value === "тент 20 т"`,
+    "choosing a type fills the vehicle");
+  let chosenState = await service("planner_planning_status");
+  if (chosenState.input.vehicle.payload_kg !== 20000 || chosenState.input.vehicle.volume_m3 !== undefined
+    || chosenState.input.vehicle.start?.place !== "Місто А")
+    throw new Error("failed: the chosen type is kept and the start stays");
+  console.log("PASS the chosen type is kept and the start stays");
 
   await click('ui.button(ui.orderPart(), "Запропонувати маршрути")');
   await waitFor("variants for the complete order", "ui.variants().length >= 1");
@@ -275,10 +321,10 @@ try {
   await idle();
   if ((await ordered()) !== initial) throw new Error("failed: a point moves back");
 
-  await type('ui.field(ui.packagePart(), "Тип / клас транспорту для планування")', "тент 22 т");
+  await choose('ui.field(ui.packagePart(), "Тип / клас транспорту для планування")', "реф 10 т");
   await type('ui.field(ui.rows()[0], "Назва вантажу")', "Правка вручну");
   await type('ui.field(ui.rows()[0], "Маса, кг")', "2300");
-  await expect(`ui.field(ui.packagePart(), "Тип / клас транспорту для планування").value === "тент 22 т"
+  await expect(`ui.field(ui.packagePart(), "Тип / клас транспорту для планування").value === "реф 10 т"
     && ui.field(ui.rows()[0], "Назва вантажу").value === "Правка вручну"
     && ui.field(ui.rows()[0], "Маса, кг").value === "2300"`, "manual corrections of the package are typed in");
   await click('ui.button(ui.packagePart(), "Додати вантаж")');
@@ -312,6 +358,8 @@ try {
   if (after !== before) throw new Error(`failed: the package form comes back\n before ${before}\n after  ${after}`);
   console.log("PASS the package form comes back exactly as left");
   await expect('ui.field(ui.orders()[0], "Маса, кг").value === "2400"', "the corrected orders come back");
+  await expect('ui.types() === "тент 20 т|реф 10 т" && ui.typeList().value === "тент 20 т"',
+    "the vehicle types come back with the last used first");
   await expect(`ui.field(ui.routingPart(), "Адреса Valhalla").value === "http://127.0.0.1:9/"
     && ui.field(ui.routingPart(), "ID набору карт").value === "synthetic"`,
     "the routing settings come back");
@@ -339,6 +387,11 @@ try {
   state = await service("planner_planning_status");
   if (state.package.cargos[0].pickup_point_id !== "") throw new Error("failed: the detached point is saved");
   console.log("PASS the detached point is saved");
+  await click('ui.button(ui.orderPart(), "Прибрати тип зі списку")');
+  await waitFor("one type left", 'ui.types() === "реф 10 т"');
+  await idle();
+  await expect('ui.typeList().value === "" && ui.button(ui.orderPart(), "Прибрати тип зі списку").disabled',
+    "a removed type leaves the list and the vehicle stays as typed");
   await expect('!document.querySelector("main > p.error")', "no error message is shown");
 
   for (const [locale, title] of [["en", "Orders and route variants"], ["ja", "注文とルート案"]]) {

@@ -44,6 +44,8 @@ impl PoolFilter {
 pub struct AvailableCapacity {
     pub payload_kg: Option<u32>,
     pub pallets: Option<u16>,
+    /// Cargo space in litres. Without it the volume is not checked.
+    pub volume_litres: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -178,6 +180,7 @@ pub struct RouteCargoLeg {
     pub unload_stop: usize,
     pub weight_kg: Option<u32>,
     pub pallets: Option<u16>,
+    pub volume_litres: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -197,12 +200,19 @@ pub enum RouteHardRejectReason {
         load_pallets: u32,
         capacity_pallets: u16,
     },
+    VolumeExceededOnSegment {
+        segment_index: usize,
+        load_litres: u64,
+        capacity_litres: u32,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RouteNeedsCheckReason {
     CargoWeightUnknown(CargoId),
     CargoPalletsUnknown(CargoId),
+    /// Reported only when the vehicle states its cargo space.
+    CargoVolumeUnknown(CargoId),
     AvailablePayloadUnknown,
     AvailablePalletsUnknown,
 }
@@ -249,8 +259,20 @@ pub fn evaluate_route_segments(
 
         let mut known_weight_kg = 0_u64;
         let mut known_pallets = 0_u32;
+        let mut known_litres = 0_u64;
 
         for leg in active_legs {
+            match leg.volume_litres {
+                Some(litres) => known_litres += u64::from(litres),
+                None if capacity.volume_litres.is_some() => {
+                    let reason = RouteNeedsCheckReason::CargoVolumeUnknown(leg.cargo_id);
+                    if !check_reasons.contains(&reason) {
+                        check_reasons.push(reason);
+                    }
+                }
+                None => {}
+            }
+
             match leg.weight_kg {
                 Some(weight_kg) => known_weight_kg += u64::from(weight_kg),
                 None => {
@@ -270,6 +292,16 @@ pub fn evaluate_route_segments(
                     }
                 }
             }
+        }
+
+        if let Some(capacity_litres) = capacity.volume_litres
+            && known_litres > u64::from(capacity_litres)
+        {
+            hard_reasons.push(RouteHardRejectReason::VolumeExceededOnSegment {
+                segment_index,
+                load_litres: known_litres,
+                capacity_litres,
+            });
         }
 
         match capacity.payload_kg {
@@ -2267,6 +2299,7 @@ mod tests {
             AvailableCapacity {
                 payload_kg: Some(3_000),
                 pallets: Some(8),
+                volume_litres: None,
             },
         );
 
@@ -2289,6 +2322,7 @@ mod tests {
             AvailableCapacity {
                 payload_kg: Some(2_000),
                 pallets: Some(5),
+                volume_litres: None,
             },
         );
 
@@ -2322,6 +2356,7 @@ mod tests {
             AvailableCapacity {
                 payload_kg: Some(5_000),
                 pallets: Some(10),
+                volume_litres: None,
             },
         );
 
@@ -2350,6 +2385,7 @@ mod tests {
             AvailableCapacity {
                 payload_kg: Some(3_000),
                 pallets: None,
+                volume_litres: None,
             },
         );
 
@@ -2388,6 +2424,7 @@ mod tests {
             AvailableCapacity {
                 payload_kg: Some(3_000),
                 pallets: Some(8),
+                volume_litres: None,
             },
         );
 
@@ -2419,6 +2456,7 @@ mod tests {
                 AvailableCapacity {
                     payload_kg: Some(3_000),
                     pallets: Some(8),
+                    volume_litres: None,
                 },
             );
 
@@ -2443,10 +2481,12 @@ mod tests {
                 unload_stop: 1,
                 weight_kg: Some(1_000),
                 pallets: Some(2),
+                volume_litres: None,
             }],
             AvailableCapacity {
                 payload_kg: Some(3_500),
                 pallets: Some(8),
+                volume_litres: None,
             },
         );
 
@@ -2472,6 +2512,7 @@ mod tests {
                     unload_stop: 2,
                     weight_kg: Some(2_500),
                     pallets: Some(4),
+                    volume_litres: None,
                 },
                 RouteCargoLeg {
                     cargo_id: cargo_id(3),
@@ -2479,11 +2520,13 @@ mod tests {
                     unload_stop: 3,
                     weight_kg: Some(2_000),
                     pallets: Some(3),
+                    volume_litres: None,
                 },
             ],
             AvailableCapacity {
                 payload_kg: Some(4_000),
                 pallets: Some(6),
+                volume_litres: None,
             },
         );
 
@@ -2517,6 +2560,7 @@ mod tests {
                     unload_stop: 1,
                     weight_kg: Some(3_000),
                     pallets: Some(5),
+                    volume_litres: None,
                 },
                 RouteCargoLeg {
                     cargo_id: cargo_id(5),
@@ -2524,17 +2568,58 @@ mod tests {
                     unload_stop: 2,
                     weight_kg: Some(3_000),
                     pallets: Some(5),
+                    volume_litres: None,
                 },
             ],
             AvailableCapacity {
                 payload_kg: Some(3_500),
                 pallets: Some(6),
+                volume_litres: None,
             },
         );
 
         assert_eq!(result.level, FeasibilityLevel::Feasible);
         assert!(result.hard_reasons.is_empty());
         assert!(result.check_reasons.is_empty());
+    }
+
+    #[test]
+    fn volume_is_checked_only_against_a_stated_cargo_space() {
+        let leg = |number, volume_litres| RouteCargoLeg {
+            cargo_id: cargo_id(number),
+            pickup_stop: 0,
+            unload_stop: 1,
+            weight_kg: Some(100),
+            pallets: Some(1),
+            volume_litres,
+        };
+        let space = |volume_litres| AvailableCapacity {
+            payload_kg: Some(1_000),
+            pallets: Some(10),
+            volume_litres,
+        };
+        let legs = [leg(7, Some(50_000)), leg(8, Some(40_000))];
+
+        let tight = evaluate_route_segments(2, &legs, space(Some(86_000)));
+        assert_eq!(
+            tight.hard_reasons,
+            [RouteHardRejectReason::VolumeExceededOnSegment {
+                segment_index: 0,
+                load_litres: 90_000,
+                capacity_litres: 86_000,
+            }]
+        );
+        let exact = evaluate_route_segments(2, &legs, space(Some(90_000)));
+        assert_eq!(exact.level, FeasibilityLevel::Feasible);
+
+        let unknown = [leg(9, None)];
+        let unchecked = evaluate_route_segments(2, &unknown, space(None));
+        assert_eq!(unchecked.level, FeasibilityLevel::Feasible);
+        let asked = evaluate_route_segments(2, &unknown, space(Some(86_000)));
+        assert_eq!(
+            asked.check_reasons,
+            [RouteNeedsCheckReason::CargoVolumeUnknown(cargo_id(9))]
+        );
     }
 
     #[test]
@@ -2547,10 +2632,12 @@ mod tests {
                 unload_stop: 1,
                 weight_kg: None,
                 pallets: None,
+                volume_litres: None,
             }],
             AvailableCapacity {
                 payload_kg: None,
                 pallets: None,
+                volume_litres: None,
             },
         );
 

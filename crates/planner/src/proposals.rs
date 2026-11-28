@@ -22,6 +22,7 @@ pub struct ProposalOrder {
     pub delivery: GeoPoint,
     pub weight_kg: Option<u32>,
     pub pallets: Option<u16>,
+    pub volume_litres: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -68,7 +69,8 @@ pub struct Proposal {
     /// Largest known weight on board between two stops.
     pub peak_weight_kg: u64,
     pub peak_pallets: u32,
-    /// Some weight, pallet count or capacity is unknown.
+    pub peak_volume_litres: u64,
+    /// A weight, pallet count, volume or capacity needed for the check is unknown.
     pub needs_check: bool,
 }
 
@@ -123,6 +125,7 @@ fn measure(
                 unload_stop: position(StopAction::Delivery)?,
                 weight_kg: orders[order].weight_kg,
                 pallets: orders[order].pallets,
+                volume_litres: orders[order].volume_litres,
             })
         })
         .collect();
@@ -147,24 +150,30 @@ fn measure(
     let mut pallets = 0_u32;
     let mut peak_weight_kg = 0_u64;
     let mut peak_pallets = 0_u32;
+    let mut litres = 0_u64;
+    let mut peak_volume_litres = 0_u64;
     for (index, stop) in stops.iter().enumerate() {
         let order = orders[stop.order];
         let cargo_weight = u64::from(order.weight_kg.unwrap_or(0));
         let cargo_pallets = u32::from(order.pallets.unwrap_or(0));
+        let cargo_litres = u64::from(order.volume_litres.unwrap_or(0));
         match stop.action {
             StopAction::Pickup => {
                 on_board += 1;
                 weight += cargo_weight;
                 pallets += cargo_pallets;
+                litres += cargo_litres;
             }
             StopAction::Delivery => {
                 on_board = on_board.saturating_sub(1);
                 weight = weight.saturating_sub(cargo_weight);
                 pallets = pallets.saturating_sub(cargo_pallets);
+                litres = litres.saturating_sub(cargo_litres);
             }
         }
         peak_weight_kg = peak_weight_kg.max(weight);
         peak_pallets = peak_pallets.max(pallets);
+        peak_volume_litres = peak_volume_litres.max(litres);
         if let Some(next) = stops.get(index + 1) {
             let distance = straight_line_km(place(stop), place(next));
             straight_km += distance;
@@ -188,6 +197,7 @@ fn measure(
         empty_km,
         peak_weight_kg,
         peak_pallets,
+        peak_volume_litres,
         needs_check: feasibility.level == FeasibilityLevel::NeedsCheck,
     })
 }
@@ -314,8 +324,10 @@ pub fn propose_routes(
     let fits = |order: &ProposalOrder| {
         let weight = order.weight_kg.zip(capacity.payload_kg);
         let pallets = order.pallets.zip(capacity.pallets);
+        let volume = order.volume_litres.zip(capacity.volume_litres);
         weight.is_none_or(|(cargo, limit)| cargo <= limit)
             && pallets.is_none_or(|(cargo, limit)| cargo <= limit)
+            && volume.is_none_or(|(cargo, limit)| cargo <= limit)
     };
     let usable: Vec<usize> = (0..orders.len())
         .filter(|&order| fits(&orders[order]))
@@ -395,6 +407,7 @@ mod tests {
             delivery: at(delivery),
             weight_kg: Some(weight_kg),
             pallets: Some(1),
+            volume_litres: None,
         }
     }
 
@@ -405,6 +418,7 @@ mod tests {
             capacity: AvailableCapacity {
                 payload_kg: Some(payload_kg),
                 pallets: Some(33),
+                volume_litres: None,
             },
         }
     }
@@ -461,6 +475,31 @@ mod tests {
         .expect("two orders");
         assert_eq!(set.too_large, [0]);
         assert!(set.proposals[0].stops.iter().all(|stop| stop.order == 1));
+    }
+
+    #[test]
+    fn cargo_space_limits_what_travels_together() {
+        let bulky = |pickup, delivery, volume_litres| ProposalOrder {
+            volume_litres: Some(volume_litres),
+            ..order(pickup, delivery, 1_000)
+        };
+        let mut space = settings(20_000);
+        space.capacity.volume_litres = Some(86_000);
+        let set = propose_routes(
+            &[
+                bulky(30.0, 33.0, 50_000),
+                bulky(31.0, 32.0, 50_000),
+                bulky(31.0, 32.0, 90_000),
+            ],
+            space,
+        )
+        .expect("three orders");
+        assert_eq!(set.too_large, [2]);
+        assert!(!set.proposals.is_empty());
+        for proposal in &set.proposals {
+            assert_eq!(proposal.peak_volume_litres, 50_000);
+            assert!(one_at_a_time(&proposal.stops));
+        }
     }
 
     #[test]

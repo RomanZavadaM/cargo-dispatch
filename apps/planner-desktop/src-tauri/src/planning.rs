@@ -7,10 +7,11 @@ use cargo_dispatch_planner::proposals::{
     propose_routes,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    AppliedPlanView, ApplyPlanInput, InputOrder, InputPlace, Money, PackageDraft, PlanKind,
-    PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopView, PlannerPackageCargoInput,
-    PlanningInput, PlanningStateView, ProposeInput, RoadState, SkipReason, SkippedOrder,
-    parse_moment, validate_input,
+    AppliedPlanView, ApplyPlanInput, INPUT_SCHEMA_VERSION, InputOrder, InputPlace, Money,
+    OLDER_INPUT_SCHEMA_VERSION, PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView,
+    PlanStopAction, PlanStopView, PlannerPackageCargoInput, PlanningInput, PlanningStateView,
+    ProposeInput, RoadState, SkipReason, SkippedOrder, VehicleType, VehicleTypeName, parse_moment,
+    validate_input,
 };
 
 const PLANNING_FILE: &str = "planner-input-v1.json";
@@ -28,6 +29,9 @@ pub(crate) struct StoredPlanning {
     cargos: Vec<PlannerPackageCargoInput>,
     #[serde(default)]
     package: Option<PackageDraft>,
+    /// The one used last comes first.
+    #[serde(default)]
+    vehicle_types: Vec<VehicleType>,
 }
 
 pub(crate) fn planning_path(journal_path: &Path) -> PathBuf {
@@ -61,6 +65,12 @@ fn write_atomically(path: &Path, text: &str) -> std::io::Result<()> {
 
 fn coordinates(place: &InputPlace) -> Option<GeoPoint> {
     GeoPoint::new(place.lat?, place.lon?).ok()
+}
+
+/// The capacity check counts whole litres, so that sums compare exactly.
+fn litres(volume_m3: Option<f64>) -> Option<u32> {
+    // The conversion saturates; invalid volumes never reach the calculation.
+    volume_m3.map(|volume| (volume * 1000.0).round() as u32)
 }
 
 /// A date without a time means the whole day.
@@ -177,7 +187,51 @@ impl PlannerDesktopService {
             routing_profile: stored.routing_profile,
             cargos: stored.cargos,
             package: stored.package,
+            vehicle_types: stored.vehicle_types,
         })
+    }
+
+    fn change_vehicle_types(
+        &self,
+        change: impl FnOnce(&mut Vec<VehicleType>),
+    ) -> Result<Vec<VehicleType>, String> {
+        self.change_planning(|stored| change(&mut stored.vehicle_types))?;
+        Ok(self.stored_planning()?.vehicle_types)
+    }
+
+    /// Adds a type or replaces the one of the same name; it becomes the first.
+    pub(crate) fn save_vehicle_type(
+        &self,
+        mut saved: VehicleType,
+    ) -> Result<Vec<VehicleType>, String> {
+        if !saved.is_usable() {
+            return Err("Vehicle type needs a name and positive limits".to_owned());
+        }
+        saved.name = saved.name.trim().to_owned();
+        self.change_vehicle_types(|types| {
+            types.retain(|known| !known.is_named(&saved.name));
+            types.insert(0, saved);
+        })
+    }
+
+    /// Moves the chosen type to the head of the list.
+    pub(crate) fn use_vehicle_type(
+        &self,
+        chosen: VehicleTypeName,
+    ) -> Result<Vec<VehicleType>, String> {
+        self.change_vehicle_types(|types| {
+            if let Some(at) = types.iter().position(|known| known.is_named(&chosen.name)) {
+                let found = types.remove(at);
+                types.insert(0, found);
+            }
+        })
+    }
+
+    pub(crate) fn remove_vehicle_type(
+        &self,
+        removed: VehicleTypeName,
+    ) -> Result<Vec<VehicleType>, String> {
+        self.change_vehicle_types(|types| types.retain(|known| !known.is_named(&removed.name)))
     }
 
     /// Keeps the trip package section as typed; nothing in it is checked here.
@@ -202,7 +256,11 @@ impl PlannerDesktopService {
     }
 
     pub(crate) fn save_input(&self, path: &Path) -> Result<(), String> {
-        let input = self.stored_planning()?.input;
+        let mut input = self.stored_planning()?.input;
+        // What is written follows the current version of the format.
+        if input.schema_version == OLDER_INPUT_SCHEMA_VERSION {
+            input.schema_version = INPUT_SCHEMA_VERSION.to_owned();
+        }
         let text = serde_json::to_string_pretty(&input)
             .map_err(|error| format!("Could not save input file: {error}"))?;
         write_atomically(path, &text).map_err(|error| format!("Could not save input file: {error}"))
@@ -260,6 +318,7 @@ impl PlannerDesktopService {
                 delivery,
                 weight_kg: order.cargo.weight_kg,
                 pallets: order.cargo.pallets,
+                volume_litres: litres(order.cargo.volume_m3),
             });
         }
 
@@ -270,6 +329,7 @@ impl PlannerDesktopService {
             capacity: AvailableCapacity {
                 payload_kg: input.vehicle.payload_kg,
                 pallets: input.vehicle.pallets,
+                volume_litres: litres(input.vehicle.volume_m3),
             },
         };
         let set = match propose_routes(&candidates, settings) {
@@ -373,6 +433,7 @@ impl PlannerDesktopService {
                 road_hours,
                 peak_weight_kg: proposal.peak_weight_kg,
                 peak_pallets: proposal.peak_pallets,
+                peak_volume_m3: proposal.peak_volume_litres as f64 / 1000.0,
                 needs_check: proposal.needs_check,
                 date_conflict: date_conflict(&places),
                 revenue: revenue(&included),
@@ -563,6 +624,30 @@ pub(crate) async fn planner_planning_save(
 }
 
 #[tauri::command]
+pub(crate) fn planner_vehicle_type_save(
+    input: VehicleType,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<Vec<VehicleType>, String> {
+    state.save_vehicle_type(input)
+}
+
+#[tauri::command]
+pub(crate) fn planner_vehicle_type_use(
+    input: VehicleTypeName,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<Vec<VehicleType>, String> {
+    state.use_vehicle_type(input)
+}
+
+#[tauri::command]
+pub(crate) fn planner_vehicle_type_remove(
+    input: VehicleTypeName,
+    state: State<'_, PlannerDesktopService>,
+) -> Result<Vec<VehicleType>, String> {
+    state.remove_vehicle_type(input)
+}
+
+#[tauri::command]
 pub(crate) async fn planner_planning_propose(
     input: ProposeInput,
     state: State<'_, PlannerDesktopService>,
@@ -689,6 +774,29 @@ mod tests {
     }
 
     #[test]
+    fn a_version_1_0_file_is_read_and_saved_as_the_current_version() {
+        let folder = std::env::temp_dir().join(format!(
+            "cargo-planner-versions-{}",
+            unix_time_ms().expect("clock")
+        ));
+        fs::create_dir_all(&folder).expect("folder");
+        let old = folder.join("old.json");
+        let text = r#"{"schema":"cargo-dispatch.planning-input","schema_version":"1.0",
+            "vehicle":{"type":"Tent","payload_kg":20000}}"#;
+        fs::write(&old, text).expect("old file");
+        let service = PlannerDesktopService::default();
+        let view = service.import_input(&old).expect("version 1.0");
+        assert_eq!(view.problems, []);
+        assert_eq!(view.input.vehicle.volume_m3, None);
+        let saved = folder.join("saved.json");
+        service.save_input(&saved).expect("saved");
+        let again = service.import_input(&saved).expect("current version");
+        assert_eq!(again.input.schema_version, INPUT_SCHEMA_VERSION);
+        assert_eq!(again.problems, []);
+        let _ = fs::remove_dir_all(folder);
+    }
+
+    #[test]
     fn the_half_filled_package_form_survives_a_restart() {
         let folder = std::env::temp_dir().join(format!(
             "cargo-planner-package-{}",
@@ -718,6 +826,51 @@ mod tests {
 
         let second = PlannerDesktopService::open(journal).expect("reopen");
         assert_eq!(second.planning_view().expect("view").package, Some(draft));
+        let _ = fs::remove_dir_all(folder);
+    }
+
+    #[test]
+    fn vehicle_types_are_kept_with_the_last_used_first() {
+        let folder = std::env::temp_dir().join(format!(
+            "cargo-planner-types-{}",
+            unix_time_ms().expect("clock")
+        ));
+        let journal = folder.join(PLANNER_JOURNAL_FILE);
+        fs::create_dir_all(&folder).expect("folder");
+        // A file written before types were kept has no such list.
+        fs::write(planning_path(&journal), r#"{"cargos":[]}"#).expect("old file");
+        let first = PlannerDesktopService::open(journal.clone()).expect("open");
+        assert!(first.planning_view().expect("view").vehicle_types.is_empty());
+        let named = |name: &str, payload_kg| VehicleType {
+            name: name.to_owned(),
+            payload_kg: Some(payload_kg),
+            ..VehicleType::default()
+        };
+        let chosen = |name: &str| VehicleTypeName {
+            name: name.to_owned(),
+        };
+        let names = |types: &[VehicleType]| -> Vec<String> {
+            types.iter().map(|item| item.name.clone()).collect()
+        };
+        first.save_vehicle_type(named("Tent", 20_000)).expect("saved");
+        first.save_vehicle_type(named("Reefer", 18_000)).expect("saved");
+        first.save_vehicle_type(named("Van", 1_500)).expect("saved");
+        let types = first.use_vehicle_type(chosen("tent ")).expect("used");
+        assert_eq!(names(&types), ["Tent", "Van", "Reefer"]);
+        let types = first.save_vehicle_type(named(" van", 2_000)).expect("replaced");
+        assert_eq!(names(&types), ["van", "Tent", "Reefer"]);
+        let types = first.remove_vehicle_type(chosen("Reefer")).expect("removed");
+        assert_eq!(names(&types), ["van", "Tent"]);
+        for broken in [named(" ", 1), named("Empty", 0)] {
+            let problem = first.save_vehicle_type(broken).expect_err("rejected");
+            assert!(problem.starts_with("Vehicle type"));
+        }
+        drop(first);
+
+        let second = PlannerDesktopService::open(journal).expect("reopen");
+        let kept = second.planning_view().expect("view").vehicle_types;
+        assert_eq!(names(&kept), ["van", "Tent"]);
+        assert_eq!(kept[0].payload_kg, Some(2_000));
         let _ = fs::remove_dir_all(folder);
     }
 
