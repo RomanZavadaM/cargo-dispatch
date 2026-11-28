@@ -268,6 +268,39 @@ try {
   await idle();
   await expect('!ui.orderPart().textContent.includes("бракує координат")', "both orders are planned");
 
+  // What is copied in Google Maps goes into one field.
+  const pasteName = "З Google Maps: вставте посилання або координати";
+  const delivery = 'ui.orders()[0].querySelectorAll(".routing-grid")[2]';
+  const paste = async (scope, text) => {
+    await evaluate(`{ const item = ui.field(${scope}, "${pasteName}"); item.focus(); item.select(); } true`);
+    await send("Input.insertText", { text });
+    await idle();
+  };
+  const point = async () => {
+    const delivery = (await service("planner_planning_status")).input.orders[0].delivery;
+    return `${delivery.place};${delivery.lat};${delivery.lon}`;
+  };
+  await paste(delivery, "https://www.google.com/maps/@50.1,30.1,17z");
+  await expect('document.querySelector("main > p.error")?.textContent.includes("Не знайшов точку")',
+    "a link without a point is explained");
+  await paste(delivery, "https://www.google.com/maps/place/X/@1.5,2.5,17z/data=!8m2!3d50.45!4d31.55");
+  if ((await point()) !== "Місто Б;50.45;31.55") throw new Error(`failed: a pasted link ${await point()}`);
+  console.log("PASS a pasted link fills the point and keeps the name");
+  await expect(`ui.field(${delivery}, "Широта").value === "50.45" && ui.field(${delivery}, "${pasteName}").value === ""
+    && !document.querySelector("main > p.error")`, "the fields show the point and the paste field is empty again");
+  await paste(delivery, `50°24'00.0"N 31°30'00.0"E`);
+  if ((await point()) !== "Місто Б;50.4;31.5") throw new Error(`failed: pasted degrees ${await point()}`);
+  console.log("PASS pasted degrees fill the point");
+  const manual = 'ui.section("Чернетка маршруту")';
+  await paste(manual, "49.500000, 24.500000");
+  await expect(`ui.field(${manual}, "Широта").value === "49.5" && ui.field(${manual}, "Довгота").value === "24.5"
+    && ui.field(${manual}, "Назва точки").value === "49.50000, 24.50000"`,
+    "pasted coordinates fill the point added by hand");
+  await click('ui.button(ui.orderPart(), "Запропонувати маршрути")');
+  await waitFor("variants after the pasted points",
+    'ui.variants().length >= 2 && ui.variants()[0].querySelectorAll("li").length === 4');
+  await idle();
+
   const first = 'ui.button(ui.variants()[0], "Обрати цей маршрут")';
   await click(first);
   await waitFor("the chosen route", 'document.querySelectorAll(".route-item").length === 4 && ui.rows().length === 2');

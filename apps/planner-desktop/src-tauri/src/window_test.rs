@@ -9,7 +9,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::post,
 };
-use cargo_dispatch_planner_ui_contracts::{OpenRouteInput, OpenedRoute};
+use cargo_dispatch_planner_ui_contracts::{OpenRouteInput, OpenedRoute, PlaceInput};
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use std::{
@@ -113,6 +113,11 @@ async fn run(window: &Window, call: Call) -> Result<Value, String> {
         }
         "planner_planning_propose" => answer(service.propose(argument(args)?).await),
         "planner_planning_apply" => answer(service.apply_plan(argument(args)?)),
+        // The texts used by the test need no request to Google.
+        "planner_place_resolve" => {
+            let input: PlaceInput = argument(args)?;
+            answer(places::resolve_place(&input.text).await)
+        }
         // The address is built as usual; no browser is started here.
         "planner_open_route" => {
             let input: OpenRouteInput = argument(args)?;

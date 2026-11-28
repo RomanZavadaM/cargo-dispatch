@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod browser;
+mod places;
 mod planning;
 
 use cargo_dispatch_contracts::{
@@ -1307,7 +1308,8 @@ pub fn run() {
             planning::planner_vehicle_type_save,
             planning::planner_vehicle_type_use,
             planning::planner_vehicle_type_remove,
-            browser::planner_open_route
+            browser::planner_open_route,
+            places::planner_place_resolve
         ])
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");
