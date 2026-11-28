@@ -120,6 +120,8 @@ try {
     const data = new DataTransfer();
     data.items.add(${bigFile(name)});
     document.getElementById("file").files = data.files;
+    // The same file means the same stop too: the whole trip, before and after a reload.
+    document.getElementById("filePoint").value = "";
     document.getElementById("fileStatus").textContent = "";
     document.getElementById("sendFile").click();
   } true`;
