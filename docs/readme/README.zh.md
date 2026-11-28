@@ -4,7 +4,7 @@
 
 货运车队调度系统：规划行程、交付执行、与司机保持联系，并记录实际情况。主要开发语言为 **Rust**。
 
-**稳定版本：[v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0)。** 开发仍在继续；测试版本见 [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases)。
+**稳定版本：[v0.4.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.4.0)。** 开发仍在继续；测试版本见 [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases)。
 
 ## 组成
 
@@ -46,6 +46,7 @@
 **司机：浏览器、Android、iPhone 和 iPad**
 - 路线和地图、标记地点完成、调整未完成地点顺序；
 - 接收文件资料；发送文件、照片和视频；
+- 文件分段传输，连接中断后继续；
 - 上报位置；应用中还支持后台上报，需明确开启和关闭，并带有重发队列；
 - 标记地点完成前需要确认；应用还提供导航按钮、将文件关联到地点、界面自动刷新、无网络时保存行驶轨迹（最多 500 个位置）以及显示被拒收的文件。
 

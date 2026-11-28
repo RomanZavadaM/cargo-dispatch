@@ -4,7 +4,7 @@
 
 Disposition für eine Frachtflotte: Tour planen, zur Durchführung übergeben, mit dem Fahrer in Verbindung bleiben und den tatsächlichen Ablauf festhalten. Hauptentwicklungssprache ist **Rust**.
 
-**Stabile Version: [v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0).** Die Entwicklung geht weiter; Testversionen stehen unter [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
+**Stabile Version: [v0.4.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.4.0).** Die Entwicklung geht weiter; Testversionen stehen unter [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases).
 
 ## Bestandteile
 
@@ -46,6 +46,7 @@ Control ist die einzige verbindliche Quelle für den Stand einer aktiven Tour. E
 **Fahrer: Browser, Android, iPhone und iPad**
 - Route und Karte, Punkt als erledigt markieren, offene Punkte umstellen;
 - Dokumente empfangen; Dateien, Fotos und Videos senden;
+- Dateien werden in Teilen übertragen und nach einem Abbruch fortgesetzt;
 - Position übertragen; in den Apps auch im Hintergrund, ausdrücklich ein- und ausschaltbar, mit Warteschlange für erneutes Senden;
 - vor dem Erledigt-Markieren wird nachgefragt; die Apps bieten außerdem eine Navigator-Schaltfläche, die Zuordnung einer Datei zu einem Punkt, eine selbstaktualisierende Ansicht, die Speicherung der Strecke ohne Verbindung (bis 500 Positionen) und sichtbare abgelehnte Dateien.
 

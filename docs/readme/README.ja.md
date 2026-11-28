@@ -4,7 +4,7 @@
 
 貨物車両の配車システムです。運行を計画し、実行に引き渡し、ドライバーと連絡を取り、実際の経過を記録します。主な開発言語は **Rust** です。
 
-**安定版：[v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0)。** 開発は継続中で、テスト版は [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases) にあります。
+**安定版：[v0.4.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.4.0)。** 開発は継続中で、テスト版は [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases) にあります。
 
 ## 構成
 
@@ -46,6 +46,7 @@
 **ドライバー：ブラウザー、Android、iPhone・iPad**
 - 経路と地図、地点の完了記録、未完了地点の並べ替え；
 - 書類の受信、ファイル・写真・動画の送信；
+- ファイルは分割して送受信し、接続が切れても続きから再開します；
 - 位置の送信。アプリではバックグラウンド送信も可能で、明示的に開始・停止し、再送キューがあります；
 - 地点の完了記録の前に確認します。アプリにはナビボタン、ファイルの地点への関連付け、自動更新される画面、接続がない間の移動経路の保存（最大 500 件）、受け付けられなかったファイルの表示もあります。
 

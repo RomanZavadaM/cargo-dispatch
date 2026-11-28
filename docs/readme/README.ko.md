@@ -4,7 +4,7 @@
 
 화물 차량 배차 시스템입니다. 운행을 계획하고, 실행에 넘기고, 운전자와 연락하며, 실제 진행 상황을 기록합니다. 주 개발 언어는 **Rust**입니다.
 
-**안정 버전: [v0.3.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.3.0).** 개발은 계속되며, 테스트 빌드는 [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases)에 있습니다.
+**안정 버전: [v0.4.0](https://github.com/RomanZavadaM/cargo-dispatch/releases/tag/v0.4.0).** 개발은 계속되며, 테스트 빌드는 [Releases](https://github.com/RomanZavadaM/cargo-dispatch/releases)에 있습니다.
 
 ## 구성
 
@@ -46,6 +46,7 @@
 **운전자: 브라우저, Android, iPhone·iPad**
 - 경로와 지도, 지점 완료 표시, 미완료 지점 순서 변경;
 - 문서 받기; 파일, 사진, 동영상 보내기;
+- 파일은 나누어 전송되며 연결이 끊기면 이어서 전송됩니다;
 - 위치 전송; 앱에서는 백그라운드 전송도 가능하며 명시적으로 켜고 끄고, 재전송 대기열이 있습니다;
 - 지점 완료 표시 전에 확인을 요청합니다. 앱에는 내비게이션 버튼, 파일의 지점 연결, 자동 갱신 화면, 연결이 없을 때의 이동 경로 보관(최대 500개 위치), 거부된 파일 표시 기능도 있습니다.
 
