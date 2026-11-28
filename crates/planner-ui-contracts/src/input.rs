@@ -271,8 +271,7 @@ pub fn validate_input(input: &PlanningInput) -> Vec<InputProblem> {
     if input.schema != INPUT_SCHEMA {
         found.push(problem("schema".to_owned(), InputProblemKind::Schema));
     }
-    if ![INPUT_SCHEMA_VERSION, OLDER_INPUT_SCHEMA_VERSION]
-        .contains(&input.schema_version.as_str())
+    if ![INPUT_SCHEMA_VERSION, OLDER_INPUT_SCHEMA_VERSION].contains(&input.schema_version.as_str())
     {
         found.push(problem(
             "schema_version".to_owned(),

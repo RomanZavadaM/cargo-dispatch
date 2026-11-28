@@ -1,10 +1,10 @@
 //! What the Planner window and its service exchange while planning from orders.
 
+use crate::input::bad_volume;
 use crate::{
     InputProblem, InputVehicle, Money, PlannerPackageCargoInput, PlannerRouteView,
     PlannerRoutingConfigInput, PlannerRoutingProfileInput, PlanningInput,
 };
-use crate::input::bad_volume;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

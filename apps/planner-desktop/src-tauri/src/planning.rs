@@ -840,7 +840,13 @@ mod tests {
         // A file written before types were kept has no such list.
         fs::write(planning_path(&journal), r#"{"cargos":[]}"#).expect("old file");
         let first = PlannerDesktopService::open(journal.clone()).expect("open");
-        assert!(first.planning_view().expect("view").vehicle_types.is_empty());
+        assert!(
+            first
+                .planning_view()
+                .expect("view")
+                .vehicle_types
+                .is_empty()
+        );
         let named = |name: &str, payload_kg| VehicleType {
             name: name.to_owned(),
             payload_kg: Some(payload_kg),
@@ -852,14 +858,22 @@ mod tests {
         let names = |types: &[VehicleType]| -> Vec<String> {
             types.iter().map(|item| item.name.clone()).collect()
         };
-        first.save_vehicle_type(named("Tent", 20_000)).expect("saved");
-        first.save_vehicle_type(named("Reefer", 18_000)).expect("saved");
+        first
+            .save_vehicle_type(named("Tent", 20_000))
+            .expect("saved");
+        first
+            .save_vehicle_type(named("Reefer", 18_000))
+            .expect("saved");
         first.save_vehicle_type(named("Van", 1_500)).expect("saved");
         let types = first.use_vehicle_type(chosen("tent ")).expect("used");
         assert_eq!(names(&types), ["Tent", "Van", "Reefer"]);
-        let types = first.save_vehicle_type(named(" van", 2_000)).expect("replaced");
+        let types = first
+            .save_vehicle_type(named(" van", 2_000))
+            .expect("replaced");
         assert_eq!(names(&types), ["van", "Tent", "Reefer"]);
-        let types = first.remove_vehicle_type(chosen("Reefer")).expect("removed");
+        let types = first
+            .remove_vehicle_type(chosen("Reefer"))
+            .expect("removed");
         assert_eq!(names(&types), ["van", "Tent"]);
         for broken in [named(" ", 1), named("Empty", 0)] {
             let problem = first.save_vehicle_type(broken).expect_err("rejected");

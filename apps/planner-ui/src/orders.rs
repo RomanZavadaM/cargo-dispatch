@@ -319,7 +319,12 @@ fn save_type(panel: Panel) {
     };
     panel.package_type.set(current.name.clone());
     let input = serde_json::json!(current);
-    change_types(panel, "planner_vehicle_type_save", input, Some(K::TypeSaved));
+    change_types(
+        panel,
+        "planner_vehicle_type_save",
+        input,
+        Some(K::TypeSaved),
+    );
 }
 
 /// One line of the list: the name and what the vehicle takes.
