@@ -5,12 +5,14 @@ mod planning;
 mod problems;
 pub use input::{
     INPUT_SCHEMA, INPUT_SCHEMA_VERSION, InputCargo, InputOrder, InputPlace, InputProblem,
-    InputProblemKind, InputVehicle, Money, PlanningInput, parse_moment, validate_input,
+    InputProblemKind, InputVehicle, Money, OLDER_INPUT_SCHEMA_VERSION, PlanningInput, parse_moment,
+    validate_input,
 };
 pub use planning::{
     AppliedPlanView, ApplyPlanInput, CargoRowDraft, PackageDraft, PlanKind, PlanProposalSetView,
     PlanProposalView, PlanStopAction, PlanStopRef, PlanStopView, PlanningStateView, ProfileDraft,
-    ProposeInput, RoadState, SkipReason, SkippedOrder, UpdatePlanningInput,
+    ProposeInput, RoadState, SkipReason, SkippedOrder, UpdatePlanningInput, VehicleType,
+    VehicleTypeName,
 };
 pub use problems::{ProblemKind, classify_problem, localize_problem};
 

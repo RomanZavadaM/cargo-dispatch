@@ -1268,7 +1268,10 @@ pub fn run() {
             planning::planner_planning_open,
             planning::planner_planning_save,
             planning::planner_planning_propose,
-            planning::planner_planning_apply
+            planning::planner_planning_apply,
+            planning::planner_vehicle_type_save,
+            planning::planner_vehicle_type_use,
+            planning::planner_vehicle_type_remove
         ])
         .run(tauri::generate_context!())
         .expect("Cargo Dispatch Planner failed");

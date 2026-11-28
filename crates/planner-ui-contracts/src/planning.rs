@@ -1,8 +1,9 @@
 //! What the Planner window and its service exchange while planning from orders.
 
+use crate::input::bad_volume;
 use crate::{
-    InputProblem, Money, PlannerPackageCargoInput, PlannerRouteView, PlannerRoutingConfigInput,
-    PlannerRoutingProfileInput, PlanningInput,
+    InputProblem, InputVehicle, Money, PlannerPackageCargoInput, PlannerRouteView,
+    PlannerRoutingConfigInput, PlannerRoutingProfileInput, PlanningInput,
 };
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +18,63 @@ pub struct PlanningStateView {
     pub cargos: Vec<PlannerPackageCargoInput>,
     /// The trip package section as the operator left it; wins over `cargos`.
     pub package: Option<PackageDraft>,
+    /// Saved vehicle types, the one used last comes first.
+    pub vehicle_types: Vec<VehicleType>,
+}
+
+/// A kind of vehicle the operator chooses from a list instead of typing it again.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct VehicleType {
+    pub name: String,
+    pub payload_kg: Option<u32>,
+    pub volume_m3: Option<f64>,
+    pub pallets: Option<u16>,
+    pub features: Option<String>,
+}
+
+impl VehicleType {
+    /// The type described by the vehicle of the document, once it has a name.
+    #[must_use]
+    pub fn of(vehicle: &InputVehicle) -> Option<Self> {
+        let name = vehicle.vehicle_type.as_deref()?.trim();
+        (!name.is_empty()).then(|| Self {
+            name: name.to_owned(),
+            payload_kg: vehicle.payload_kg,
+            volume_m3: vehicle.volume_m3,
+            pallets: vehicle.pallets,
+            features: vehicle.features.clone(),
+        })
+    }
+
+    /// Copies the type into the vehicle; where it stands and its cost stay.
+    pub fn apply_to(&self, vehicle: &mut InputVehicle) {
+        vehicle.vehicle_type = Some(self.name.clone());
+        vehicle.payload_kg = self.payload_kg;
+        vehicle.volume_m3 = self.volume_m3;
+        vehicle.pallets = self.pallets;
+        vehicle.features.clone_from(&self.features);
+    }
+
+    /// Names differing only in letter case or outer spaces mean one type.
+    #[must_use]
+    pub fn is_named(&self, name: &str) -> bool {
+        self.name.trim().to_lowercase() == name.trim().to_lowercase()
+    }
+
+    /// A name and, where stated, positive limits.
+    #[must_use]
+    pub fn is_usable(&self) -> bool {
+        !self.name.trim().is_empty()
+            && self.payload_kg != Some(0)
+            && self.pallets != Some(0)
+            && !bad_volume(self.volume_m3)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VehicleTypeName {
+    pub name: String,
 }
 
 /// The trip package section exactly as typed, so that a half-filled form comes back.
@@ -123,6 +181,8 @@ pub struct PlanProposalView {
     pub road_hours: Option<f64>,
     pub peak_weight_kg: u64,
     pub peak_pallets: u32,
+    /// Zero when no volume is known.
+    pub peak_volume_m3: f64,
     pub needs_check: bool,
     /// Dates of the orders contradict this order of stops.
     pub date_conflict: bool,

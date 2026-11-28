@@ -112,6 +112,9 @@ async fn run(window: &Window, call: Call) -> Result<Value, String> {
         }
         "planner_planning_propose" => answer(service.propose(argument(args)?).await),
         "planner_planning_apply" => answer(service.apply_plan(argument(args)?)),
+        "planner_vehicle_type_save" => answer(service.save_vehicle_type(argument(args)?)),
+        "planner_vehicle_type_use" => answer(service.use_vehicle_type(argument(args)?)),
+        "planner_vehicle_type_remove" => answer(service.remove_vehicle_type(argument(args)?)),
         // Closing and starting the program again.
         "test_restart" => {
             *window.service.write().expect("service") = started(&window.folder);
@@ -204,6 +207,7 @@ async fn the_window_works_in_a_real_browser() {
     let saved = fs::read_to_string(folder.join("saved-orders.json")).expect("saved orders");
     let saved: Value = serde_json::from_str(&saved).expect("saved orders are JSON");
     assert_eq!(saved["schema"], "cargo-dispatch.planning-input");
+    assert_eq!(saved["schema_version"], "1.1");
     assert_eq!(saved["orders"].as_array().map(Vec::len), Some(2));
     assert_eq!(saved["orders"][0]["cargo"]["weight_kg"], 2400);
     let _ = fs::remove_dir_all(folder);

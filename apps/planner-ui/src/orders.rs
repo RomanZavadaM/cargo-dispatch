@@ -8,7 +8,8 @@ use cargo_dispatch_planner_ui_contracts::{
     AppliedPlanView, ApplyPlanInput, InputOrder, InputPlace, InputProblem, InputProblemKind, Money,
     PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopRef,
     PlannerPackageCargoInput, PlannerRouteView, PlannerRoutingProfileInput, PlannerTollPreference,
-    PlanningInput, PlanningStateView, ProposeInput, RoadState, SkipReason, localize_problem,
+    PlanningInput, PlanningStateView, ProposeInput, RoadState, SkipReason, VehicleType,
+    localize_problem,
 };
 use leptos::{prelude::*, task::spawn_local};
 use std::collections::BTreeSet;
@@ -25,6 +26,10 @@ struct Panel {
     proposals: RwSignal<Option<PlanProposalSetView>>,
     /// The variant waiting for a second press before it replaces the route.
     confirming: RwSignal<Option<usize>>,
+    /// Saved vehicle types, the one used last comes first.
+    types: RwSignal<Vec<VehicleType>>,
+    /// The vehicle type named in the trip package.
+    package_type: RwSignal<String>,
 }
 
 impl Panel {
@@ -40,11 +45,18 @@ impl Panel {
         self.error.set(true);
     }
 
+    fn tell(self, key: K, error: bool) {
+        let words = text(self.locale.get_untracked(), key);
+        self.message.set(words.to_owned());
+        self.error.set(error);
+    }
+
     fn show(self, view: PlanningStateView) {
         let ids = view.input.orders.iter().map(|order| order.id.clone());
         self.selected.set(ids.collect());
         self.document.set(view.input);
         self.problems.set(view.problems);
+        self.types.set(view.vehicle_types);
         self.proposals.set(None);
         self.confirming.set(None);
     }
@@ -239,6 +251,11 @@ fn order_card(panel: Panel, index: usize, order: InputOrder) -> impl IntoView {
                         order.cargo.weight_kg = whole(&value);
                     }
                 })}
+                {field(panel, K::Volume, shown(order.cargo.volume_m3), move |input, value| {
+                    if let Some(order) = input.orders.get_mut(index) {
+                        order.cargo.volume_m3 = decimal(&value);
+                    }
+                })}
                 {field(panel, K::Pallets, shown(order.cargo.pallets), move |input, value| {
                     if let Some(order) = input.orders.get_mut(index) {
                         order.cargo.pallets = whole(&value);
@@ -268,10 +285,143 @@ fn order_card(panel: Panel, index: usize, order: InputOrder) -> impl IntoView {
     }
 }
 
+/// Sends a change of the saved type list and shows the list that results.
+fn change_types(panel: Panel, command: &'static str, input: serde_json::Value, done: Option<K>) {
+    spawn_local(async move {
+        let args = serde_json::json!({ "input": input });
+        match invoke::<Vec<VehicleType>, _>(command, &args).await {
+            Ok(types) => {
+                panel.types.set(types);
+                if let Some(done) = done {
+                    panel.tell(done, false);
+                }
+            }
+            Err(problem) => panel.report(&problem),
+        }
+    });
+}
+
+fn choose_type(panel: Panel, name: &str) {
+    let saved = panel.types.get_untracked();
+    let Some(chosen) = saved.into_iter().find(|known| known.name == name) else {
+        return;
+    };
+    panel.package_type.set(chosen.name.clone());
+    let named = serde_json::json!({ "name": chosen.name });
+    panel.change(move |input| chosen.apply_to(&mut input.vehicle));
+    change_types(panel, "planner_vehicle_type_use", named, None);
+}
+
+fn save_type(panel: Panel) {
+    let Some(current) = VehicleType::of(&panel.document.get_untracked().vehicle) else {
+        panel.tell(K::TypeNeedsName, true);
+        return;
+    };
+    panel.package_type.set(current.name.clone());
+    let input = serde_json::json!(current);
+    change_types(
+        panel,
+        "planner_vehicle_type_save",
+        input,
+        Some(K::TypeSaved),
+    );
+}
+
+/// One line of the list: the name and what the vehicle takes.
+fn type_line(locale: UiLocale, kind: &VehicleType) -> String {
+    let mut parts = vec![kind.name.clone()];
+    if let Some(weight) = kind.payload_kg {
+        parts.push(format!("{weight} kg"));
+    }
+    if let Some(volume) = kind.volume_m3 {
+        parts.push(format!("{volume} m³"));
+    }
+    if let Some(pallets) = kind.pallets {
+        parts.push(format!("{}: {pallets}", text(locale, K::Pallets)));
+    }
+    parts.extend(kind.features.clone());
+    parts.join(" · ")
+}
+
+/// The list the vehicle is chosen from.
+fn type_picker(panel: Panel, current: Option<VehicleType>) -> impl IntoView {
+    view! {
+        <div class="routing-grid">
+            <label>
+                {panel.say(K::TypeList)}
+                <select on:change=move |event| {
+                    choose_type(panel, &event_target_value(&event));
+                }>
+                    {move || {
+                        let locale = panel.locale.get();
+                        let types = panel.types.get();
+                        // Shown as chosen only while every value matches the saved type.
+                        let chosen = types.iter().position(|known| Some(known) == current.as_ref());
+                        let none = chosen.is_none();
+                        let options = types
+                            .iter()
+                            .enumerate()
+                            .map(|(at, known)| {
+                                let selected = chosen == Some(at);
+                                let line = type_line(locale, known);
+                                view! {
+                                    <option value=known.name.clone() prop:selected=selected>
+                                        {line}
+                                    </option>
+                                }
+                            })
+                            .collect_view();
+                        view! {
+                            <option value="" prop:selected=none>
+                                {text(locale, K::TypeChoose)}
+                            </option>
+                            {options}
+                        }
+                    }}
+                </select>
+            </label>
+        </div>
+    }
+}
+
+/// Keeps the typed values as a type, or takes the named type off the list.
+fn type_actions(panel: Panel, current: Option<VehicleType>) -> impl IntoView {
+    let name = current.map(|kind| kind.name);
+    let listed = name.clone();
+    let unlisted = move || {
+        let types = panel.types.get();
+        !listed
+            .as_ref()
+            .is_some_and(|name| types.iter().any(|known| known.is_named(name)))
+    };
+    view! {
+        <div class="actions">
+            <button type="button" on:click=move |_| save_type(panel)>
+                {panel.say(K::SaveType)}
+            </button>
+            <button
+                type="button"
+                class="danger"
+                disabled=unlisted
+                on:click=move |_| {
+                    if let Some(name) = &name {
+                        let input = serde_json::json!({ "name": name });
+                        let done = Some(K::TypeRemoved);
+                        change_types(panel, "planner_vehicle_type_remove", input, done);
+                    }
+                }
+            >
+                {panel.say(K::RemoveType)}
+            </button>
+        </div>
+    }
+}
+
 fn vehicle_fields(panel: Panel, document: &PlanningInput) -> impl IntoView + use<> {
     let vehicle = document.vehicle.clone();
     let start = vehicle.start.clone().unwrap_or_default();
     let cost = vehicle.cost_per_km.clone().unwrap_or_default();
+    let current = VehicleType::of(&vehicle);
     let begin = move |input: &mut PlanningInput, change: &dyn Fn(&mut InputPlace)| {
         let mut place = input.vehicle.start.clone().unwrap_or_default();
         change(&mut place);
@@ -285,6 +435,7 @@ fn vehicle_fields(panel: Panel, document: &PlanningInput) -> impl IntoView + use
     };
     view! {
         <h3>{panel.say(K::Vehicle)}</h3>
+        {type_picker(panel, current.clone())}
         <div class="routing-grid">
             {field(panel, K::VehicleType, shown(vehicle.vehicle_type), |input, value| {
                 input.vehicle.vehicle_type = filled(&value);
@@ -292,9 +443,18 @@ fn vehicle_fields(panel: Panel, document: &PlanningInput) -> impl IntoView + use
             {field(panel, K::Payload, shown(vehicle.payload_kg), |input, value| {
                 input.vehicle.payload_kg = whole(&value);
             })}
+            {field(panel, K::Volume, shown(vehicle.volume_m3), |input, value| {
+                input.vehicle.volume_m3 = decimal(&value);
+            })}
             {field(panel, K::Pallets, shown(vehicle.pallets), |input, value| {
                 input.vehicle.pallets = whole(&value);
             })}
+            {field(panel, K::Features, shown(vehicle.features), |input, value| {
+                input.vehicle.features = filled(&value);
+            })}
+        </div>
+        {type_actions(panel, current)}
+        <div class="routing-grid">
             {field(panel, K::Start, start.place.clone(), move |input, value| {
                 begin(input, &|place| place.place = value.clone());
             })}
@@ -401,8 +561,13 @@ fn figures(locale: UiLocale, proposal: &PlanProposalView) -> Vec<String> {
         say(K::Empty),
         proposal.empty_km
     ));
+    let volume = if proposal.peak_volume_m3 > 0.0 {
+        format!(", {:.1} m³", proposal.peak_volume_m3)
+    } else {
+        String::new()
+    };
     lines.push(format!(
-        "{}: {} kg, {} {}",
+        "{}: {} kg, {} {}{volume}",
         say(K::Peak),
         proposal.peak_weight_kg,
         proposal.peak_pallets,
@@ -436,6 +601,7 @@ pub(crate) fn OrdersPanel(
     route: RwSignal<Option<PlannerRouteView>>,
     profile: RwSignal<RoutingProfileDraft>,
     vehicle_type: RwSignal<String>,
+    vehicle_types: RwSignal<Vec<VehicleType>>,
     cargos: RwSignal<Vec<CargoDraft>>,
     next_cargo_row: RwSignal<u64>,
 ) -> impl IntoView {
@@ -449,6 +615,8 @@ pub(crate) fn OrdersPanel(
         selected: RwSignal::new(BTreeSet::new()),
         proposals: RwSignal::new(None),
         confirming: RwSignal::new(None),
+        types: vehicle_types,
+        package_type: vehicle_type,
     };
     let fill_cargos = move |rows: Vec<PlannerPackageCargoInput>| {
         if let Some(last) = rows.iter().map(|row| row.row_id).max() {

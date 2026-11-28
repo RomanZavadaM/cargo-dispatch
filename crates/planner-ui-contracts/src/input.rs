@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 pub const INPUT_SCHEMA: &str = "cargo-dispatch.planning-input";
-pub const INPUT_SCHEMA_VERSION: &str = "1.0";
+pub const INPUT_SCHEMA_VERSION: &str = "1.1";
+/// Version 1.1 added volume and vehicle features; 1.0 files stay readable.
+pub const OLDER_INPUT_SCHEMA_VERSION: &str = "1.0";
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -46,6 +48,8 @@ pub struct InputCargo {
     pub weight_kg: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pallets: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volume_m3: Option<f64>,
     /// Names of the values above that are estimates, not facts from the source.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub estimated: Vec<String>,
@@ -82,6 +86,11 @@ pub struct InputVehicle {
     pub payload_kg: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pallets: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volume_m3: Option<f64>,
+    /// What else the vehicle offers, for example a refrigerator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub features: Option<String>,
     /// Where the vehicle is before the first pickup.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<InputPlace>,
@@ -249,6 +258,11 @@ fn check_money(money: &Money, path: &str, found: &mut Vec<InputProblem>) {
     }
 }
 
+/// A volume is positive and at least one litre.
+pub(crate) fn bad_volume(volume_m3: Option<f64>) -> bool {
+    volume_m3.is_some_and(|volume| !(volume.is_finite() && volume >= 0.001))
+}
+
 /// Everything that has to be corrected before the document can be used.
 #[must_use]
 pub fn validate_input(input: &PlanningInput) -> Vec<InputProblem> {
@@ -257,7 +271,8 @@ pub fn validate_input(input: &PlanningInput) -> Vec<InputProblem> {
     if input.schema != INPUT_SCHEMA {
         found.push(problem("schema".to_owned(), InputProblemKind::Schema));
     }
-    if input.schema_version != INPUT_SCHEMA_VERSION {
+    if ![INPUT_SCHEMA_VERSION, OLDER_INPUT_SCHEMA_VERSION].contains(&input.schema_version.as_str())
+    {
         found.push(problem(
             "schema_version".to_owned(),
             InputProblemKind::Schema,
@@ -270,6 +285,10 @@ pub fn validate_input(input: &PlanningInput) -> Vec<InputProblem> {
     }
     if vehicle.pallets == Some(0) {
         let field = "vehicle.pallets".to_owned();
+        found.push(problem(field, InputProblemKind::NotPositive));
+    }
+    if bad_volume(vehicle.volume_m3) {
+        let field = "vehicle.volume_m3".to_owned();
         found.push(problem(field, InputProblemKind::NotPositive));
     }
     if let Some(start) = &vehicle.start {
@@ -298,7 +317,11 @@ pub fn validate_input(input: &PlanningInput) -> Vec<InputProblem> {
             let field = format!("{path}.cargo.pallets");
             found.push(problem(field, InputProblemKind::NotPositive));
         }
-        let known = ["weight_kg", "pallets"];
+        if bad_volume(order.cargo.volume_m3) {
+            let field = format!("{path}.cargo.volume_m3");
+            found.push(problem(field, InputProblemKind::NotPositive));
+        }
+        let known = ["weight_kg", "pallets", "volume_m3"];
         if order
             .cargo
             .estimated
@@ -375,6 +398,37 @@ mod tests {
         ] {
             assert!(fields.iter().any(|field| field == expected), "{expected}");
         }
+    }
+
+    #[test]
+    fn both_versions_are_accepted_and_volume_is_checked() {
+        let mut input = PlanningInput {
+            orders: vec![order("A1")],
+            ..PlanningInput::default()
+        };
+        input.vehicle.volume_m3 = Some(86.0);
+        input.orders[0].cargo.volume_m3 = Some(12.5);
+        input.orders[0].cargo.estimated = vec!["volume_m3".to_owned()];
+        assert_eq!(input.schema_version, "1.1");
+        assert_eq!(validate_input(&input), []);
+        input.schema_version = "1.0".to_owned();
+        assert_eq!(validate_input(&input), []);
+
+        input.schema_version = "2.0".to_owned();
+        input.vehicle.volume_m3 = Some(0.0);
+        input.orders[0].cargo.volume_m3 = Some(-1.0);
+        let fields: Vec<_> = validate_input(&input)
+            .into_iter()
+            .map(|problem| problem.field)
+            .collect();
+        assert_eq!(
+            fields,
+            [
+                "schema_version",
+                "vehicle.volume_m3",
+                "orders[0].cargo.volume_m3"
+            ]
+        );
     }
 
     #[test]

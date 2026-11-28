@@ -29,6 +29,7 @@ const FRAGMENTS: &[(&str, ProblemKind)] = &[
     ("Input file", ProblemKind::InputFile),
     ("planning input", ProblemKind::Storage),
     ("vehicle data", ProblemKind::Orders),
+    ("Vehicle type", ProblemKind::Orders),
     ("order selected", ProblemKind::Orders),
     ("orders for one calculation", ProblemKind::Orders),
     ("Order has no coordinates", ProblemKind::Orders),
