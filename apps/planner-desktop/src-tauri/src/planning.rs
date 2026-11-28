@@ -1,17 +1,19 @@
 //! Orders from the input file, route variants and the chosen route.
 
 use super::*;
+use cargo_dispatch_contracts::{PlannedDistance, PlannedDistanceSource, PlannedRouteEstimate};
 use cargo_dispatch_planner::AvailableCapacity;
 use cargo_dispatch_planner::proposals::{
     MAX_ORDERS, ProposalError, ProposalKind, ProposalOrder, ProposalSettings, StopAction,
-    propose_routes,
+    propose_routes, straight_line_km,
 };
 use cargo_dispatch_planner_ui_contracts::{
-    AppliedPlanView, ApplyPlanInput, INPUT_SCHEMA_VERSION, InputOrder, InputPlace, MapLinkError,
-    MapService, Money, OLDER_INPUT_SCHEMA_VERSION, PackageDraft, PlanKind, PlanProposalSetView,
-    PlanProposalView, PlanStopAction, PlanStopView, PlannerPackageCargoInput, PlanningInput,
-    PlanningStateView, ProposeInput, RoadState, SkipReason, SkippedOrder, VehicleType,
-    VehicleTypeName, parse_moment, validate_input,
+    AppliedPlanView, ApplyPlanInput, FigureDraft, FiguresDraft, INPUT_SCHEMA_VERSION, InputOrder,
+    InputPlace, InputVehicle, MapLinkError, MapService, Money, OLDER_INPUT_SCHEMA_VERSION,
+    PackageDraft, PlanKind, PlanProposalSetView, PlanProposalView, PlanStopAction, PlanStopView,
+    PlannerPackageCargoInput, PlanningInput, PlanningStateView, ProposeInput, RoadState,
+    SkipReason, SkippedOrder, VehicleType, VehicleTypeName, parse_distance_km, parse_drive_minutes,
+    parse_moment, validate_input,
 };
 
 const PLANNING_FILE: &str = "planner-input-v1.json";
@@ -95,6 +97,82 @@ fn date_conflict(places: &[&InputPlace]) -> bool {
     })
 }
 
+/// The places a trip passes: from where the vehicle stands, through the points
+/// of the route, and back when the vehicle has to return.
+pub(crate) fn trip_path(vehicle: &InputVehicle, mut points: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
+    let start = vehicle.start.as_ref().and_then(coordinates);
+    if let Some(start) = start.filter(|_| !points.is_empty()) {
+        points.insert(0, (start.lat(), start.lon()));
+        if vehicle.return_to_start {
+            points.push((start.lat(), start.lon()));
+        }
+    }
+    points
+}
+
+fn straight_distance(path: &[(f64, f64)]) -> Option<PlannedDistance> {
+    let places: Vec<GeoPoint> = path
+        .iter()
+        .filter_map(|&(lat, lon)| GeoPoint::new(lat, lon).ok())
+        .collect();
+    let km: f64 = places
+        .windows(2)
+        .map(|pair| straight_line_km(pair[0], pair[1]))
+        .sum();
+    // The conversion saturates and a route on Earth stays far below the limit.
+    let meters = (km * 1000.0).round() as u32;
+    (meters > 0).then_some(PlannedDistance {
+        meters,
+        source: PlannedDistanceSource::StraightLine,
+    })
+}
+
+/// What a package says about distance and time: the figures typed for this
+/// version of the route, otherwise the straight-line distance and no time.
+/// The flag reports a typed value that belongs to another version.
+pub(crate) fn route_estimate(
+    figures: &FiguresDraft,
+    route_id: &str,
+    revision: u64,
+    path: &[(f64, f64)],
+) -> Result<(Option<PlannedRouteEstimate>, bool), String> {
+    let mut left_out = false;
+    let mut current = |figure: &FigureDraft| {
+        if figure.is_outdated(route_id, revision) {
+            left_out = true;
+            return None;
+        }
+        let value = figure.value.trim();
+        (!value.is_empty()).then(|| value.to_owned())
+    };
+    let typed_distance = current(&figures.distance_km);
+    let typed_time = current(&figures.drive_time);
+    let distance = match typed_distance {
+        Some(text) => {
+            let km = parse_distance_km(&text)
+                .ok_or_else(|| "The typed kilometres cannot be read".to_owned())?;
+            Some(PlannedDistance {
+                // At most 100 000 km are accepted.
+                meters: ((km * 1000.0).round() as u32).max(1),
+                source: PlannedDistanceSource::Operator,
+            })
+        }
+        None => straight_distance(path),
+    };
+    let drive_minutes = typed_time
+        .map(|text| {
+            parse_drive_minutes(&text)
+                .ok_or_else(|| "The typed driving time cannot be read".to_owned())
+        })
+        .transpose()?;
+    let known = distance.is_some() || drive_minutes.is_some();
+    let estimate = known.then_some(PlannedRouteEstimate {
+        distance,
+        drive_minutes,
+    });
+    Ok((estimate, left_out))
+}
+
 fn revenue(orders: &[&InputOrder]) -> Vec<Money> {
     let mut sums: BTreeMap<&str, f64> = BTreeMap::new();
     for rate in orders.iter().filter_map(|order| order.rate.as_ref()) {
@@ -176,6 +254,11 @@ impl PlannerDesktopService {
             // Settings that are no longer accepted stay in the form for correction.
             let _ = self.configure_routing(routing);
         }
+    }
+
+    /// The vehicle of the planning document.
+    pub(crate) fn vehicle(&self) -> Result<InputVehicle, String> {
+        Ok(self.stored_planning()?.input.vehicle)
     }
 
     pub(crate) fn planning_view(&self) -> Result<PlanningStateView, String> {
@@ -470,21 +553,15 @@ impl PlannerDesktopService {
     /// The address of the working route in a map service: from where the vehicle
     /// stands, through the points, and back when the vehicle has to return.
     pub(crate) fn route_link(&self, service: MapService) -> Result<String, String> {
-        let vehicle = self.stored_planning()?.input.vehicle;
-        let mut points: Vec<(f64, f64)> = self
+        let vehicle = self.vehicle()?;
+        let points: Vec<(f64, f64)> = self
             .status()?
             .points
             .iter()
             .map(|point| (point.latitude, point.longitude))
             .collect();
-        let start = vehicle.start.as_ref().and_then(coordinates);
-        if let Some(start) = start.filter(|_| !points.is_empty()) {
-            points.insert(0, (start.lat(), start.lon()));
-            if vehicle.return_to_start {
-                points.push((start.lat(), start.lon()));
-            }
-        }
-        service.route_address(&points).map_err(|error| match error {
+        let path = trip_path(&vehicle, points);
+        service.route_address(&path).map_err(|error| match error {
             MapLinkError::TooFewPoints => {
                 "Opening a route needs at least two ordered points".to_owned()
             }
@@ -694,8 +771,7 @@ pub(crate) fn planner_planning_apply(
 mod tests {
     use super::*;
     use cargo_dispatch_planner_ui_contracts::{
-        CargoRowDraft, FigureDraft, FiguresDraft, InputCargo, PlanStopRef, PlannerTollPreference,
-        ProfileDraft,
+        CargoRowDraft, InputCargo, PlanStopRef, PlannerTollPreference, ProfileDraft,
     };
 
     fn order(id: &str, from: f64, to: f64) -> InputOrder {

@@ -282,6 +282,16 @@ pub struct DashboardPlanningCargo {
 pub struct DashboardPlanningBasis {
     pub vehicle_type: String,
     pub cargos: Vec<DashboardPlanningCargo>,
+    pub route_estimate: Option<DashboardRouteEstimate>,
+}
+
+/// Distance and driving time as the plan states them.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DashboardRouteEstimate {
+    pub distance_m: Option<u32>,
+    /// Entered by the operator; otherwise measured in straight lines.
+    pub distance_typed: bool,
+    pub drive_minutes: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

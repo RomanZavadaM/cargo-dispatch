@@ -508,7 +508,16 @@ impl PlannerDesktopService {
             return Err("At least one cargo is required for trip package export".to_owned());
         }
 
-        let (working_route_id, revision, route, planning_basis, last_export_version) = {
+        // Read before the route is locked; the two are never held together.
+        let vehicle = self.vehicle()?;
+        let (
+            working_route_id,
+            revision,
+            route,
+            planning_basis,
+            typed_left_out,
+            last_export_version,
+        ) = {
             let state = self
                 .inner
                 .lock()
@@ -554,9 +563,21 @@ impl PlannerDesktopService {
                     })
                 })
                 .collect::<Result<Vec<_>, String>>()?;
+            let points = route
+                .iter()
+                .filter_map(|point| point.navigation.as_ref())
+                .map(|target| (target.latitude(), target.longitude()))
+                .collect();
+            let (route_estimate, typed_left_out) = planning::route_estimate(
+                &input.figures,
+                &hex_id(state.route.working_route_id.as_bytes()),
+                state.route.current_revision,
+                &planning::trip_path(&vehicle, points),
+            )?;
             let planning_basis = TripPlanningBasis {
                 vehicle_type: input.vehicle_type.trim().to_owned(),
                 cargos,
+                route_estimate,
             };
             validate_trip_planning_basis(&planning_basis, &route)
                 .map_err(|error| format!("Invalid planning basis: {error:?}"))?;
@@ -565,6 +586,7 @@ impl PlannerDesktopService {
                 state.route.current_revision,
                 route,
                 planning_basis,
+                typed_left_out,
                 state.last_export_version,
             )
         };
@@ -690,6 +712,12 @@ impl PlannerDesktopService {
             return Err(problem);
         }
 
+        let estimate = draft
+            .planning_basis
+            .as_ref()
+            .and_then(|basis| basis.route_estimate);
+        let distance = estimate.and_then(|estimate| estimate.distance);
+
         Ok(PlannerPackageExportResult {
             path: path.to_string_lossy().into_owned(),
             trip_id: hex_id(trip_id.as_bytes()),
@@ -702,6 +730,12 @@ impl PlannerDesktopService {
                 .as_ref()
                 .map_or(0, |basis| basis.cargos.len()),
             geometry_included: draft.route_geometry.is_some(),
+            distance_m: distance.map(|distance| distance.meters),
+            distance_typed: distance.is_some_and(|distance| {
+                distance.source == cargo_dispatch_contracts::PlannedDistanceSource::Operator
+            }),
+            drive_minutes: estimate.and_then(|estimate| estimate.drive_minutes),
+            typed_left_out,
         })
     }
 }
@@ -1290,7 +1324,9 @@ mod tests {
         extract::State as AxumState,
         routing::{get, post},
     };
-    use cargo_dispatch_planner_ui_contracts::PlannerPackageCargoInput;
+    use cargo_dispatch_planner_ui_contracts::{
+        FigureDraft, FiguresDraft, PlannerPackageCargoInput,
+    };
     use serde_json::{Value, json};
     use std::{
         sync::{Arc, Mutex as StdMutex},
@@ -1735,6 +1771,7 @@ mod tests {
                 }],
                 routing_profile: None,
                 routing_preview: None,
+                figures: FiguresDraft::default(),
             })
             .expect("first export");
 
@@ -1744,6 +1781,89 @@ mod tests {
         assert!(second_name.ends_with("-v2.zip"));
 
         let _ = fs::remove_file(&package);
+        let _ = fs::remove_file(journal.with_extension("operator-id.bin"));
+        let _ = fs::remove_file(journal);
+    }
+
+    #[test]
+    fn the_package_carries_typed_figures_or_the_straight_distance() {
+        let journal = unique_journal("package-route-estimate");
+        let service = PlannerDesktopService::open(journal.clone()).expect("open Planner");
+        service
+            .add_point(point("Warehouse", 49.8393, 24.0296))
+            .expect("warehouse");
+        let route = service
+            .add_point(point("Customer", 49.8430, 24.0360))
+            .expect("customer");
+        let typed = |value: &str, revision: u64| FigureDraft {
+            value: value.to_owned(),
+            route_id: route.working_route_id.clone(),
+            revision,
+        };
+        let export = |name: &str, distance_km: FigureDraft, drive_time: FigureDraft| {
+            service.export_trip_package(PlannerPackageExportInput {
+                path: journal.with_extension(name).to_string_lossy().into_owned(),
+                vehicle_type: "truck".to_owned(),
+                cargos: vec![PlannerPackageCargoInput {
+                    row_id: 1,
+                    title: "Synthetic cargo".to_owned(),
+                    weight_kg: None,
+                    pallets: None,
+                    pickup_point_id: None,
+                    unload_point_id: None,
+                }],
+                routing_profile: None,
+                routing_preview: None,
+                figures: FiguresDraft {
+                    distance_km,
+                    drive_time,
+                },
+            })
+        };
+        let nothing = FigureDraft::default;
+
+        let plain = export("estimate-1.zip", nothing(), nothing()).expect("without figures");
+        let straight = plain.distance_m.expect("straight distance");
+        assert!((500..800).contains(&straight), "{straight}");
+        assert!(!plain.distance_typed && !plain.typed_left_out);
+        assert_eq!(plain.drive_minutes, None);
+
+        let now = route.revision;
+        let entered = export("estimate-2.zip", typed("640,5", now), typed("9:15", now))
+            .expect("typed figures");
+        assert_eq!(entered.distance_m, Some(640_500));
+        assert!(entered.distance_typed && !entered.typed_left_out);
+        assert_eq!(entered.drive_minutes, Some(555));
+        let folder = journal.with_extension("estimate-import");
+        // The second version follows the first into the same trip.
+        let first = Path::new(&plain.path);
+        cargo_dispatch_trip_files::TripFolder::import(&folder, first).expect("first version");
+        let second = Path::new(&entered.path);
+        let imported =
+            cargo_dispatch_trip_files::TripFolder::import(&folder, second).expect("import");
+        let carried = imported
+            .planning_basis()
+            .and_then(|basis| basis.route_estimate)
+            .expect("estimate in the package");
+        assert_eq!(carried.drive_minutes, Some(555));
+        drop(imported);
+
+        let old = now - 1;
+        let stale = export("estimate-3.zip", typed("640,5", old), typed("9:15", old))
+            .expect("outdated figures are left out");
+        assert_eq!(stale.distance_m, Some(straight));
+        assert!(!stale.distance_typed && stale.typed_left_out);
+        assert_eq!(stale.drive_minutes, None);
+
+        let problem =
+            export("estimate-4.zip", nothing(), typed("9:75", now)).expect_err("unreadable time");
+        assert!(problem.starts_with("The typed driving time"));
+        assert!(!journal.with_extension("estimate-4.zip").exists());
+
+        for name in ["estimate-1.zip", "estimate-2.zip", "estimate-3.zip"] {
+            let _ = fs::remove_file(journal.with_extension(name));
+        }
+        let _ = fs::remove_dir_all(folder);
         let _ = fs::remove_file(journal.with_extension("operator-id.bin"));
         let _ = fs::remove_file(journal);
     }
@@ -1787,6 +1907,7 @@ mod tests {
                 cargos: vec![first_cargo, stable_cargo.clone()],
                 routing_profile: None,
                 routing_preview: None,
+                figures: FiguresDraft::default(),
             })
             .expect("export v1");
 
@@ -1797,6 +1918,7 @@ mod tests {
                 cargos: vec![stable_cargo],
                 routing_profile: None,
                 routing_preview: None,
+                figures: FiguresDraft::default(),
             })
             .expect("export v2");
 
@@ -1842,6 +1964,7 @@ mod tests {
                 cargos: Vec::new(),
                 routing_profile: None,
                 routing_preview: None,
+                figures: FiguresDraft::default(),
             })
             .expect_err("cargo description is required");
 
@@ -1882,6 +2005,7 @@ mod tests {
                 cargos: vec![cargo.clone()],
                 routing_profile: None,
                 routing_preview: None,
+                figures: FiguresDraft::default(),
             })
             .expect("first export");
         assert_eq!(first.trip_version, 1);
@@ -1895,6 +2019,7 @@ mod tests {
                 cargos: vec![cargo],
                 routing_profile: None,
                 routing_preview: None,
+                figures: FiguresDraft::default(),
             })
             .expect("second export");
         assert_eq!(second.trip_id, first.trip_id);
@@ -1957,11 +2082,12 @@ mod tests {
                 }],
                 routing_profile: Some(profile.clone()),
                 routing_preview: Some(preview.clone()),
+                figures: FiguresDraft::default(),
             })
             .expect("export package");
 
         assert_eq!(result.schema_major, 1);
-        assert_eq!(result.schema_minor, 4);
+        assert_eq!(result.schema_minor, 5);
         assert_eq!(result.trip_version, 1);
         assert_eq!(result.point_count, 2);
         assert_eq!(result.cargo_count, 1);
@@ -2050,6 +2176,7 @@ mod tests {
                 }],
                 routing_profile: Some(profile),
                 routing_preview: Some(preview),
+                figures: FiguresDraft::default(),
             })
             .expect_err("stale preview must fail");
         assert!(error.contains("stale") || error.contains("does not match"));

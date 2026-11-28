@@ -411,6 +411,10 @@ try {
   await waitFor("the exported package", 'document.querySelector(".package-result")?.textContent.includes(".zip")');
   await idle();
   console.log("PASS the trip package for Control is exported");
+  await expect(`(() => {
+    const shown = document.querySelector(".package-result").textContent;
+    return shown.includes("640.5 km (вручну)") && shown.includes("Час у дорозі в пакеті: 9:15");
+  })()`, "the package result names the typed distance and time");
 
   const gone = await evaluate('ui.rows()[0].querySelectorAll("select")[0].value');
   const position = (await service("planner_status")).points.findIndex(point => point.point_id === gone);

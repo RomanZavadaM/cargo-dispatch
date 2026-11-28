@@ -4,7 +4,7 @@ use cargo_dispatch_domain::{CargoId, PointId, ReplanRequestId, TripId};
 use core::fmt;
 
 pub const TRIP_PACKAGE_SCHEMA_NAME: &str = "cargo-dispatch.trip-package";
-pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion::new(1, 4);
+pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion::new(1, 5);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SchemaVersion {
@@ -206,10 +206,35 @@ pub struct PlannedCargoBasis {
     pub unload_point_id: Option<PointId>,
 }
 
+/// Where a distance of the plan comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlannedDistanceSource {
+    /// Entered by the operator.
+    Operator,
+    /// Measured in straight lines between the places; the road is longer.
+    StraightLine,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlannedDistance {
+    pub meters: u32,
+    pub source: PlannedDistanceSource,
+}
+
+/// Distance and driving time of the plan. The time is only what the operator
+/// entered; it is never derived from a straight line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlannedRouteEstimate {
+    pub distance: Option<PlannedDistance>,
+    pub drive_minutes: Option<u32>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TripPlanningBasis {
     pub vehicle_type: String,
     pub cargos: Vec<PlannedCargoBasis>,
+    /// Packages before schema 1.5 have none.
+    pub route_estimate: Option<PlannedRouteEstimate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -220,6 +245,8 @@ pub enum PlanningBasisError {
     CargoPalletsMustBePositive(CargoId),
     UnknownPickupPoint(CargoId),
     UnknownUnloadPoint(CargoId),
+    /// An estimate without a value, or with a zero one.
+    InvalidRouteEstimate,
 }
 
 pub fn validate_trip_planning_basis(
@@ -228,6 +255,15 @@ pub fn validate_trip_planning_basis(
 ) -> Result<(), PlanningBasisError> {
     if basis.vehicle_type.trim().is_empty() {
         return Err(PlanningBasisError::VehicleTypeRequired);
+    }
+    if let Some(estimate) = basis.route_estimate
+        && (estimate
+            .distance
+            .is_some_and(|distance| distance.meters == 0)
+            || estimate.drive_minutes == Some(0)
+            || (estimate.distance.is_none() && estimate.drive_minutes.is_none()))
+    {
+        return Err(PlanningBasisError::InvalidRouteEstimate);
     }
     for cargo in &basis.cargos {
         if cargo.title.trim().is_empty() {
@@ -721,7 +757,7 @@ mod tests {
         .expect("valid trip header");
 
         assert_eq!(header.schema_name, TRIP_PACKAGE_SCHEMA_NAME);
-        assert_eq!(header.schema_version, SchemaVersion::new(1, 4));
+        assert_eq!(header.schema_version, SchemaVersion::new(1, 5));
         assert_eq!(header.trip_version.get(), 7);
         assert_eq!(header.base_version.map(TripVersion::get), Some(6));
     }

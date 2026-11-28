@@ -1,10 +1,11 @@
 #![forbid(unsafe_code)]
 
 use cargo_dispatch_contracts::{
-    CURRENT_SCHEMA_VERSION, PackageContentFingerprint, PlannedCargoBasis, ReplanRequest,
-    TRIP_PACKAGE_SCHEMA_NAME, TripNavigationTarget, TripPackageHeader, TripPlanningBasis,
-    TripPointKind, TripRoadGeometry, TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity,
-    TripVersion, validate_route_points, validate_trip_planning_basis, validate_trip_road_geometry,
+    CURRENT_SCHEMA_VERSION, PackageContentFingerprint, PlannedCargoBasis, PlannedDistance,
+    PlannedDistanceSource, PlannedRouteEstimate, ReplanRequest, TRIP_PACKAGE_SCHEMA_NAME,
+    TripNavigationTarget, TripPackageHeader, TripPlanningBasis, TripPointKind, TripRoadGeometry,
+    TripRoadGeometryPoint, TripRoutePoint, TripRoutingIdentity, TripVersion, validate_route_points,
+    validate_trip_planning_basis, validate_trip_road_geometry,
 };
 use cargo_dispatch_control::{
     ImportResult, InMemoryTripRegistry, ReplanBuildError, ReplanRequestDraft,
@@ -677,16 +678,73 @@ impl From<&PlannedCargoBasis> for PlannedCargoBasisFile {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum DistanceSourceFile {
+    Operator,
+    StraightLine,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DistanceFile {
+    meters: u32,
+    source: DistanceSourceFile,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RouteEstimateFile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    distance: Option<DistanceFile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    drive_minutes: Option<u32>,
+}
+
+impl From<RouteEstimateFile> for PlannedRouteEstimate {
+    fn from(file: RouteEstimateFile) -> Self {
+        Self {
+            distance: file.distance.map(|distance| PlannedDistance {
+                meters: distance.meters,
+                source: match distance.source {
+                    DistanceSourceFile::Operator => PlannedDistanceSource::Operator,
+                    DistanceSourceFile::StraightLine => PlannedDistanceSource::StraightLine,
+                },
+            }),
+            drive_minutes: file.drive_minutes,
+        }
+    }
+}
+
+impl From<PlannedRouteEstimate> for RouteEstimateFile {
+    fn from(estimate: PlannedRouteEstimate) -> Self {
+        Self {
+            distance: estimate.distance.map(|distance| DistanceFile {
+                meters: distance.meters,
+                source: match distance.source {
+                    PlannedDistanceSource::Operator => DistanceSourceFile::Operator,
+                    PlannedDistanceSource::StraightLine => DistanceSourceFile::StraightLine,
+                },
+            }),
+            drive_minutes: estimate.drive_minutes,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PlanningBasisFile {
     vehicle_type: String,
     cargos: Vec<PlannedCargoBasisFile>,
+    /// Left out when absent, so that older packages keep their fingerprint.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    route_estimate: Option<RouteEstimateFile>,
 }
 
 impl PlanningBasisFile {
     fn typed(&self) -> io::Result<TripPlanningBasis> {
         Ok(TripPlanningBasis {
+            route_estimate: self.route_estimate.map(PlannedRouteEstimate::from),
             vehicle_type: self.vehicle_type.clone(),
             cargos: self
                 .cargos
@@ -706,6 +764,7 @@ impl From<&TripPlanningBasis> for PlanningBasisFile {
                 .iter()
                 .map(PlannedCargoBasisFile::from)
                 .collect(),
+            route_estimate: basis.route_estimate.map(RouteEstimateFile::from),
         }
     }
 }
@@ -805,6 +864,9 @@ impl Manifest {
             return Err(invalid("planning basis requires trip package schema 1.4"));
         }
         let basis = file.typed()?;
+        if basis.route_estimate.is_some() && self.schema_version[1] < 5 {
+            return Err(invalid("route estimate requires trip package schema 1.5"));
+        }
         validate_trip_planning_basis(&basis, route_points).map_err(invalid)?;
         Ok(Some(basis))
     }
@@ -897,6 +959,13 @@ pub fn export_package(
     }
     if draft.planning_basis.is_some() && h.schema_version.minor < 4 {
         return Err(invalid("planning basis requires trip package schema 1.4"));
+    }
+    let estimated = draft
+        .planning_basis
+        .as_ref()
+        .is_some_and(|basis| basis.route_estimate.is_some());
+    if estimated && h.schema_version.minor < 5 {
+        return Err(invalid("route estimate requires trip package schema 1.5"));
     }
     if h.schema_version.minor >= 4 && draft.planning_basis.is_none() {
         return Err(invalid("trip package schema 1.4 requires planning basis"));
@@ -1705,6 +1774,7 @@ mod tests {
             created_by: OperatorId::from_bytes([trip_byte + 2; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
             planning_basis: Some(TripPlanningBasis {
+                route_estimate: None,
                 vehicle_type: "synthetic truck".to_owned(),
                 cargos: Vec::new(),
             }),
@@ -1912,6 +1982,7 @@ mod tests {
             created_by: OperatorId::from_bytes([94; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|point| point.point_id).collect(),
             planning_basis: Some(TripPlanningBasis {
+                route_estimate: None,
                 vehicle_type: "synthetic truck".to_owned(),
                 cargos: Vec::new(),
             }),
@@ -2124,6 +2195,7 @@ mod tests {
             }),
         }];
         let basis = TripPlanningBasis {
+            route_estimate: None,
             vehicle_type: "operator-entered truck class".to_owned(),
             cargos: vec![PlannedCargoBasis {
                 cargo_id,
@@ -2177,6 +2249,7 @@ mod tests {
             },
         ];
         let basis = TripPlanningBasis {
+            route_estimate: None,
             vehicle_type: "tractor + semi-trailer".to_owned(),
             cargos: vec![PlannedCargoBasis {
                 cargo_id: CargoId::from_bytes([49; 16]).unwrap(),
@@ -2199,6 +2272,66 @@ mod tests {
             route_geometry: None,
         };
 
+        export_package(&package, &draft, &route)?;
+        let imported = TripFolder::import(&folder, &package)?;
+        assert_eq!(imported.planning_basis(), Some(&basis));
+        drop(imported);
+        let reopened = TripFolder::open(&folder, trip)?;
+        assert_eq!(reopened.planning_basis(), Some(&basis));
+        Ok(())
+    }
+
+    #[test]
+    fn schema_1_5_carries_the_route_estimate_and_older_schemas_cannot() -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let package = tmp.path().join("estimate.zip");
+        let folder = tmp.path().join("estimate-trip");
+        let trip = TripId::from_bytes([61; 16]).unwrap();
+        let point = PointId::from_bytes([62; 16]).unwrap();
+        let route = vec![TripRoutePoint {
+            point_id: point,
+            sequence: 1,
+            kind: TripPointKind::Load,
+            title: "Pickup".to_owned(),
+            navigation: None,
+        }];
+        let estimate = PlannedRouteEstimate {
+            distance: Some(PlannedDistance {
+                meters: 640_500,
+                source: PlannedDistanceSource::Operator,
+            }),
+            drive_minutes: Some(555),
+        };
+        let basis = TripPlanningBasis {
+            vehicle_type: "box".to_owned(),
+            cargos: Vec::new(),
+            route_estimate: Some(estimate),
+        };
+        let mut draft = PlannerTripExportDraft {
+            header: TripPackageHeader::new(trip, TripVersion::new(1).unwrap(), None).unwrap(),
+            working_route_id: WorkingRouteId::from_bytes([63; 16]).unwrap(),
+            working_route_revision: 1,
+            created_at_unix_ms: 1,
+            created_by: OperatorId::from_bytes([64; 16]).unwrap(),
+            ordered_point_ids: vec![point],
+            planning_basis: Some(basis.clone()),
+            routing_profile: None,
+            route_geometry: None,
+        };
+
+        draft.header.schema_version = SchemaVersion::new(1, 4);
+        assert!(export_package(&package, &draft, &route).is_err());
+        draft.header.schema_version = SchemaVersion::new(1, 5);
+        draft.planning_basis = Some(TripPlanningBasis {
+            route_estimate: Some(PlannedRouteEstimate {
+                distance: None,
+                drive_minutes: None,
+            }),
+            ..basis.clone()
+        });
+        assert!(export_package(&package, &draft, &route).is_err());
+
+        draft.planning_basis = Some(basis.clone());
         export_package(&package, &draft, &route)?;
         let imported = TripFolder::import(&folder, &package)?;
         assert_eq!(imported.planning_basis(), Some(&basis));
@@ -2276,6 +2409,7 @@ mod tests {
             created_by: OperatorId::from_bytes([3; 16]).unwrap(),
             ordered_point_ids: route.iter().map(|p| p.point_id).collect(),
             planning_basis: Some(TripPlanningBasis {
+                route_estimate: None,
                 vehicle_type: "synthetic truck".to_owned(),
                 cargos: Vec::new(),
             }),
@@ -2343,6 +2477,7 @@ mod tests {
             1,
             operator,
             TripPlanningBasis {
+                route_estimate: None,
                 vehicle_type: "synthetic truck".to_owned(),
                 cargos: Vec::new(),
             },
@@ -2399,6 +2534,7 @@ mod tests {
             4,
             operator,
             TripPlanningBasis {
+                route_estimate: None,
                 vehicle_type: "synthetic truck".to_owned(),
                 cargos: Vec::new(),
             },

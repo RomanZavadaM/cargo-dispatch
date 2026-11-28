@@ -22,6 +22,7 @@ pub enum ProblemKind {
     InputFile,
     Orders,
     MapPoints,
+    Figures,
 }
 
 /// Fragments of service messages. The first match wins.
@@ -32,6 +33,7 @@ const FRAGMENTS: &[(&str, ProblemKind)] = &[
     ("vehicle data", ProblemKind::Orders),
     ("Vehicle type", ProblemKind::Orders),
     ("map service takes", ProblemKind::MapPoints),
+    ("The typed", ProblemKind::Figures),
     ("order selected", ProblemKind::Orders),
     ("orders for one calculation", ProblemKind::Orders),
     ("Order has no coordinates", ProblemKind::Orders),
@@ -236,6 +238,15 @@ fn texts(kind: ProblemKind) -> [&'static str; 7] {
             "지점이 너무 많습니다. Google 지도는 차량 위치를 포함해 최대 11곳입니다.",
             "地点が多すぎます。Google マップは車両位置を含めて11地点までです。",
             "地点过多：Google 地图最多 11 个（含车辆位置）。",
+        ],
+        ProblemKind::Figures => [
+            "Перевірте внесені кілометри та час (год:хв) або очистіть поле.",
+            "Prüfen Sie die eingegebenen Kilometer und die Zeit (Std:Min) oder leeren Sie das Feld.",
+            "Vérifiez les kilomètres et le temps saisis (h:min) ou videz le champ.",
+            "Revise los kilómetros y el tiempo introducidos (h:min) o vacíe el campo.",
+            "입력한 거리와 시간(시:분)을 확인하거나 칸을 비우세요.",
+            "入力した距離と時間（時:分）を確認するか、欄を空にしてください。",
+            "请检查输入的公里数和时间（时:分），或清空该栏。",
         ],
         ProblemKind::Internal => [
             "Внутрішня помилка Planner. Перезапустіть програму.",

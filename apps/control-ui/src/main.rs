@@ -2549,12 +2549,46 @@ fn ControlApp() -> impl IntoView {
                                     {planning_basis.map(|basis| {
                                         let vehicle_type = basis.vehicle_type;
                                         let cargos = basis.cargos;
+                                        let estimate = basis.route_estimate;
+                                        let distance = estimate.and_then(|plan| {
+                                            plan.distance_m.map(|meters| (meters, plan.distance_typed))
+                                        });
+                                        let drive_minutes = estimate.and_then(|plan| plan.drive_minutes);
                                         view! {
                                             <div>
                                                 <p>
                                                     <strong>{move || format!("{}: ", strings(locale.get()).planned_vehicle)}</strong>
                                                     {vehicle_type}
                                                 </p>
+                                                {distance.map(|(meters, typed)| {
+                                                    let km = f64::from(meters) / 1000.0;
+                                                    let value = if typed {
+                                                        format!("{km:.1} km")
+                                                    } else {
+                                                        format!("≈ {km:.0} km")
+                                                    };
+                                                    view! {
+                                                        <p class="planned-distance">
+                                                            <strong>{move || format!("{}: ", strings(locale.get()).planned_distance)}</strong>
+                                                            {value}
+                                                            " "
+                                                            {move || {
+                                                                let texts = strings(locale.get());
+                                                                if typed {
+                                                                    texts.planned_distance_typed
+                                                                } else {
+                                                                    texts.planned_distance_straight
+                                                                }
+                                                            }}
+                                                        </p>
+                                                    }
+                                                })}
+                                                {drive_minutes.map(|minutes| view! {
+                                                    <p class="planned-drive-time">
+                                                        <strong>{move || format!("{}: ", strings(locale.get()).planned_drive_time)}</strong>
+                                                        {format!("{}:{:02}", minutes / 60, minutes % 60)}
+                                                    </p>
+                                                })}
                                                 <h4>{move || strings(locale.get()).planned_cargos}</h4>
                                                 {cargos.is_empty().then(|| view! {
                                                     <p class="note">{move || strings(locale.get()).not_specified}</p>

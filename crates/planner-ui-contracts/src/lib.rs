@@ -180,6 +180,9 @@ pub struct PlannerPackageExportInput {
     pub cargos: Vec<PlannerPackageCargoInput>,
     pub routing_profile: Option<PlannerRoutingProfileInput>,
     pub routing_preview: Option<PlannerRoutingPreviewView>,
+    /// Kilometres and time as typed; the service decides what the package gets.
+    #[serde(default)]
+    pub figures: FiguresDraft,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -192,4 +195,11 @@ pub struct PlannerPackageExportResult {
     pub point_count: usize,
     pub cargo_count: usize,
     pub geometry_included: bool,
+    /// The distance written into the package.
+    pub distance_m: Option<u32>,
+    /// Typed by the operator; otherwise measured in straight lines.
+    pub distance_typed: bool,
+    pub drive_minutes: Option<u32>,
+    /// A typed value belongs to another version of the route and was not used.
+    pub typed_left_out: bool,
 }
